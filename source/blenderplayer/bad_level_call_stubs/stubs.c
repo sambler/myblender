@@ -356,7 +356,6 @@ void uiLayoutSetScaleX(struct uiLayout *layout, float scale) {STUB_ASSERT(0);}
 void uiLayoutSetScaleY(struct uiLayout *layout, float scale) {STUB_ASSERT(0);}
 void uiTemplateIconView(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname) {STUB_ASSERT(0);}
 void ED_base_object_free_and_unlink(struct Scene *scene, struct Base *base) {STUB_ASSERT(0);}
-void ED_mesh_calc_normals(struct Mesh *me) {STUB_ASSERT(0);}
 void ED_mesh_geometry_add(struct Mesh *mesh, struct ReportList *reports, int verts, int edges, int faces) {STUB_ASSERT(0);}
 void ED_mesh_material_add(struct Mesh *me, struct Material *ma) {STUB_ASSERT(0);}
 void ED_mesh_transform(struct Mesh *me, float *mat) {STUB_ASSERT(0);}
@@ -390,6 +389,12 @@ void ED_sequencer_update_view(struct bContext *C, int view) {STUB_ASSERT(0);}
 float ED_rollBoneToVector(struct EditBone *bone, float new_up_axis[3]) {STUB_ASSERT(0); return 0.0f;}
 void ED_space_image_get_size(struct SpaceImage *sima, int *width, int *height) {STUB_ASSERT(0);}
 int ED_space_image_check_show_maskedit(struct Scene *scene, struct SpaceImage *sima) {STUB_ASSERT(0); return 0;}
+
+bool ED_texture_context_check_world(struct bContext *C) {STUB_ASSERT(0); return false;}
+bool ED_texture_context_check_material(struct bContext *C) {STUB_ASSERT(0); return false;}
+bool ED_texture_context_check_lamp(struct bContext *C) {STUB_ASSERT(0); return false;}
+bool ED_texture_context_check_particles(struct bContext *C) {STUB_ASSERT(0); return false;}
+bool ED_texture_context_check_others(struct bContext *C) {STUB_ASSERT(0); return false;}
 
 void ED_nurb_set_spline_type(struct Nurb *nu, int type) {STUB_ASSERT(0);}
 
@@ -529,6 +534,9 @@ char *WM_operator_pystring(struct bContext *C, struct wmOperatorType *ot, struct
 struct wmKeyMapItem *WM_modalkeymap_add_item(struct wmKeyMap *km, int type, int val, int modifier, int keymodifier, int value) {STUB_ASSERT(0); return (struct wmKeyMapItem *)NULL;}
 struct wmKeyMapItem *WM_modalkeymap_add_item_str(struct wmKeyMap *km, int type, int val, int modifier, int keymodifier, const char *value) {STUB_ASSERT(0); return (struct wmKeyMapItem *)NULL;}
 struct wmKeyMap *WM_modalkeymap_add(struct wmKeyConfig *keyconf, char *idname, EnumPropertyItem *items) {STUB_ASSERT(0); return (struct wmKeyMap *) NULL;}
+struct uiPopupMenu *uiPupMenuBegin(struct bContext *C, const char *title, int icon) {STUB_ASSERT(0); return (struct uiPopupMenu *) NULL;}
+void uiPupMenuEnd(struct bContext *C, struct uiPopupMenu *head) {STUB_ASSERT(0);}
+struct uiLayout *uiPupMenuLayout(struct uiPopupMenu *head) {STUB_ASSERT(0); return (struct uiLayout *) NULL;}
 
 /* RNA COLLADA dependency */
 int collada_export(struct Scene *sce, const char *filepath) {STUB_ASSERT(0); return 0; }

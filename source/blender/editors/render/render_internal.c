@@ -40,12 +40,14 @@
 
 #include "BLF_translation.h"
 
+#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_userdef_types.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
+#include "BKE_depsgraph.h"
 #include "BKE_freestyle.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
@@ -53,6 +55,7 @@
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_multires.h"
+#include "BKE_paint.h"
 #include "BKE_report.h"
 #include "BKE_sequencer.h"
 #include "BKE_screen.h"
@@ -539,6 +542,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
 	const short is_write_still = RNA_boolean_get(op->ptr, "write_still");
 	struct Object *camera_override = v3d ? V3D_CAMERA_LOCAL(v3d) : NULL;
 	const char *name;
+	Object *active_object = CTX_data_active_object(C);
 	
 	/* only one render job at a time */
 	if (WM_jobs_test(CTX_wm_manager(C), scene, WM_JOB_TYPE_RENDER))
@@ -572,7 +576,10 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
 	WM_cursor_wait(1);
 
 	/* flush multires changes (for sculpt) */
-	multires_force_render_update(CTX_data_active_object(C));
+	multires_force_render_update(active_object);
+
+	/* flush changes from dynamic topology sculpt */
+	sculptsession_bm_to_me_for_render(active_object);
 
 	/* cleanup sequencer caches before starting user triggered render.
 	 * otherwise, invalidated cache entries can make their way into
@@ -712,6 +719,8 @@ typedef struct RenderPreview {
 	Main *bmain;
 	RenderEngine *engine;
 	
+	float viewmat[4][4];
+	
 	int keep_data;
 } RenderPreview;
 
@@ -751,12 +760,12 @@ static int render_view3d_disprect(Scene *scene, ARegion *ar, View3D *v3d, Region
 
 /* returns true if OK  */
 static bool render_view3d_get_rects(ARegion *ar, View3D *v3d, RegionView3D *rv3d, rctf *viewplane, RenderEngine *engine,
-                                    float *r_clipsta, float *r_clipend, bool *r_ortho)
+                                    float *r_clipsta, float *r_clipend, float *r_pixsize, bool *r_ortho)
 {
 	
 	if (ar->winx < 4 || ar->winy < 4) return false;
 	
-	*r_ortho = ED_view3d_viewplane_get(v3d, rv3d, ar->winx, ar->winy, viewplane, r_clipsta, r_clipend);
+	*r_ortho = ED_view3d_viewplane_get(v3d, rv3d, ar->winx, ar->winy, viewplane, r_clipsta, r_clipend, r_pixsize);
 	
 	engine->resolution_x = ar->winx;
 	engine->resolution_y = ar->winy;
@@ -810,19 +819,19 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 	RenderData rdata;
 	rctf viewplane;
 	rcti cliprct;
-	float clipsta, clipend;
+	float clipsta, clipend, pixsize;
 	bool orth, restore = 0;
 	char name[32];
 		
 	G.is_break = FALSE;
 	
-	if (false == render_view3d_get_rects(rp->ar, rp->v3d, rp->rv3d, &viewplane, rp->engine, &clipsta, &clipend, &orth))
+	if (false == render_view3d_get_rects(rp->ar, rp->v3d, rp->rv3d, &viewplane, rp->engine, &clipsta, &clipend, &pixsize, &orth))
 		return;
 	
 	rp->stop = stop;
 	rp->do_update = do_update;
 
-//	printf("Enter previewrender\n");
+	// printf("Enter previewrender\n");
 	
 	/* ok, are we rendering all over? */
 	sprintf(name, "View3dPreview %p", (void *)rp->ar);
@@ -847,7 +856,7 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 		rdata = rp->scene->r;
 		rdata.mode &= ~(R_OSA | R_MBLUR | R_BORDER | R_PANORAMA);
 		rdata.scemode &= ~(R_DOSEQ | R_DOCOMP | R_FREE_IMAGE);
-		rdata.scemode |= R_PREVIEWBUTS;
+		rdata.scemode |= R_VIEWPORT_PREVIEW;
 		
 		/* we do use layers, but only active */
 		rdata.scemode |= R_SINGLE_LAYER;
@@ -866,6 +875,8 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 	else
 		RE_SetWindow(re, &viewplane, clipsta, clipend);
 
+	RE_SetPixelSize(re, pixsize);
+	
 	/* database free can crash on a empty Render... */
 	if (rp->keep_data == 0 && rstats->convertdone)
 		RE_Database_Free(re);
@@ -878,14 +889,14 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 			lay |= rp->v3d->lay;
 		else lay = rp->v3d->lay;
 		
-		RE_SetView(re, rp->rv3d->viewmat);
+		RE_SetView(re, rp->viewmat);
 		
 		RE_Database_FromScene(re, rp->bmain, rp->scene, lay, 0);		// 0= dont use camera view
-//		printf("dbase update\n");
+		// printf("dbase update\n");
 	}
 	else {
-//		printf("dbase rotate\n");
-		RE_DataBase_IncrementalView(re, rp->rv3d->viewmat, 0);
+		// printf("dbase rotate\n");
+		RE_DataBase_IncrementalView(re, rp->viewmat, 0);
 		restore = 1;
 	}
 
@@ -894,15 +905,13 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 	/* OK, can we enter render code? */
 	if (rstats->convertdone) {
 		RE_TileProcessor(re);
-//		printf("tile processor\n");
 		
+		/* always rotate back */
 		if (restore)
-			RE_DataBase_IncrementalView(re, rp->rv3d->viewmat, 1);
-		
+			RE_DataBase_IncrementalView(re, rp->viewmat, 1);
+
 		rp->engine->flag &= ~RE_ENGINE_DO_UPDATE;
 	}
-
-//	printf("done\n\n");
 }
 
 static void render_view3d_free(void *customdata)
@@ -920,7 +929,6 @@ static void render_view3d_do(RenderEngine *engine, const bContext *C, int keep_d
 	
 	if (CTX_wm_window(C) == NULL) {
 		engine->flag |= RE_ENGINE_DO_UPDATE;
-		
 		return;
 	}
 
@@ -937,6 +945,7 @@ static void render_view3d_do(RenderEngine *engine, const bContext *C, int keep_d
 	rp->rv3d = CTX_wm_region_view3d(C);
 	rp->bmain = CTX_data_main(C);
 	rp->keep_data = keep_data;
+	copy_m4_m4(rp->viewmat, rp->rv3d->viewmat);
 	
 	/* dont alloc in threads */
 	if (engine->text == NULL)
@@ -955,7 +964,7 @@ static void render_view3d_do(RenderEngine *engine, const bContext *C, int keep_d
 
 /* callback for render engine , on changes */
 void render_view3d(RenderEngine *engine, const bContext *C)
-{
+{	
 	render_view3d_do(engine, C, 0);
 }
 
@@ -979,23 +988,23 @@ static int render_view3d_changed(RenderEngine *engine, const bContext *C)
 		float clipsta, clipend;
 		bool orth;
 
-		if (engine->update_flag == RE_ENGINE_UPDATE_MA)
+		if (engine->update_flag & RE_ENGINE_UPDATE_MA)
 			update |= PR_UPDATE_MATERIAL;
+		
+		if (engine->update_flag & RE_ENGINE_UPDATE_OTHER)
+			update |= PR_UPDATE_MATERIAL;
+		
 		engine->update_flag = 0;
 		
 		if (engine->resolution_x != ar->winx || engine->resolution_y != ar->winy)
 			update |= PR_UPDATE_RENDERSIZE;
 
-		/* view updating fails on raytrace */
 		RE_GetView(re, mat);
 		if (compare_m4m4(mat, rv3d->viewmat, 0.00001f) == 0) {
-			if ((scene->r.mode & R_RAYTRACE) == 0)
-				update |= PR_UPDATE_VIEW;
-			else
-				engine->flag |= RE_ENGINE_DO_UPDATE;
+			update |= PR_UPDATE_VIEW;
 		}
 		
-		render_view3d_get_rects(ar, v3d, rv3d, &viewplane, engine, &clipsta, &clipend, &orth);
+		render_view3d_get_rects(ar, v3d, rv3d, &viewplane, engine, &clipsta, &clipend, NULL, &orth);
 		RE_GetViewPlane(re, &viewplane1, &disprect1);
 		
 		if (BLI_rctf_compare(&viewplane, &viewplane1, 0.00001f) == 0)
@@ -1007,8 +1016,8 @@ static int render_view3d_changed(RenderEngine *engine, const bContext *C)
 		
 		if (update)
 			engine->flag |= RE_ENGINE_DO_UPDATE;
-//		if (update)
-//			printf("changed ma %d res %d view %d\n", update & PR_UPDATE_MATERIAL, update & PR_UPDATE_RENDERSIZE, update & PR_UPDATE_VIEW);
+		//if (update)
+		//	printf("changed ma %d res %d view %d\n", update & PR_UPDATE_MATERIAL, update & PR_UPDATE_RENDERSIZE, update & PR_UPDATE_VIEW);
 	}
 	
 	return update;

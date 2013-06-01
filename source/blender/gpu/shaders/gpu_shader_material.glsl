@@ -279,6 +279,14 @@ void math_greater_than(float val1, float val2, out float outval)
 		outval = 0.0;
 }
 
+void math_modulo(float val1, float val2, out float outval)
+{
+	if (val2 == 0.0)
+		outval = 0.0;
+	else
+		outval = mod(val1, val2);
+}
+
 void squeeze(float val, float width, float center, out float outval)
 {
 	outval = 1.0/(1.0 + pow(2.71828183, -((val-center)*width)));
@@ -2055,6 +2063,11 @@ void node_bsdf_glass(vec4 color, float roughness, float ior, vec3 N, out vec4 re
 	node_bsdf_diffuse(color, 0.0, N, result);
 }
 
+void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, out vec4 result)
+{
+	node_bsdf_diffuse(color, 0.0, N, result);
+}
+
 void node_bsdf_translucent(vec4 color, vec3 N, out vec4 result)
 {
 	node_bsdf_diffuse(color, 0.0, N, result);
@@ -2258,6 +2271,11 @@ void node_object_info(out vec3 location, out float object_index, out float mater
 	object_index = 0.0;
 	material_index = 0.0;
 	random = 0.0;
+}
+
+void node_normal_map(float strength, vec4 color, vec3 N, out vec3 result)
+{
+	result = N;
 }
 
 void node_bump(float strength, float dist, float height, vec3 N, out vec3 result)

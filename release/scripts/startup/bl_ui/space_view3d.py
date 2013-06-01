@@ -1437,14 +1437,32 @@ class VIEW3D_MT_particle_specials(Menu):
         particle_edit = context.tool_settings.particle_edit
 
         layout.operator("particle.rekey")
+        layout.operator("particle.delete")
+        layout.operator("particle.remove_doubles")
 
-        layout.separator()
         if particle_edit.select_mode == 'POINT':
             layout.operator("particle.subdivide")
+
+        layout.operator("particle.weight_set")
+        layout.separator()
+
+        layout.operator("particle.mirror")
+
+        if particle_edit.select_mode == 'POINT':
+            layout.separator()
             layout.operator("particle.select_roots")
             layout.operator("particle.select_tips")
 
-        layout.operator("particle.remove_doubles")
+            layout.separator()
+
+            layout.operator("particle.select_more")
+            layout.operator("particle.select_less")
+
+            layout.separator()
+
+            layout.operator("particle.select_all").action = 'TOGGLE'
+            layout.operator("particle.select_linked")
+            layout.operator("particle.select_all", text="Inverse").action = 'INVERT'
 
 
 class VIEW3D_MT_particle_showhide(ShowHideMenu, Menu):
@@ -1746,9 +1764,8 @@ class VIEW3D_MT_edit_mesh(Menu):
 
         layout.separator()
         layout.operator("mesh.symmetrize")
-        layout.operator("view3d.edit_mesh_extrude_move_normal", text="Extrude Region")
-        layout.operator("view3d.edit_mesh_extrude_individual_move", text="Extrude Individual")
         layout.operator("mesh.duplicate_move")
+        layout.menu("VIEW3D_MT_edit_mesh_extrude")
         layout.menu("VIEW3D_MT_edit_mesh_delete")
 
         layout.separator()
@@ -1966,6 +1983,7 @@ class VIEW3D_MT_edit_mesh_faces(Menu):
         layout.operator("mesh.flip_normals")
         layout.operator("mesh.edge_face_add")
         layout.operator("mesh.fill")
+        layout.operator("mesh.fill_grid")
         layout.operator("mesh.beautify_fill")
         layout.operator("mesh.inset")
         layout.operator("mesh.bevel").vertex_only = False

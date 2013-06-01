@@ -885,13 +885,15 @@ class CyclesTexture_PT_context(CyclesButtonsPanel, Panel):
         use_pin_id = space.use_pin_id
         user = context.texture_user
 
-        if not use_pin_id or not isinstance(pin_id, bpy.types.Texture):
+        space.use_limited_texture_context = False
+
+        if not (use_pin_id and isinstance(pin_id, bpy.types.Texture)):
             pin_id = None
 
         if not pin_id:
             layout.template_texture_user()
 
-        if user:
+        if user or pin_id:
             layout.separator()
 
             split = layout.split(percentage=0.65)
@@ -1160,7 +1162,7 @@ def draw_device(self, context):
         device_type = context.user_preferences.system.compute_device_type
         if device_type == 'CUDA':
             layout.prop(cscene, "device")
-        elif device_type == 'OPENCL' and cscene.feature_set == 'EXPERIMENTAL':
+        elif device_type == 'OPENCL':
             layout.prop(cscene, "device")
 
         if engine.with_osl() and (cscene.device == 'CPU' or device_type == 'NONE'):

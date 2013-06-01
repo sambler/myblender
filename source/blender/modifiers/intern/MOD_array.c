@@ -418,7 +418,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 	for (j = 0; j < count - 1; j++) {
 		float tmp_mat[4][4];
-		mult_m4_m4m4(tmp_mat, offset, final_offset);
+		mul_m4_m4m4(tmp_mat, offset, final_offset);
 		copy_m4_m4(final_offset, tmp_mat);
 	}
 
@@ -539,7 +539,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 		if (end_cap) {
 			float endoffset[4][4];
-			mult_m4_m4m4(endoffset, offset, final_offset);
+			mul_m4_m4m4(endoffset, offset, final_offset);
 			bm_merge_dm_transform(bm, end_cap, endoffset, amd,
 			                      &dupe_op, (count == 1) ? dupe_op.slots_in : dupe_op.slots_out,
 			                      (count == 1) ? "geom" : "geom.out", &weld_op);
@@ -565,11 +565,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 	if ((amd->offset_type & MOD_ARR_OFF_OBJ) && (amd->offset_ob)) {
 		/* Update normals in case offset object has rotation. */
-		
-		/* BMESH_TODO: check if normal recalc needed under any other
-		 * conditions? */
-
-		CDDM_calc_normals(result);
+		result->dirty |= DM_DIRTY_NORMALS;
 	}
 
 	BM_mesh_free(bm);
@@ -590,9 +586,6 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	ArrayModifierData *amd = (ArrayModifierData *) md;
 
 	result = arrayModifier_doArray(amd, md->scene, ob, dm, 0);
-
-	//if (result != dm)
-	//	CDDM_calc_normals_mapping(result);
 
 	return result;
 }

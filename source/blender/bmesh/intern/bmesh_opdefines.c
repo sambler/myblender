@@ -523,9 +523,33 @@ static BMOpDefine bmo_bridge_loops_def = {
 	},
 	/* slots_out */
 	{{"faces.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_FACE}}, /* new faces */
+	 {"edges.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_EDGE}}, /* new edges */
 	 {{'\0'}},
 	},
 	bmo_bridge_loops_exec,
+	BMO_OPTYPE_FLAG_NORMALS_CALC | BMO_OPTYPE_FLAG_SELECT_FLUSH,
+};
+
+/*
+ * Grid Fill.
+ *
+ * Create faces defined by 2 disconnected edge loops (which share edges).
+ */
+static BMOpDefine bmo_grid_fill_def = {
+	"grid_fill",
+	/* slots_in */
+	{{"edges", BMO_OP_SLOT_ELEMENT_BUF, {BM_EDGE}}, /* input edges */
+	/* restricts edges to groups.  maps edges to integer */
+	 {"mat_nr",         BMO_OP_SLOT_INT},      /* material to use */
+	 {"use_smooth",     BMO_OP_SLOT_BOOL},     /* smooth state to use */
+	 {{'\0'}},
+	},
+	/* slots_out */
+	/* maps new faces to the group numbers they came from */
+	{{"faces.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_FACE}},     /* new faces */
+	 {{'\0'}},
+	},
+	bmo_grid_fill_exec,
 	BMO_OPTYPE_FLAG_NORMALS_CALC | BMO_OPTYPE_FLAG_SELECT_FLUSH,
 };
 
@@ -995,6 +1019,28 @@ static BMOpDefine bmo_subdivide_edges_def = {
 	 {{'\0'}},
 	},
 	bmo_subdivide_edges_exec,
+	BMO_OPTYPE_FLAG_UNTAN_MULTIRES | BMO_OPTYPE_FLAG_NORMALS_CALC | BMO_OPTYPE_FLAG_SELECT_FLUSH,
+};
+
+/*
+ * Subdivide Edge-Ring.
+ *
+ * Take an edge-ring, and supdivide with interpolation options.
+ */
+static BMOpDefine bmo_subdivide_edgering_def = {
+	"subdivide_edgering",
+	/* slots_in */
+	{{"edges", BMO_OP_SLOT_ELEMENT_BUF, {BM_EDGE}}, /* input vertices */
+	 {"interp_mode", BMO_OP_SLOT_INT},
+	 {"smooth", BMO_OP_SLOT_FLT},
+	 {"cuts", BMO_OP_SLOT_INT},
+	 {"profile_shape", BMO_OP_SLOT_INT},
+	 {"profile_shape_factor", BMO_OP_SLOT_FLT},
+	 {{'\0'}},
+	},
+	{{"faces.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_FACE}}, /* output faces */
+	 {{'\0'}}},  /* no output */
+	bmo_subdivide_edgering_exec,
 	BMO_OPTYPE_FLAG_UNTAN_MULTIRES | BMO_OPTYPE_FLAG_NORMALS_CALC | BMO_OPTYPE_FLAG_SELECT_FLUSH,
 };
 
@@ -1701,6 +1747,7 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_extrude_face_region_def,
 	&bmo_extrude_vert_indiv_def,
 	&bmo_find_doubles_def,
+	&bmo_grid_fill_def,
 	&bmo_inset_individual_def,
 	&bmo_inset_region_def,
 	&bmo_join_triangles_def,
@@ -1732,6 +1779,7 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_split_def,
 	&bmo_split_edges_def,
 	&bmo_subdivide_edges_def,
+	&bmo_subdivide_edgering_def,
 	&bmo_symmetrize_def,
 	&bmo_transform_def,
 	&bmo_translate_def,

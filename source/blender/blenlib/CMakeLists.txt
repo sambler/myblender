@@ -29,7 +29,6 @@ set(INC
 	.
 	# ../blenkernel  # dont add this back!
 	../makesdna
-	../makesrna
 	../../../intern/ghost
 	../../../intern/guardedalloc
 	../../../extern/wcwidth
@@ -150,6 +149,7 @@ set(SRC
 	BLI_string.h
 	BLI_string_cursor_utf8.h
 	BLI_string_utf8.h
+	BLI_sys_types.h
 	BLI_threads.h
 	BLI_utildefines.h
 	BLI_uvproject.h
@@ -165,10 +165,6 @@ if(WITH_BINRELOC)
 		${BINRELOC_INCLUDE_DIRS}
 	)
 	add_definitions(-DWITH_BINRELOC)
-endif()
-
-if(WITH_OPENMP)
-	add_definitions(-DPARALLEL=1)
 endif()
 
 if(WIN32)

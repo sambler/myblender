@@ -325,28 +325,28 @@ static int print_help(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	printf("Other Options:\n");
 	BLI_argsPrintOtherDoc(ba);
 
-	printf ("Argument Parsing:\n");
-	printf ("\targuments must be separated by white space. eg\n");
-	printf ("\t\t\"blender -ba test.blend\"\n");
-	printf ("\t...will ignore the 'a'\n");
-	printf ("\t\t\"blender -b test.blend -f8\"\n");
-	printf ("\t...will ignore 8 because there is no space between the -f and the frame value\n\n");
+	printf("Argument Parsing:\n");
+	printf("\targuments must be separated by white space. eg\n");
+	printf("\t\t\"blender -ba test.blend\"\n");
+	printf("\t...will ignore the 'a'\n");
+	printf("\t\t\"blender -b test.blend -f8\"\n");
+	printf("\t...will ignore 8 because there is no space between the -f and the frame value\n\n");
 
-	printf ("Argument Order:\n");
-	printf ("Arguments are executed in the order they are given. eg\n");
-	printf ("\t\t\"blender --background test.blend --render-frame 1 --render-output /tmp\"\n");
-	printf ("\t...will not render to /tmp because '--render-frame 1' renders before the output path is set\n");
-	printf ("\t\t\"blender --background --render-output /tmp test.blend --render-frame 1\"\n");
-	printf ("\t...will not render to /tmp because loading the blend file overwrites the render output that was set\n");
-	printf ("\t\t\"blender --background test.blend --render-output /tmp --render-frame 1\" works as expected.\n\n");
+	printf("Argument Order:\n");
+	printf("\targuments are executed in the order they are given. eg\n");
+	printf("\t\t\"blender --background test.blend --render-frame 1 --render-output /tmp\"\n");
+	printf("\t...will not render to /tmp because '--render-frame 1' renders before the output path is set\n");
+	printf("\t\t\"blender --background --render-output /tmp test.blend --render-frame 1\"\n");
+	printf("\t...will not render to /tmp because loading the blend file overwrites the render output that was set\n");
+	printf("\t\t\"blender --background test.blend --render-output /tmp --render-frame 1\" works as expected.\n\n");
 
-	printf ("\nEnvironment Variables:\n");
-	printf ("  $BLENDER_USER_CONFIG      Directory for user configuration files.\n");
-	printf ("  $BLENDER_USER_SCRIPTS     Directory for user scripts.\n");
-	printf ("  $BLENDER_SYSTEM_SCRIPTS   Directory for system wide scripts.\n");
-	printf ("  $BLENDER_USER_DATAFILES   Directory for user data files (icons, translations, ..).\n");
-	printf ("  $BLENDER_SYSTEM_DATAFILES Directory for system wide data files.\n");
-	printf ("  $BLENDER_SYSTEM_PYTHON    Directory for system python libraries.\n");
+	printf("\nEnvironment Variables:\n");
+	printf("  $BLENDER_USER_CONFIG      Directory for user configuration files.\n");
+	printf("  $BLENDER_USER_SCRIPTS     Directory for user scripts.\n");
+	printf("  $BLENDER_SYSTEM_SCRIPTS   Directory for system wide scripts.\n");
+	printf("  $BLENDER_USER_DATAFILES   Directory for user data files (icons, translations, ..).\n");
+	printf("  $BLENDER_SYSTEM_DATAFILES Directory for system wide data files.\n");
+	printf("  $BLENDER_SYSTEM_PYTHON    Directory for system python libraries.\n");
 #ifdef WIN32
 	printf("  $TEMP                     Store temporary files here.\n");
 #else
@@ -634,6 +634,11 @@ static int playback_mode(int argc, const char **argv, void *UNUSED(data))
 {
 	/* not if -b was given first */
 	if (G.background == 0) {
+#ifdef WITH_FFMPEG
+		/* Setup FFmpeg with current debug flags. */
+		IMB_ffmpeg_init();
+#endif
+
 		WM_main_playanim(argc, argv); /* not the same argc and argv as before */
 		exit(0); /* 2.4x didn't do this */
 	}

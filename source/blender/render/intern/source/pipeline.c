@@ -428,6 +428,11 @@ void RE_FreeAllRender(void)
 	while (RenderGlobal.renderlist.first) {
 		RE_FreeRender(RenderGlobal.renderlist.first);
 	}
+
+#ifdef WITH_FREESTYLE
+	/* finalize Freestyle */
+	FRS_exit();
+#endif
 }
 
 /* on file load, free all re */
@@ -467,7 +472,7 @@ void RE_FreePersistentData(void)
 /* disprect is optional, if NULL it assumes full window render */
 void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *srl, int winx, int winy, rcti *disprect)
 {
-	bool had_freestyle = (re->r.mode & R_EDGE_FRS);
+	bool had_freestyle = (re->r.mode & R_EDGE_FRS) != 0;
 
 	re->ok = TRUE;   /* maybe flag */
 	
@@ -575,7 +580,7 @@ void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *
 	/* if preview render, we try to keep old result */
 	BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
 
-	if (re->r.scemode & R_PREVIEWBUTS) {
+	if (re->r.scemode & (R_BUTS_PREVIEW|R_VIEWPORT_PREVIEW)) {
 		if (had_freestyle || (re->r.mode & R_EDGE_FRS)) {
 			/* freestyle manipulates render layers so always have to free */
 			render_result_free(re->result);
@@ -724,7 +729,7 @@ static int render_display_draw_enabled(Render *re)
 {
 	/* don't show preprocess for previewrender sss */
 	if (re->sss_points)
-		return !(re->r.scemode & R_PREVIEWBUTS);
+		return !(re->r.scemode & (R_BUTS_PREVIEW|R_VIEWPORT_PREVIEW));
 	else
 		return 1;
 }
@@ -761,7 +766,7 @@ static void *do_part_thread(void *pa_v)
 		}
 		else if (render_display_draw_enabled(&R)) {
 			/* on break, don't merge in result for preview renders, looks nicer */
-			if (R.test_break(R.tbh) && (R.r.scemode & R_PREVIEWBUTS)) {
+			if (R.test_break(R.tbh) && (R.r.scemode & (R_BUTS_PREVIEW|R_VIEWPORT_PREVIEW))) {
 				/* pass */
 			}
 			else {
@@ -942,7 +947,7 @@ static void threaded_tile_processor(Render *re)
 	BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
 
 	/* first step; free the entire render result, make new, and/or prepare exr buffer saving */
-	if (re->result == NULL || !(re->r.scemode & R_PREVIEWBUTS)) {
+	if (re->result == NULL || !(re->r.scemode & (R_BUTS_PREVIEW|R_VIEWPORT_PREVIEW))) {
 		render_result_free(re->result);
 
 		if (re->sss_points && render_display_draw_enabled(re))
@@ -1635,6 +1640,15 @@ static void add_freestyle(Render *re)
 
 	actsrl = BLI_findlink(&re->r.layers, re->r.actlay);
 
+	/* We use the same window manager for freestyle bmain as
+	 * real bmain uses. This is needed because freestyle's
+	 * bmain could be used to tag scenes for update, which
+	 * implies call of ED_render_scene_update in some cases
+	 * and that function requires proper windoew manager
+	 * to present (sergey)
+	 */
+	re->freestyle_bmain.wm = re->main->wm;
+
 	FRS_init_stroke_rendering(re);
 
 	for (srl= (SceneRenderLayer *)re->r.layers.first; srl; srl= srl->next) {
@@ -2254,6 +2268,13 @@ int RE_is_rendering_allowed(Scene *scene, Object *camera_override, ReportList *r
 			BKE_report(reports, RPT_ERROR, "No ortho render possible for panorama");
 			return 0;
 		}
+
+#ifdef WITH_FREESTYLE
+		if ((scene->r.mode & R_EDGE_FRS) && (!BKE_scene_use_new_shading_nodes(scene))) {
+			BKE_report(reports, RPT_ERROR, "Panoramic camera not supported in Freestyle");
+			return 0;
+		}
+#endif
 	}
 
 	/* layer flag tests */

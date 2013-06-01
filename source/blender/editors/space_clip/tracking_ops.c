@@ -72,6 +72,8 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 
+#include "BLF_translation.h"
+
 #include "PIL_time.h"
 
 #include "UI_view2d.h"
@@ -80,7 +82,7 @@
 
 /********************** add marker operator *********************/
 
-static void add_marker(const bContext *C, float x, float y)
+static bool add_marker(const bContext *C, float x, float y)
 {
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip_get_clip(sc);
@@ -92,11 +94,17 @@ static void add_marker(const bContext *C, float x, float y)
 
 	ED_space_clip_get_size(sc, &width, &height);
 
+	if (width == 0 || height == 0) {
+		return false;
+	}
+
 	track = BKE_tracking_track_add(tracking, tracksbase, x, y, framenr, width, height);
 
 	BKE_tracking_track_select(tracksbase, track, TRACK_AREA_ALL, 0);
 
 	clip->tracking.act_track = track;
+
+	return true;
 }
 
 static int add_marker_exec(bContext *C, wmOperator *op)
@@ -104,16 +112,12 @@ static int add_marker_exec(bContext *C, wmOperator *op)
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip_get_clip(sc);
 	float pos[2];
-	int width, height;
-
-	ED_space_clip_get_size(sc, &width, &height);
-
-	if (!width || !height)
-		return OPERATOR_CANCELLED;
 
 	RNA_float_get_array(op->ptr, "location", pos);
 
-	add_marker(C, pos[0], pos[1]);
+	if (!add_marker(C, pos[0], pos[1])) {
+		return OPERATOR_CANCELLED;
+	}
 
 	/* reset offset from locked position, so frame jumping wouldn't be so confusing */
 	sc->xlockof = 0;
@@ -129,11 +133,12 @@ static int add_marker_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	ARegion *ar = CTX_wm_region(C);
 
-	float co[2];
-
-	ED_clip_mouse_pos(sc, ar, event->mval, co);
-
-	RNA_float_set_array(op->ptr, "location", co);
+	if (!RNA_struct_property_is_set(op->ptr, "location")) {
+		/* If location is not set, use mouse positio nas default. */
+		float co[2];
+		ED_clip_mouse_pos(sc, ar, event->mval, co);
+		RNA_float_set_array(op->ptr, "location", co);
+	}
 
 	return add_marker_exec(C, op);
 }
@@ -156,6 +161,69 @@ void CLIP_OT_add_marker(wmOperatorType *ot)
 	/* properties */
 	RNA_def_float_vector(ot->srna, "location", 2, NULL, -FLT_MAX, FLT_MAX,
 	                     "Location", "Location of marker on frame", -1.0f, 1.0f);
+}
+
+/********************** add marker operator *********************/
+
+static int add_marker_at_click_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	ED_area_headerprint(CTX_wm_area(C), IFACE_("Use LMB click to define location where place the marker"));
+
+	/* add modal handler for ESC */
+	WM_event_add_modal_handler(C, op);
+
+	return OPERATOR_RUNNING_MODAL;
+}
+
+static int add_marker_at_click_modal(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
+{
+	SpaceClip *sc = CTX_wm_space_clip(C);
+	MovieClip *clip = ED_space_clip_get_clip(sc);
+	ARegion *ar = CTX_wm_region(C);
+	float pos[2];
+
+	switch (event->type) {
+		case MOUSEMOVE:
+			return OPERATOR_RUNNING_MODAL;
+			break;
+
+		case LEFTMOUSE:
+			ED_area_headerprint(CTX_wm_area(C), NULL);
+
+			ED_clip_point_stable_pos(sc, ar,
+			                         event->x - ar->winrct.xmin,
+			                         event->y - ar->winrct.ymin,
+			                         &pos[0], &pos[1]);
+
+			if (!add_marker(C, pos[0], pos[1]))
+				return OPERATOR_CANCELLED;
+
+			WM_event_add_notifier(C, NC_MOVIECLIP | NA_EDITED, clip);
+			return OPERATOR_FINISHED;
+			break;
+
+		case ESCKEY:
+			ED_area_headerprint(CTX_wm_area(C), NULL);
+			return OPERATOR_CANCELLED;
+	}
+
+	return OPERATOR_PASS_THROUGH;
+}
+
+void CLIP_OT_add_marker_at_click(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Marker at Click";
+	ot->idname = "CLIP_OT_add_marker_at_click";
+	ot->description = "Place new marker at the desired (clicked) position";
+
+	/* api callbacks */
+	ot->invoke = add_marker_at_click_invoke;
+	ot->poll = ED_space_clip_tracking_poll;
+	ot->modal = add_marker_at_click_modal;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
 }
 
 /********************** delete track operator *********************/
@@ -1859,7 +1927,7 @@ static void object_solver_inverted_matrix(Scene *scene, Object *ob, float invmat
 				BKE_object_where_is_calc_mat4(scene, cam, invmat);
 			}
 
-			mult_m4_m4m4(invmat, invmat, data->invmat);
+			mul_m4_m4m4(invmat, invmat, data->invmat);
 
 			found = TRUE;
 		}
@@ -2063,7 +2131,7 @@ static void set_axis(Scene *scene,  Object *ob, MovieClip *clip, MovieTrackingOb
 	if (is_camera) {
 		invert_m4(mat);
 
-		mult_m4_m4m4(mat, mat, obmat);
+		mul_m4_m4m4(mat, mat, obmat);
 	}
 	else {
 		if (!flip) {
@@ -2080,7 +2148,7 @@ static void set_axis(Scene *scene,  Object *ob, MovieClip *clip, MovieTrackingOb
 			mul_serie_m4(mat, lmat, mat, ilmat, obmat, NULL, NULL, NULL, NULL);
 		}
 		else {
-			mult_m4_m4m4(mat, obmat, mat);
+			mul_m4_m4m4(mat, obmat, mat);
 		}
 	}
 
@@ -2172,14 +2240,14 @@ static int set_plane_exec(bContext *C, wmOperator *op)
 		invert_m4(mat);
 
 		BKE_object_to_mat4(object, obmat);
-		mult_m4_m4m4(mat, mat, obmat);
-		mult_m4_m4m4(newmat, rot, mat);
+		mul_m4_m4m4(mat, mat, obmat);
+		mul_m4_m4m4(newmat, rot, mat);
 		BKE_object_apply_mat4(object, newmat, 0, 0);
 
 		/* make camera have positive z-coordinate */
 		if (object->loc[2] < 0) {
 			invert_m4(rot);
-			mult_m4_m4m4(newmat, rot, mat);
+			mul_m4_m4m4(newmat, rot, mat);
 			BKE_object_apply_mat4(object, newmat, 0, 0);
 		}
 	}

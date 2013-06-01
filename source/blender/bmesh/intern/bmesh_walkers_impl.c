@@ -433,7 +433,7 @@ static void *bmw_IslandWalker_step(BMWalker *walker)
 static bool bm_edge_is_single(BMEdge *e)
 {
 	return ((BM_edge_is_boundary(e)) &&
-	        (e->l->f->len != 4) &&
+	        (e->l->f->len > 4) &&
 	        (BM_edge_is_boundary(e->l->next->e) || BM_edge_is_boundary(e->l->prev->e)));
 }
 
@@ -648,7 +648,7 @@ static void *bmw_LoopWalker_step(BMWalker *walker)
 			} while (true);
 		}
 
-		if (owalk.is_single == false && bm_edge_is_single(l->e)) {
+		if (owalk.is_single == false && l && bm_edge_is_single(l->e)) {
 			l = NULL;
 		}
 

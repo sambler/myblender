@@ -215,12 +215,6 @@ static void layerFree_bmesh_elem_py_ptr(void *data, int count, int size)
 	}
 }
 
-
-static void linklist_free_simple(void *link)
-{
-	MEM_freeN(link);
-}
-
 static void layerInterp_mdeformvert(void **sources, const float *weights,
                                     const float *UNUSED(sub_weights), int count, void *dest)
 {
@@ -239,12 +233,16 @@ static void layerInterp_mdeformvert(void **sources, const float *weights,
 
 		for (j = 0; j < source->totweight; ++j) {
 			MDeformWeight *dw = &source->dw[j];
+			float weight = dw->weight * interp_weight;
+
+			if (weight == 0.0f)
+				continue;
 
 			for (node = dest_dw; node; node = node->next) {
 				MDeformWeight *tmp_dw = (MDeformWeight *)node->link;
 
 				if (tmp_dw->def_nr == dw->def_nr) {
-					tmp_dw->weight += dw->weight * interp_weight;
+					tmp_dw->weight += weight;
 					break;
 				}
 			}
@@ -254,7 +252,7 @@ static void layerInterp_mdeformvert(void **sources, const float *weights,
 				MDeformWeight *tmp_dw = MEM_callocN(sizeof(*tmp_dw),
 				                                    "layerInterp_mdeformvert tmp_dw");
 				tmp_dw->def_nr = dw->def_nr;
-				tmp_dw->weight = dw->weight * interp_weight;
+				tmp_dw->weight = weight;
 				BLI_linklist_prepend(&dest_dw, tmp_dw);
 				totweight++;
 			}
@@ -277,7 +275,7 @@ static void layerInterp_mdeformvert(void **sources, const float *weights,
 	else
 		memset(dvert, 0, sizeof(*dvert));
 
-	BLI_linklist_free(dest_dw, linklist_free_simple);
+	BLI_linklist_free(dest_dw, MEM_freeN);
 }
 
 static void layerCopy_tface(const void *source, void *dest, int count)
@@ -1187,7 +1185,7 @@ const CustomDataMask CD_MASK_DERIVEDMESH =
     CD_MASK_MCOL | CD_MASK_PROP_FLT | CD_MASK_PROP_INT | CD_MASK_CLOTH_ORCO |
     CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_MTEXPOLY | CD_MASK_PREVIEW_MLOOPCOL |
     CD_MASK_PROP_STR | CD_MASK_ORIGSPACE | CD_MASK_ORIGSPACE_MLOOP | CD_MASK_ORCO | CD_MASK_TANGENT |
-    CD_MASK_PREVIEW_MCOL | CD_MASK_NORMAL | CD_MASK_SHAPEKEY | CD_MASK_RECAST |
+    CD_MASK_PREVIEW_MCOL | CD_MASK_SHAPEKEY | CD_MASK_RECAST |
     CD_MASK_ORIGINDEX | CD_MASK_MVERT_SKIN | CD_MASK_FREESTYLE_EDGE | CD_MASK_FREESTYLE_FACE;
 const CustomDataMask CD_MASK_BMESH =
     CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_MTEXPOLY |

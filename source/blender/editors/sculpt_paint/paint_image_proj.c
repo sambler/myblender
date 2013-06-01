@@ -248,7 +248,8 @@ typedef struct ProjPaintState {
 	short is_ortho;
 	bool do_masking;              /* use masking during painting. Some operations such as airbrush may disable */
 	bool is_texbrush;              /* only to avoid running  */
-	bool is_maskbrush;
+	bool is_maskbrush;            /* mask brush is applied before masking */
+	bool is_maskbrush_tiled;      /* mask brush is applied after masking */
 #ifndef PROJ_DEBUG_NOSEAMBLEED
 	float seam_bleed_px;
 #endif
@@ -264,12 +265,14 @@ typedef struct ProjPaintState {
 	Image *reproject_image;
 	ImBuf *reproject_ibuf;
 
-
 	/* threads */
 	int thread_tot;
 	int bucketMin[2];
 	int bucketMax[2];
 	int context_bucket_x, context_bucket_y; /* must lock threads while accessing these */
+
+	/* redraw */
+	bool need_redraw;
 } ProjPaintState;
 
 typedef union pixelPointer {
@@ -2927,8 +2930,8 @@ static void project_paint_begin(ProjPaintState *ps)
 			}
 
 			/* same as #ED_view3d_ob_project_mat_get */
-			mult_m4_m4m4(vmat, viewmat, ps->ob->obmat);
-			mult_m4_m4m4(ps->projectMat, winmat, vmat);
+			mul_m4_m4m4(vmat, viewmat, ps->ob->obmat);
+			mul_m4_m4m4(ps->projectMat, winmat, vmat);
 		}
 
 
@@ -3206,7 +3209,7 @@ static void project_paint_begin(ProjPaintState *ps)
 	BLI_linklist_free(image_LinkList, NULL);
 }
 
-static void paint_proj_begin_clone(ProjPaintState *ps, const int mouse[2])
+static void paint_proj_begin_clone(ProjPaintState *ps, const float mouse[2])
 {
 	/* setup clone offset */
 	if (ps->tool == PAINT_TOOL_CLONE) {
@@ -3839,7 +3842,14 @@ static void *do_projectpaint_thread(void *ph_v)
 							 * and never exceeds it, which gives nice smooth results. */
 							float mask_accum = projPixel->mask_accum;
 
-							mask = mask_accum + (brush_alpha * 65535.0f - mask_accum) * mask;
+							if (ps->is_maskbrush) {
+								float texmask = BKE_brush_sample_masktex(ps->scene, ps->brush, projPixel->projCoSS, thread_index, pool);
+								CLAMP(texmask, 0.0f, 1.0f);
+								mask = mask_accum + (brush_alpha * texmask * 65535.0f - mask_accum) * mask;
+							}
+							else {
+								mask = mask_accum + (brush_alpha * 65535.0f - mask_accum) * mask;
+							}
 							mask_short = (unsigned short)mask;
 
 							if (mask_short > projPixel->mask_accum) {
@@ -3851,8 +3861,14 @@ static void *do_projectpaint_thread(void *ph_v)
 								continue;
 							}
 						}
-						else
+						else {
 							mask *= brush_alpha;
+							if (ps->is_maskbrush) {
+								float texmask = BKE_brush_sample_masktex(ps->scene, ps->brush, projPixel->projCoSS, thread_index, pool);
+								CLAMP(texmask, 0.0f, 1.0f);
+								mask *= texmask;
+							}
+						}
 
 						if (ps->is_texbrush) {
 							MTex *mtex = &brush->mtex;
@@ -3875,7 +3891,7 @@ static void *do_projectpaint_thread(void *ph_v)
 							mask *= texrgba[3];
 						}
 
-						if (ps->is_maskbrush) {
+						if (ps->is_maskbrush_tiled) {
 							mask *= BKE_brush_sample_masktex(ps->scene, ps->brush, projPixel->projCoSS, thread_index, pool);
 						}
 
@@ -4044,43 +4060,36 @@ static int project_paint_op(void *state, const float lastpos[2], const float pos
 }
 
 
-int paint_proj_stroke(bContext *C, void *pps, const int prevmval_i[2], const int mval_i[2])
+void paint_proj_stroke(bContext *C, void *pps, const float prev_pos[2], const float pos[2])
 {
 	ProjPaintState *ps = pps;
-	int a, redraw;
-	float pos[2], prev_pos[2];
-
-	pos[0] = (float)(mval_i[0]);
-	pos[1] = (float)(mval_i[1]);
-
-	prev_pos[0] = (float)(prevmval_i[0]);
-	prev_pos[1] = (float)(prevmval_i[1]);
+	int a;
 
 	/* clone gets special treatment here to avoid going through image initialization */
 	if (ps->tool == PAINT_TOOL_CLONE && ps->mode == BRUSH_STROKE_INVERT) {
 		Scene *scene = ps->scene;
 		View3D *v3d = ps->v3d;
 		float *cursor = give_cursor(scene, v3d);
+		int mval_i[2] = {(int)pos[0], (int)pos[1]};
 
 		view3d_operator_needs_opengl(C);
 
 		if (!ED_view3d_autodist(scene, ps->ar, v3d, mval_i, cursor, false))
-			return 0;
+			return;
 
 		ED_region_tag_redraw(ps->ar);
 
-		return 0;
+		return;
 	}
 
-	for (a = 0; a < ps->image_tot; a++)
-		partial_redraw_array_init(ps->projImages[a].partRedrawRect);
+	/* continue adding to existing partial redraw rects until redraw */
+	if (!ps->need_redraw) {
+		for (a = 0; a < ps->image_tot; a++)
+			partial_redraw_array_init(ps->projImages[a].partRedrawRect);
+	}
 
-	redraw = project_paint_op(ps, prev_pos, pos) ? 1 : 0;
-
-	if (project_image_refresh_tagged(ps))
-		return redraw;
-
-	return 0;
+	if (project_paint_op(ps, prev_pos, pos))
+		ps->need_redraw = true;
 }
 
 
@@ -4104,13 +4113,23 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps, int 
 		                  (brush->mtex.tex && !ELEM3(brush->mtex.brush_map_mode, MTEX_MAP_MODE_TILED, MTEX_MAP_MODE_STENCIL, MTEX_MAP_MODE_3D)))
 		                 ? false : true;
 		ps->is_texbrush = (brush->mtex.tex && brush->imagepaint_tool == PAINT_TOOL_DRAW) ? true : false;
-		ps->is_maskbrush = (brush->mask_mtex.tex) ? true : false;
+		ps->is_maskbrush = false;
+		ps->is_maskbrush_tiled = false;
+		if (brush->mask_mtex.tex) {
+			if (ELEM(brush->mask_mtex.brush_map_mode, MTEX_MAP_MODE_STENCIL, MTEX_MAP_MODE_TILED)) {
+				ps->is_maskbrush_tiled = true;
+			}
+			else {
+				ps->is_maskbrush = true;
+			}
+		}
 	}
 	else {
 		/* brush may be NULL*/
 		ps->do_masking = false;
 		ps->is_texbrush = false;
 		ps->is_maskbrush = false;
+		ps->is_maskbrush_tiled = false;
 	}
 
 	/* sizeof(ProjPixel), since we alloc this a _lot_ */
@@ -4160,7 +4179,7 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps, int 
 	return;
 }
 
-void *paint_proj_new_stroke(bContext *C, Object *ob, const int mouse[2], int mode)
+void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int mode)
 {
 	ProjPaintState *ps = MEM_callocN(sizeof(ProjPaintState), "ProjectionPaintState");
 	project_state_init(C, ob, ps, mode);
@@ -4199,6 +4218,28 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const int mouse[2], int mod
 	paint_proj_begin_clone(ps, mouse);
 
 	return ps;
+}
+
+void paint_proj_redraw(const bContext *C, void *pps, bool final)
+{
+	ProjPaintState *ps = pps;
+
+	if (ps->need_redraw) {
+		project_image_refresh_tagged(ps);
+
+		ps->need_redraw = false;
+	}
+	else if (!final) {
+		return;
+	}
+
+	if (final) {
+		/* compositor listener deals with updating */
+		WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, NULL);
+	}
+	else {
+		ED_region_tag_redraw(CTX_wm_region(C));
+	}
 }
 
 void paint_proj_stroke_done(void *pps)
@@ -4273,6 +4314,7 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 	/* override */
 	ps.is_texbrush = false;
 	ps.is_maskbrush = false;
+	ps.is_maskbrush_tiled = false;
 	ps.do_masking = false;
 	orig_brush_size = BKE_brush_size_get(scene, ps.brush);
 	BKE_brush_size_set(scene, ps.brush, 32); /* cover the whole image */

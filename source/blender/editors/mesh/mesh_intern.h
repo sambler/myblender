@@ -159,6 +159,7 @@ extern struct EnumPropertyItem *corner_type_items;
 
 /* *** editmesh_tools.c *** */
 void MESH_OT_subdivide(struct wmOperatorType *ot);
+void MESH_OT_subdivide_edgering(struct wmOperatorType *ot);
 void MESH_OT_unsubdivide(struct wmOperatorType *ot);
 void MESH_OT_normals_make_consistent(struct wmOperatorType *ot);
 void MESH_OT_vertices_smooth(struct wmOperatorType *ot);
@@ -193,6 +194,7 @@ void MESH_OT_solidify(struct wmOperatorType *ot);
 void MESH_OT_knife_cut(struct wmOperatorType *ot);
 void MESH_OT_separate(struct wmOperatorType *ot);
 void MESH_OT_fill(struct wmOperatorType *ot);
+void MESH_OT_fill_grid(struct wmOperatorType *ot);
 void MESH_OT_beautify_fill(struct wmOperatorType *ot);
 void MESH_OT_quads_convert_to_tris(struct wmOperatorType *ot);
 void MESH_OT_tris_convert_to_quads(struct wmOperatorType *ot);

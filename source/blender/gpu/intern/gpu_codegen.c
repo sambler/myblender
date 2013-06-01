@@ -47,7 +47,7 @@
 #include "GPU_material.h"
 #include "GPU_extensions.h"
 
-#include "BLO_sys_types.h" // for intptr_t support
+#include "BLI_sys_types.h" // for intptr_t support
 
 #include "gpu_codegen.h"
 
@@ -255,7 +255,7 @@ void GPU_codegen_exit(void)
 		GPU_material_free(&defmaterial);
 
 	if (FUNCTION_HASH) {
-		BLI_ghash_free(FUNCTION_HASH, NULL, (GHashValFreeFP)MEM_freeN);
+		BLI_ghash_free(FUNCTION_HASH, NULL, MEM_freeN);
 		FUNCTION_HASH = NULL;
 	}
 

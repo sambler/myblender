@@ -370,10 +370,8 @@ typedef struct bNodeTree {
 	 * Only available in base node trees (e.g. scene->node_tree)
 	 */
 	struct bNodeInstanceHash *previews;
-	/* XXX workaround for ambiguous viewer output:
-	 * Viewer nodes all write to the same image buffer.
-	 * This determines the tree instance containing the "active" output.
-	 * Only used in local scene->nodetree.
+	/* Defines the node tree instance to use for the "active" context,
+	 * in case multiple different editors are used and make context ambiguous.
 	 */
 	bNodeInstanceKey active_viewer_key;
 	int pad;
@@ -871,6 +869,10 @@ typedef struct NodeShaderNormalMap {
 #define SHD_GLOSSY_SHARP	1
 #define SHD_GLOSSY_GGX		2
 
+/* toon modes */
+#define SHD_TOON_DIFFUSE	0
+#define SHD_TOON_GLOSSY		1
+
 /* blend texture */
 #define SHD_BLEND_LINEAR			0
 #define SHD_BLEND_QUADRATIC			1
@@ -942,9 +944,11 @@ typedef struct NodeShaderNormalMap {
 #define SHD_TANGENT_AXIS_Z			2
 
 /* normal map space */
-#define SHD_NORMAL_MAP_TANGENT		0
-#define SHD_NORMAL_MAP_OBJECT		1
-#define SHD_NORMAL_MAP_WORLD		2
+#define SHD_NORMAL_MAP_TANGENT			0
+#define SHD_NORMAL_MAP_OBJECT			1
+#define SHD_NORMAL_MAP_WORLD			2
+#define SHD_NORMAL_MAP_BLENDER_OBJECT	3
+#define SHD_NORMAL_MAP_BLENDER_WORLD	4
 
 /* blur node */
 #define CMP_NODE_BLUR_ASPECT_NONE		0

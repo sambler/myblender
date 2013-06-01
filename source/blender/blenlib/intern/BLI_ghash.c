@@ -35,11 +35,11 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_sys_types.h"  /* for intptr_t support */
 #include "BLI_utildefines.h"
 #include "BLI_mempool.h"
 #include "BLI_ghash.h"
 
-#include "MEM_sys_types.h"  /* for intptr_t support */
 /***/
 
 #ifdef __GNUC__
@@ -410,5 +410,5 @@ int BLI_ghashutil_paircmp(const void *a, const void *b)
 
 void BLI_ghashutil_pairfree(void *ptr)
 {
-	MEM_freeN((void *)ptr);
+	MEM_freeN(ptr);
 }

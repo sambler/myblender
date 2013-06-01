@@ -259,7 +259,6 @@ void ED_mesh_edges_remove(struct Mesh *mesh, struct ReportList *reports, int cou
 void ED_mesh_vertices_remove(struct Mesh *mesh, struct ReportList *reports, int count);
 
 void ED_mesh_transform(struct Mesh *me, float *mat);
-void ED_mesh_calc_normals(struct Mesh *me);
 void ED_mesh_calc_tessface(struct Mesh *mesh);
 void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges, int calc_tessface);
 
@@ -307,6 +306,8 @@ bool ED_mesh_pick_face_vert(struct bContext *C, struct Object *ob, const int mva
 
 #define ED_MESH_PICK_DEFAULT_VERT_SIZE 50
 #define ED_MESH_PICK_DEFAULT_FACE_SIZE 3
+
+#define USE_LOOPSLIDE_HACK
 
 #ifdef __cplusplus
 }

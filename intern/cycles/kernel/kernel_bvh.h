@@ -119,8 +119,6 @@ __device_inline void bvh_node_intersect(KernelGlobals *kg,
 	bool *closestChild1, int *nodeAddr0, int *nodeAddr1,
 	float3 P, float3 idir, float t, uint visibility, int nodeAddr, float difl, float extmax)
 {
-	float hdiff = 1.0f + difl;
-	float ldiff = 1.0f - difl;
 #else
 __device_inline void bvh_node_intersect(KernelGlobals *kg,
 	bool *traverseChild0, bool *traverseChild1,
@@ -157,11 +155,13 @@ __device_inline void bvh_node_intersect(KernelGlobals *kg,
 
 #ifdef __HAIR__
 	if(difl != 0.0f) {
+		float hdiff = 1.0f + difl;
+		float ldiff = 1.0f - difl;
 		if(__float_as_int(cnodes.z) & PATH_RAY_CURVE) {
 			c0min = max(ldiff * c0min, c0min - extmax);
 			c0max = min(hdiff * c0max, c0max + extmax);
 		}
-		if(__float_as_int(cnodes.z) & PATH_RAY_CURVE) {
+		if(__float_as_int(cnodes.w) & PATH_RAY_CURVE) {
 			c1min = max(ldiff * c1min, c1min - extmax);
 			c1max = min(hdiff * c1max, c1max + extmax);
 		}
@@ -470,9 +470,9 @@ __device_inline void bvh_cardinal_curve_intersect(KernelGlobals *kg, Intersectio
 					float d0 = d - r_curr;
 					float d1 = d + r_curr;
 					if (d0 >= 0)
-						coverage = (min(d1 / mw_extension, 1.0f) - min(d0 / mw_extension, 1.0f)) * 0.5;
+						coverage = (min(d1 / mw_extension, 1.0f) - min(d0 / mw_extension, 1.0f)) * 0.5f;
 					else // inside
-						coverage = (min(d1 / mw_extension, 1.0f) + min(-d0 / mw_extension, 1.0f)) * 0.5;
+						coverage = (min(d1 / mw_extension, 1.0f) + min(-d0 / mw_extension, 1.0f)) * 0.5f;
 				}
 				
 				if (p_curr.x * p_curr.x + p_curr.y * p_curr.y >= r_ext * r_ext || p_curr.z <= epsilon) {

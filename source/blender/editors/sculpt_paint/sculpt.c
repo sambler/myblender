@@ -44,6 +44,7 @@
 
 #include "BLF_translation.h"
 
+#include "DNA_customdata_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_node_types.h"
@@ -1256,7 +1257,7 @@ static void calc_brush_local_mat(const Brush *brush, Object *ob,
 	/* Scale by brush radius */
 	normalize_m4(mat);
 	scale_m4_fl(scale, cache->radius);
-	mult_m4_m4m4(tmat, mat, scale);
+	mul_m4_m4m4(tmat, mat, scale);
 
 	/* Return inverse (for converting from modelspace coords to local
 	 * area coords) */
@@ -2729,7 +2730,7 @@ static void do_clay_strips_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int t
 
 	/* scale mat */
 	scale_m4_fl(scale, ss->cache->radius);
-	mult_m4_m4m4(tmat, mat, scale);
+	mul_m4_m4m4(tmat, mat, scale);
 	invert_m4_m4(mat, tmat);
 
 	#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP)
@@ -2942,9 +2943,7 @@ void sculpt_vertcos_to_key(Object *ob, KeyBlock *kb, float (*vertCos)[3])
 		for (a = 0; a < me->totvert; a++, mvert++)
 			copy_v3_v3(mvert->co, vertCos[a]);
 
-		BKE_mesh_calc_normals_mapping(me->mvert, me->totvert, me->mloop,
-		                              me->mpoly, me->totloop, me->totpoly,
-		                              NULL, NULL, 0, NULL, NULL);
+		BKE_mesh_calc_normals(me);
 	}
 
 	/* apply new coords on active key block */
@@ -3278,7 +3277,7 @@ static void sculpt_flush_stroke_deform(Sculpt *sd, Object *ob)
 		/* Modifiers could depend on mesh normals, so we should update them/
 		 * Note, then if sculpting happens on locked key, normals should be re-calculated
 		 * after applying coords from keyblock on base mesh */
-		BKE_mesh_calc_normals(me->mvert, me->totvert, me->mloop, me->mpoly, me->totloop, me->totpoly, NULL);
+		BKE_mesh_calc_normals(me);
 	}
 	else if (ss->kb) {
 		sculpt_update_keyblock(ob);
@@ -4399,7 +4398,7 @@ static int sculpt_brush_stroke_invoke(bContext *C, wmOperator *op, const wmEvent
 
 	stroke = paint_stroke_new(C, sculpt_stroke_get_location,
 	                          sculpt_stroke_test_start,
-	                          sculpt_stroke_update_step,
+	                          sculpt_stroke_update_step, NULL,
 	                          sculpt_stroke_done, event->type);
 
 	op->customdata = stroke;
@@ -4428,7 +4427,7 @@ static int sculpt_brush_stroke_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	op->customdata = paint_stroke_new(C, sculpt_stroke_get_location, sculpt_stroke_test_start,
-	                                  sculpt_stroke_update_step, sculpt_stroke_done, 0);
+	                                  sculpt_stroke_update_step, NULL, sculpt_stroke_done, 0);
 
 	/* frees op->customdata */
 	paint_stroke_exec(C, op);
@@ -4542,7 +4541,7 @@ void sculpt_pbvh_clear(Object *ob)
 	ss->pbvh = NULL;
 	if (dm)
 		dm->getPBVH(NULL, dm);
-	BKE_object_free_display(ob);
+	BKE_object_free_derived_caches(ob);
 }
 
 void sculpt_update_after_dynamic_topology_toggle(bContext *C)
@@ -4935,7 +4934,7 @@ static int sculpt_toggle_mode(bContext *C, wmOperator *UNUSED(op))
 
 		BKE_paint_init(&ts->sculpt->paint, PAINT_CURSOR_SCULPT);
 
-		paint_cursor_start(C, sculpt_poll);
+		paint_cursor_start(C, sculpt_mode_poll_view3d);
 	}
 
 	WM_event_add_notifier(C, NC_SCENE | ND_MODE, scene);

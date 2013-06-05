@@ -15,31 +15,28 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2004 Blender Foundation.
- * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Geoffrey Bantle.
+ * Contributor(s):
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BMESH_MESH_CONV_H__
-#define __BMESH_MESH_CONV_H__
+#ifndef __BMESH_PATH_H__
+#define __BMESH_PATH_H__
 
-/** \file blender/bmesh/intern/bmesh_mesh_conv.h
+/** \file blender/bmesh/tools/bmesh_path.h
  *  \ingroup bmesh
  */
 
-struct Mesh;
+struct LinkNode *BM_mesh_calc_path_vert(
+        BMesh *bm, BMVert *v_src, BMVert *v_dst, const bool  use_length,
+        void *user_data, bool (*filter_fn)(BMVert *, void *));
 
-void BM_mesh_cd_flag_ensure(BMesh *bm, struct Mesh *mesh, const char cd_flag);
-void BM_mesh_cd_flag_apply(BMesh *bm, const char cd_flag);
-char BM_mesh_cd_flag_from_bmesh(BMesh *bm);
+struct LinkNode *BM_mesh_calc_path_edge(
+        BMesh *bm, BMEdge *e_src, BMEdge *e_dst, const bool  use_length,
+        void *user_data, bool (*filter_fn)(BMEdge *, void *));
 
-void BM_mesh_bm_from_me(BMesh *bm, struct Mesh *me,
-                        const bool calc_face_normal, const bool set_key, int act_key_nr);
-void BM_mesh_bm_to_me(BMesh *bm, struct Mesh *me, bool do_tessface);
+struct LinkNode *BM_mesh_calc_path_face(
+        BMesh *bm, BMFace *f_src, BMFace *f_dst, const bool  use_length,
+        void *user_data, bool (*test_fn)(BMFace *, void *));
 
-#endif /* __BMESH_MESH_CONV_H__ */
+#endif /* __BMESH_PATH_H__ */

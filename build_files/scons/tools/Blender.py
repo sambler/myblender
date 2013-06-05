@@ -155,12 +155,12 @@ def setup_staticlibs(lenv):
         libincs += Split(lenv['BF_OPENEXR_LIBPATH'])
         if lenv['WITH_BF_STATICOPENEXR']:
             statlibs += Split(lenv['BF_OPENEXR_LIB_STATIC'])
+    if lenv['WITH_BF_ZLIB'] and lenv['WITH_BF_STATICZLIB']:
+        statlibs += Split(lenv['BF_ZLIB_LIB_STATIC'])
     if lenv['WITH_BF_TIFF']:
         libincs += Split(lenv['BF_TIFF_LIBPATH'])
         if lenv['WITH_BF_STATICTIFF']:
             statlibs += Split(lenv['BF_TIFF_LIB_STATIC'])
-    if lenv['WITH_BF_ZLIB'] and lenv['WITH_BF_STATICZLIB']:
-        statlibs += Split(lenv['BF_ZLIB_LIB_STATIC'])
     if lenv['WITH_BF_FFTW3']:
         libincs += Split(lenv['BF_FFTW3_LIBPATH'])
         if lenv['WITH_BF_STATICFFTW3']:
@@ -282,10 +282,10 @@ def setup_syslibs(lenv):
 
     if lenv['WITH_BF_OPENEXR'] and not lenv['WITH_BF_STATICOPENEXR']:
         syslibs += Split(lenv['BF_OPENEXR_LIB'])
-    if lenv['WITH_BF_TIFF'] and not lenv['WITH_BF_STATICTIFF']:
-        syslibs += Split(lenv['BF_TIFF_LIB'])
     if lenv['WITH_BF_ZLIB'] and not lenv['WITH_BF_STATICZLIB']:
         syslibs += Split(lenv['BF_ZLIB_LIB'])
+    if lenv['WITH_BF_TIFF'] and not lenv['WITH_BF_STATICTIFF']:
+        syslibs += Split(lenv['BF_TIFF_LIB'])
     if lenv['WITH_BF_FFMPEG'] and not lenv['WITH_BF_STATICFFMPEG']:
         syslibs += Split(lenv['BF_FFMPEG_LIB'])
         if lenv['WITH_BF_OGG']:
@@ -412,7 +412,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '57174'
+        build_rev = '57249'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

@@ -105,8 +105,8 @@ typedef enum eWireDrawMode {
 typedef struct drawDMVerts_userData {
 	BMEditMesh *em;
 
-	int sel;
 	BMVert *eve_act;
+	char sel;
 
 	/* cached theme values */
 	unsigned char th_editmesh_active[4];
@@ -1942,20 +1942,25 @@ static void drawlattice(Scene *scene, View3D *v3d, Object *ob)
 /* ***************** ******************** */
 
 /*  draw callback */
+
+typedef struct drawDMVertSel_userData {
+	MVert *mvert;
+	int active;
+	unsigned char *col[3];  /* (base, sel, act) */
+	char sel_prev;
+} drawDMVertSel_userData;
+
 static void drawSelectedVertices__mapFunc(void *userData, int index, const float co[3],
                                           const float UNUSED(no_f[3]), const short UNUSED(no_s[3]))
 {
-	MVert *mv = &((MVert *)userData)[index];
+	drawDMVertSel_userData *data = userData;
+	MVert *mv = &data->mvert[index];
 
 	if (!(mv->flag & ME_HIDE)) {
-		const char sel = mv->flag & SELECT;
-
-		/* TODO define selected color */
-		if (sel) {
-			glColor3f(1.0f, 1.0f, 0.0f);
-		}
-		else {
-			glColor3f(0.0f, 0.0f, 0.0f);
+		const char sel = (index == data->active) ? 2 : (mv->flag & SELECT);
+		if (sel != data->sel_prev) {
+			glColor3ubv(data->col[sel]);
+			data->sel_prev = sel;
 		}
 
 		glVertex3fv(co);
@@ -1964,8 +1969,23 @@ static void drawSelectedVertices__mapFunc(void *userData, int index, const float
 
 static void drawSelectedVertices(DerivedMesh *dm, Mesh *me)
 {
+	drawDMVertSel_userData data;
+
+	/* TODO define selected color */
+	unsigned char base_col[3] = {0x0, 0x0, 0x0};
+	unsigned char sel_col[3] = {0xd8, 0xb8, 0x0};
+	unsigned char act_col[3] = {0xff, 0xff, 0xff};
+
+	data.mvert = me->mvert;
+	data.active = BKE_mesh_mselect_active_get(me, ME_VSEL);
+	data.sel_prev = 0xff;
+
+	data.col[0] = base_col;
+	data.col[1] = sel_col;
+	data.col[2] = act_col;
+
 	glBegin(GL_POINTS);
-	dm->foreachMappedVert(dm, drawSelectedVertices__mapFunc, me->mvert);
+	dm->foreachMappedVert(dm, drawSelectedVertices__mapFunc, &data);
 	glEnd();
 }
 
@@ -2038,13 +2058,13 @@ static void draw_dm_face_normals(BMEditMesh *em, Scene *scene, Object *ob, Deriv
 static void draw_dm_face_centers__mapFunc(void *userData, int index, const float cent[3], const float UNUSED(no[3]))
 {
 	BMFace *efa = EDBM_face_at_index(((void **)userData)[0], index);
-	int sel = *(((int **)userData)[1]);
+	const char sel = *(((char **)userData)[1]);
 	
 	if (efa && !BM_elem_flag_test(efa, BM_ELEM_HIDDEN) && BM_elem_flag_test(efa, BM_ELEM_SELECT) == sel) {
 		bglVertex3fv(cent);
 	}
 }
-static void draw_dm_face_centers(BMEditMesh *em, DerivedMesh *dm, int sel)
+static void draw_dm_face_centers(BMEditMesh *em, DerivedMesh *dm, char sel)
 {
 	void *ptrs[2] = {em, &sel};
 
@@ -2065,9 +2085,7 @@ static void draw_dm_vert_normals__mapFunc(void *userData, int index, const float
 			copy_v3_v3(no, no_f);
 		}
 		else {
-			no[0] = no_s[0] / 32767.0f;
-			no[1] = no_s[1] / 32767.0f;
-			no[2] = no_s[2] / 32767.0f;
+			normal_short_to_float_v3(no, no_s);
 		}
 
 		if (!data->uniform_scale) {
@@ -2147,7 +2165,7 @@ static void draw_dm_verts__mapFunc(void *userData, int index, const float co[3],
 	}
 }
 
-static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, int sel, BMVert *eve_act,
+static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVert *eve_act,
                           RegionView3D *rv3d)
 {
 	drawDMVerts_userData data;
@@ -5092,7 +5110,7 @@ static void ob_draw_RE_motion(float com[3], float rotscale[3][3], float itw, flo
 
 /* place to add drawers */
 
-static void drawhandlesN(Nurb *nu, short sel, short hide_handles)
+static void drawhandlesN(Nurb *nu, const char sel, const bool hide_handles)
 {
 	BezTriple *bezt;
 	float *fp;
@@ -5187,7 +5205,7 @@ static void drawhandlesN_active(Nurb *nu)
 	glLineWidth(1);
 }
 
-static void drawvertsN(Nurb *nu, short sel, short hide_handles, void *lastsel)
+static void drawvertsN(Nurb *nu, const char sel, const bool hide_handles, void *lastsel)
 {
 	BezTriple *bezt;
 	BPoint *bp;
@@ -5450,7 +5468,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	Curve *cu = ob->data;
 	Nurb *nu;
 	BevList *bl;
-	short hide_handles = (cu->drawflag & CU_HIDE_HANDLES);
+	const bool hide_handles = (cu->drawflag & CU_HIDE_HANDLES) != 0;
 	int index;
 	unsigned char wire_col[3];
 
@@ -5460,7 +5478,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 
 	drawDispList(scene, v3d, rv3d, base, dt, dflag, ob_wire_col);
 
-	if (v3d->zbuf) glDisable(GL_DEPTH_TEST);
+	if (v3d->zbuf) glDepthFunc(GL_ALWAYS);
 	
 	/* first non-selected and active handles */
 	index = 0;
@@ -5481,7 +5499,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 		drawvertsN(nu, 0, hide_handles, NULL);
 	}
 	
-	if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
+	if (v3d->zbuf) glDepthFunc(GL_LEQUAL);
 
 	/* direction vectors for 3d curve paths
 	 * when at its lowest, don't render normals */
@@ -5526,13 +5544,13 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 		}
 	}
 
-	if (v3d->zbuf) glDisable(GL_DEPTH_TEST);
+	if (v3d->zbuf) glDepthFunc(GL_ALWAYS);
 	
 	for (nu = nurb; nu; nu = nu->next) {
 		drawvertsN(nu, 1, hide_handles, cu->lastsel);
 	}
 	
-	if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
+	if (v3d->zbuf) glDepthFunc(GL_LEQUAL);
 }
 
 /* draw a sphere for use as an empty drawtype */
@@ -6722,7 +6740,15 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 			break;
 		case OB_LATTICE:
 			if ((v3d->flag2 & V3D_RENDER_OVERRIDE) == 0) {
-				drawlattice(scene, v3d, ob);
+				/* Do not allow boundbox in edit nor pose mode! */
+				if ((dt == OB_BOUNDBOX) && (ob->mode & OB_MODE_EDIT))
+					dt = OB_WIRE;
+				if (dt == OB_BOUNDBOX) {
+					draw_bounding_volume(scene, ob, ob->boundtype);
+				}
+				else {
+					drawlattice(scene, v3d, ob);
+				}
 			}
 			break;
 		case OB_ARMATURE:

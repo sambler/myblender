@@ -32,30 +32,6 @@ from rna_prop_ui import rna_idprop_ui_prop_get, rna_idprop_ui_prop_clear
 from bpy.app.translations import pgettext_tip as tip_
 
 
-class MESH_OT_delete_edgeloop(Operator):
-    """Delete an edge loop by merging the faces on each side """ \
-    """to a single face loop"""
-    bl_idname = "mesh.delete_edgeloop"
-    bl_label = "Delete Edge Loop"
-    bl_options = {'UNDO', 'REGISTER'}
-
-    @classmethod
-    def poll(cls, context):
-        return bpy.ops.transform.edge_slide.poll()
-
-    def execute(self, context):
-        mesh = context.object.data
-        use_mirror_x = mesh.use_mirror_x
-        mesh.use_mirror_x = False
-        if 'FINISHED' in bpy.ops.transform.edge_slide(value=1.0, correct_uv=True):
-            bpy.ops.mesh.select_more()
-            bpy.ops.mesh.remove_doubles()
-            ret = {'FINISHED'}
-        else:
-            ret = {'CANCELLED'}
-        mesh.use_mirror_x = use_mirror_x
-        return ret
-
 rna_path_prop = StringProperty(
         name="Context Attributes",
         description="RNA context string",
@@ -1199,9 +1175,10 @@ class WM_OT_keyconfig_activate(Operator):
             )
 
     def execute(self, context):
-        bpy.utils.keyconfig_set(self.filepath)
-        return {'FINISHED'}
-
+        if bpy.utils.keyconfig_set(self.filepath, report=self.report):
+            return {'FINISHED'}
+        else:
+            return {'CANCELLED'}
 
 class WM_OT_appconfig_default(Operator):
     bl_idname = "wm.appconfig_default"
@@ -1386,9 +1363,10 @@ class WM_OT_keyconfig_import(Operator):
             return {'CANCELLED'}
 
         # sneaky way to check we're actually running the code.
-        bpy.utils.keyconfig_set(path)
-
-        return {'FINISHED'}
+        if bpy.utils.keyconfig_set(path, report=self.report):
+            return {'FINISHED'}
+        else:
+            return {'CANCELLED'}
 
     def invoke(self, context, event):
         wm = context.window_manager

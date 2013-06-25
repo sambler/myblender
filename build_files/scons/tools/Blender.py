@@ -412,7 +412,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '57494'
+        build_rev = '57724'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -847,7 +847,7 @@ class BlenderEnvironment(SConsEnvironment):
 
         def list_substring(quickie, libname):
             for q in quickie:
-                if libname.find(q) != -1:
+                if q in libname:
                     return True
             return False
 

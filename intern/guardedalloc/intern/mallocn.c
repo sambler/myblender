@@ -131,6 +131,7 @@ typedef struct MemHead {
 	const char *nextname;
 	int tag2;
 	int mmap;  /* if true, memory was mmapped */
+	char pad[8]; /* pad to get sizeof as multiples of 16 */
 #ifdef DEBUG_MEMCOUNTER
 	int _count;
 #endif

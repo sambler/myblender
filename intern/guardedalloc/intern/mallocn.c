@@ -131,7 +131,15 @@ typedef struct MemHead {
 	const char *nextname;
 	int tag2;
 	int mmap;  /* if true, memory was mmapped */
-	char pad[8]; /* pad to get sizeof as multiples of 16 */
+
+#if defined(__x86_64__)
+    /* pad to get sizeof(MemHead) as multiples of 16 to keep alignment
+     * as the byte after this struct is the ptr used for data
+     * debugging extras throw alignment off - that's ok for debugging
+     */
+    char pad[8];
+#endif
+
 #ifdef DEBUG_MEMCOUNTER
 	int _count;
 #endif

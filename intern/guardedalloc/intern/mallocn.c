@@ -508,8 +508,7 @@ void *MEM_mallocN(size_t len, const char *str)
 
 	len = (len + 3) & ~3;   /* allocate in units of 4 */
 	
-	if( posix_memalign(&memh, 16, len + sizeof(MemHead) + sizeof(MemTail) ) )
-		return NULL;
+	memh = (MemHead *)malloc(len + sizeof(MemHead) + sizeof(MemTail));
 
 	if (memh) {
 		make_memhead_header(memh, len, str);

@@ -131,6 +131,18 @@ void BLI_rw_mutex_free(ThreadRWMutex *mutex);
 void BLI_rw_mutex_lock(ThreadRWMutex *mutex, int mode);
 void BLI_rw_mutex_unlock(ThreadRWMutex *mutex);
 
+/* Ticket Mutex Lock
+ *
+ * This is a 'fair' mutex in that it will grant the lock to the first thread
+ * that requests it. */
+
+typedef struct TicketMutex TicketMutex;
+
+TicketMutex *BLI_ticket_mutex_alloc(void);
+void BLI_ticket_mutex_free(TicketMutex *ticket);
+void BLI_ticket_mutex_lock(TicketMutex *ticket);
+void BLI_ticket_mutex_unlock(TicketMutex *ticket);
+
 /* ThreadedWorker
  *
  * A simple tool for dispatching work to a limited number of threads
@@ -169,6 +181,13 @@ int BLI_thread_queue_size(ThreadQueue *queue);
 
 void BLI_thread_queue_wait_finish(ThreadQueue *queue);
 void BLI_thread_queue_nowait(ThreadQueue *queue);
+
+/* Thread Local Storage */
+#ifdef _MSC_VER
+#  define ThreadVariable  __declspec(thread)
+#else
+#  define ThreadVariable  __thread
+#endif
 
 #ifdef __cplusplus
 }

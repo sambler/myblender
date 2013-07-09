@@ -268,8 +268,8 @@ static BMFace *bev_create_ngon(BMesh *bm, BMVert **vert_arr, const int totv,
 		}
 		f = BM_face_create(bm, vert_arr, ee, totv, 0);
 	}
-	if ((facerep || face_arr) && f) {
-		BM_elem_attrs_copy(bm, bm, facerep, f);
+	if ((facerep || (face_arr && face_arr[0])) && f) {
+		BM_elem_attrs_copy(bm, bm, facerep ? facerep : face_arr[0], f);
 		if (do_interp) {
 			i = 0;
 			BM_ITER_ELEM (l, &iter, f, BM_LOOPS_OF_FACE) {
@@ -281,7 +281,8 @@ static BMFace *bev_create_ngon(BMesh *bm, BMVert **vert_arr, const int totv,
 				else {
 					interp_f = facerep;
 				}
-				BM_loop_interp_from_face(bm, l, interp_f, TRUE, TRUE);
+				if (interp_f)
+					BM_loop_interp_from_face(bm, l, interp_f, TRUE, TRUE);
 				i++;
 			}
 		}
@@ -404,7 +405,8 @@ static BMFace *bev_create_quad_straddle(BMesh *bm, BMVert *v1, BMVert *v2, BMVer
 			facerep = f1;
 		else
 			facerep = f2;
-		BM_loop_interp_from_face(bm, l, facerep, TRUE, TRUE);
+		if (facerep)
+			BM_loop_interp_from_face(bm, l, facerep, TRUE, TRUE);
 	}
 	return f;
 }
@@ -2221,6 +2223,7 @@ static void bevel_build_edge_polygons(BMesh *bm, BevelParams *bp, BMEdge *bme)
 	BMVert *bmv1, *bmv2, *bmv3, *bmv4, *bmv1i, *bmv2i, *bmv3i, *bmv4i;
 	VMesh *vm1, *vm2;
 	EdgeHalf *e1, *e2;
+	BMEdge *bme1, *bme2;
 	BMFace *f1, *f2, *f;
 	int k, nseg, i1, i2, odd, mid;
 
@@ -2292,6 +2295,13 @@ static void bevel_build_edge_polygons(BMesh *bm, BevelParams *bp, BMEdge *bme)
 		bev_merge_end_uvs(bm, bv1, e1);
 	if (!e2->is_seam && bv2->vmesh->mesh_kind == M_NONE)
 		bev_merge_end_uvs(bm, bv2, e2);
+
+	/* Copy edge data to first and last edge */
+	bme1 = BM_edge_exists(bmv1, bmv2);
+	bme2 = BM_edge_exists(bmv3, bmv4);
+	BLI_assert(bme1 && bme2);
+	BM_elem_attrs_copy(bm, bm, bme, bme1);
+	BM_elem_attrs_copy(bm, bm, bme, bme2);
 }
 
 /*

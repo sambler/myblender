@@ -204,7 +204,7 @@ void paintface_flush_flags(struct Object *ob);
 bool paintface_mouse_select(struct bContext *C, struct Object *ob, const int mval[2], bool extend, bool deselect, bool toggle);
 int  do_paintface_box_select(struct ViewContext *vc, struct rcti *rect, bool select, bool extend);
 void paintface_deselect_all_visible(struct Object *ob, int action, bool flush_flags);
-void paintface_select_linked(struct bContext *C, struct Object *ob, const int mval[2], int mode);
+void paintface_select_linked(struct bContext *C, struct Object *ob, const int mval[2], const bool select);
 bool paintface_minmax(struct Object *ob, float r_min[3], float r_max[3]);
 
 void paintface_hide(struct Object *ob, const bool unselected);
@@ -233,6 +233,7 @@ void ED_mesh_mirrtopo_free(MirrTopoStore_t *mesh_topo_store);
 #define WEIGHT_ADD 2
 #define WEIGHT_SUBTRACT 3
 
+bool                 ED_vgroup_sync_from_pose(struct Object *ob);
 struct bDeformGroup *ED_vgroup_add(struct Object *ob);
 struct bDeformGroup *ED_vgroup_add_name(struct Object *ob, const char *name);
 void                 ED_vgroup_delete(struct Object *ob, struct bDeformGroup *defgroup);

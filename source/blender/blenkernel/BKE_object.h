@@ -95,15 +95,16 @@ void BKE_object_mat3_to_rot(struct Object *ob, float mat[3][3], bool use_compat)
 void BKE_object_to_mat3(struct Object *ob, float mat[3][3]);
 void BKE_object_to_mat4(struct Object *ob, float mat[4][4]);
 void BKE_object_apply_mat4(struct Object *ob, float mat[4][4], const bool use_compat, const bool use_parent);
+void BKE_object_matrix_local_get(struct Object *ob, float mat[4][4]);
 
 bool BKE_object_pose_context_check(struct Object *ob);
 struct Object *BKE_object_pose_armature_get(struct Object *ob);
 
 void BKE_object_where_is_calc(struct Scene *scene, struct Object *ob);
-void BKE_object_where_is_calc_ex(struct Scene *scene, struct RigidBodyWorld *rbw, struct Object *ob);
+void BKE_object_where_is_calc_ex(struct Scene *scene, struct RigidBodyWorld *rbw, struct Object *ob, float r_originmat[3][3]);
 void BKE_object_where_is_calc_time(struct Scene *scene, struct Object *ob, float ctime);
 void BKE_object_where_is_calc_time_ex(struct Scene *scene, struct Object *ob, float ctime,
-									  struct RigidBodyWorld *rbw);
+                                      struct RigidBodyWorld *rbw, float r_originmat[3][3]);
 void BKE_object_where_is_calc_simul(struct Scene *scene, struct Object *ob);
 void BKE_object_where_is_calc_mat4(struct Scene *scene, struct Object *ob, float obmat[4][4]);
 
@@ -121,11 +122,11 @@ bool BKE_object_minmax_dupli(struct Scene *scene, struct Object *ob, float r_min
 
 /* sometimes min-max isn't enough, we need to loop over each point */
 void BKE_object_foreach_display_point(struct Object *ob, float obmat[4][4],
-									  void (*func_cb)(const float[3], void *), void *user_data);
+                                      void (*func_cb)(const float[3], void *), void *user_data);
 void BKE_scene_foreach_display_point(struct Scene *scene,
-									 struct View3D *v3d,
-									 const short flag,
-									 void (*func_cb)(const float[3], void *), void *user_data);
+                                     struct View3D *v3d,
+                                     const short flag,
+                                     void (*func_cb)(const float[3], void *), void *user_data);
 
 bool BKE_object_parent_loop_check(const struct Object *parent, const struct Object *ob);
 
@@ -142,15 +143,15 @@ typedef struct ObjectTfmProtectedChannels {
 } ObjectTfmProtectedChannels;
 
 void BKE_object_tfm_protected_backup(const struct Object *ob,
-									 ObjectTfmProtectedChannels *obtfm);
+                                     ObjectTfmProtectedChannels *obtfm);
 
 void BKE_object_tfm_protected_restore(struct Object *ob,
-									  const ObjectTfmProtectedChannels *obtfm,
-									  const short protectflag);
+                                      const ObjectTfmProtectedChannels *obtfm,
+                                      const short protectflag);
 
 void BKE_object_handle_update(struct Scene *scene, struct Object *ob);
 void BKE_object_handle_update_ex(struct Scene *scene, struct Object *ob,
-								 struct RigidBodyWorld *rbw);
+                                 struct RigidBodyWorld *rbw);
 void BKE_object_sculpt_modifiers_changed(struct Object *ob);
 
 int BKE_object_obdata_texspace_get(struct Object *ob, short **r_texflag, float **r_loc, float **r_size, float **r_rot);

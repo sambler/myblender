@@ -684,12 +684,9 @@ void BKE_scene_set_background(Main *bmain, Scene *scene)
 		}
 	}
 
-	/* sort baselist */
-	DAG_scene_relations_rebuild(bmain, scene);
-	
-	/* ensure dags are built for sets */
+	/* sort baselist for scene and sets */
 	for (sce = scene; sce; sce = sce->set)
-		DAG_scene_relations_update(bmain, sce);
+		DAG_scene_relations_rebuild(bmain, sce);
 
 	/* copy layers and flags from bases to objects */
 	for (base = scene->base.first; base; base = base->next) {
@@ -748,7 +745,7 @@ void BKE_scene_unlink(Main *bmain, Scene *sce, Scene *newsce)
  */
 int BKE_scene_base_iter_next(SceneBaseIter *iter, Scene **scene, int val, Base **base, Object **ob)
 {
-	static ThreadVariable int in_next_object = 0;
+	static int in_next_object = 0;
 	int run_again = 1;
 	
 	/* init */

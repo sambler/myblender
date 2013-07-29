@@ -1131,7 +1131,7 @@ static int need_add_seq_dup(Sequence *seq)
 {
 	Sequence *p;
 
-	if ((!seq->strip) || (!seq->strip->stripdata) || (!seq->strip->stripdata->name))
+	if ((!seq->strip) || (!seq->strip->stripdata))
 		return(1);
 
 	/*
@@ -1140,7 +1140,7 @@ static int need_add_seq_dup(Sequence *seq)
 	 */
 	p = seq->prev;
 	while (p) {
-		if ((!p->strip) || (!p->strip->stripdata) || (!p->strip->stripdata->name)) {
+		if ((!p->strip) || (!p->strip->stripdata)) {
 			p = p->prev;
 			continue;
 		}
@@ -1152,7 +1152,7 @@ static int need_add_seq_dup(Sequence *seq)
 
 	p = seq->next;
 	while (p) {
-		if ((!p->strip) || (!p->strip->stripdata) || (!p->strip->stripdata->name)) {
+		if ((!p->strip) || (!p->strip->stripdata)) {
 			p = p->next;
 			continue;
 		}

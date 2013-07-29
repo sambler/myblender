@@ -33,8 +33,8 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_array.h"
 #include "BLI_math.h"
+#include "BLI_alloca.h"
 
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
@@ -338,16 +338,16 @@ bool BM_verts_in_face(BMFace *f, BMVert **varr, int len)
  */
 bool BM_edge_in_face(BMFace *f, BMEdge *e)
 {
-	BMLoop *l_iter;
-	BMLoop *l_first;
+	if (e->l) {
+		BMLoop *l_iter, *l_first;
 
-	l_iter = l_first = BM_FACE_FIRST_LOOP(f);
-
-	do {
-		if (l_iter->e == e) {
-			return true;
-		}
-	} while ((l_iter = l_iter->next) != l_first);
+		l_iter = l_first = e->l;
+		do {
+			if (l_iter->f == f) {
+				return true;
+			}
+		} while ((l_iter = l_iter->radial_next) != l_first);
+	}
 
 	return false;
 }
@@ -1717,6 +1717,18 @@ bool BM_face_is_any_edge_flag_test(BMFace *f, const char hflag)
 		}
 	} while ((l_iter = l_iter->next) != l_first);
 	return false;
+}
+
+/**
+ * Use within assert's to check normals are valid.
+ */
+bool BM_face_is_normal_valid(BMFace *f)
+{
+	const float eps = 0.0001f;
+	float no[3];
+
+	BM_face_calc_normal(f, no);
+	return len_squared_v3v3(no, f->no) < (eps * eps);
 }
 
 static void bm_mesh_calc_volume_face(BMFace *f, float *r_vol)

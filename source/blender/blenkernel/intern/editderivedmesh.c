@@ -1458,7 +1458,6 @@ static void emDM_copyLoopArray(DerivedMesh *dm, MLoop *r_loop)
 	BMesh *bm = bmdm->em->bm;
 	BMIter iter;
 	BMFace *efa;
-	BMLoop *l;
 
 	BM_mesh_elem_index_ensure(bm, BM_VERT | BM_EDGE);
 
@@ -1466,8 +1465,8 @@ static void emDM_copyLoopArray(DerivedMesh *dm, MLoop *r_loop)
 		BMLoop *l_iter, *l_first;
 		l_iter = l_first = BM_FACE_FIRST_LOOP(efa);
 		do {
-			r_loop->v = BM_elem_index_get(l->v);
-			r_loop->e = BM_elem_index_get(l->e);
+			r_loop->v = BM_elem_index_get(l_iter->v);
+			r_loop->e = BM_elem_index_get(l_iter->e);
 			r_loop++;
 		} while ((l_iter = l_iter->next) != l_first);
 	}
@@ -1583,17 +1582,17 @@ static void emDM_release(DerivedMesh *dm)
 
 	if (DM_release(dm)) {
 		if (bmdm->vertexCos) {
-			MEM_freeN(bmdm->vertexCos);
+			MEM_freeN((void *)bmdm->vertexCos);
 			if (bmdm->vertexNos) {
-				MEM_freeN(bmdm->vertexNos);
+				MEM_freeN((void *)bmdm->vertexNos);
 			}
 			if (bmdm->polyNos) {
-				MEM_freeN(bmdm->polyNos);
+				MEM_freeN((void *)bmdm->polyNos);
 			}
 		}
 
 		if (bmdm->polyCos) {
-			MEM_freeN(bmdm->polyCos);
+			MEM_freeN((void *)bmdm->polyCos);
 		}
 
 		MEM_freeN(bmdm);

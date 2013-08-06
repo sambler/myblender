@@ -2555,6 +2555,24 @@ void rna_def_render_layer_common(StructRNA *srna, int scene)
 	RNA_def_property_ui_text(prop, "Transmission Color", "Deliver transmission color pass");
 	if (scene) RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
 	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	
+	prop = RNA_def_property(srna, "use_pass_subsurface_direct", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_SUBSURFACE_DIRECT);
+	RNA_def_property_ui_text(prop, "Subsurface Direct", "Deliver subsurface direct pass");
+	if (scene) RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop = RNA_def_property(srna, "use_pass_subsurface_indirect", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_SUBSURFACE_INDIRECT);
+	RNA_def_property_ui_text(prop, "Subsurface Indirect", "Deliver subsurface indirect pass");
+	if (scene) RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop = RNA_def_property(srna, "use_pass_subsurface_color", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_SUBSURFACE_COLOR);
+	RNA_def_property_ui_text(prop, "Subsurface Color", "Deliver subsurface color pass");
+	if (scene) RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 }
 
 static void rna_def_freestyle_linesets(BlenderRNA *brna, PropertyRNA *cprop)
@@ -3126,6 +3144,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
+	static EnumPropertyItem vsync_items[] = {
+		{VSYNC_OFF, "OFF", 0, "Off", "Disables vsync"},
+		{VSYNC_ON, "ON", 0, "On", "Enables vsync"},
+		{VSYNC_ADAPTIVE, "ADAPTIVE", 0, "Adaptive", "Enables adaptive vsync (if supported)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	static EnumPropertyItem storage_items[] = {
 		{RAS_STORE_AUTO, "AUTO", 0, "Auto Select", "Chooses the best supported mode"},
 		{RAS_STORE_IMMEDIATE, "IMMEDIATE", 0, "Immediate Mode", "Slowest performance, requires OpenGL (any version)"},
@@ -3152,6 +3177,11 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	RNA_def_property_range(prop, 4, 10000);
 	RNA_def_property_ui_text(prop, "Resolution Y", "Number of vertical pixels in the screen");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "vsync", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "vsync");
+	RNA_def_property_enum_items(prop, vsync_items);
+	RNA_def_property_ui_text(prop, "Vsync", "Change vsync settings");
 	
 	prop = RNA_def_property(srna, "samples", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "aasamples");

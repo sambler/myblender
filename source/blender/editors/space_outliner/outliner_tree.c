@@ -74,6 +74,7 @@
 #include "BKE_modifier.h"
 #include "BKE_sequencer.h"
 #include "BKE_idcode.h"
+#include "BKE_treehash.h"
 
 #include "ED_armature.h"
 #include "ED_screen.h"
@@ -116,9 +117,8 @@ static void outliner_storage_cleanup(SpaceOops *soops)
 				if (BLI_mempool_count(ts) == unused) {
 					BLI_mempool_destroy(ts);
 					soops->treestore = NULL;
-
 					if (soops->treehash) {
-						BLI_ghash_free(soops->treehash, NULL, NULL);
+						BKE_treehash_free(soops->treehash);
 						soops->treehash = NULL;
 					}
 				}
@@ -135,14 +135,9 @@ static void outliner_storage_cleanup(SpaceOops *soops)
 					}
 					BLI_mempool_destroy(ts);
 					soops->treestore = new_ts;
-
 					if (soops->treehash) {
 						/* update hash table to fix broken pointers */
-						BLI_ghash_clear(soops->treehash, NULL, NULL);
-						BLI_mempool_iternew(soops->treestore, &iter);
-						while ((tselem = BLI_mempool_iterstep(&iter))) {
-							BLI_ghash_insert(soops->treehash, tselem, tselem);
-						}
+						BKE_treehash_rebuild_from_treestore(soops->treehash, soops->treestore);
 					}
 				}
 			}
@@ -150,53 +145,23 @@ static void outliner_storage_cleanup(SpaceOops *soops)
 	}
 }
 
-static unsigned int tse_hash(const void *ptr)
-{
-	const TreeStoreElem *tse = (const TreeStoreElem *)ptr;
-	unsigned int hash;
-	BLI_assert(tse->type || !tse->nr);
-	hash = BLI_ghashutil_inthash(SET_INT_IN_POINTER((tse->nr << 16) + tse->type));
-	hash ^= BLI_ghashutil_inthash(tse->id);
-	return hash;
-}
-
-static int tse_cmp(const void *a, const void *b)
-{
-	const TreeStoreElem *tse_a = (const TreeStoreElem *)a;
-	const TreeStoreElem *tse_b = (const TreeStoreElem *)b;
-	return tse_a->type != tse_b->type || tse_a->nr != tse_b->nr || tse_a->id != tse_b->id;
-}
-
 static void check_persistent(SpaceOops *soops, TreeElement *te, ID *id, short type, short nr)
 {
-	/* When treestore comes directly from readfile.c, treehash is empty;
-	 * In this case we don't want to get TSE_CLOSED while adding elements one by one,
-     * that is why this function restores treehash */
-	bool restore_treehash = (soops->treestore && !soops->treehash);
-	TreeStoreElem *tselem, elem_template;
+	TreeStoreElem *tselem;
 	
 	if (soops->treestore == NULL) {
 		/* if treestore was not created in readfile.c, create it here */
 		soops->treestore = BLI_mempool_create(sizeof(TreeStoreElem), 1, 512, BLI_MEMPOOL_ALLOW_ITER);
+		
 	}
 	if (soops->treehash == NULL) {
-		soops->treehash = BLI_ghash_new(tse_hash, tse_cmp, "treehash");
-	}
-	
-	if (restore_treehash) {
-		BLI_mempool_iter iter;
-		BLI_mempool_iternew(soops->treestore, &iter);
-		while ((tselem = BLI_mempool_iterstep(&iter))) {
-			BLI_ghash_insert(soops->treehash, tselem, tselem);
-		}
+		soops->treehash = BKE_treehash_create_from_treestore(soops->treestore);
 	}
 
-	/* check if 'te' is in treestore */
-	elem_template.type = type;
-	elem_template.nr = type ? nr : 0;  // we're picky! :)
-	elem_template.id = id;
-	tselem = BLI_ghash_lookup(soops->treehash, &elem_template);
-	if (tselem && !tselem->used) {
+	/* find any unused tree element in treestore and mark it as used
+	 * (note that there may be multiple unused elements in case of linked objects) */
+	tselem = BKE_treehash_lookup_unused(soops->treehash, type, nr, id);
+	if (tselem) {
 		te->store_elem = tselem;
 		tselem->used = 1;
 		return;
@@ -210,7 +175,7 @@ static void check_persistent(SpaceOops *soops, TreeElement *te, ID *id, short ty
 	tselem->used = 0;
 	tselem->flag = TSE_CLOSED;
 	te->store_elem = tselem;
-	BLI_ghash_insert(soops->treehash, tselem, tselem);
+	BKE_treehash_add_element(soops->treehash, tselem);
 }
 
 /* ********************************************************* */
@@ -250,16 +215,12 @@ static TreeElement *outliner_find_tree_element(ListBase *lb, TreeStoreElem *stor
 /* tse is not in the treestore, we use its contents to find a match */
 TreeElement *outliner_find_tse(SpaceOops *soops, TreeStoreElem *tse)
 {
-	GHash *th = soops->treehash;
-	TreeStoreElem *tselem, tselem_template;
+	TreeStoreElem *tselem;
 
 	if (tse->id == NULL) return NULL;
 	
 	/* check if 'tse' is in treestore */
-	tselem_template.id = tse->id;
-	tselem_template.type = tse->type;
-	tselem_template.nr = tse->type ? tse->nr : 0;
-	tselem = BLI_ghash_lookup(th, &tselem_template);
+	tselem = BKE_treehash_lookup_any(soops->treehash, tse->type, tse->nr, tse->id);
 	if (tselem) 
 		return outliner_find_tree_element(&soops->tree, tselem);
 	

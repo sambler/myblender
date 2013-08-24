@@ -159,7 +159,6 @@ EnumPropertyItem node_sampler_type_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-
 EnumPropertyItem prop_noise_basis_items[] = {
 	{SHD_NOISE_PERLIN, "PERLIN", 0, "Perlin", ""},
 	{SHD_NOISE_VORONOI_F1, "VORONOI_F1", 0, "Voronoi F1", ""},
@@ -177,15 +176,6 @@ EnumPropertyItem prop_noise_type_items[] = {
 	{SHD_NOISE_HARD, "HARD", 0, "Hard", ""},
 	{0, NULL, 0, NULL, NULL}
 };
-
-#if 0
-EnumPropertyItem prop_wave_items[] = {
-	{SHD_WAVE_SINE, "SINE", 0, "Sine", "Use a sine wave to produce bands"},
-	{SHD_WAVE_SAW, "SAW", 0, "Saw", "Use a saw wave to produce bands"},
-	{SHD_WAVE_TRI, "TRI", 0, "Tri", "Use a triangle wave to produce bands"},
-	{0, NULL, 0, NULL, NULL}
-};
-#endif
 
 #ifdef RNA_RUNTIME
 
@@ -3650,6 +3640,25 @@ static void def_sh_tangent(StructRNA *srna)
 	RNA_def_struct_sdna_from(srna, "bNode", NULL);
 }
 
+
+static void def_sh_subsurface(StructRNA *srna)
+{
+	static EnumPropertyItem prop_subsurface_falloff_items[] = {
+		{SHD_SUBSURFACE_COMPATIBLE, "COMPATIBLE", 0, "Compatible", "Subsurface scattering falloff compatible with previous versions"},
+		{SHD_SUBSURFACE_CUBIC, "CUBIC", 0, "Cubic", "Simple cubic falloff function"},
+		{SHD_SUBSURFACE_GAUSSIAN, "GAUSSIAN", 0, "Gaussian", "Normal distribution, multiple can be combined to fit more complex profiles"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	PropertyRNA *prop;
+	
+	prop = RNA_def_property(srna, "falloff", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "custom1");
+	RNA_def_property_enum_items(prop, prop_subsurface_falloff_items);
+	RNA_def_property_ui_text(prop, "Falloff", "Function to determine how much light nearby points contribute based on their distance to the shading point");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 static void def_sh_script(StructRNA *srna)
 {
 	PropertyRNA *prop;
@@ -5919,6 +5928,29 @@ static void def_cmp_translate(StructRNA *srna)
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
+static void def_cmp_planetrackdeform(StructRNA *srna)
+{
+	PropertyRNA *prop;
+
+	prop = RNA_def_property(srna, "clip", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "id");
+	RNA_def_property_struct_type(prop, "MovieClip");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Movie Clip", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	RNA_def_struct_sdna_from(srna, "NodePlaneTrackDeformData", "storage");
+
+	prop = RNA_def_property(srna, "tracking_object", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "tracking_object");
+	RNA_def_property_ui_text(prop, "Tracking Object", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "plane_track_name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "plane_track_name");
+	RNA_def_property_ui_text(prop, "Plane Track", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
 
 /* -- Texture Nodes --------------------------------------------------------- */
 

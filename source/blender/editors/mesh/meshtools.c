@@ -178,7 +178,6 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 			if (kb->data) MEM_freeN(kb->data);
 			kb->data = MEM_callocN(sizeof(float) * 3 * totvert, "join_shapekey");
 			kb->totelem = totvert;
-			kb->weights = NULL;
 		}
 	}
 	else if (haskey) {
@@ -1336,7 +1335,7 @@ bool ED_mesh_pick_vert(bContext *C, Object *ob, const int mval[2], unsigned int 
 		const float mval_f[2] = {(float)mval[0],
 		                         (float)mval[1]};
 
-		VertPickData data = {0};
+		VertPickData data = {NULL};
 
 		ED_view3d_init_mats_rv3d(ob, rv3d);
 

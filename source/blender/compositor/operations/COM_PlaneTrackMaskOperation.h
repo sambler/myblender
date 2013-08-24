@@ -1,5 +1,6 @@
+
 /*
- * Copyright 2011, Blender Foundation.
+ * Copyright 2013, Blender Foundation.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -14,48 +15,35 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * Contributor:
+ *		Sergey Sharybin
  */
 
-#include "util_foreach.h"
-#include "util_math.h"
-#include "util_memarena.h"
+#ifndef _COM_PlaneTrackMaskOperation_h
+#define _COM_PlaneTrackMaskOperation_h
 
-CCL_NAMESPACE_BEGIN
+#include <string.h>
 
-MemArena::MemArena(bool use_calloc_, size_t buffer_size_)
-{
-	use_calloc = use_calloc_;
-	buffer_size = buffer_size_;
+#include "COM_PlaneTrackCommonOperation.h"
 
-	last_left = 0;
-	last_buffer = NULL;
-}
+#include "DNA_movieclip_types.h"
+#include "DNA_tracking_types.h"
 
-MemArena::~MemArena()
-{
-	foreach(uint8_t *buffer, buffers)
-		delete [] buffer;
-}
+#include "BLI_listbase.h"
+#include "BLI_string.h"
 
-void *MemArena::alloc(size_t size)
-{
-	if(size > last_left) {
-		last_left = (size > buffer_size)? size: buffer_size;
-		last_buffer = new uint8_t[last_left];
+class PlaneTrackMaskOperation : public PlaneTrackCommonOperation {
+protected:
+	int m_osa;
+	float m_jitter[32][2];
 
-		if(use_calloc)
-			memset(last_buffer, 0, last_left);
+public:
+	PlaneTrackMaskOperation();
 
-		buffers.push_back(last_buffer);
-	}
+	void initExecution();
 
-	uint8_t *mem = last_buffer;
+	void executePixel(float output[4], float x, float y, PixelSampler sampler);
+};
 
-	last_buffer += size;
-	last_left -= size;
-
-	return (void*)mem;
-}
-
-CCL_NAMESPACE_END
-
+#endif

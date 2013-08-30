@@ -1004,17 +1004,6 @@ static void draw_marker_texts(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 	}
 }
 
-static void view2d_to_region_float(View2D *v2d, float x, float y, float *regionx, float *regiony)
-{
-	/* express given coordinates as proportional values */
-	x = -v2d->cur.xmin / BLI_rctf_size_x(&v2d->cur);
-	y = -v2d->cur.ymin / BLI_rctf_size_y(&v2d->cur);
-
-	/* convert proportional distances to screen coordinates */
-	*regionx = v2d->mask.xmin + x * BLI_rcti_size_x(&v2d->mask);
-	*regiony = v2d->mask.ymin + y * BLI_rcti_size_y(&v2d->mask);
-}
-
 static void plane_track_colors(bool is_active, float color[3], float selected_color[3])
 {
 	UI_GetThemeColor3fv(TH_MARKER, color);
@@ -1078,8 +1067,6 @@ static void draw_plane_marker_ex(SpaceClip *sc, MovieTrackingPlaneTrack *plane_t
 	else if (tiny) {
 		glLineStipple(3, 0xaaaa);
 		glEnable(GL_LINE_STIPPLE);
-		glEnable(GL_COLOR_LOGIC_OP);
-		glLogicOp(GL_NOR);
 	}
 
 	/* Draw rectangle itself. */
@@ -1127,10 +1114,7 @@ static void draw_plane_marker_ex(SpaceClip *sc, MovieTrackingPlaneTrack *plane_t
 		}
 	}
 	else if (tiny) {
-		glDisable(GL_COLOR_LOGIC_OP);
 		glDisable(GL_LINE_STIPPLE);
-		glLineStipple(3, 0xaaaa);
-		glEnable(GL_LINE_STIPPLE);
 	}
 }
 
@@ -1180,7 +1164,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	 * to avoid this flickering, calculate base point in the same way as it happens
 	 * in UI_view2d_to_region_no_clip, but do it in floats here */
 
-	view2d_to_region_float(&ar->v2d, 0.0f, 0.0f, &x, &y);
+	UI_view2d_to_region_float(&ar->v2d, 0.0f, 0.0f, &x, &y);
 
 	glPushMatrix();
 	glTranslatef(x, y, 0);
@@ -1423,7 +1407,7 @@ static void draw_distortion(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	if ((sc->flag & SC_SHOW_GRID) == 0 && (sc->flag & SC_MANUAL_CALIBRATION) == 0)
 		return;
 
-	view2d_to_region_float(&ar->v2d, 0.0f, 0.0f, &x, &y);
+	UI_view2d_to_region_float(&ar->v2d, 0.0f, 0.0f, &x, &y);
 
 	glPushMatrix();
 	glTranslatef(x, y, 0);

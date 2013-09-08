@@ -811,7 +811,6 @@ class CyclesWorld_PT_volume(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.active = False
 
         world = context.world
         panel_node_draw(layout, world, 'OUTPUT_WORLD', 'Volume')
@@ -911,7 +910,7 @@ class CyclesWorld_PT_settings(CyclesButtonsPanel, Panel):
         sub = col.row(align=True)
         sub.active = cworld.sample_as_light
         sub.prop(cworld, "sample_map_resolution")
-        if not cscene.progressive:
+        if cscene.progressive == 'BRANCHED_PATH':
             sub.prop(cworld, "samples")
 
 
@@ -957,7 +956,6 @@ class CyclesMaterial_PT_volume(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.active = False
 
         mat = context.material
         cmat = mat.cycles

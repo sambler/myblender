@@ -894,6 +894,45 @@ bool isect_line_tri_v3(const float p1[3], const float p2[3],
 	return 1;
 }
 
+/* like isect_line_tri_v3, but allows epsilon tolerance around triangle */
+bool isect_line_tri_epsilon_v3(const float p1[3], const float p2[3],
+                       const float v0[3], const float v1[3], const float v2[3],
+                       float *r_lambda, float r_uv[2], const float epsilon)
+{
+
+	float p[3], s[3], d[3], e1[3], e2[3], q[3];
+	float a, f, u, v;
+
+	sub_v3_v3v3(e1, v1, v0);
+	sub_v3_v3v3(e2, v2, v0);
+	sub_v3_v3v3(d, p2, p1);
+
+	cross_v3_v3v3(p, d, e2);
+	a = dot_v3v3(e1, p);
+	if ((a > -0.000001f) && (a < 0.000001f)) return 0;
+	f = 1.0f / a;
+
+	sub_v3_v3v3(s, p1, v0);
+
+	u = f * dot_v3v3(s, p);
+	if ((u < -epsilon) || (u > 1.0f + epsilon)) return 0;
+
+	cross_v3_v3v3(q, s, e1);
+
+	v = f * dot_v3v3(d, q);
+	if ((v < -epsilon) || ((u + v) > 1.0f + epsilon)) return 0;
+
+	*r_lambda = f * dot_v3v3(e2, q);
+	if ((*r_lambda < 0.0f) || (*r_lambda > 1.0f)) return 0;
+
+	if (r_uv) {
+		r_uv[0] = u;
+		r_uv[1] = v;
+	}
+
+	return 1;
+}
+
 /* moved from effect.c
  * test if the ray starting at p1 going in d direction intersects the triangle v0..v2
  * return non zero if it does
@@ -1082,50 +1121,28 @@ bool isect_point_planes_v3(float (*planes)[4], int totplane, const float p[3])
  * \param l2 The second point of the line.
  * \param plane_co A point on the plane to intersect with.
  * \param plane_no The direction of the plane (does not need to be normalized).
- * \param no_flip When true, the intersection point will always be from l1 to l2, even if this is not on the plane.
+ *
+ * \note #line_plane_factor_v3() shares logic.
  */
 bool isect_line_plane_v3(float out[3],
                          const float l1[3], const float l2[3],
-                         const float plane_co[3], const float plane_no[3], const bool no_flip)
+                         const float plane_co[3], const float plane_no[3])
 {
-	float l_vec[3]; /* l1 -> l2 normalized vector */
-	float p_no[3]; /* 'plane_no' normalized */
+	float u[3], h[3];
 	float dot;
 
-	sub_v3_v3v3(l_vec, l2, l1);
+	sub_v3_v3v3(u, l2, l1);
+	sub_v3_v3v3(h, l1, plane_co);
+	dot = dot_v3v3(plane_no, u);
 
-	normalize_v3(l_vec);
-	normalize_v3_v3(p_no, plane_no);
-
-	dot = dot_v3v3(l_vec, p_no);
-	if (dot == 0.0f) {
-		return 0;
+	if (fabsf(dot) > FLT_EPSILON) {
+		float lambda = -dot_v3v3(plane_no, h) / dot;
+		madd_v3_v3v3fl(out, l1, u, lambda);
+		return true;
 	}
 	else {
-		float l1_plane[3]; /* line point aligned with the plane */
-		float dist; /* 'plane_no' aligned distance to the 'plane_co' */
-
-		/* for predictable flipping since the plane is only used to
-		 * define a direction, ignore its flipping and aligned with 'l_vec' */
-		if (dot < 0.0f) {
-			dot = -dot;
-			negate_v3(p_no);
-		}
-
-		add_v3_v3v3(l1_plane, l1, p_no);
-
-		dist = line_point_factor_v3(plane_co, l1, l1_plane);
-
-		/* treat line like a ray, when 'no_flip' is set */
-		if (no_flip && dist < 0.0f) {
-			dist = -dist;
-		}
-
-		mul_v3_fl(l_vec, dist / dot);
-
-		add_v3_v3v3(out, l1, l_vec);
-
-		return 1;
+		/* The segment is parallel to plane */
+		return false;
 	}
 }
 
@@ -1151,7 +1168,7 @@ void isect_plane_plane_v3(float r_isect_co[3], float r_isect_no[3],
 	cross_v3_v3v3(r_isect_no, plane_a_no, plane_b_no); /* direction is simply the cross product */
 	cross_v3_v3v3(plane_a_co_other, plane_a_no, r_isect_no);
 	add_v3_v3(plane_a_co_other, plane_a_co);
-	isect_line_plane_v3(r_isect_co, plane_a_co, plane_a_co_other, plane_b_co, plane_b_no, FALSE);
+	isect_line_plane_v3(r_isect_co, plane_a_co, plane_a_co_other, plane_b_co, plane_b_no);
 }
 
 
@@ -1677,6 +1694,20 @@ float line_point_factor_v2(const float p[2], const float l1[2], const float l2[2
 #endif
 }
 
+/**
+ * \note #isect_line_plane_v3() shares logic
+ */
+float line_plane_factor_v3(const float plane_co[3], const float plane_no[3],
+                           const float l1[3], const float l2[3])
+{
+	float u[3], h[3];
+	float dot;
+	sub_v3_v3v3(u, l2, l1);
+	sub_v3_v3v3(h, l1, plane_co);
+	dot = dot_v3v3(plane_no, u);
+	return (dot != 0.0f) ? -dot_v3v3(plane_no, h) / dot : 0.0f;
+}
+
 /* ensure the distance between these points is no greater then 'dist'
  * if it is, scale then both into the center */
 void limit_dist_v3(float v1[3], float v2[3], const float dist)
@@ -2169,8 +2200,6 @@ void barycentric_weights_v2_quad(const float v1[2], const float v2[2], const flo
 	        ((_area = cross_v2v2(dirs[i1], dirs[i2])) != 0.0f ? \
 	         fabsf(((lens[i1] * lens[i2]) - dot_v2v2(dirs[i1], dirs[i2])) / _area) : 0.0f)
 
-	float wtot, area;
-
 	const float dirs[4][2] = {
 	    {v1[0] - co[0], v1[1] - co[1]},
 	    {v2[0] - co[0], v2[1] - co[1]},
@@ -2185,20 +2214,29 @@ void barycentric_weights_v2_quad(const float v1[2], const float v2[2], const flo
 	    len_v2(dirs[3]),
 	};
 
-	/* variable 'area' is just for storage,
-	 * the order its initialized doesn't matter */
+	/* avoid divide by zero */
+	if      (UNLIKELY(lens[0] < FLT_EPSILON)) { w[0] = 1.0f; w[1] = w[2] = w[3] = 0.0f; }
+	else if (UNLIKELY(lens[1] < FLT_EPSILON)) { w[1] = 1.0f; w[0] = w[2] = w[3] = 0.0f; }
+	else if (UNLIKELY(lens[2] < FLT_EPSILON)) { w[2] = 1.0f; w[0] = w[1] = w[3] = 0.0f; }
+	else if (UNLIKELY(lens[3] < FLT_EPSILON)) { w[3] = 1.0f; w[0] = w[1] = w[2] = 0.0f;
+	}
+	else {
+		float wtot, area;
+
+		/* variable 'area' is just for storage,
+		 * the order its initialized doesn't matter */
 #ifdef __clang__
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wunsequenced"
 #endif
 
-	/* inline mean_value_half_tan four times here */
-	float t[4] = {
-	    MEAN_VALUE_HALF_TAN_V2(area, 0, 1),
-	    MEAN_VALUE_HALF_TAN_V2(area, 1, 2),
-	    MEAN_VALUE_HALF_TAN_V2(area, 2, 3),
-	    MEAN_VALUE_HALF_TAN_V2(area, 3, 0),
-	};
+		/* inline mean_value_half_tan four times here */
+		float t[4] = {
+			MEAN_VALUE_HALF_TAN_V2(area, 0, 1),
+			MEAN_VALUE_HALF_TAN_V2(area, 1, 2),
+			MEAN_VALUE_HALF_TAN_V2(area, 2, 3),
+			MEAN_VALUE_HALF_TAN_V2(area, 3, 0),
+		};
 
 #ifdef __clang__
 #  pragma clang diagnostic pop
@@ -2206,18 +2244,19 @@ void barycentric_weights_v2_quad(const float v1[2], const float v2[2], const flo
 
 #undef MEAN_VALUE_HALF_TAN_V2
 
-	w[0] = (t[3] + t[0]) / lens[0];
-	w[1] = (t[0] + t[1]) / lens[1];
-	w[2] = (t[1] + t[2]) / lens[2];
-	w[3] = (t[2] + t[3]) / lens[3];
+		w[0] = (t[3] + t[0]) / lens[0];
+		w[1] = (t[0] + t[1]) / lens[1];
+		w[2] = (t[1] + t[2]) / lens[2];
+		w[3] = (t[2] + t[3]) / lens[3];
 
-	wtot = w[0] + w[1] + w[2] + w[3];
+		wtot = w[0] + w[1] + w[2] + w[3];
 
-	if (wtot != 0.0f) {
-		mul_v4_fl(w, 1.0f / wtot);
-	}
-	else { /* dummy values for zero area face */
-		copy_v4_fl(w, 1.0f / 4.0f);
+		if (wtot != 0.0f) {
+			mul_v4_fl(w, 1.0f / wtot);
+		}
+		else { /* dummy values for zero area face */
+			copy_v4_fl(w, 1.0f / 4.0f);
+		}
 	}
 }
 
@@ -2355,17 +2394,16 @@ int interp_sparse_array(float *array, int const list_size, const float skipval)
  * more than 3 vertices */
 static float mean_value_half_tan_v3(const float v1[3], const float v2[3], const float v3[3])
 {
-	float d2[3], d3[3], cross[3], area, dot, len;
+	float d2[3], d3[3], cross[3], area;
 
 	sub_v3_v3v3(d2, v2, v1);
 	sub_v3_v3v3(d3, v3, v1);
 	cross_v3_v3v3(cross, d2, d3);
 
 	area = len_v3(cross);
-	dot = dot_v3v3(d2, d3);
-	len = len_v3(d2) * len_v3(d3);
-
 	if (LIKELY(area != 0.0f)) {
+		const float dot = dot_v3v3(d2, d3);
+		const float len = len_v3(d2) * len_v3(d3);
 		return (len - dot) / area;
 	}
 	else {
@@ -2374,18 +2412,16 @@ static float mean_value_half_tan_v3(const float v1[3], const float v2[3], const 
 }
 static float mean_value_half_tan_v2(const float v1[2], const float v2[2], const float v3[2])
 {
-	float d2[2], d3[2], area, dot, len;
+	float d2[2], d3[2], area;
 
 	sub_v2_v2v2(d2, v2, v1);
 	sub_v2_v2v2(d3, v3, v1);
 
 	/* different from the 3d version but still correct */
 	area = cross_v2v2(d2, d3);
-
-	dot = dot_v2v2(d2, d3);
-	len = len_v2(d2) * len_v2(d3);
-
 	if (LIKELY(area != 0.0f)) {
+		const float dot = dot_v2v2(d2, d3);
+		const float len = len_v2(d2) * len_v2(d3);
 		return (len - dot) / area;
 	}
 	else {

@@ -262,6 +262,7 @@ mark_as_advanced(PYTHON_NUMPY_PATH)
 # Cycles
 option(WITH_CYCLES					"Enable cycles Render Engine" ON)
 option(WITH_CYCLES_STANDALONE		"Build cycles standalone application" OFF)
+option(WITH_CYCLES_STANDALONE_GUI	"Build cycles standalone with GUI" OFF)
 option(WITH_CYCLES_OSL				"Build Cycles with OSL support" OFF)
 option(WITH_CYCLES_CUDA_BINARIES	"Build cycles CUDA binaries" OFF)
 set(CYCLES_CUDA_BINARIES_ARCH sm_20 sm_21 sm_30 sm_35 CACHE STRING "CUDA architectures to build binaries for")
@@ -305,7 +306,9 @@ if(APPLE)
 	endif()
 	
 	execute_process(COMMAND uname -r OUTPUT_VARIABLE MAC_SYS) # check for actual system-version
-	if(${MAC_SYS} MATCHES 12)
+	if(${MAC_SYS} MATCHES 13)
+		set(OSX_SYSTEM 10.9)
+	elseif(${MAC_SYS} MATCHES 12)
 		set(OSX_SYSTEM 10.8)
 	elseif(${MAC_SYS} MATCHES 11)
 		set(OSX_SYSTEM 10.7)
@@ -881,8 +884,6 @@ if(UNIX AND NOT APPLE)
 
 	if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 		if(NOT WITH_PYTHON_MODULE)
-			# BSD's dont use libdl.so
-		set(PLATFORM_LINKLIBS "${PLATFORM_LINKLIBS} -ldl")
 			# binreloc is linux only
 			set(BINRELOC_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/extern/binreloc/include)
 			set(WITH_BINRELOC ON)

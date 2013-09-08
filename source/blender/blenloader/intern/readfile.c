@@ -250,11 +250,7 @@ static void convert_tface_mt(FileData *fd, Main *main);
  * we could alternatively have a versions of a report function which forces printing - campbell
  */
 
-static void BKE_reportf_wrap(ReportList *reports, ReportType type, const char *format, ...)
-#ifdef __GNUC__
-__attribute__ ((format(printf, 3, 4)))
-#endif
-;
+static void BKE_reportf_wrap(ReportList *reports, ReportType type, const char *format, ...) ATTR_PRINTF_FORMAT(3, 4);
 static void BKE_reportf_wrap(ReportList *reports, ReportType type, const char *format, ...)
 {
 	char fixed_buf[1024]; /* should be long enough */
@@ -4371,12 +4367,8 @@ static void lib_link_object(FileData *fd, Main *main)
 			for (sens = ob->sensors.first; sens; sens = sens->next) {
 				for (a = 0; a < sens->totlinks; a++)
 					sens->links[a] = newglobadr(fd, sens->links[a]);
-				
-				if (sens->type == SENS_TOUCH) {
-					bTouchSensor *ts = sens->data;
-					ts->ma = newlibadr(fd, ob->id.lib, ts->ma);
-				}
-				else if (sens->type == SENS_MESSAGE) {
+
+				if (sens->type == SENS_MESSAGE) {
 					bMessageSensor *ms = sens->data;
 					ms->fromObject =
 						newlibadr(fd, ob->id.lib, ms->fromObject);
@@ -7143,7 +7135,7 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, int flag, ID
 	if (id->flag & LIB_FAKEUSER) id->us= 1;
 	else id->us = 0;
 	id->icon_id = 0;
-	id->flag &= ~(LIB_ID_RECALC|LIB_ID_RECALC_DATA);
+	id->flag &= ~(LIB_ID_RECALC|LIB_ID_RECALC_DATA|LIB_DOIT);
 	
 	/* this case cannot be direct_linked: it's just the ID part */
 	if (bhead->code == ID_ID) {
@@ -9538,8 +9530,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
-	if (MAIN_VERSION_OLDER(main, 267, 1))
-	{
+	if (MAIN_VERSION_OLDER(main, 267, 1)) {
 		Object *ob;
 
 		for (ob = main->object.first; ob; ob = ob->id.next) {
@@ -9583,9 +9574,23 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		#undef BRUSH_FIXED
 	}
 	
-	{
+
+	if (!MAIN_VERSION_ATLEAST(main, 268, 4)) {
 		bScreen *sc;
 		Object *ob;
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			bConstraint *con;
+			for (con = ob->constraints.first; con; con = con->next) {
+				if (con->type == CONSTRAINT_TYPE_SHRINKWRAP) {
+					bShrinkwrapConstraint *data = (bShrinkwrapConstraint *)con->data;
+					if      (data->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_X_AXIS) data->projAxis = OB_POSX;
+					else if (data->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_Y_AXIS) data->projAxis = OB_POSY;
+					else                                                          data->projAxis = OB_POSZ;
+					data->projAxisSpace = CONSTRAINT_SPACE_LOCAL;
+				}
+			}
+		}
 
 		for (ob = main->object.first; ob; ob = ob->id.next) {
 			ModifierData *md;
@@ -9617,6 +9622,32 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							snode->zoom = 1.0;
 						}
 					}
+				}
+			}
+		}
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			bSensor *sens;
+			bTouchSensor *ts;
+			bCollisionSensor *cs;
+			Material *ma;
+
+			for (sens = ob->sensors.first; sens; sens = sens->next) {
+				if (sens->type == SENS_TOUCH) {
+					ts = sens->data;
+					cs = MEM_callocN(sizeof(bCollisionSensor), "touch -> collision sensor do_version");
+
+					if (ts->ma) {
+						ma = blo_do_versions_newlibadr(fd, ob->id.lib, ts->ma);
+						BLI_strncpy(cs->materialName, ma->id.name+2, sizeof(cs->materialName));
+					}
+
+					cs->mode = SENS_COLLISION_MATERIAL;
+
+					MEM_freeN(ts);
+
+					sens->data = cs;
+					sens->type = sens->otype = SENS_COLLISION;
 				}
 			}
 		}
@@ -10521,11 +10552,7 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 		expand_doit(fd, mainvar, psys->part);
 	
 	for (sens = ob->sensors.first; sens; sens = sens->next) {
-		if (sens->type == SENS_TOUCH) {
-			bTouchSensor *ts = sens->data;
-			expand_doit(fd, mainvar, ts->ma);
-		}
-		else if (sens->type == SENS_MESSAGE) {
+		if (sens->type == SENS_MESSAGE) {
 			bMessageSensor *ms = sens->data;
 			expand_doit(fd, mainvar, ms->fromObject);
 		}
@@ -10949,13 +10976,17 @@ static void give_base_to_groups(Main *mainvar, Scene *scene)
 {
 	Group *group;
 	
-	/* give all objects which are LIB_INDIRECT a base, or for a group when *lib has been set */
+	/* give all objects which are tagged a base */
 	for (group = mainvar->group.first; group; group = group->id.next) {
-		if (((group->id.flag & LIB_INDIRECT)==0 && (group->id.flag & LIB_PRE_EXISTING)==0)) {
+		if (group->id.flag & LIB_DOIT) {
 			Base *base;
+			Object *ob;
+
+			/* any indirect group should not have been tagged */
+			BLI_assert((group->id.flag & LIB_INDIRECT)==0);
 			
 			/* BKE_object_add(...) messes with the selection */
-			Object *ob = BKE_object_add_only_object(mainvar, OB_EMPTY, group->id.name + 2);
+			ob = BKE_object_add_only_object(mainvar, OB_EMPTY, group->id.name + 2);
 			ob->type = OB_EMPTY;
 			ob->lay = scene->lay;
 			
@@ -11080,6 +11111,11 @@ static ID *append_named_part_ex(const bContext *C, Main *mainl, FileData *fd, co
 			}
 		}
 	}
+	else if (id && (GS(id->name) == ID_GR)) {
+		/* tag as needing to be instanced */
+		if (flag & FILE_GROUP_INSTANCE)
+			id->flag |= LIB_DOIT;
+	}
 	
 	return id;
 }
@@ -11125,6 +11161,9 @@ static Main *library_append_begin(Main *mainvar, FileData **fd, const char *file
 
 	(*fd)->mainlist = MEM_callocN(sizeof(ListBase), "FileData.mainlist");
 	
+	/* clear for group instancing tag */
+	tag_main_lb(&(mainvar->group), 0);
+
 	/* make mains */
 	blo_split_main((*fd)->mainlist, mainvar);
 	
@@ -11201,6 +11240,10 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 			printf("library_append_end, scene is NULL (objects wont get bases)\n");
 		}
 	}
+
+	/* clear group instancing tag */
+	tag_main_lb(&(mainvar->group), 0);
+	
 	/* has been removed... erm, why? s..ton) */
 	/* 20040907: looks like they are give base already in append_named_part(); -Nathan L */
 	/* 20041208: put back. It only linked direct, not indirect objects (ton) */

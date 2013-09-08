@@ -387,7 +387,7 @@ macro(setup_liblinks
 		target_link_libraries(${target} ${PTHREADS_LIBRARIES})
 	endif()
 
-	target_link_libraries(${target} ${PLATFORM_LINKLIBS})
+	target_link_libraries(${target} ${PLATFORM_LINKLIBS} ${CMAKE_DL_LIBS})
 endmacro()
 
 macro(TEST_SSE_SUPPORT
@@ -498,6 +498,7 @@ macro(remove_strict_flags)
 		remove_cc_flag("-Wredundant-decls")
 		remove_cc_flag("-Wundef")
 		remove_cc_flag("-Wshadow")
+		remove_cc_flag("-Wdouble-promotion")
 		remove_cc_flag("-Wold-style-definition")
 		remove_cc_flag("-Werror=[^ ]+")
 		remove_cc_flag("-Werror")

@@ -278,9 +278,14 @@ void OCIO_matrixTransformRelease(OCIO_MatrixTransformRcPtr *mt)
 	impl->matrixTransformRelease(mt);
 }
 
-void OCIO_matrixTransformScale(float * m44, float * offset4, const float *scale4f)
+void OCIO_matrixTransformScale(float *m44, float *offset4, const float *scale4f)
 {
 	impl->matrixTransformScale(m44, offset4, scale4f);
+}
+
+int OCIO_supportGLSLDraw(void)
+{
+	return (int) impl->supportGLSLDraw();
 }
 
 int OCIO_setupGLSLDraw(struct OCIO_GLSLDrawState **state_r, OCIO_ConstProcessorRcPtr *processor, int predivide)

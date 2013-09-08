@@ -542,6 +542,7 @@ static BMOpDefine bmo_grid_fill_def = {
 	/* restricts edges to groups.  maps edges to integer */
 	 {"mat_nr",         BMO_OP_SLOT_INT},      /* material to use */
 	 {"use_smooth",     BMO_OP_SLOT_BOOL},     /* smooth state to use */
+	 {"use_interp_simple", BMO_OP_SLOT_BOOL},  /* use simple interpolation */
 	 {{'\0'}},
 	},
 	/* slots_out */
@@ -1177,8 +1178,9 @@ static BMOpDefine bmo_duplicate_def = {
 	 {"geom.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE}},
 	/* facemap maps from source faces to dupe
 	 * faces, and from dupe faces to source faces */
-	 {"face_map.out", BMO_OP_SLOT_MAPPING, {BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
 	 {"vert_map.out", BMO_OP_SLOT_MAPPING, {BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	 {"edge_map.out", BMO_OP_SLOT_MAPPING, {BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	 {"face_map.out", BMO_OP_SLOT_MAPPING, {BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
 	 {"boundary_map.out", BMO_OP_SLOT_MAPPING, {BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
 	 {"isovert_map.out", BMO_OP_SLOT_MAPPING, {BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
 	{{'\0'}},

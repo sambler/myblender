@@ -975,8 +975,8 @@ typedef struct NodeShaderNormalMap {
 #define SHD_NORMAL_MAP_BLENDER_OBJECT	3
 #define SHD_NORMAL_MAP_BLENDER_WORLD	4
 
-/* tangent */
-#define SHD_SUBSURFACE_COMPATIBLE		0
+/* subsurface */
+#define SHD_SUBSURFACE_COMPATIBLE		0 // Deprecated
 #define SHD_SUBSURFACE_CUBIC			1
 #define SHD_SUBSURFACE_GAUSSIAN			2
 

@@ -2847,6 +2847,15 @@ static void rna_ShaderNodeSubsurface_update(Main *bmain, Scene *scene, PointerRN
 	rna_Node_update(bmain, scene, ptr);
 }
 
+static void rna_CompositorNodeScale_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	bNodeTree *ntree = (bNodeTree *)ptr->id.data;
+	bNode *node = (bNode *)ptr->data;
+
+	nodeUpdate(ntree, node);
+	rna_Node_update(bmain, scene, ptr);
+}
+
 #else
 
 static EnumPropertyItem prop_image_layer_items[] = {
@@ -3135,9 +3144,23 @@ static void def_sh_material(StructRNA *srna)
 
 static void def_sh_mapping(StructRNA *srna)
 {
+	static EnumPropertyItem prop_vect_type_items[] = {
+		{TEXMAP_TYPE_TEXTURE, "TEXTURE", 0, "Texture", "Transform a texture by inverse mapping the texture coordinate"},
+		{TEXMAP_TYPE_POINT,   "POINT",   0, "Point",   "Transform a point"},
+		{TEXMAP_TYPE_VECTOR,  "VECTOR",  0, "Vector",  "Transform a direction vector"},
+		{TEXMAP_TYPE_NORMAL,  "NORMAL",  0, "Normal",  "Transform a normal vector with unit length"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	PropertyRNA *prop;
 	
 	RNA_def_struct_sdna_from(srna, "TexMapping", "storage");
+
+	prop = RNA_def_property(srna, "vector_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "type");
+	RNA_def_property_enum_items(prop, prop_vect_type_items);
+	RNA_def_property_ui_text(prop, "Type", "Type of vector that the mapping transforms");
+	RNA_def_property_update(prop, 0, "rna_Mapping_Node_update");
 
 	prop = RNA_def_property(srna, "translation", PROP_FLOAT, PROP_TRANSLATION);
 	RNA_def_property_float_sdna(prop, NULL, "loc");
@@ -3244,7 +3267,7 @@ static void def_sh_tex_sky(StructRNA *srna)
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 	
 	prop = RNA_def_property(srna, "turbidity", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 1.0f, 30.0f);
+	RNA_def_property_range(prop, 1.0f, 10.0f);
 	RNA_def_property_ui_range(prop, 1.0f, 10.0f, 10, 3);
 	RNA_def_property_ui_text(prop, "Turbidity", "Atmospheric turbidity");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
@@ -3522,9 +3545,9 @@ static void def_sh_tex_coord(StructRNA *srna)
 static void def_sh_vect_transform(StructRNA *srna)
 {
 	static EnumPropertyItem prop_vect_type_items[] = {
-		{SHD_VECT_TRANSFORM_TYPE_VECTOR, "VECTOR",  0, "Vector",   ""},
-		{SHD_VECT_TRANSFORM_TYPE_POINT,  "POINT",   0, "Point",    ""},
-		{SHD_VECT_TRANSFORM_TYPE_NORMAL, "NORMAL",  0, "Normal",   ""},
+		{SHD_VECT_TRANSFORM_TYPE_POINT,  "POINT",   0, "Point",    "Transform a point"},
+		{SHD_VECT_TRANSFORM_TYPE_VECTOR, "VECTOR",  0, "Vector",   "Transform a direction vector"},
+		{SHD_VECT_TRANSFORM_TYPE_NORMAL, "NORMAL",  0, "Normal",   "Transform a normal vector with unit length"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -3539,7 +3562,8 @@ static void def_sh_vect_transform(StructRNA *srna)
 	
 	RNA_def_struct_sdna_from(srna, "NodeShaderVectTransform", "storage");
 	
-	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
+	prop = RNA_def_property(srna, "vector_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "type");
 	RNA_def_property_enum_items(prop, prop_vect_type_items);
 	RNA_def_property_ui_text(prop, "Type", "");
 	RNA_def_property_update(prop, 0, "rna_Node_update");
@@ -3675,7 +3699,6 @@ static void def_sh_tangent(StructRNA *srna)
 static void def_sh_subsurface(StructRNA *srna)
 {
 	static EnumPropertyItem prop_subsurface_falloff_items[] = {
-		{SHD_SUBSURFACE_COMPATIBLE, "COMPATIBLE", 0, "Compatible", "Subsurface scattering falloff compatible with previous versions"},
 		{SHD_SUBSURFACE_CUBIC, "CUBIC", 0, "Cubic", "Simple cubic falloff function"},
 		{SHD_SUBSURFACE_GAUSSIAN, "GAUSSIAN", 0, "Gaussian", "Normal distribution, multiple can be combined to fit more complex profiles"},
 		{0, NULL, 0, NULL, NULL}
@@ -4345,7 +4368,7 @@ static void def_cmp_scale(StructRNA *srna)
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
 	RNA_def_property_enum_items(prop, space_items);
 	RNA_def_property_ui_text(prop, "Space", "Coordinate space to scale relative to");
-	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_CompositorNodeScale_update");
 
 	/* expose 2 flags as a enum of 3 items */
 	prop = RNA_def_property(srna, "frame_method", PROP_ENUM, PROP_NONE);

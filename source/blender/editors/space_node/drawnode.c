@@ -571,7 +571,7 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 	 */
 #if 0
 	/* body */
-	uiSetRoundBox(15);
+	uiSetRoundBox(UI_CNR_ALL);
 	UI_ThemeColor4(TH_NODE);
 	glEnable(GL_BLEND);
 	uiRoundBox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, size);
@@ -709,6 +709,8 @@ static void node_shader_buts_mapping(uiLayout *layout, bContext *UNUSED(C), Poin
 {
 	uiLayout *row;
 	
+	uiItemR(layout, ptr, "vector_type", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+
 	uiItemL(layout, IFACE_("Location:"), ICON_NONE);
 	row = uiLayoutRow(layout, TRUE);
 	uiItemR(row, ptr, "translation", 0, "", ICON_NONE);
@@ -737,7 +739,7 @@ static void node_shader_buts_vect_math(uiLayout *layout, bContext *UNUSED(C), Po
 
 static void node_shader_buts_vect_transform(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 { 
-	uiItemR(layout, ptr, "type", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+	uiItemR(layout, ptr, "vector_type", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "convert_from", 0, "", ICON_NONE);
 	uiItemR(layout, ptr, "convert_to", 0, "", ICON_NONE);
 }
@@ -911,8 +913,16 @@ static void node_shader_buts_glossy(uiLayout *layout, bContext *UNUSED(C), Point
 	uiItemR(layout, ptr, "distribution", 0, "", ICON_NONE);
 }
 
-static void node_shader_buts_subsurface(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void node_shader_buts_subsurface(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
+	/* SSS does not work on GPU yet */
+	PointerRNA scene = CTX_data_pointer_get(C, "scene");
+	if (scene.data) {
+		PointerRNA cscene = RNA_pointer_get(&scene, "cycles");
+		if (cscene.data && RNA_enum_get(&cscene, "device") == 1)
+			uiItemL(layout, IFACE_("SSS not supported on GPU"), ICON_ERROR);
+	}
+
 	uiItemR(layout, ptr, "falloff", 0, "", ICON_NONE);
 }
 

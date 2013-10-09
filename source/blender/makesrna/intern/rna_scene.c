@@ -219,6 +219,13 @@ EnumPropertyItem snap_uv_element_items[] = {
 #  define R_IMF_ENUM_TIFF
 #endif
 
+#ifdef WITH_PSD
+#  define R_IMF_ENUM_PSD     {R_IMF_IMTYPE_PSD, "PSD", ICON_FILE_IMAGE, "Photosp PSD", \
+                                                "Output image in Photoshop PSD format"},
+#else
+#  define R_IMF_ENUM_PSD
+#endif
+
 
 #define IMAGE_TYPE_ITEMS_IMAGE_ONLY                                           \
 	R_IMF_ENUM_BMP                                                            \
@@ -236,6 +243,7 @@ EnumPropertyItem snap_uv_element_items[] = {
 	R_IMF_ENUM_EXR                                                            \
 	R_IMF_ENUM_HDR                                                            \
 	R_IMF_ENUM_TIFF                                                           \
+	R_IMF_ENUM_PSD                                                            \
 
 
 EnumPropertyItem image_only_type_items[] = {
@@ -1541,7 +1549,8 @@ static void rna_FreestyleLineSet_linestyle_set(PointerRNA *ptr, PointerRNA value
 {
 	FreestyleLineSet *lineset = (FreestyleLineSet *)ptr->data;
 
-	lineset->linestyle->id.us--;
+	if (lineset->linestyle)
+		lineset->linestyle->id.us--;
 	lineset->linestyle = (FreestyleLineStyle *)value.data;
 	lineset->linestyle->id.us++;
 }
@@ -2072,8 +2081,8 @@ static void rna_def_statvis(BlenderRNA  *brna)
 		{SCE_STATVIS_OVERHANG,  "OVERHANG",  0, "Overhang",  ""},
 		{SCE_STATVIS_THICKNESS, "THICKNESS", 0, "Thickness", ""},
 		{SCE_STATVIS_INTERSECT, "INTERSECT", 0, "Intersect", ""},
-		{SCE_STATVIS_DISTORT,   "DISTORT",   0, "Distort", ""},
-	    {SCE_STATVIS_SHARP, "SHARP", 0, "Sharp", ""},
+		{SCE_STATVIS_DISTORT,   "DISTORT",   0, "Distortion", ""},
+		{SCE_STATVIS_SHARP, "SHARP", 0, "Sharp", ""},
 		{0, NULL, 0, NULL, NULL}};
 
 	srna = RNA_def_struct(brna, "MeshStatVis", NULL);

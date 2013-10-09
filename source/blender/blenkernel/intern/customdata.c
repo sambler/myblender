@@ -971,6 +971,11 @@ static void layerDefault_mcol(void *data, int count)
 	}
 }
 
+static void layerDefault_origindex(void *data, int count)
+{
+	fill_vn_i((int *)data, count, ORIGINDEX_NONE);
+}
+
 static void layerInterp_bweight(void **sources, const float *weights,
                                 const float *UNUSED(sub_weights), int count, void *dest)
 {
@@ -1077,7 +1082,7 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
 	{sizeof(MCol) * 4, "MCol", 4, N_("Col"), NULL, NULL, layerInterp_mcol,
 	 layerSwap_mcol, layerDefault_mcol},
 	/* 7: CD_ORIGINDEX */
-	{sizeof(int), "", 0, NULL, NULL, NULL, NULL, NULL, NULL},
+	{sizeof(int), "", 0, NULL, NULL, NULL, NULL, NULL, layerDefault_origindex},
 	/* 8: CD_NORMAL */
 	/* 3 floats per normal vector */
 	{sizeof(float) * 3, "vec3f", 1, NULL, NULL, NULL, NULL, NULL, NULL},
@@ -1458,8 +1463,7 @@ int CustomData_get_named_layer_index(const CustomData *data, int type, const cha
 
 	for (i = 0; i < data->totlayer; ++i)
 		if (data->layers[i].type == type)
-			if ((!name && !data->layers[i].name) ||
-			    (strcmp(data->layers[i].name, name) == 0))
+			if (strcmp(data->layers[i].name, name) == 0)
 				return i;
 
 	return -1;
@@ -1965,10 +1969,10 @@ static void CustomData_copy_data_layer(const CustomData *source, CustomData *des
 	dest_offset = dest_index * typeInfo->size;
 
 	if (!src_data || !dest_data) {
-		if (src_data != NULL && dest_data != NULL) {
+		if (!(src_data == NULL && dest_data == NULL)) {
 			printf("%s: warning null data for %s type (%p --> %p), skipping\n",
-			       __func__, layerType_getName(source->layers[src_i].type),
-			       (void *)src_data, (void *)dest_data);
+				   __func__, layerType_getName(source->layers[src_i].type),
+				   (void *)src_data, (void *)dest_data);
 		}
 		return;
 	}

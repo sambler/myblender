@@ -68,7 +68,7 @@ typedef struct {
 	NumInput num_input;
 
 	/* modal only */
-	int mcenter[2];
+	float mcenter[2];
 	BMBackup mesh_backup;
 	void *draw_handle_pixel;
 	short twtype;
@@ -96,10 +96,10 @@ static void edbm_inset_update_header(wmOperator *op, bContext *C)
 		BLI_snprintf(msg, HEADER_LENGTH, str,
 		             flts_str,
 		             flts_str + NUM_STR_REP_LEN,
-		             opdata->modify_depth ? IFACE_("On") : IFACE_("Off"),
-		             RNA_boolean_get(op->ptr, "use_outset") ? IFACE_("On") : IFACE_("Off"),
-		             RNA_boolean_get(op->ptr, "use_boundary") ? IFACE_("On") : IFACE_("Off"),
-		             RNA_boolean_get(op->ptr, "use_individual") ? IFACE_("On") : IFACE_("Off")
+		             WM_bool_as_string(opdata->modify_depth),
+		             WM_bool_as_string(RNA_boolean_get(op->ptr, "use_outset")),
+		             WM_bool_as_string(RNA_boolean_get(op->ptr, "use_boundary")),
+		             WM_bool_as_string(RNA_boolean_get(op->ptr, "use_individual"))
 		            );
 
 		ED_area_headerprint(sa, msg);
@@ -166,7 +166,7 @@ static void edbm_inset_exit(bContext *C, wmOperator *op)
 	MEM_freeN(op->customdata);
 }
 
-static int edbm_inset_cancel(bContext *C, wmOperator *op)
+static void edbm_inset_cancel(bContext *C, wmOperator *op)
 {
 	InsetData *opdata;
 
@@ -180,7 +180,6 @@ static int edbm_inset_cancel(bContext *C, wmOperator *op)
 
 	/* need to force redisplay or we may still view the modified result */
 	ED_region_tag_redraw(CTX_wm_region(C));
-	return OPERATOR_CANCELLED;
 }
 
 static bool edbm_inset_calc(wmOperator *op)

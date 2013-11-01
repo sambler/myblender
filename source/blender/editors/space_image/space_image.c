@@ -56,6 +56,7 @@
 #include "ED_mask.h"
 #include "ED_mesh.h"
 #include "ED_node.h"
+#include "ED_render.h"
 #include "ED_space_api.h"
 #include "ED_screen.h"
 #include "ED_uvedit.h"
@@ -653,7 +654,16 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	/* put scene context variable in iuser */
-	sima->iuser.scene = scene;
+	if (sima->image && sima->image->type == IMA_TYPE_R_RESULT) {
+		/* for render result, try to use the currently rendering scene */
+		Scene *render_scene = ED_render_job_get_scene(C);
+		if (render_scene)
+			sima->iuser.scene = render_scene;
+		else
+			sima->iuser.scene = scene;
+	}
+	else
+		sima->iuser.scene = scene;
 
 	/* we set view2d from own zoom and offset each time */
 	image_main_area_set_view2d(sima, ar);
@@ -674,7 +684,6 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 	}
 	else if (sima->mode == SI_MODE_MASK) {
 		mask = ED_space_image_get_mask(sima);
-		draw_image_cursor(ar, sima->cursor);
 	}
 
 	ED_region_draw_cb_draw(C, ar, REGION_DRAW_POST_VIEW);
@@ -715,7 +724,9 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 			BLI_unlock_thread(LOCK_DRAW_IMAGE);
 
 		ED_mask_draw_region(mask, ar,
-		                    sima->mask_info.draw_flag, sima->mask_info.draw_type,
+		                    sima->mask_info.draw_flag,
+		                    sima->mask_info.draw_type,
+		                    sima->mask_info.overlay_mode,
 		                    width, height,
 		                    aspx, aspy,
 		                    TRUE, FALSE,
@@ -723,7 +734,9 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 
 		ED_mask_draw_frames(mask, ar, CFRA, mask->sfra, mask->efra);
 
+		UI_view2d_view_ortho(v2d);
 		draw_image_cursor(ar, sima->cursor);
+		UI_view2d_view_restore(C);
 	}
 
 	/* scrollers? */

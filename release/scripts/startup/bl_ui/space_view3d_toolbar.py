@@ -135,6 +135,7 @@ class VIEW3D_PT_tools_rigidbody(View3DPanel, Panel):
         col.operator("rigidbody.shape_change", text="Change Shape")
         col.operator("rigidbody.mass_calculate", text="Calculate Mass")
         col.operator("rigidbody.object_settings_copy", text="Copy from Active")
+        col.operator("object.visual_transform_apply", text="Apply Transformation")
         col.operator("rigidbody.bake_to_keyframes", text="Bake To Keyframes")
         col.label(text="Constraints:")
         col.operator("rigidbody.connect", text="Connect")
@@ -743,6 +744,17 @@ class VIEW3D_PT_tools_brush_overlay(Panel, View3DPaintPanel):
     bl_label = "Overlay"
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        settings = cls.paint_settings(context)
+        return (settings and
+                settings.brush and
+                (context.sculpt_object or
+                 context.vertex_paint_object or
+                 context.weight_paint_object or
+                 context.image_paint_object))
+				 
+				 
     def draw(self, context):
         layout = self.layout
 

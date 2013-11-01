@@ -295,7 +295,7 @@ static const char **get_file_extensions(int format)
 		}
 		case FFMPEG_OGG:
 		{
-			static const char *rv[] = { ".ogg", ".ogv", NULL };
+			static const char *rv[] = { ".ogv", ".ogg", NULL };
 			return rv;
 		}
 		case FFMPEG_MP3:
@@ -1254,9 +1254,7 @@ void BKE_ffmpeg_property_del(RenderData *rd, void *type, void *prop_)
 
 	group = IDP_GetPropertyFromGroup(rd->ffcodecdata.properties, type);
 	if (group && prop) {
-		IDP_RemFromGroup(group, prop);
-		IDP_FreeProperty(prop);
-		MEM_freeN(prop);
+		IDP_FreeFromGroup(group, prop);
 	}
 }
 

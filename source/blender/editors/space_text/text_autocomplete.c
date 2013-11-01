@@ -361,6 +361,7 @@ static int text_autocomplete_modal(bContext *C, wmOperator *op, const wmEvent *e
 			}
 			break;
 		case RETKEY:
+		case PADENTER:
 			if (event->val == KM_PRESS) {
 				if (tools & TOOL_SUGG_LIST) {
 					confirm_suggestion(st->text);
@@ -528,10 +529,9 @@ static void text_autocomplete_free(bContext *C, wmOperator *op)
 	}
 }
 
-static int text_autocomplete_cancel(bContext *C, wmOperator *op)
+static void text_autocomplete_cancel(bContext *C, wmOperator *op)
 {
 	text_autocomplete_free(C, op);
-	return OPERATOR_CANCELLED;
 }
 
 void TEXT_OT_autocomplete(wmOperatorType *ot)

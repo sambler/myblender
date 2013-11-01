@@ -285,7 +285,7 @@ void animviz_get_object_motionpaths(Object *ob, ListBase *targets)
 /* ........ */
 
 /* Note on evaluation optimizations:
- * Optimisations currently used here play tricks with the depsgraph in order to try and 
+ * Optimization's currently used here play tricks with the depsgraph in order to try and
  * evaluate as few objects as strictly necessary to get nicer performance under standard
  * production conditions. For those people who really need the accurate version, 
  * disable the ifdef (i.e. 1 -> 0) and comment out the call to motionpaths_calc_optimise_depsgraph()
@@ -530,7 +530,7 @@ void calc_curvepath(Object *ob, ListBase *nurbs)
 		path->len = nu->resolu * SEGMENTSU(nu);
 	}
 	
-	dist = (float *)MEM_mallocN((tot + 1) * 4, "calcpathdist");
+	dist = (float *)MEM_mallocN(sizeof(float) * (tot + 1), "calcpathdist");
 
 	/* all lengths in *dist */
 	bevp = bevpfirst = (BevPoint *)(bl + 1);

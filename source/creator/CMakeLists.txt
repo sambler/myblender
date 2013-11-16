@@ -290,7 +290,7 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything
@@ -307,6 +307,7 @@ if(WITH_PYTHON)
 		DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
 		DESTINATION ${TARGETDIR_VER}
 		PATTERN ".svn" EXCLUDE
+		PATTERN ".git" EXCLUDE
 		PATTERN "__pycache__" EXCLUDE
 		PATTERN "${ADDON_EXCLUDE_CONDITIONAL}" EXCLUDE
 		PATTERN "${FREESTYLE_EXCLUDE_CONDITIONAL}" EXCLUDE
@@ -323,6 +324,7 @@ if(WITH_INTERNATIONAL)
 			${CMAKE_SOURCE_DIR}/release/datafiles/fonts
 		DESTINATION ${TARGETDIR_VER}/datafiles
 		PATTERN ".svn" EXCLUDE
+		PATTERN ".git" EXCLUDE
 	)
 
 	set(_locale_dir "${CMAKE_SOURCE_DIR}/release/datafiles/locale")
@@ -369,6 +371,7 @@ if(WITH_INTERNATIONAL)
 				${_locale_dir}
 			DESTINATION ${TARGETDIR_VER}/datafiles
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 		)
 	endif()
 
@@ -381,6 +384,7 @@ if(WITH_OPENCOLORIO)
 		DIRECTORY ${CMAKE_SOURCE_DIR}/release/datafiles/colormanagement
 		DESTINATION ${TARGETDIR_VER}/datafiles
 		PATTERN ".svn" EXCLUDE
+		PATTERN ".git" EXCLUDE
 	)
 endif()
 
@@ -458,6 +462,7 @@ if(UNIX AND NOT APPLE)
 				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/256x256
 			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "*.svg" EXCLUDE
 		)
 		install(
@@ -500,6 +505,7 @@ if(UNIX AND NOT APPLE)
 				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
 				DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}
 				PATTERN ".svn" EXCLUDE
+				PATTERN ".git" EXCLUDE
 				PATTERN "__pycache__" EXCLUDE               # * any cache *
 				PATTERN "distutils" EXCLUDE                 # ./distutils
 				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
@@ -522,6 +528,7 @@ if(UNIX AND NOT APPLE)
 					DIRECTORY ${PYTHON_NUMPY_PATH}/numpy
 					DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/site-packages
 					PATTERN ".svn" EXCLUDE
+					PATTERN ".git" EXCLUDE
 					PATTERN "__pycache__" EXCLUDE           # * any cache *
 					PATTERN "*.pyc" EXCLUDE                 # * any cache *
 					PATTERN "*.pyo" EXCLUDE                 # * any cache *
@@ -748,6 +755,7 @@ elseif(APPLE)
 			DIRECTORY ${from}
 			DESTINATION ${to}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "*.pyc" EXCLUDE
 			PATTERN "*.pyo" EXCLUDE
 			PATTERN "*.orig" EXCLUDE

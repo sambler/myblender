@@ -36,14 +36,14 @@
 extern "C" {
 #endif
 
-struct RenderData;
+struct RenderData;	
 struct ReportList;
 struct Scene;
 
 int BKE_frameserver_start(struct Scene *scene, struct RenderData *rd, int rectx, int recty, struct ReportList *reports);
 void BKE_frameserver_end(void);
 int BKE_frameserver_append(struct RenderData *rd, int start_frame, int frame, int *pixels,
-						   int rectx, int recty, struct ReportList *reports);
+                           int rectx, int recty, struct ReportList *reports);
 int BKE_frameserver_loop(struct RenderData *rd, struct ReportList *reports);
 
 #ifdef __cplusplus

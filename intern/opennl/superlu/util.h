@@ -52,8 +52,8 @@
 #define SUPERLU_FREE(addr) USER_FREE(addr)
 
 #define CHECK_MALLOC(where) {                 \
-	extern int superlu_malloc_total;        \
-	printf("%s: malloc_total %d Bytes\n",     \
+    extern int superlu_malloc_total;        \
+    printf("%s: malloc_total %d Bytes\n",     \
 	   where, superlu_malloc_total); \
 }
 
@@ -61,7 +61,7 @@
 #define SUPERLU_MIN(x, y) 	( (x) < (y) ? (x) : (y) )
 
 /***********************************************************************
- * Constants
+ * Constants 
  ***********************************************************************/
 #define EMPTY	(-1)
 /*#define NO	(-1)*/
@@ -82,26 +82,26 @@ typedef enum {LUSUP, UCOL, LSUB, USUB}                          MemType;
 typedef enum {HEAD, TAIL}                                       stack_end_t;
 typedef enum {SYSTEM, USER}                                     LU_space_t;
 
-/*
- * The following enumerate type is used by the statistics variable
+/* 
+ * The following enumerate type is used by the statistics variable 
  * to keep track of flop count and time spent at various stages.
  *
  * Note that not all of the fields are disjoint.
  */
 typedef enum {
-	COLPERM, /* find a column ordering that minimizes fills */
-	RELAX,   /* find artificial supernodes */
-	ETREE,   /* compute column etree */
-	EQUIL,   /* equilibrate the original matrix */
-	FACT,    /* perform LU factorization */
-	RCOND,   /* estimate reciprocal condition number */
-	SOLVE,   /* forward and back solves */
-	REFINE,  /* perform iterative refinement */
-	SLU_FLOAT,   /* time spent in floating-point operations */
-	TRSV,    /* fraction of FACT spent in xTRSV */
-	GEMV,    /* fraction of FACT spent in xGEMV */
-	FERR,    /* estimate error bounds after iterative refinement */
-	NPHASES  /* total number of phases */
+    COLPERM, /* find a column ordering that minimizes fills */
+    RELAX,   /* find artificial supernodes */
+    ETREE,   /* compute column etree */
+    EQUIL,   /* equilibrate the original matrix */
+    FACT,    /* perform LU factorization */
+    RCOND,   /* estimate reciprocal condition number */
+    SOLVE,   /* forward and back solves */
+    REFINE,  /* perform iterative refinement */
+    SLU_FLOAT,   /* time spent in floating-point operations */
+    TRSV,    /* fraction of FACT spent in xTRSV */
+    GEMV,    /* fraction of FACT spent in xGEMV */
+    FERR,    /* estimate error bounds after iterative refinement */
+    NPHASES  /* total number of phases */
 } PhaseType;
 
 
@@ -111,7 +111,7 @@ typedef enum {
 typedef float    flops_t;
 typedef unsigned char Logical;
 
-/*
+/* 
  *-- This contains the options used to control the solve process.
  *
  * Fact   (fact_t)
@@ -123,7 +123,7 @@ typedef unsigned char Logical;
  *        = SamePattern: The matrix A will be factorized assuming
  *             that a factorization of a matrix with the same sparsity
  *             pattern was performed prior to this one. Therefore, this
- *             factorization will reuse column permutation vector
+ *             factorization will reuse column permutation vector 
  *             ScalePermstruct->perm_c and the column elimination tree
  *             LUstruct->etree.
  *        = SamePattern_SameRowPerm: The matrix A will be factorized
@@ -134,7 +134,7 @@ typedef unsigned char Logical;
  *             both row and column permutation vectors perm_r and perm_c,
  *             distributed data structure set up from the previous symbolic
  *             factorization.
- *        = FACTORED: On entry, L, U, perm_r and perm_c contain the
+ *        = FACTORED: On entry, L, U, perm_r and perm_c contain the 
  *              factored form of A. If DiagScale is not NOEQUIL, the matrix
  *              A has been equilibrated with scaling factors R and C.
  *
@@ -144,12 +144,12 @@ typedef unsigned char Logical;
  *
  * ColPerm (colperm_t)
  *        Specifies what type of column permutation to use to reduce fill.
- *        = NATURAL: use the natural ordering
+ *        = NATURAL: use the natural ordering 
  *        = MMD_ATA: use minimum degree ordering on structure of A'*A
  *        = MMD_AT_PLUS_A: use minimum degree ordering on structure of A'+A
  *        = COLAMD: use approximate minimum degree column ordering
  *        = MY_PERMC: use the ordering specified in ScalePermstruct->perm_c[]
- *
+ *         
  * Trans  (trans_t)
  *        Specifies the form of the system of equations:
  *        = NOTRANS: A * X = B        (No transpose)
@@ -180,7 +180,7 @@ typedef unsigned char Logical;
  *        = NO: not to permute the rows
  *        = LargeDiag: make the diagonal large relative to the off-diagonal
  *        = MY_PERMR: use the permutation given in ScalePermstruct->perm_r[]
- *
+ *           
  * ReplaceTinyPivot (yes_no_t) (only for SuperLU_DIST)
  *        Specifies whether to replace the tiny diagonals by
  *        sqrt(epsilon)*||A|| during LU factorization.
@@ -195,28 +195,28 @@ typedef unsigned char Logical;
  *        refinement.
  */
 typedef struct {
-	fact_t        Fact;
-	yes_no_t      Equil;
-	colperm_t     ColPerm;
-	trans_t       Trans;
-	IterRefine_t  IterRefine;
-	yes_no_t      PrintStat;
-	yes_no_t      SymmetricMode;
-	double        DiagPivotThresh;
-	yes_no_t      PivotGrowth;
-	yes_no_t      ConditionNumber;
-	rowperm_t     RowPerm;
-	yes_no_t      ReplaceTinyPivot;
-	yes_no_t      SolveInitialized;
-	yes_no_t      RefineInitialized;
+    fact_t        Fact;
+    yes_no_t      Equil;
+    colperm_t     ColPerm;
+    trans_t       Trans;
+    IterRefine_t  IterRefine;
+    yes_no_t      PrintStat;
+    yes_no_t      SymmetricMode;
+    double        DiagPivotThresh;
+    yes_no_t      PivotGrowth;
+    yes_no_t      ConditionNumber;
+    rowperm_t     RowPerm;
+    yes_no_t      ReplaceTinyPivot;
+    yes_no_t      SolveInitialized;
+    yes_no_t      RefineInitialized;
 } superlu_options_t;
 
 typedef struct {
-	int     *panel_histo; /* histogram of panel size distribution */
-	double  *utime;       /* running time at various phases */
-	flops_t *ops;         /* operation count at various phases */
-	int     TinyPivots;   /* number of tiny pivots */
-	int     RefineSteps;  /* number of iterative refinement steps */
+    int     *panel_histo; /* histogram of panel size distribution */
+    double  *utime;       /* running time at various phases */
+    flops_t *ops;         /* operation count at various phases */
+    int     TinyPivots;   /* number of tiny pivots */
+    int     RefineSteps;  /* number of iterative refinement steps */
 } SuperLUStat_t;
 
 
@@ -236,14 +236,14 @@ extern void    Destroy_Dense_Matrix(SuperMatrix *);
 extern void    get_perm_c(int, SuperMatrix *, int *);
 extern void    set_default_options(superlu_options_t *options);
 extern void    sp_preorder (superlu_options_t *, SuperMatrix*, int*, int*,
-				SuperMatrix*);
+			    SuperMatrix*);
 extern void    superlu_abort_and_exit(char*);
 extern void    *superlu_malloc (size_t);
 extern int     *intMalloc (int);
 extern int     *intCalloc (int);
 extern void    superlu_free (void*);
 extern void    SetIWork (int, int, int, int *, int **, int **, int **,
-						 int **, int **, int **, int **);
+                         int **, int **, int **, int **);
 extern int     sp_coletree (int *, int *, int *, int, int, int *);
 extern void    relax_snode (const int, int *, const int, int *, int *);
 extern void    heap_relax_snode (const int, int *, const int, int *, int *);

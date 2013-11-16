@@ -47,7 +47,7 @@ struct Scene;
 /* materials */
 
 void init_def_material(void);
-void BKE_material_free(struct Material *sc);
+void BKE_material_free(struct Material *sc); 
 void BKE_material_free_ex(struct Material *ma, int do_id_user);
 void test_object_materials(struct Main *bmain, struct ID *id);
 void BKE_material_resize_object(struct Object *ob, const short totcol, bool do_id_user);
@@ -111,7 +111,7 @@ void free_matcopybuf(void);
 void copy_matcopybuf(struct Material *ma);
 void paste_matcopybuf(struct Material *ma);
 
-/* handle backward compatibility for tface/materials called from doversion (fileload=1) or Help Menu (fileload=0) */
+/* handle backward compatibility for tface/materials called from doversion (fileload=1) or Help Menu (fileload=0) */	
 int do_version_tface(struct Main *main, int fileload);
 
 #ifdef __cplusplus

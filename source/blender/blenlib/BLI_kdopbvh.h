@@ -36,7 +36,7 @@
  */
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" { 
 #endif
 
 #include <float.h>
@@ -102,16 +102,16 @@ float BLI_bvhtree_getepsilon(const BVHTree *tree);
 /* find nearest node to the given coordinates
  * (if nearest is given it will only search nodes where square distance is smaller than nearest->dist) */
 int BLI_bvhtree_find_nearest(BVHTree *tree, const float co[3], BVHTreeNearest *nearest,
-							 BVHTree_NearestPointCallback callback, void *userdata);
+                             BVHTree_NearestPointCallback callback, void *userdata);
 
 int BLI_bvhtree_ray_cast(BVHTree *tree, const float co[3], const float dir[3], float radius, BVHTreeRayHit *hit,
-						 BVHTree_RayCastCallback callback, void *userdata);
+                         BVHTree_RayCastCallback callback, void *userdata);
 
 float BLI_bvhtree_bb_raycast(const float bv[6], const float light_start[3], const float light_end[3], float pos[3]);
 
 /* range query */
 int BLI_bvhtree_range_query(BVHTree *tree, const float co[3], float radius,
-							BVHTree_RangeQuery callback, void *userdata);
+                            BVHTree_RangeQuery callback, void *userdata);
 
 #ifdef __cplusplus
 }

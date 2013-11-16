@@ -71,7 +71,7 @@ void DAG_scene_free(struct Scene *sce);
  *
  * DAG_scene_update_flags will mark all objects that depend on time (animation,
  * physics, ..) to be recalculated, used when changing the current frame.
- *
+ * 
  * DAG_on_visible_update will mark all objects that are visible for the first
  * time to be updated, for example on file load or changing layer visibility.
  *
@@ -113,7 +113,7 @@ void DAG_pose_sort(struct Object *ob);
 /* Editors: callbacks to notify editors of datablock changes */
 
 void DAG_editors_update_cb(void (*id_func)(struct Main *bmain, struct ID *id),
-						   void (*scene_func)(struct Main *bmain, struct Scene *scene, int updated));
+                           void (*scene_func)(struct Main *bmain, struct Scene *scene, int updated));
 
 /* Debugging: print dependency graph for scene or armature object to console */
 
@@ -122,5 +122,5 @@ void DAG_print_dependencies(struct Main *bmain, struct Scene *scene, struct Obje
 #ifdef __cplusplus
 }
 #endif
-
+		
 #endif

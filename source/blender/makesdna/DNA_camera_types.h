@@ -46,8 +46,8 @@ struct Ipo;
 
 typedef struct Camera {
 	ID id;
-	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */
-
+	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */ 
+	
 	char type; /* CAM_PERSP, CAM_ORTHO or CAM_PANO */
 	char dtx; /* draw type extra */
 	short flag;
@@ -56,14 +56,14 @@ typedef struct Camera {
 	float lens, ortho_scale, drawsize;
 	float sensor_x, sensor_y;
 	float shiftx, shifty;
-
+	
 	/* yafray: dof params */
 	/* qdn: yafray var 'YF_dofdist' now enabled for defocus composite node as well.
 	 * The name was not changed so that no other files need to be modified */
 	float YF_dofdist;
 
 	struct Ipo *ipo  DNA_DEPRECATED; /* old animation system, deprecated for 2.5 */
-
+	
 	struct Object *dof_ob;
 
 	char sensor_fit;

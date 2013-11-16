@@ -131,7 +131,11 @@ if(WITH_BUILDINFO)
 		# # define in header now, else these get out of date on rebuilds.
 		# -DBUILD_DATE="${BUILD_DATE}"
 		# -DBUILD_TIME="${BUILD_TIME}"
-		# -DBUILD_REV="${BUILD_REV}"
+		# -DBUILD_COMMIT_TIMESTAMP="${BUILD_COMMIT_TIMESTAMP}"
+		# -DBUILD_COMMIT_TIME="${BUILD_COMMIT_TIME}"
+		# -DBUILD_COMMIT_DATE="${BUILD_COMMIT_DATE}"
+		# -DBUILD_HASH="${BUILD_HASH}"
+		# -DBUILD_BRANCH="${BUILD_BRANCH}"
 		-DWITH_BUILDINFO_HEADER # alternative to lines above
 		-DBUILD_PLATFORM="${CMAKE_SYSTEM_NAME}"
 		-DBUILD_TYPE="${CMAKE_BUILD_TYPE}"
@@ -286,7 +290,7 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything
@@ -303,7 +307,6 @@ if(WITH_PYTHON)
 		DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
 		DESTINATION ${TARGETDIR_VER}
 		PATTERN ".svn" EXCLUDE
-		PATTERN ".git" EXCLUDE
 		PATTERN "__pycache__" EXCLUDE
 		PATTERN "${ADDON_EXCLUDE_CONDITIONAL}" EXCLUDE
 		PATTERN "${FREESTYLE_EXCLUDE_CONDITIONAL}" EXCLUDE
@@ -317,12 +320,59 @@ endif()
 if(WITH_INTERNATIONAL)
 	install(
 		DIRECTORY
-			${CMAKE_SOURCE_DIR}/release/datafiles/locale
 			${CMAKE_SOURCE_DIR}/release/datafiles/fonts
 		DESTINATION ${TARGETDIR_VER}/datafiles
 		PATTERN ".svn" EXCLUDE
-		PATTERN ".git" EXCLUDE
 	)
+
+	set(_locale_dir "${CMAKE_SOURCE_DIR}/release/datafiles/locale")
+
+	if(EXISTS "${_locale_dir}/po")
+		set(_locale_target_dir ${TARGETDIR_VER}/datafiles/locale)
+
+		file(GLOB _po_files "${_locale_dir}/po/*.po")
+		foreach(_po_file ${_po_files})
+			msgfmt_simple(${_po_file} _all_mo_files)
+		endforeach()
+
+		# Create a custom target which will compile all po to mo
+		add_custom_target(
+			locales
+			DEPENDS ${_all_mo_files})
+
+		add_dependencies(blender locales)
+
+		# Generate INSTALL rules
+		install(
+			FILES ${_locale_dir}/languages
+			DESTINATION ${_locale_target_dir}
+		)
+
+		foreach(_mo_file ${_all_mo_files})
+			get_filename_component(_locale_name ${_mo_file} NAME_WE)
+			install(
+				FILES ${_mo_file}
+				DESTINATION ${_locale_target_dir}/${_locale_name}/LC_MESSAGES
+				RENAME blender.mo
+			)
+			unset(_locale_name)
+		endforeach()
+
+		unset(_all_mo_files)
+		unset(_po_files)
+		unset(_po_file)
+		unset(_mo_file)
+		unset(_locale_target_dir)
+	else()
+		install(
+			DIRECTORY
+				${_locale_dir}
+			DESTINATION ${TARGETDIR_VER}/datafiles
+			PATTERN ".svn" EXCLUDE
+		)
+	endif()
+
+	unset(_locale_dir)
 endif()
 
 # color management
@@ -408,7 +458,6 @@ if(UNIX AND NOT APPLE)
 				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/256x256
 			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor
 			PATTERN ".svn" EXCLUDE
-			PATTERN ".git" EXCLUDE
 			PATTERN "*.svg" EXCLUDE
 		)
 		install(
@@ -451,7 +500,6 @@ if(UNIX AND NOT APPLE)
 				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
 				DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}
 				PATTERN ".svn" EXCLUDE
-				PATTERN ".git" EXCLUDE
 				PATTERN "__pycache__" EXCLUDE               # * any cache *
 				PATTERN "distutils" EXCLUDE                 # ./distutils
 				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
@@ -700,7 +748,6 @@ elseif(APPLE)
 			DIRECTORY ${from}
 			DESTINATION ${to}
 			PATTERN ".svn" EXCLUDE
-			PATTERN ".git" EXCLUDE
 			PATTERN "*.pyc" EXCLUDE
 			PATTERN "*.pyo" EXCLUDE
 			PATTERN "*.orig" EXCLUDE

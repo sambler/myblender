@@ -380,8 +380,8 @@ typedef int (*StructValidateFunc)(struct PointerRNA *ptr, void *data, int *have_
 typedef int (*StructCallbackFunc)(struct bContext *C, struct PointerRNA *ptr, struct FunctionRNA *func, ParameterList *list);
 typedef void (*StructFreeFunc)(void *data);
 typedef struct StructRNA *(*StructRegisterFunc)(
-		struct Main *bmain, struct ReportList *reports, void *data, const char *identifier,
-		StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free);
+        struct Main *bmain, struct ReportList *reports, void *data, const char *identifier,
+        StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free);
 
 typedef void (*StructUnregisterFunc)(struct Main *bmain, struct StructRNA *type);
 typedef void **(*StructInstanceFunc)(PointerRNA *ptr);
@@ -404,7 +404,7 @@ typedef struct ExtensionRNA {
 	StructRNA *srna;
 	StructCallbackFunc call;
 	StructFreeFunc free;
-
+	
 } ExtensionRNA;
 
 #ifdef __cplusplus

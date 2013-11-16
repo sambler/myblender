@@ -44,7 +44,7 @@ struct FileData;
 struct ID;
 struct PackedFile;
 struct GPUTexture;
-
+	
 typedef struct IDPropertyData {
 	void *pointer;
 	ListBase group;
@@ -57,10 +57,10 @@ typedef struct IDProperty {
 	short flag;
 	char name[64];	/* MAX_IDPROP_NAME */
 	int saved; /* saved is used to indicate if this struct has been saved yet.
-				* seemed like a good idea as a pad var was needed anyway :)*/
+	            * seemed like a good idea as a pad var was needed anyway :)*/
 	IDPropertyData data;	/* note, alignment for 64 bits */
 	int len; /* array length, also (this is important!) string length + 1.
-			  * the idea is to be able to reuse array realloc functions on strings.*/
+	          * the idea is to be able to reuse array realloc functions on strings.*/
 	/* totallen is total length of allocated array/string, including a buffer.
 	 * Note that the buffering is mild; the code comes from python's list implementation.*/
 	int totallen; /*strings and arrays are both buffered, though the buffer isn't saved.*/
@@ -89,8 +89,8 @@ typedef struct IDProperty {
 #define IDP_STRING_SUB_BYTE  1 /* arbitrary byte array, _not_ null terminated */
 /*->flag*/
 #define IDP_FLAG_GHOST (1<<7)  /* this means the property is set but RNA will return
-								* false when checking 'RNA_property_is_set',
-								* currently this is a runtime flag */
+                                * false when checking 'RNA_property_is_set',
+                                * currently this is a runtime flag */
 
 
 /* add any future new id property types here.*/
@@ -138,7 +138,7 @@ typedef struct Library {
 							 * setting 'name' directly and it will be kept in
 							 * sync - campbell */
 	struct Library *parent;	/* set for indirectly linked libs, used in the outliner and while reading */
-
+	
 	struct PackedFile *packedfile;
 } Library;
 

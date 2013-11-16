@@ -4,8 +4,8 @@ Copyright (c) 2003-2006 Erwin Coumans  http://continuousphysics.com/Bullet/
 
 This software is provided 'as-is', without any express or implied warranty.
 In no event will the authors be held liable for any damages arising from the use of this software.
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it freely,
+Permission is granted to anyone to use this software for any purpose, 
+including commercial applications, and to alter it and redistribute it freely, 
 subject to the following restrictions:
 
 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -35,7 +35,7 @@ typedef plReal	plVector3[3];
 typedef plReal	plQuaternion[4];
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" { 
 #endif
 
 /**	Particular physics SDK (C-API) */
@@ -44,7 +44,7 @@ extern "C" {
 /** 	Dynamics world, belonging to some physics SDK (C-API)*/
 	PL_DECLARE_HANDLE(plDynamicsWorldHandle);
 
-/** Rigid Body that can be part of a Dynamics World (C-API)*/
+/** Rigid Body that can be part of a Dynamics World (C-API)*/	
 	PL_DECLARE_HANDLE(plRigidBodyHandle);
 
 /** 	Collision Shape/Geometry, property of a Rigid Body (C-API)*/
@@ -62,7 +62,7 @@ extern "C" {
 	PL_DECLARE_HANDLE(plCollisionWorldHandle);
 
 /**
-	Create and Delete a Physics SDK
+	Create and Delete a Physics SDK	
 */
 
 	extern	plPhysicsSdkHandle	plNewBulletSdk(void); //this could be also another sdk, like ODE, PhysX etc.
@@ -83,11 +83,11 @@ extern "C" {
 	extern void plSetBoundingBox(plBroadphaseProxyHandle proxyHandle, plReal minX,plReal minY,plReal minZ, plReal maxX,plReal maxY, plReal maxZ);
 
 /* todo: add pair cache support with queries like add/remove/find pair */
-
+	
 	extern plCollisionWorldHandle plCreateCollisionWorld(plPhysicsSdkHandle physicsSdk);
 
 /* todo: add/remove objects */
-
+	
 
 /* Dynamics World */
 
@@ -113,7 +113,7 @@ extern "C" {
 
 	extern  plCollisionShapeHandle plNewSphereShape(plReal radius);
 	extern  plCollisionShapeHandle plNewBoxShape(plReal x, plReal y, plReal z);
-	extern  plCollisionShapeHandle plNewCapsuleShape(plReal radius, plReal height);
+	extern  plCollisionShapeHandle plNewCapsuleShape(plReal radius, plReal height);	
 	extern  plCollisionShapeHandle plNewConeShape(plReal radius, plReal height);
 	extern  plCollisionShapeHandle plNewCylinderShape(plReal radius, plReal height);
 	extern	plCollisionShapeHandle plNewCompoundShape(void);
@@ -150,9 +150,9 @@ extern "C" {
 	extern	void plSetOpenGLMatrix(plRigidBodyHandle object, plReal* matrix);
 
 	typedef struct plRayCastResult {
-		plRigidBodyHandle		m_body;
-		plCollisionShapeHandle	m_shape;
-		plVector3				m_positionWorld;
+		plRigidBodyHandle		m_body;  
+		plCollisionShapeHandle	m_shape; 		
+		plVector3				m_positionWorld; 		
 		plVector3				m_normalWorld;
 	} plRayCastResult;
 
@@ -163,7 +163,7 @@ extern "C" {
 	/* extern  plRigidBodyHandle plObjectCast(plDynamicsWorldHandle world, const plVector3 rayStart, const plVector3 rayEnd, plVector3 hitpoint, plVector3 normal); */
 
 	/* Continuous Collision Detection API */
-
+	
 	// needed for source/blender/blenkernel/intern/collision.c
 	double plNearestPoints(float p1[3], float p2[3], float p3[3], float q1[3], float q2[3], float q3[3], float *pa, float *pb, float normal[3]);
 

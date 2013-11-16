@@ -193,8 +193,8 @@ LogImageFile *logImageOpenFromMemory(const unsigned char *buffer, unsigned int s
 LogImageFile *logImageOpenFromFile(const char *filename, int cineon);
 void logImageGetSize(LogImageFile *logImage, int *width, int *height, int *depth);
 LogImageFile *logImageCreate(const char *filename, int cineon, int width, int height, int bitsPerSample,
-							 int isLogarithmic, int hasAlpha, int referenceWhite, int referenceBlack,
-							 float gamma, const char *creator);
+                             int isLogarithmic, int hasAlpha, int referenceWhite, int referenceBlack,
+                             float gamma, const char *creator);
 void logImageClose(LogImageFile *logImage);
 
 /* Data handling */

@@ -43,7 +43,7 @@ static const char *traceback_filepath(PyTracebackObject *tb, PyObject **coerce)
 /* copied from pythonrun.c, 3.3.0 */
 static int
 parse_syntax_error(PyObject *err, PyObject **message, const char **filename,
-					int *lineno, int *offset, const char **text)
+                   int *lineno, int *offset, const char **text)
 {
 	long hold;
 	PyObject *v;

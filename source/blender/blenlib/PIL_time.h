@@ -34,10 +34,10 @@
 #define __PIL_TIME_H__
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" { 
 #endif
 
-extern
+extern 
 /** Return an indication of time, expressed	as
  * seconds since some fixed point. Successive calls
  * are guaranteed to generate values greater than or

@@ -28,13 +28,13 @@
  *     levy@loria.fr
  *
  *     ISA Project
- *     LORIA, INRIA Lorraine,
+ *     LORIA, INRIA Lorraine, 
  *     Campus Scientifique, BP 239
- *     54506 VANDOEUVRE LES NANCY CEDEX
+ *     54506 VANDOEUVRE LES NANCY CEDEX 
  *     FRANCE
  *
  *  Note that the GNU General Public License does not permit incorporating
- *  the Software into proprietary programs.
+ *  the Software into proprietary programs. 
  */
 
 /*

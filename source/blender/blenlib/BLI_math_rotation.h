@@ -79,7 +79,7 @@ void quat_to_mat4(float mat[4][4], const float q[4]);
 void mat3_to_quat(float q[4], float mat[3][3]);
 void mat4_to_quat(float q[4], float mat[4][4]);
 void tri_to_quat_ex(float quat[4], const float v1[3], const float v2[3], const float v3[3],
-					const float no_orig[3]);
+                    const float no_orig[3]);
 void tri_to_quat(float q[4], const float a[3], const float b[3], const float c[3]);
 void vec_to_quat(float q[4], const float vec[3], short axis, const short upflag);
 /* note: v1 and v2 must be normalized */
@@ -143,7 +143,7 @@ void eulO_to_mat3(float mat[3][3], const float eul[3], const short order);
 void eulO_to_mat4(float mat[4][4], const float eul[3], const short order);
 void eulO_to_axis_angle(float axis[3], float *angle, const float eul[3], const short order);
 void eulO_to_gimbal_axis(float gmat[3][3], const float eul[3], const short order);
-
+ 
 void quat_to_eulO(float eul[3], const short order, const float quat[4]);
 void mat3_to_eulO(float eul[3], const short order, float mat[3][3]);
 void mat4_to_eulO(float eul[3], const short order, float mat[4][4]);
@@ -184,7 +184,7 @@ float angle_wrap_deg(float angle);
 float angle_compat_rad(float angle, float angle_compat);
 
 int mat3_from_axis_conversion(int from_forward, int from_up, int to_forward, int to_up,
-							  float r_mat[3][3]);
+                              float r_mat[3][3]);
 
 #ifdef __cplusplus
 }

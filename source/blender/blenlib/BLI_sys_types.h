@@ -46,7 +46,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
- 
+
 /* MSVC 2010 and 2012 (>=1600) have stdint.h so we should use this for consistency */
 #if defined(_WIN32) && defined(_MSC_VER) && _MSC_VER <= 1500
 
@@ -123,10 +123,10 @@ typedef bool _BLI_Bool;
 #  else
 /* Make sure bool is alays defined with the same size for both C and C++ */
 #   define _BLI_Bool unsigned char
-#endif
+#  endif
 # else
 #  define _BLI_Bool _Bool
-#endif
+# endif
 # define bool _BLI_Bool
 # define false 0
 # define true 1

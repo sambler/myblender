@@ -57,17 +57,17 @@ typedef struct SelBox {
 	float x, y, w, h;
 } SelBox;
 
-typedef struct EditFont {
+typedef struct EditFont {	
 	wchar_t *copybuf;
 	wchar_t *copybufinfo;
-
+	
 	wchar_t *textbuf;
 	struct CharInfo *textbufinfo;
 	wchar_t *oldstr;
 	struct CharInfo *oldstrinfo;
-
+	
 	float textcurs[4][2];
-
+	
 } EditFont;
 
 
@@ -75,7 +75,7 @@ bool BKE_vfont_is_builtin(struct VFont *vfont);
 void BKE_vfont_builtin_register(void *mem, int size);
 
 void BKE_vfont_free_data(struct VFont *vfont);
-void BKE_vfont_free(struct VFont *sc);
+void BKE_vfont_free(struct VFont *sc); 
 struct VFont *BKE_vfont_builtin_get(void);
 struct VFont *BKE_vfont_load(struct Main *bmain, const char *name);
 

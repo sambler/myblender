@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * of the License, or (at your option) any later version. 
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,7 +17,7 @@
  *
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
- *
+ * 
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -57,12 +57,12 @@ void		WM_keyconfig_update_tag(struct wmKeyMap *keymap, struct wmKeyMapItem *kmi)
 void		WM_keymap_init		(struct bContext *C);
 void		WM_keymap_free		(struct wmKeyMap *keymap);
 
-wmKeyMapItem *WM_keymap_verify_item(struct wmKeyMap *keymap, const char *idname, int type,
-									int val, int modifier, int keymodifier);
-wmKeyMapItem *WM_keymap_add_item(struct wmKeyMap *keymap, const char *idname, int type,
-								 int val, int modifier, int keymodifier);
+wmKeyMapItem *WM_keymap_verify_item(struct wmKeyMap *keymap, const char *idname, int type, 
+                                    int val, int modifier, int keymodifier);
+wmKeyMapItem *WM_keymap_add_item(struct wmKeyMap *keymap, const char *idname, int type, 
+                                 int val, int modifier, int keymodifier);
 wmKeyMapItem *WM_keymap_add_menu(struct wmKeyMap *keymap, const char *idname, int type,
-								 int val, int modifier, int keymodifier);
+                                 int val, int modifier, int keymodifier);
 
 bool        WM_keymap_remove_item(struct wmKeyMap *keymap, struct wmKeyMapItem *kmi);
 int         WM_keymap_item_to_string(wmKeyMapItem *kmi, char *str, const int len);

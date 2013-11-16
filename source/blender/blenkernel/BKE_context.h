@@ -72,7 +72,7 @@ struct bContextDataResult;
 typedef struct bContextDataResult bContextDataResult;
 
 typedef int (*bContextDataCallback)(const bContext *C,
-									const char *member, bContextDataResult *result);
+                                    const char *member, bContextDataResult *result);
 
 typedef struct bContextStoreEntry {
 	struct bContextStoreEntry *next, *prev;
@@ -214,8 +214,8 @@ void CTX_data_list_add(bContextDataResult *result, void *data);
 		CollectionPointerLink *ctx_link;                                      \
 		CTX_data_##member(C, &ctx_data_list);                                 \
 		for (ctx_link = ctx_data_list.first;                                  \
-			 ctx_link;                                                        \
-			 ctx_link = ctx_link->next)                                       \
+		     ctx_link;                                                        \
+		     ctx_link = ctx_link->next)                                       \
 		{                                                                     \
 			Type instance = ctx_link->ptr.data;
 
@@ -278,6 +278,6 @@ int CTX_data_visible_pose_bones(const bContext *C, ListBase *list);
 #ifdef __cplusplus
 }
 #endif
-
+	
 #endif
 

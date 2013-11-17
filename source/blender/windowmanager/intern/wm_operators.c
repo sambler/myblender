@@ -1684,7 +1684,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	extern char build_hash[], build_commit_date[], build_commit_time[], build_branch[];
 
 	/* Builds made from tag only shows tag sha */
-	BLI_snprintf(hash_buf, sizeof(hash_buf), "Hash: %s", build_hash);
+	BLI_snprintf(hash_buf, sizeof(hash_buf), "Custom build       Hash: %s", build_hash);
 	BLI_snprintf(date_buf, sizeof(date_buf), "Date: %s %s", build_commit_date, build_commit_time);
 	
 	BLF_size(style->widgetlabel.uifont_id, style->widgetlabel.points, U.pixelsize * U.dpi);
@@ -1714,7 +1714,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	if (!STREQ(build_branch, "master")) {
 		char branch_buf[128] = "\0";
 		int branch_width;
-		BLI_snprintf(branch_buf, sizeof(branch_buf), "Branch: %s", build_branch);
+		BLI_snprintf(branch_buf, sizeof(branch_buf), "by sambler    Branch: %s", build_branch);
 		branch_width = (int)BLF_width(style->widgetlabel.uifont_id, branch_buf) + 0.5f * U.widget_unit;
 		uiDefBut(block, LABEL, 0, branch_buf, U.pixelsize * 494 - branch_width, U.pixelsize * (258 - label_delta), branch_width, UI_UNIT_Y, NULL, 0, 0, 0, 0, NULL);
 	}

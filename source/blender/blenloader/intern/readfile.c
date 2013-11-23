@@ -40,6 +40,7 @@
 #include <string.h> // for strrchr strncmp strstr
 #include <math.h> // for fabs
 #include <stdarg.h> /* for va_start/end */
+#include <time.h> /* for gmtime */
 
 #include "BLI_utildefines.h"
 #ifndef WIN32
@@ -3360,6 +3361,8 @@ static void lib_link_curve(FileData *fd, Main *main)
 			
 			cu->ipo = newlibadr_us(fd, cu->id.lib, cu->ipo); // XXX deprecated - old animation system
 			cu->key = newlibadr_us(fd, cu->id.lib, cu->key);
+
+			cu->selboxes = NULL;  /* runtime, clear */
 			
 			cu->id.flag -= LIB_NEED_LINK;
 		}
@@ -5933,6 +5936,14 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					/* not very nice, but could help */
 					if ((v3d->layact & v3d->lay) == 0) v3d->layact = v3d->lay;
 					
+					/* its possible the current transform orientation has been removed */
+					if (v3d->twmode >= V3D_MANIP_CUSTOM) {
+						const int selected_index = (v3d->twmode - V3D_MANIP_CUSTOM);
+						if (!BLI_findlink(&sc->scene->transform_spaces, selected_index)) {
+							v3d->twmode = V3D_MANIP_GLOBAL;
+						}
+					}
+
 					/* free render engines for now */
 					for (ar = sa->regionbase.first; ar; ar = ar->next) {
 						RegionView3D *rv3d= ar->regiondata;
@@ -7932,7 +7943,12 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		char build_commit_datetime[32];
 		time_t temp_time = main->build_commit_timestamp;
 		struct tm *tm = gmtime(&temp_time);
-		strftime(build_commit_datetime, sizeof(build_commit_datetime), "%Y-%m-%d %H:%M", tm);
+		if (LIKELY(tm)) {
+			strftime(build_commit_datetime, sizeof(build_commit_datetime), "%Y-%m-%d %H:%M", tm);
+		}
+		else {
+			BLI_strncpy(build_commit_datetime, "date-unknown", sizeof(build_commit_datetime));
+		}
 
 		printf("read file %s\n  Version %d sub %d date %s hash %s\n",
 		       fd->relabase, main->versionfile, main->subversionfile,

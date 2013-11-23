@@ -1,13 +1,17 @@
 [submodule "release/scripts/addons"]
 	path = release/scripts/addons
 	url = ../externals/addons
+	ignore = all
 [submodule "release/datafiles/locale"]
 	path = release/datafiles/locale
 	url = ../externals/locale
+	ignore = all
 [submodule "release/scripts/addons_contrib"]
 	path = release/scripts/addons_contrib
 	url = ../externals/contrib
-[submodule "scons"]
-	path = scons
-	url = ../externals/scons.git
 	ignore = all
+[submodule "scons"]
+        path = scons
+        url = ../externals/scons
+        ignore = all
+

@@ -735,6 +735,21 @@ void combine_rgb(float r, float g, float b, out vec4 col)
 	col = vec4(r, g, b, 1.0);
 }
 
+void separate_hsv(vec4 col, out float h, out float s, out float v)
+{
+	vec4 hsv;
+
+	rgb_to_hsv(col, hsv);
+	h = hsv[0];
+	s = hsv[1];
+	v = hsv[2];
+}
+
+void combine_hsv(float h, float s, float v, out vec4 col)
+{
+	hsv_to_rgb(vec4(h, s, v, 1.0), col);
+}
+
 void output_node(vec4 rgb, float alpha, out vec4 outrgb)
 {
 	outrgb = vec4(rgb.rgb, alpha);
@@ -2142,6 +2157,24 @@ void node_fresnel(float ior, vec3 N, vec3 I, out float result)
 {
 	float eta = max(ior, 0.00001);
 	result = fresnel_dielectric(normalize(I), N, (gl_FrontFacing)? eta: 1.0/eta);
+}
+
+/* layer_weight */
+
+void node_layer_weight(float blend, vec3 N, vec3 I, out float fresnel, out float facing)
+{
+	/* fresnel */
+	float eta = max(1.0 - blend, 0.00001);
+	fresnel = fresnel_dielectric(normalize(I), N, (gl_FrontFacing)? 1.0/eta : eta );
+
+	/* facing */
+	facing = abs(dot(normalize(I), N));
+	if(blend != 0.5) {
+		blend = clamp(blend, 0.0, 0.99999);
+		blend = (blend < 0.5)? 2.0*blend: 0.5/(1.0 - blend);
+		facing = pow(facing, blend);
+	}
+	facing = 1.0 - facing;
 }
 
 /* gamma */

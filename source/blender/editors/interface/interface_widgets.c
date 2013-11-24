@@ -1656,8 +1656,14 @@ static void widget_state(uiWidgetType *wt, int state)
 {
 	uiWidgetStateColors *wcol_state = wt->wcol_state;
 
+	if ((state & UI_BUT_LIST_ITEM) && !(state & UI_TEXTINPUT)) {
+		/* Override default widget's colors. */
+		bTheme *btheme = UI_GetTheme();
+		wt->wcol_theme = &btheme->tui.wcol_list_item;
+	}
+
 	wt->wcol = *(wt->wcol_theme);
-	
+
 	if (state & UI_SELECT) {
 		copy_v4_v4_char(wt->wcol.inner, wt->wcol.inner_sel);
 
@@ -2318,9 +2324,9 @@ static void widget_numbut(uiWidgetColors *wcol, rcti *rect, int state, int round
 	widget_numbut_draw(wcol, rect, state, roundboxalign, false);
 }
 
-/*
+/**
  * Draw number buttons still with triangles when field is not embossed
-*/
+ */
 static void widget_numbut_embossn(uiBut *UNUSED(but), uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
 {
 	widget_numbut_draw(wcol, rect, state, roundboxalign, true);

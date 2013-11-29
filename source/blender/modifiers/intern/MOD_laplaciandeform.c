@@ -41,7 +41,6 @@
 
 #include "MOD_util.h"
 
-#include "ONL_opennl.h"
 
 enum {
 	LAPDEFORM_SYSTEM_NOT_CHANGE = 0,
@@ -53,6 +52,10 @@ enum {
 	LAPDEFORM_SYSTEM_CHANGE_EDGES,
 	LAPDEFORM_SYSTEM_CHANGE_NOT_VALID_GROUP,
 };
+
+#ifdef WITH_OPENNL
+
+#include "ONL_opennl.h"
 
 typedef struct LaplacianSystem {
 	bool is_matrix_computed;
@@ -731,7 +734,7 @@ static void LaplacianDeformModifier_do(
 					modifier_setError(&lmd->modifier, "Edges changed from %d to %d", sys->total_edges, dm->getNumEdges(dm));
 				}
 				else if (sysdif == LAPDEFORM_SYSTEM_CHANGE_NOT_VALID_GROUP) {
-					modifier_setError(&lmd->modifier, "Vertex group  %s is not valid", sys->anchor_grp_name);
+					modifier_setError(&lmd->modifier, "Vertex group '%s' is not valid", sys->anchor_grp_name);
 				}
 			}
 		}
@@ -762,10 +765,18 @@ static void LaplacianDeformModifier_do(
 		}
 	}
 	if (sys->is_matrix_computed && !sys->has_solution) {
-		modifier_setError(&lmd->modifier, "The system did not find a solution.");
+		modifier_setError(&lmd->modifier, "The system did not find a solution");
 	}
 }
 
+#else  /* WITH_OPENNL */
+static void LaplacianDeformModifier_do(
+        LaplacianDeformModifierData *lmd, Object *ob, DerivedMesh *dm,
+        float (*vertexCos)[3], int numVerts)
+{
+	(void)lmd, (void)ob, (void)dm, (void)vertexCos, (void)numVerts;
+}
+#endif  /* WITH_OPENNL */
 
 static void initData(ModifierData *md)
 {
@@ -831,11 +842,12 @@ static void deformVertsEM(
 static void freeData(ModifierData *md)
 {
 	LaplacianDeformModifierData *lmd = (LaplacianDeformModifierData *)md;
+#ifdef WITH_OPENNL
 	LaplacianSystem *sys = (LaplacianSystem *)lmd->cache_system;
-
 	if (sys) {
 		deleteLaplacianSystem(sys);
 	}
+#endif
 	MEM_SAFE_FREE(lmd->vertexco);
 	lmd->total_verts = 0;
 }

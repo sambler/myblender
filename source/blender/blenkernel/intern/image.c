@@ -976,7 +976,7 @@ int BKE_imtype_to_ftype(const char imtype)
 		return RADHDR;
 #endif
 	else if (imtype == R_IMF_IMTYPE_PNG)
-		return PNG | 90;
+		return PNG | 15;
 #ifdef WITH_DDS
 	else if (imtype == R_IMF_IMTYPE_DDS)
 		return DDS;
@@ -1340,7 +1340,7 @@ void BKE_imformat_defaults(ImageFormatData *im_format)
 	im_format->imtype = R_IMF_IMTYPE_PNG;
 	im_format->depth = R_IMF_CHAN_DEPTH_8;
 	im_format->quality = 90;
-	im_format->compress = 90;
+	im_format->compress = 15;
 
 	BKE_color_managed_display_settings_init(&im_format->display_settings);
 	BKE_color_managed_view_settings_init(&im_format->view_settings);
@@ -2855,7 +2855,7 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	return ibuf;
 }
 
-static void image_get_fame_and_index(Image *ima, ImageUser *iuser, int *frame_r, int *index_r)
+static void image_get_frame_and_index(Image *ima, ImageUser *iuser, int *frame_r, int *index_r)
 {
 	int frame = 0, index = 0;
 
@@ -3176,7 +3176,7 @@ ImBuf *BKE_image_pool_acquire_ibuf(Image *ima, ImageUser *iuser, ImagePool *pool
 		return BKE_image_acquire_ibuf(ima, iuser, NULL);
 	}
 
-	image_get_fame_and_index(ima, iuser, &frame, &index);
+	image_get_frame_and_index(ima, iuser, &frame, &index);
 
 	ibuf = image_pool_find_entry(pool, ima, frame, index, &found);
 	if (found)

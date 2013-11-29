@@ -3258,6 +3258,19 @@ static void def_sh_geometry(StructRNA *srna)
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
+static void def_sh_lamp(StructRNA *srna)
+{
+	PropertyRNA *prop;
+	
+	prop = RNA_def_property(srna, "lamp_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "id");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Lamp_object_poll");
+	RNA_def_property_ui_text(prop, "Lamp Object", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 static void def_sh_attribute(StructRNA *srna)
 {
 	PropertyRNA *prop;
@@ -5439,7 +5452,7 @@ static void def_cmp_mask(StructRNA *srna)
 
 	prop = RNA_def_property(srna, "use_motion_blur", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_MASK_MOTION_BLUR);
-	RNA_def_property_ui_text(prop, "Motion Blur", "Use feather information from the mask");
+	RNA_def_property_ui_text(prop, "Motion Blur", "Use multi-sampled motion blur of the mask");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	prop = RNA_def_property(srna, "motion_blur_samples", PROP_INT, PROP_NONE);

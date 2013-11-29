@@ -7,6 +7,3 @@
 [submodule "release/scripts/addons_contrib"]
 	path = release/scripts/addons_contrib
 	url = ../externals/contrib
-[submodule "scons"]
-	path = scons
-	url = ../externals/scons

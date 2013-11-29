@@ -235,10 +235,11 @@ int			WM_operator_call_py(struct bContext *C, struct wmOperatorType *ot, short c
 
 void		WM_operator_properties_alloc(struct PointerRNA **ptr, struct IDProperty **properties, const char *opstring); /* used for keymap and macro items */
 void		WM_operator_properties_sanitize(struct PointerRNA *ptr, const bool no_context); /* make props context sensitive or not */
-int         WM_operator_properties_default(struct PointerRNA *ptr, const bool do_update);
+bool        WM_operator_properties_default(struct PointerRNA *ptr, const bool do_update);
 void        WM_operator_properties_reset(struct wmOperator *op);
 void		WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring);
 void		WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot);
+void        WM_operator_properties_clear(struct PointerRNA *ptr);
 void		WM_operator_properties_free(struct PointerRNA *ptr);
 void		WM_operator_properties_filesel(struct wmOperatorType *ot, int filter, short type, short action, short flag, short display);
 void        WM_operator_properties_border(struct wmOperatorType *ot);
@@ -272,9 +273,11 @@ bool        WM_operator_last_properties_store(struct wmOperator *op);
 
 
 		/* operator as a python command (resultuing string must be freed) */
-char		*WM_operator_pystring_ex(struct bContext *C, struct wmOperator *op, const bool all_args,
+char		*WM_operator_pystring_ex(struct bContext *C, struct wmOperator *op,
+                                     const bool all_args, const bool macro_args,
                                      struct wmOperatorType *ot, struct PointerRNA *opptr);
-char		*WM_operator_pystring(struct bContext *C, struct wmOperator *op, const bool all_args);
+char		*WM_operator_pystring(struct bContext *C, struct wmOperator *op,
+                                  const bool all_args, const bool macro_args);
 char		*WM_prop_pystring_assign(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
 void		WM_operator_bl_idname(char *to, const char *from);
 void		WM_operator_py_idname(char *to, const char *from);

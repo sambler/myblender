@@ -5944,14 +5944,6 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					
 					/* not very nice, but could help */
 					if ((v3d->layact & v3d->lay) == 0) v3d->layact = v3d->lay;
-					
-					/* its possible the current transform orientation has been removed */
-					if (v3d->twmode >= V3D_MANIP_CUSTOM) {
-						const int selected_index = (v3d->twmode - V3D_MANIP_CUSTOM);
-						if (!BLI_findlink(&sc->scene->transform_spaces, selected_index)) {
-							v3d->twmode = V3D_MANIP_GLOBAL;
-						}
-					}
 
 					/* free render engines for now */
 					for (ar = sa->regionbase.first; ar; ar = ar->next) {
@@ -9776,7 +9768,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		} FOREACH_NODETREE_END
 	}
 
-	{
+	if (!MAIN_VERSION_ATLEAST(main, 269, 3)) {
 		bScreen *sc;
 		ScrArea *sa;
 		SpaceLink *sl;
@@ -9842,25 +9834,27 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 
 		for (scene = main->scene.first; scene; scene = scene->id.next) {
-			if (scene->gm.matmode == GAME_MAT_TEXFACE) {
-				scene->gm.matmode = GAME_MAT_MULTITEX;
-			}
-		}
+			/* this can now be turned off */
+			ToolSettings *ts= scene->toolsettings;
+			if (ts->sculpt)
+				ts->sculpt->flags |= SCULPT_DYNTOPO_SUBDIVIDE;
 
-		/* 'Increment' mode disabled for nodes, use true grid snapping instead */
-		for (scene = main->scene.first; scene; scene = scene->id.next) {
+			/* single texture mode removed from game engine */
+			if (scene->gm.matmode == GAME_MAT_TEXFACE)
+				scene->gm.matmode = GAME_MAT_MULTITEX;
+
+			/* 'Increment' mode disabled for nodes, use true grid snapping instead */
 			if (scene->toolsettings->snap_node_mode == SCE_SNAP_MODE_INCREMENT)
 				scene->toolsettings->snap_node_mode = SCE_SNAP_MODE_GRID;
-		}
 
-		/* Update for removed "sound-only" option in FFMPEG export settings. */
 #ifdef WITH_FFMPEG
-		for (scene = main->scene.first; scene; scene = scene->id.next) {
+			/* Update for removed "sound-only" option in FFMPEG export settings. */
 			if (scene->r.ffcodecdata.type >= FFMPEG_INVALID) {
 				scene->r.ffcodecdata.type = FFMPEG_AVI;
 			}
-		}
 #endif
+
+		}
 	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */

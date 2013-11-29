@@ -859,10 +859,10 @@ static void region_azone_add(ScrArea *sa, ARegion *ar, int alignment)
 static int rct_fits(rcti *rect, char dir, int size)
 {
 	if (dir == 'h') {
-		return BLI_rcti_size_x(rect) - size;
+		return BLI_rcti_size_x(rect) + 1 - size;
 	}
 	else {  /* 'v' */
-		return BLI_rcti_size_y(rect) - size;
+		return BLI_rcti_size_y(rect) + 1 - size;
 	}
 }
 
@@ -1157,16 +1157,16 @@ static void region_rect_recursive(wmWindow *win, ScrArea *sa, ARegion *ar, rcti 
 
 static void area_calc_totrct(ScrArea *sa, int sizex, int sizey)
 {
-	short rt = U.pixelsize > 1.0f ? 1 : 0;
+	short rt = (short) U.pixelsize;
 
-	if (sa->v1->vec.x > 0) sa->totrct.xmin = sa->v1->vec.x + 1 + rt;
+	if (sa->v1->vec.x > 0) sa->totrct.xmin = sa->v1->vec.x + rt;
 	else sa->totrct.xmin = sa->v1->vec.x;
-	if (sa->v4->vec.x < sizex - 1) sa->totrct.xmax = sa->v4->vec.x - 1 - rt;
+	if (sa->v4->vec.x < sizex - 1) sa->totrct.xmax = sa->v4->vec.x - rt;
 	else sa->totrct.xmax = sa->v4->vec.x;
 	
-	if (sa->v1->vec.y > 0) sa->totrct.ymin = sa->v1->vec.y + 1 + rt;
+	if (sa->v1->vec.y > 0) sa->totrct.ymin = sa->v1->vec.y + rt;
 	else sa->totrct.ymin = sa->v1->vec.y;
-	if (sa->v2->vec.y < sizey - 1) sa->totrct.ymax = sa->v2->vec.y - 1 - rt;
+	if (sa->v2->vec.y < sizey - 1) sa->totrct.ymax = sa->v2->vec.y - rt;
 	else sa->totrct.ymax = sa->v2->vec.y;
 	
 	/* for speedup */
@@ -1566,12 +1566,13 @@ void ED_region_panels(const bContext *C, ARegion *ar, int vertical, const char *
 	Panel *panel;
 	View2D *v2d = &ar->v2d;
 	View2DScrollers *scrollers;
-	int x, y, xco, yco, w, em, triangle, open, newcontext = 0;
+	int x, y, xco, yco, w, em, triangle, open;
+	bool is_context_new = 0;
 	int redo;
 	int scroll;
 
 	if (contextnr >= 0)
-		newcontext = UI_view2d_tab_set(v2d, contextnr);
+		is_context_new = UI_view2d_tab_set(v2d, contextnr);
 	
 	/* before setting the view */
 	if (vertical) {
@@ -1683,7 +1684,7 @@ void ED_region_panels(const bContext *C, ARegion *ar, int vertical, const char *
 		}
 		else {
 			/* don't jump back when panels close or hide */
-			if (!newcontext)
+			if (!is_context_new)
 				x = max_ii(x, v2d->cur.xmax);
 			y = -y;
 		}

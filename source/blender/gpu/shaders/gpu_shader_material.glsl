@@ -140,7 +140,7 @@ void uv_attribute(vec2 attuv, out vec3 uv)
 void geom(vec3 co, vec3 nor, mat4 viewinvmat, vec3 attorco, vec2 attuv, vec4 attvcol, out vec3 global, out vec3 local, out vec3 view, out vec3 orco, out vec3 uv, out vec3 normal, out vec4 vcol, out float vcol_alpha, out float frontback)
 {
 	local = co;
-	view = normalize(local);
+	view = (gl_ProjectionMatrix[3][3] == 0.0)? normalize(local): vec3(0.0, 0.0, -1.0);
 	global = (viewinvmat*vec4(local, 1.0)).xyz;
 	orco = attorco;
 	uv_attribute(attuv, uv);
@@ -163,7 +163,16 @@ void camera(vec3 co, out vec3 outview, out float outdepth, out float outdist)
 {
 	outdepth = abs(co.z);
 	outdist = length(co);
-	outview = (gl_ProjectionMatrix[3][3] == 0.0)? normalize(co): vec3(0.0, 0.0, -1.0);
+	outview = normalize(co);
+}
+
+void lamp(vec4 col, vec3 lv, float dist, vec3 shadow, float visifac, out vec4 outcol, out vec3 outlv, out float outdist, out vec4 outshadow, out float outvisifac)
+{
+	outcol = col;
+	outlv = lv;
+	outdist = dist;
+	outshadow = vec4(shadow, 1.0);
+	outvisifac = visifac;
 }
 
 void math_add(float val1, float val2, out float outval)
@@ -1970,6 +1979,30 @@ void test_shadowbuf_vsm(vec3 rco, sampler2D shadowmap, mat4 shadowpersmat, float
 		else {
 			result = 1.0;
 		}
+	}
+}
+
+void shadows_only(vec3 rco, sampler2DShadow shadowmap, mat4 shadowpersmat, float shadowbias, vec3 shadowcolor, float inp, out vec3 result)
+{
+	result = vec3(1.0);
+
+	if(inp > 0.0) {
+		float shadfac;
+
+		test_shadowbuf(rco, shadowmap, shadowpersmat, shadowbias, inp, shadfac);
+		result -= (1.0 - shadfac) * (vec3(1.0) - shadowcolor);
+	}
+}
+
+void shadows_only_vsm(vec3 rco, sampler2D shadowmap, mat4 shadowpersmat, float shadowbias, float bleedbias, vec3 shadowcolor, float inp, out vec3 result)
+{
+	result = vec3(1.0);
+
+	if(inp > 0.0) {
+		float shadfac;
+
+		test_shadowbuf_vsm(rco, shadowmap, shadowpersmat, shadowbias, bleedbias, inp, shadfac);
+		result -= (1.0 - shadfac) * (vec3(1.0) - shadowcolor);
 	}
 }
 

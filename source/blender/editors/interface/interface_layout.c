@@ -908,9 +908,15 @@ void uiItemsFullEnumO(uiLayout *layout, const char *opname, const char *propname
 						block->flag |= UI_BLOCK_NO_FLIP;
 					}
 
-					uiItemL(column, item->name, ICON_NONE);
-					but = block->buttons.last;
-					but->drawflag = UI_BUT_TEXT_LEFT;
+					if (item->icon) {
+						uiItemL(column, item->name, item->icon);
+						but = block->buttons.last;
+					}
+					else {
+						/* Do not use uiItemL here, as our root layout is a menu one, it will add a fake blank icon! */
+						but = uiDefBut(block, LABEL, 0, item->name, 0, 0, UI_UNIT_X * 5, UI_UNIT_Y, NULL,
+						               0.0, 0.0, 0, 0, "");
+					}
 					ui_but_tip_from_enum_item(but, item);
 				}
 				else {  /* XXX bug here, colums draw bottom item badly */
@@ -1875,7 +1881,7 @@ static int ui_litem_min_width(int itemw)
 static void ui_litem_layout_row(uiLayout *litem)
 {
 	uiItem *item;
-	int x, y, w, tot, totw, neww, itemw, minw, itemh, offset;
+	int x, y, w, tot, totw, neww, newtotw, itemw, minw, itemh, offset;
 	int fixedw, freew, fixedx, freex, flag = 0, lastw = 0;
 
 	/* x = litem->x; */ /* UNUSED */
@@ -1902,6 +1908,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 		freew = 0;
 		x = 0;
 		flag = 0;
+		newtotw = totw;
 
 		for (item = litem->items.first; item; item = item->next) {
 			if (item->flag)
@@ -1922,7 +1929,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 				item->flag = 1;
 				fixedw += minw;
 				flag = 1;
-				totw -= itemw;
+				newtotw -= itemw;
 			}
 			else {
 				/* keep free size */
@@ -1931,6 +1938,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 			}
 		}
 
+		totw = newtotw;
 		lastw = fixedw;
 	} while (flag);
 
@@ -2969,7 +2977,7 @@ static void ui_intro_button(DynStr *ds, uiButtonItem *bitem)
 	BLI_dynstr_appendf(ds, "'tip':'''%s''', ", but->tip ? but->tip : "");  /* not exactly needed, rna has this */
 
 	if (but->optype) {
-		char *opstr = WM_operator_pystring_ex(but->block->evil_C, NULL, false, but->optype, but->opptr);
+		char *opstr = WM_operator_pystring_ex(but->block->evil_C, NULL, false, true, but->optype, but->opptr);
 		BLI_dynstr_appendf(ds, "'operator':'''%s''', ", opstr ? opstr : "");
 		MEM_freeN(opstr);
 	}

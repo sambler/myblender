@@ -406,7 +406,7 @@ static void node_draw_frame_label(bNodeTree *ntree, bNode *node, const float asp
 	/* title color */
 	UI_ThemeColorBlendShade(TH_TEXT, color_id, 0.8f, 10);
 
-	width = BLF_width(fontid, label);
+	width = BLF_width(fontid, label, sizeof(label));
 	ascender = BLF_ascender(fontid);
 	
 	/* 'x' doesn't need aspect correction */
@@ -3132,7 +3132,7 @@ int node_link_bezier_points(View2D *v2d, SpaceNode *snode, bNodeLink *link, floa
 		toreroute = 0;
 	}
 
-	dist = UI_GetThemeValue(TH_NODE_CURVING) * 0.10f * ABS(vec[0][0] - vec[3][0]);
+	dist = UI_GetThemeValue(TH_NODE_CURVING) * 0.10f * fabsf(vec[0][0] - vec[3][0]);
 	deltax = vec[3][0] - vec[0][0];
 	deltay = vec[3][1] - vec[0][1];
 	/* check direction later, for top sockets */

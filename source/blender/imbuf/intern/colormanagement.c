@@ -1420,6 +1420,7 @@ static void *do_display_buffer_apply_thread(void *handle_v)
 			                    (height - SCANLINE_BLOCK_SIZE * i) :
 			                    SCANLINE_BLOCK_SIZE;
 			int scanline_offset = channels * start_scanline * width;
+			int scanline_offset4 = 4 * start_scanline * width;
 			bool is_straight_alpha, predivide;
 
 			display_buffer_apply_get_linear_buffer(handle, start_scanline, num_scanlines,
@@ -1440,7 +1441,7 @@ static void *do_display_buffer_apply_thread(void *handle_v)
 			/* copy result to output buffers */
 			if (display_buffer_byte) {
 				/* do conversion */
-				IMB_buffer_byte_from_float(display_buffer_byte + scanline_offset, linear_buffer,
+				IMB_buffer_byte_from_float(display_buffer_byte + scanline_offset4, linear_buffer,
 				                           channels, dither, IB_PROFILE_SRGB, IB_PROFILE_SRGB,
 				                           predivide, width, num_scanlines, width, width);
 			}
@@ -3146,37 +3147,4 @@ bool IMB_colormanagement_setup_glsl_draw_ctx(const bContext *C, bool predivide)
 void IMB_colormanagement_finish_glsl_draw(void)
 {
 	OCIO_finishGLSLDraw(global_glsl_state.ocio_glsl_state);
-}
-
-/* ** Color space conversion using GLSL shader  ** */
-
-/**
- * Configures GLSL shader for conversion from space defined by role
- * to scene linear space
- *
- * Will create appropriate OCIO processor and setup GLSL shader,
- * so further 2D texture usage will use this conversion.
- *
- * Role is an pseudonym for a color space, see bottom of file
- * IMB_colormanagement.h for list of available roles.
- *
- * When there's no need to apply transform on 2D textures, use
- * IMB_colormanagement_finish_glsl_transform().
- */
-bool IMB_colormanagement_setup_transform_from_role_glsl(int role, bool predivide)
-{
-	OCIO_ConstProcessorRcPtr *processor;
-	ColorSpace *colorspace;
-
-	colorspace = colormanage_colorspace_get_roled(role);
-
-	processor = colorspace_to_scene_linear_processor(colorspace);
-
-	return OCIO_setupGLSLDraw(&global_glsl_state.transform_ocio_glsl_state, processor, NULL, predivide);
-}
-
-/* Finish GLSL-based color space conversion */
-void IMB_colormanagement_finish_glsl_transform(void)
-{
-	OCIO_finishGLSLDraw(global_glsl_state.transform_ocio_glsl_state);
 }

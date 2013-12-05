@@ -60,6 +60,7 @@
 #include "BKE_context.h"
 #include "BKE_idprop.h"
 #include "BKE_report.h"
+#include "BKE_screen.h"
 #include "BKE_texture.h"
 #include "BKE_tracking.h"
 #include "BKE_unit.h"
@@ -1556,6 +1557,15 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 			MEM_freeN(str);
 		}
 	}
+	/* menu (any type) */
+	else if (ELEM(but->type, MENU, PULLDOWN)) {
+		MenuType *mt = uiButGetMenuType(but);
+		if (mt) {
+			char str[32 + sizeof(mt->idname)];
+			BLI_snprintf(str, sizeof(str), "bpy.ops.wm.call_menu(name=\"%s\")", mt->idname);
+			WM_clipboard_text_set(str, 0);
+		}
+	}
 }
 
 /* ************************ password text ******************************
@@ -1604,7 +1614,7 @@ void ui_button_text_password_hide(char password_str[UI_MAX_DRAW_STR], uiBut *but
 	}
 	else {
 		/* convert text to hidden test using asterisks (e.g. pass -> ****) */
-		int i, len = BLI_strlen_utf8(but->drawstr);
+		const size_t len = BLI_strlen_utf8(but->drawstr);
 
 		/* remap cursor positions */
 		if (but->pos >= 0) {
@@ -1617,7 +1627,7 @@ void ui_button_text_password_hide(char password_str[UI_MAX_DRAW_STR], uiBut *but
 		BLI_strncpy(password_str, but->drawstr, UI_MAX_DRAW_STR);
 
 		memset(but->drawstr, '*', len);
-		but->drawstr[i] = '\0';
+		but->drawstr[len] = '\0';
 	}
 }
 
@@ -7851,7 +7861,7 @@ static int ui_handler_region(bContext *C, const wmEvent *event, void *UNUSED(use
 	/* either handle events for already activated button or try to activate */
 	but = ui_but_find_activated(ar);
 
-	retval = ui_handler_panel_region(C, event);
+	retval = ui_handler_panel_region(C, event, ar);
 
 	if (retval == WM_UI_HANDLER_CONTINUE)
 		retval = ui_handle_list_event(C, event, ar);

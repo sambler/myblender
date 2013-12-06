@@ -526,6 +526,17 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 	char prefstr[FILE_MAX];
 	int success = 0;
 
+	/* Indicates whether user prefereneces were really load from memory.
+	 *
+	 * This is used for versioning code, and for this we can not rely on from_memory
+	 * passed via argument. This is because there might be configuration folder
+	 * exists but it might not have userpref.blend and in this case we fallback to
+	 * reading home file from memory.
+	 *
+	 * And in this case versioning code is to be run.
+	 */
+	bool read_userdef_from_memory = true;
+
 	/* options exclude eachother */
 	BLI_assert((from_memory && custom_file) == 0);
 
@@ -592,7 +603,10 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 	/* check new prefs only after startup.blend was finished */
 	if (!from_memory && BLI_exists(prefstr)) {
 		int done = BKE_read_file_userdef(prefstr, NULL);
-		if (done) printf("Read new prefs: %s\n", prefstr);
+		if (done) {
+			read_userdef_from_memory = false;
+			printf("Read new prefs: %s\n", prefstr);
+		}
 	}
 	
 	/* prevent buggy files that had G_FILE_RELATIVE_REMAP written out by mistake. Screws up autosaves otherwise
@@ -600,7 +614,7 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 	G.fileflags &= ~G_FILE_RELATIVE_REMAP;
 	
 	/* check userdef before open window, keymaps etc */
-	wm_init_userdef(C, (bool)from_memory);
+	wm_init_userdef(C, read_userdef_from_memory);
 	
 	/* match the read WM with current WM */
 	wm_window_match_do(C, &wmbase); 

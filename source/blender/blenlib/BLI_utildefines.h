@@ -48,11 +48,26 @@
 #endif
 
 /* min/max */
+#if defined(__GNUC__) || defined(__clang__)
+
+#define MIN2(x, y)  ({  \
+	typeof(x) x_ = (x); \
+	typeof(y) y_ = (y); \
+	((x_) < (y_) ? (x_) : (y_)); })
+
+#define MAX2(x, y)  ({  \
+	typeof(x) x_ = (x); \
+	typeof(y) y_ = (y); \
+	((x_) > (y_) ? (x_) : (y_)); })
+
+#else
 #define MIN2(x, y)          ((x) < (y) ? (x) : (y))
+#define MAX2(x, y)          ((x) > (y) ? (x) : (y))
+#endif
+
 #define MIN3(x, y, z)       (MIN2(MIN2((x), (y)), (z)))
 #define MIN4(x, y, z, a)    (MIN2(MIN2((x), (y)), MIN2((z), (a))))
 
-#define MAX2(x, y)          ((x) > (y) ? (x) : (y))
 #define MAX3(x, y, z)       (MAX2(MAX2((x), (y)), (z)))
 #define MAX4(x, y, z, a)    (MAX2(MAX2((x), (y)), MAX2((z), (a))))
 
@@ -180,9 +195,7 @@
 } (void)0
 
 
-#define ABS(a)          ( (a) < 0 ? (-(a)) : (a) )
-
-#define FTOCHAR(val) ((val) <= 0.0f) ? 0 : (((val) > (1.0f - 0.5f / 255.0f)) ? 255 : (char)((255.0f * (val)) + 0.5f))
+#define FTOCHAR(val) (char)(((val) <= 0.0f) ? 0 : (((val) > (1.0f - 0.5f / 255.0f)) ? 255 : ((255.0f * (val)) + 0.5f)))
 #define FTOUSHORT(val) ((val >= 1.0f - 0.5f / 65535) ? 65535 : (val <= 0.0f) ? 0 : (unsigned short)(val * 65535.0f + 0.5f))
 #define USHORTTOUCHAR(val) ((unsigned char)(((val) >= 65535 - 128) ? 255 : ((val) + 128) >> 8))
 #define F3TOCHAR3(v2, v1) {                                                   \
@@ -242,12 +255,37 @@
 } (void)0
 
 /* some misc stuff.... */
+
+/* avoid multiple access & type conversions for supported compilers */
+#if defined(__GNUC__) || defined(__clang__)
+
+#define ABS(a)  ({ \
+	typeof(a) a_ = (a); \
+	((a_) < 0 ? (-(a_)) : (a_)); })
+
+#define CLAMPIS(a, b, c)  ({ \
+	typeof(a) a_ = (a), b_ = (b), c_ = (c); \
+	((a_) < (b_) ? (b_) : (a_) > (c_) ? (c_) : (a_)); })
+
+#define CLAMP(a, b, c)  {            \
+	typeof(a) b_ = (b), c_ = (c);   \
+	if      ((a) < (b_)) (a) = (b_); \
+	else if ((a) > (c_)) (a) = (c_); \
+} (void)0
+
+#else
+
+#define ABS(a)  ((a) < 0 ? (-(a)) : (a))
+
+#define CLAMPIS(a, b, c)  ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
+
 #define CLAMP(a, b, c)  {           \
-	if ((a) < (b)) (a) = (b);       \
+	if      ((a) < (b)) (a) = (b);  \
 	else if ((a) > (c)) (a) = (c);  \
 } (void)0
 
-#define CLAMPIS(a, b, c) ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
+#endif
+
 
 #define IS_EQ(a, b)  ( \
 	CHECK_TYPE_INLINE(a, double), CHECK_TYPE_INLINE(b, double), \

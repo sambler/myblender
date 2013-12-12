@@ -312,6 +312,11 @@ void BKE_object_free_derived_caches(Object *ob)
 	
 	if (ob->curve_cache) {
 		BKE_displist_free(&ob->curve_cache->disp);
+		BLI_freelistN(&ob->curve_cache->bev);
+		if (ob->curve_cache->path) {
+			free_path(ob->curve_cache->path);
+			ob->curve_cache->path = NULL;
+		}
 	}
 }
 
@@ -942,7 +947,7 @@ Object *BKE_object_add_only_object(Main *bmain, int type, const char *name)
 	ob->empty_drawtype = OB_PLAINAXES;
 	ob->empty_drawsize = 1.0;
 
-	if (type == OB_CAMERA || type == OB_LAMP || type == OB_SPEAKER) {
+	if (ELEM3(type, OB_LAMP, OB_CAMERA, OB_SPEAKER)) {
 		ob->trackflag = OB_NEGZ;
 		ob->upflag = OB_POSY;
 	}

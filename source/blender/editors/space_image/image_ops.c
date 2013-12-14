@@ -63,6 +63,7 @@
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
+#include "IMB_moviecache.h"
 
 #include "RE_pipeline.h"
 
@@ -1628,9 +1629,10 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	SpaceImage *sima = CTX_wm_space_image(C);
-	ImBuf *ibuf;
+	ImBuf *ibuf, *first_ibuf = NULL;
 	int tot = 0;
 	char di[FILE_MAX];
+	struct MovieCacheIter *iter;
 	
 	if (sima->image == NULL)
 		return OPERATOR_CANCELLED;
@@ -1645,10 +1647,22 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 	
-	/* get total */
-	for (ibuf = sima->image->ibufs.first; ibuf; ibuf = ibuf->next)
-		if (ibuf->userflags & IB_BITMAPDIRTY)
-			tot++;
+	/* get total dirty buffers and first dirty buffer which is used for menu */
+	ibuf = NULL;
+	if (sima->image->cache != NULL) {
+		iter = IMB_moviecacheIter_new(sima->image->cache);
+		while (!IMB_moviecacheIter_done(iter)) {
+			ibuf = IMB_moviecacheIter_getImBuf(iter);
+			if (ibuf->userflags & IB_BITMAPDIRTY) {
+				if (first_ibuf == NULL) {
+					first_ibuf = ibuf;
+				}
+				tot++;
+			}
+			IMB_moviecacheIter_step(iter);
+		}
+		IMB_moviecacheIter_free(iter);
+	}
 	
 	if (tot == 0) {
 		BKE_report(op->reports, RPT_WARNING, "No images have been changed");
@@ -1656,18 +1670,17 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
 	}
 
 	/* get a filename for menu */
-	for (ibuf = sima->image->ibufs.first; ibuf; ibuf = ibuf->next)
-		if (ibuf->userflags & IB_BITMAPDIRTY)
-			break;
-
-	BLI_split_dir_part(ibuf->name, di, sizeof(di));
+	BLI_split_dir_part(first_ibuf->name, di, sizeof(di));
 	BKE_reportf(op->reports, RPT_INFO, "%d image(s) will be saved in %s", tot, di);
 
-	for (ibuf = sima->image->ibufs.first; ibuf; ibuf = ibuf->next) {
+	iter = IMB_moviecacheIter_new(sima->image->cache);
+	while (!IMB_moviecacheIter_done(iter)) {
+		ibuf = IMB_moviecacheIter_getImBuf(iter);
+
 		if (ibuf->userflags & IB_BITMAPDIRTY) {
 			char name[FILE_MAX];
 			BLI_strncpy(name, ibuf->name, sizeof(name));
-			
+
 			BLI_path_abs(name, bmain->name);
 
 			if (0 == IMB_saveiff(ibuf, name, IB_rect | IB_zbuf | IB_zbuffloat)) {
@@ -1678,7 +1691,10 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
 			BKE_reportf(op->reports, RPT_INFO, "Saved %s", ibuf->name);
 			ibuf->userflags &= ~IB_BITMAPDIRTY;
 		}
+
+		IMB_moviecacheIter_step(iter);
 	}
+	IMB_moviecacheIter_free(iter);
 
 	return OPERATOR_FINISHED;
 }
@@ -1837,8 +1853,10 @@ void IMAGE_OT_new(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_string(ot->srna, "name", IMA_DEF_NAME, MAX_ID_NAME - 2, "Name", "Image datablock name");
-	RNA_def_int(ot->srna, "width", 1024, 1, INT_MAX, "Width", "Image width", 1, 16384);
-	RNA_def_int(ot->srna, "height", 1024, 1, INT_MAX, "Height", "Image height", 1, 16384);
+	prop = RNA_def_int(ot->srna, "width", 1024, 1, INT_MAX, "Width", "Image width", 1, 16384);
+	RNA_def_property_subtype(prop, PROP_PIXEL);
+	prop = RNA_def_int(ot->srna, "height", 1024, 1, INT_MAX, "Height", "Image height", 1, 16384);
+	RNA_def_property_subtype(prop, PROP_PIXEL);
 	prop = RNA_def_float_color(ot->srna, "color", 4, NULL, 0.0f, FLT_MAX, "Color", "Default fill color", 0.0f, 1.0f);
 	RNA_def_property_subtype(prop, PROP_COLOR_GAMMA);
 	RNA_def_property_float_array_default(prop, default_color);

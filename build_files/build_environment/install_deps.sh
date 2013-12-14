@@ -219,8 +219,8 @@ OIIO_REPO_UID="99113d12619c90cf44721195a759674ea61f02b1"
 OIIO_FORCE_REBUILD=false
 OIIO_SKIP=false
 
-LLVM_VERSION="3.1"
-LLVM_VERSION_MIN="3.0"
+LLVM_VERSION="3.3"
+LLVM_VERSION_MIN="3.3"
 LLVM_VERSION_FOUND=""
 LLVM_SOURCE="http://llvm.org/releases/$LLVM_VERSION/llvm-$LLVM_VERSION.src.tar.gz"
 LLVM_CLANG_SOURCE="http://llvm.org/releases/$LLVM_VERSION/clang-$LLVM_VERSION.src.tar.gz"
@@ -1323,7 +1323,7 @@ clean_OSL() {
 
 compile_OSL() {
   # To be changed each time we make edits that would modify the compiled result!
-  osl_magic=13
+  osl_magic=14
   _init_osl
 
   # Clean install if needed!
@@ -1704,7 +1704,7 @@ install_DEB() {
              libfreetype6-dev libx11-dev libxi-dev wget libsqlite3-dev libbz2-dev \
              libncurses5-dev libssl-dev liblzma-dev libreadline-dev $OPENJPEG_DEV \
              libopenal-dev libglew-dev yasm $THEORA_DEV $VORBIS_DEV $OGG_DEV \
-             libsdl1.2-dev libfftw3-dev patch bzip2"
+             libsdl1.2-dev libfftw3-dev patch bzip2 libxml2-dev libyaml-cpp-dev libtinyxml-dev"
 
   OPENJPEG_USE=true
   VORBIS_USE=true
@@ -1906,20 +1906,28 @@ install_DEB() {
     INFO "WARNING! Skipping LLVM installation, as requested (this also implies skipping OSL!)..."
   else
     INFO ""
-    check_package_version_ge_DEB llvm-dev $LLVM_VERSION_MIN
+    check_package_DEB llvm-$LLVM_VERSION-dev
     if [ $? -eq 0 ]; then
-      install_packages_DEB llvm-dev clang
-      have_llvm=true
-      LLVM_VERSION_FOUND=""  # Using default one, no need to specify it!
-      clean_LLVM
-    else
-      install_packages_DEB libffi-dev
-      # LLVM can't find the debian ffi header dir
-      _FFI_INCLUDE_DIR=`dpkg -L libffi-dev | grep -e ".*/ffi.h" | sed -r 's/(.*)\/ffi.h/\1/'`
-      INFO ""
-      compile_LLVM
+      install_packages_DEB llvm-$LLVM_VERSION-dev clang-$LLVM_VERSION
       have_llvm=true
       LLVM_VERSION_FOUND=$LLVM_VERSION
+      clean_LLVM
+    else
+      check_package_version_ge_DEB llvm-dev $LLVM_VERSION_MIN
+      if [ $? -eq 0 ]; then
+        install_packages_DEB llvm-dev clang
+        have_llvm=true
+        LLVM_VERSION_FOUND=""  # Using default one, no need to specify it!
+        clean_LLVM
+      else
+        install_packages_DEB libffi-dev
+        # LLVM can't find the debian ffi header dir
+        _FFI_INCLUDE_DIR=`dpkg -L libffi-dev | grep -e ".*/ffi.h" | sed -r 's/(.*)\/ffi.h/\1/'`
+        INFO ""
+        compile_LLVM
+        have_llvm=true
+        LLVM_VERSION_FOUND=$LLVM_VERSION
+      fi
     fi
   fi
 
@@ -1940,7 +1948,7 @@ install_DEB() {
       INFO "WARNING! Skipping OpenCOLLADA installation, as requested..."
     else
       INFO ""
-      install_packages_DEB libpcre3-dev libxml2-dev
+      install_packages_DEB libpcre3-dev
       # Find path to libxml shared lib...
       _XML2_LIB=`dpkg -L libxml2-dev | grep -e ".*/libxml2.so"`
       # No package
@@ -2124,7 +2132,8 @@ install_RPM() {
   _packages="gcc gcc-c++ make scons libtiff-devel freetype-devel libjpeg-devel\
              libpng-devel libX11-devel libXi-devel wget ncurses-devel \
              readline-devel $OPENJPEG_DEV openal-soft-devel \
-             glew-devel yasm $THEORA_DEV $VORBIS_DEV $OGG_DEV patch"
+             glew-devel yasm $THEORA_DEV $VORBIS_DEV $OGG_DEV patch \
+             libxml2-devel yaml-cpp-devel tinyxml-devel"
 
   OPENJPEG_USE=true
   VORBIS_USE=true
@@ -2363,7 +2372,7 @@ install_RPM() {
       INFO "WARNING! Skipping OpenCOLLADA installation, as requested..."
     else
       INFO ""
-      install_packages_RPM pcre-devel libxml2-devel git
+      install_packages_RPM pcre-devel git
       # Find path to libxml shared lib...
       _XML2_LIB=`rpm -ql libxml2-devel | grep -e ".*/libxml2.so"`
       # No package...
@@ -2462,7 +2471,8 @@ install_ARCH() {
   THEORA_DEV="libtheora"
 
   _packages="base-devel scons cmake libxi glew libpng libtiff wget openal \
-             $OPENJPEG_DEV $VORBIS_DEV $OGG_DEV $THEORA_DEV yasm sdl fftw"
+             $OPENJPEG_DEV $VORBIS_DEV $OGG_DEV $THEORA_DEV yasm sdl fftw \
+             libxml2 yaml-cpp tinyxml"
 
   OPENJPEG_USE=true
   VORBIS_USE=true

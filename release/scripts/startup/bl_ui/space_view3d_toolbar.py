@@ -292,6 +292,9 @@ class VIEW3D_PT_tools_curveedit(View3DPanel, Panel):
         row.operator("curve.handle_type_set", text="Free").type = 'FREE_ALIGN'
 
         col = layout.column(align=True)
+        col.operator("curve.normals_make_consistent")
+
+        col = layout.column(align=True)
         col.label(text="Modeling:")
         col.operator("curve.extrude_move", text="Extrude")
         col.operator("curve.subdivide")
@@ -1023,8 +1026,16 @@ class VIEW3D_PT_sculpt_options(Panel, View3DPaintPanel):
 
         toolsettings = context.tool_settings
         sculpt = toolsettings.sculpt
+        capabilities = sculpt.brush.sculpt_capabilities
+
+        col = layout.column(align=True)
+        col.active = capabilities.has_gravity
+        col.label(text="Gravity:")
+        col.prop(sculpt, "gravity", slider=True, text="Factor")
+        col.prop(sculpt, "gravity_object")
 
         layout.label(text="Lock:")
+        
         row = layout.row(align=True)
         row.prop(sculpt, "lock_x", text="X", toggle=True)
         row.prop(sculpt, "lock_y", text="Y", toggle=True)

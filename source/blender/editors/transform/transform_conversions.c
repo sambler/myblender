@@ -78,6 +78,7 @@
 #include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_mapping.h"
 #include "BKE_modifier.h"
 #include "BKE_movieclip.h"
 #include "BKE_nla.h"
@@ -6638,7 +6639,7 @@ static void MaskPointToTransData(Scene *scene, MaskSplinePoint *point,
 
 			td->flag = 0;
 			td->loc = td2d->loc;
-			copy_v3_v3(td->center, td->loc);
+			copy_v3_v3(td->center, bezt->vec[1]);
 			copy_v3_v3(td->iloc, td->loc);
 
 			memset(td->axismtx, 0, sizeof(td->axismtx));
@@ -6686,7 +6687,7 @@ static void MaskPointToTransData(Scene *scene, MaskSplinePoint *point,
 
 		td->flag = 0;
 		td->loc = td2d->loc;
-		copy_v3_v3(td->center, td->loc);
+		copy_v3_v3(td->center, bezt->vec[1]);
 		copy_v3_v3(td->iloc, td->loc);
 
 		memset(td->axismtx, 0, sizeof(td->axismtx));

@@ -62,6 +62,7 @@
 #include "BKE_key.h"
 #include "BKE_library.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_mapping.h"
 #include "BKE_modifier.h"
 #include "BKE_multires.h"
 #include "BKE_paint.h"
@@ -316,6 +317,7 @@ typedef struct StrokeCache {
 	int alt_smooth;
 
 	float plane_trim_squared;
+	float gravity_direction[3];
 
 	rcti previous_r; /* previous redraw rectangle */
 } StrokeCache;
@@ -2996,6 +2998,49 @@ static void do_scrape_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnod
 	}
 }
 
+static void do_gravity(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode, float bstrength)
+{
+	SculptSession *ss = ob->sculpt;
+	Brush *brush = BKE_paint_brush(&sd->paint);
+
+	float offset[3]/*, an[3]*/;
+	int n;
+	float gravity_vector[3];
+
+	mul_v3_v3fl(gravity_vector, ss->cache->gravity_direction, -ss->cache->radius_squared);
+
+	/* offset with as much as possible factored in already */
+	mul_v3_v3v3(offset, gravity_vector, ss->cache->scale);
+	mul_v3_fl(offset, bstrength);
+
+	/* threaded loop over nodes */
+	#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP)
+	for(n = 0; n < totnode; n++) {
+		PBVHVertexIter vd;
+		SculptBrushTest test;
+		float (*proxy)[3];
+
+		proxy = BKE_pbvh_node_add_proxy(ss->pbvh, nodes[n])->co;
+
+		sculpt_brush_test_init(ss, &test);
+
+		BKE_pbvh_vertex_iter_begin(ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
+			if (sculpt_brush_test_sq(&test, vd.co)) {
+				const float fade = tex_strength(ss, brush, vd.co, sqrt(test.dist),
+	                                            ss->cache->sculpt_normal_symm, vd.no,
+	                                            vd.fno, vd.mask ? *vd.mask : 0.0f);
+
+				mul_v3_v3fl(proxy[vd.i], offset, fade);
+
+				if(vd.mvert)
+					vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
+			}
+		}
+		BKE_pbvh_vertex_iter_end;
+	}
+}
+
+
 void sculpt_vertcos_to_key(Object *ob, KeyBlock *kb, float (*vertCos)[3])
 {
 	Mesh *me = (Mesh *)ob->data;
@@ -3221,6 +3266,9 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush)
 				smooth(sd, ob, nodes, totnode, brush->autosmooth_factor, FALSE);
 			}
 		}
+
+		if (brush->sculpt_tool != SCULPT_TOOL_MASK && sd->gravity_factor > 0.0f)
+			do_gravity(sd, ob, nodes, totnode, sd->gravity_factor);
 
 		MEM_freeN(nodes);
 
@@ -3825,7 +3873,6 @@ static void sculpt_update_cache_invariants(bContext *C, Sculpt *sd, SculptSessio
 	cache->scale[1] = max_scale / ob->size[1];
 	cache->scale[2] = max_scale / ob->size[2];
 
-
 	cache->plane_trim_squared = brush->plane_trim * brush->plane_trim;
 
 	cache->flag = 0;
@@ -3890,6 +3937,21 @@ static void sculpt_update_cache_invariants(bContext *C, Sculpt *sd, SculptSessio
 	copy_m3_m4(mat, ob->imat);
 	mul_m3_v3(mat, viewDir);
 	normalize_v3_v3(cache->true_view_normal, viewDir);
+
+	/* get gravity vector in world space */
+	if (sd->gravity_object) {
+		Object *gravity_object = sd->gravity_object;
+
+		copy_v3_v3(cache->gravity_direction, gravity_object->obmat[2]);
+	}
+	else {
+		cache->gravity_direction[0] = cache->gravity_direction[1] = 0.0;
+		cache->gravity_direction[2] = 1.0;
+	}
+
+	/* transform to sculpted object space */
+	mul_m3_v3(mat, cache->gravity_direction);
+	normalize_v3(cache->gravity_direction);
 
 	/* Initialize layer brush displacements and persistent coords */
 	if (brush->sculpt_tool == SCULPT_TOOL_LAYER) {

@@ -248,6 +248,12 @@ static int rna_BrushCapabilities_has_texture_angle_get(PointerRNA *ptr)
 	             MTEX_MAP_MODE_RANDOM);
 }
 
+static int rna_SculptToolCapabilities_has_gravity_get(PointerRNA *ptr)
+{
+	Brush *br = (Brush *)ptr->data;
+	return br->sculpt_tool != SCULPT_TOOL_MASK;
+}
+
 static int rna_BrushCapabilities_has_texture_angle_source_get(PointerRNA *ptr)
 {
 	Brush *br = (Brush *)ptr->data;
@@ -556,6 +562,7 @@ static void rna_def_sculpt_capabilities(BlenderRNA *brna)
 	SCULPT_TOOL_CAPABILITY(has_smooth_stroke, "Has Smooth Stroke");
 	SCULPT_TOOL_CAPABILITY(has_space_attenuation, "Has Space Attenuation");
 	SCULPT_TOOL_CAPABILITY(has_strength, "Has Strength");
+	SCULPT_TOOL_CAPABILITY(has_gravity, "Has Gravity");
 
 #undef SCULPT_CAPABILITY
 }
@@ -719,7 +726,7 @@ static void rna_def_brush(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 	
 	/* number values */
-	prop = RNA_def_property(srna, "size", PROP_INT, PROP_NONE);
+	prop = RNA_def_property(srna, "size", PROP_INT, PROP_PIXEL);
 	RNA_def_property_int_funcs(prop, NULL, "rna_Brush_set_size", NULL);
 	RNA_def_property_range(prop, 1, MAX_BRUSH_PIXEL_RADIUS * 10);
 	RNA_def_property_ui_range(prop, 1, MAX_BRUSH_PIXEL_RADIUS, 1, -1);
@@ -740,7 +747,7 @@ static void rna_def_brush(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Jitter", "Jitter the position of the brush while painting");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
-	prop = RNA_def_property(srna, "jitter_absolute", PROP_INT, PROP_NONE);
+	prop = RNA_def_property(srna, "jitter_absolute", PROP_INT, PROP_PIXEL);
 	RNA_def_property_int_sdna(prop, NULL, "jitter_absolute");
 	RNA_def_property_range(prop, 0, 1000000);
 	RNA_def_property_ui_text(prop, "Jitter", "Jitter the position of the brush in pixels while painting");

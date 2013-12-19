@@ -108,7 +108,9 @@ static SpinLock image_spin;
 /* quick lookup: supports 1 million frames, thousand passes */
 #define IMA_MAKE_INDEX(frame, index)    ((frame) << 10) + index
 #define IMA_INDEX_FRAME(index)          (index >> 10)
+/*
 #define IMA_INDEX_PASS(index)           (index & ~1023)
+*/
 
 /* ******** IMAGE CACHE ************* */
 
@@ -144,7 +146,7 @@ static void imagecache_put(Image *image, int index, ImBuf *ibuf)
 	IMB_moviecache_put(image->cache, &key, ibuf);
 }
 
-static struct ImBuf* imagecache_get(Image *image, int index)
+static struct ImBuf *imagecache_get(Image *image, int index)
 {
 	if (image->cache) {
 		ImageCacheKey key;
@@ -682,7 +684,6 @@ static ImBuf *add_ibuf_size(unsigned int width, unsigned int height, const char 
 
 	if (floatbuf) {
 		ibuf = IMB_allocImBuf(width, height, depth, IB_rectfloat);
-		rect_float = ibuf->rect_float;
 
 		if (colorspace_settings->name[0] == '\0') {
 			const char *colorspace = IMB_colormanagement_role_colorspace_name_get(COLOR_ROLE_DEFAULT_FLOAT);
@@ -690,11 +691,13 @@ static ImBuf *add_ibuf_size(unsigned int width, unsigned int height, const char 
 			BLI_strncpy(colorspace_settings->name, colorspace, sizeof(colorspace_settings->name));
 		}
 
-		IMB_colormanagement_check_is_data(ibuf, colorspace_settings->name);
+		if (ibuf != NULL) {
+			rect_float = ibuf->rect_float;
+			IMB_colormanagement_check_is_data(ibuf, colorspace_settings->name);
+		}
 	}
 	else {
 		ibuf = IMB_allocImBuf(width, height, depth, IB_rect);
-		rect = (unsigned char *)ibuf->rect;
 
 		if (colorspace_settings->name[0] == '\0') {
 			const char *colorspace = IMB_colormanagement_role_colorspace_name_get(COLOR_ROLE_DEFAULT_BYTE);
@@ -702,7 +705,14 @@ static ImBuf *add_ibuf_size(unsigned int width, unsigned int height, const char 
 			BLI_strncpy(colorspace_settings->name, colorspace, sizeof(colorspace_settings->name));
 		}
 
-		IMB_colormanagement_assign_rect_colorspace(ibuf, colorspace_settings->name);
+		if (ibuf != NULL) {
+			rect = (unsigned char *)ibuf->rect;
+			IMB_colormanagement_assign_rect_colorspace(ibuf, colorspace_settings->name);
+		}
+	}
+
+	if (!ibuf) {
+		return NULL;
 	}
 
 	BLI_strncpy(ibuf->name, name, sizeof(ibuf->name));
@@ -985,7 +995,11 @@ static bool imagecache_check_free_anim(ImBuf *ibuf, void *UNUSED(userkey), void 
 /* except_frame is weak, only works for seqs without offset... */
 void BKE_image_free_anim_ibufs(Image *ima, int except_frame)
 {
-	IMB_moviecache_cleanup(ima->cache, imagecache_check_free_anim, &except_frame);
+	BLI_spin_lock(&image_spin);
+	if (ima->cache != NULL) {
+		IMB_moviecache_cleanup(ima->cache, imagecache_check_free_anim, &except_frame);
+	}
+	BLI_spin_unlock(&image_spin);
 }
 
 void BKE_image_all_free_anim_ibufs(int cfra)
@@ -1483,6 +1497,12 @@ void BKE_imbuf_to_image_format(struct ImageFormatData *im_format, const ImBuf *i
 	}
 
 	/* planes */
+	/* TODO(sergey): Channels doesn't correspond actual planes used for image buffer
+	 *               For example byte buffer will have 4 channels but it might easily
+	 *               be BW or RGB image.
+	 *
+	 *               Need to use im_format->planes = imbuf->planes instead?
+	 */
 	switch (imbuf->channels) {
 		case 0:
 		case 4: im_format->planes = R_IMF_PLANES_RGBA;
@@ -2263,6 +2283,15 @@ void BKE_image_signal(Image *ima, ImageUser *iuser, int signal)
 						IMB_freeImBuf(ibuf);
 					}
 				}
+
+				/* Changing source type to generated will likely change file format
+				 * used by generated image buffer. Saving different file format to
+				 * the old name might confuse other applications.
+				 *
+				 * Here we ensure original image path wouldn't be used when saving
+				 * generated image.
+				 */
+				ima->name[0] = '\0';
 			}
 
 #if 0
@@ -2839,13 +2868,8 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	ibuf->x = rres.rectx;
 	ibuf->y = rres.recty;
 
-	/* free rect buffer if float buffer changes, so it can be recreated with
-	 * the updated result, and also in case we got byte buffer from sequencer,
-	 * so we don't keep reference to freed buffer */
-	if (ibuf->rect_float != rectf || rect)
-		imb_freerectImBuf(ibuf);
-
 	if (rect) {
+		imb_freerectImBuf(ibuf);
 		ibuf->rect = rect;
 	}
 	else {

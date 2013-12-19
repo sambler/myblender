@@ -583,6 +583,8 @@ static void colormanage_free_config(void)
 
 		colorspace = colorspace_next;
 	}
+	global_colorspaces.first = global_colorspaces.last = NULL;
+	global_tot_colorspace = 0;
 
 	/* free displays */
 	display = global_displays.first;
@@ -602,12 +604,16 @@ static void colormanage_free_config(void)
 		MEM_freeN(display);
 		display = display_next;
 	}
+	global_displays.first = global_displays.last = NULL;
+	global_tot_display = 0;
 
 	/* free views */
 	BLI_freelistN(&global_views);
+	global_tot_view = 0;
 
 	/* free looks */
 	BLI_freelistN(&global_looks);
+	global_tot_looks = 0;
 
 	OCIO_exit();
 }
@@ -658,6 +664,18 @@ void colormanagement_init(void)
 		colormanage_load_config(config);
 
 		OCIO_configRelease(config);
+	}
+
+	/* If there're no valid display/views, use fallback mode. */
+	if (global_tot_display == 0 || global_tot_view == 0) {
+		printf("Color management: no displays/views in the config, using fallback mode instead\n");
+
+		/* Free old config. */
+		colormanage_free_config();
+
+		/* Initialize fallback config. */
+		config = OCIO_configCreateFallback();
+		colormanage_load_config(config);
 	}
 
 	BLI_init_srgb_conversion();
@@ -1839,14 +1857,8 @@ static void colormanagement_imbuf_make_display_space(ImBuf *ibuf, const ColorMan
 	if (!ibuf->rect && make_byte)
 		imb_addrectImBuf(ibuf);
 
-	if (global_tot_display == 0 || global_tot_view == 0) {
-		IMB_buffer_float_from_float(ibuf->rect_float, ibuf->rect_float, ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB,
-		                            TRUE, ibuf->x, ibuf->y, ibuf->x, ibuf->x);
-	}
-	else {
-		colormanage_display_buffer_process_ex(ibuf, ibuf->rect_float, (unsigned char *)ibuf->rect,
-		                                      view_settings, display_settings);
-	}
+	colormanage_display_buffer_process_ex(ibuf, ibuf->rect_float, (unsigned char *)ibuf->rect,
+	                                      view_settings, display_settings);
 }
 
 void IMB_colormanagement_imbuf_make_display_space(ImBuf *ibuf, const ColorManagedViewSettings *view_settings,
@@ -1874,6 +1886,13 @@ ImBuf *IMB_colormanagement_imbuf_for_write(ImBuf *ibuf, bool save_as_render, boo
 	bool is_movie = BKE_imtype_is_movie(image_format_data->imtype);
 	bool requires_linear_float = BKE_imtype_requires_linear_float(image_format_data->imtype);
 	bool do_alpha_under = image_format_data->planes != R_IMF_PLANES_RGBA;
+
+	if (ibuf->rect_float && ibuf->rect &&
+	    (ibuf->userflags & (IB_DISPLAY_BUFFER_INVALID | IB_RECT_INVALID)) != 0)
+	{
+		IMB_rect_from_float(ibuf);
+		ibuf->userflags &= ~(IB_RECT_INVALID | IB_DISPLAY_BUFFER_INVALID);
+	}
 
 	do_colormanagement = save_as_render && (is_movie || !requires_linear_float);
 
@@ -1990,122 +2009,90 @@ void IMB_colormanagement_buffer_make_display_space(float *buffer, unsigned char 
 	IMB_colormanagement_processor_free(cm_processor);
 }
 
-static void imbuf_verify_float(ImBuf *ibuf)
-{
-	/* multiple threads could request for display buffer at once and in case
-	 * view transform is not used it'll lead to display buffer calculated
-	 * several times
-	 * it is harmless, but would take much more time (assuming thread lock
-	 * happens faster than running float->byte conversion for average image)
-	 */
-	BLI_lock_thread(LOCK_COLORMANAGE);
-
-	if (ibuf->rect_float && (ibuf->rect == NULL || (ibuf->userflags & (IB_DISPLAY_BUFFER_INVALID | IB_RECT_INVALID)))) {
-		IMB_rect_from_float(ibuf);
-
-		ibuf->userflags &= ~(IB_RECT_INVALID | IB_DISPLAY_BUFFER_INVALID);
-	}
-
-	BLI_unlock_thread(LOCK_COLORMANAGE);
-}
-
 /*********************** Public display buffers interfaces *************************/
 
 /* acquire display buffer for given image buffer using specified view and display settings */
 unsigned char *IMB_display_buffer_acquire(ImBuf *ibuf, const ColorManagedViewSettings *view_settings,
                                           const ColorManagedDisplaySettings *display_settings, void **cache_handle)
 {
+	unsigned char *display_buffer;
+	int buffer_size;
+	ColormanageCacheViewSettings cache_view_settings;
+	ColormanageCacheDisplaySettings cache_display_settings;
+	ColorManagedViewSettings default_view_settings;
+	const ColorManagedViewSettings *applied_view_settings;
+
 	*cache_handle = NULL;
 
 	if (!ibuf->x || !ibuf->y)
 		return NULL;
 
-	if (global_tot_display == 0 || global_tot_view == 0) {
-		/* if there's no view transform or display transforms, fallback to standard sRGB/linear conversion
-		 * the same logic would be used if OCIO is disabled
-		 */
-
-		imbuf_verify_float(ibuf);
-
-		return (unsigned char *) ibuf->rect;
+	if (view_settings) {
+		applied_view_settings = view_settings;
 	}
 	else {
-		unsigned char *display_buffer;
-		int buffer_size;
-		ColormanageCacheViewSettings cache_view_settings;
-		ColormanageCacheDisplaySettings cache_display_settings;
-		ColorManagedViewSettings default_view_settings;
-		const ColorManagedViewSettings *applied_view_settings;
-
-		if (view_settings) {
-			applied_view_settings = view_settings;
-		}
-		else {
-			/* if no view settings were specified, use default display transformation
-			 * this happens for images which don't want to be displayed with render settings
-			 */
-
-			init_default_view_settings(display_settings,  &default_view_settings);
-			applied_view_settings = &default_view_settings;
-		}
-
-		/* early out: no float buffer and byte buffer is already in display space,
-		 * let's just use if
+		/* if no view settings were specified, use default display transformation
+		 * this happens for images which don't want to be displayed with render settings
 		 */
-		if (ibuf->rect_float == NULL && ibuf->rect_colorspace && ibuf->channels == 4) {
-			if (is_ibuf_rect_in_display_space(ibuf, applied_view_settings, display_settings))
-				return (unsigned char *) ibuf->rect;
+
+		init_default_view_settings(display_settings,  &default_view_settings);
+		applied_view_settings = &default_view_settings;
+	}
+
+	/* early out: no float buffer and byte buffer is already in display space,
+	 * let's just use if
+	 */
+	if (ibuf->rect_float == NULL && ibuf->rect_colorspace && ibuf->channels == 4) {
+		if (is_ibuf_rect_in_display_space(ibuf, applied_view_settings, display_settings))
+			return (unsigned char *) ibuf->rect;
+	}
+
+	colormanage_view_settings_to_cache(ibuf, &cache_view_settings, applied_view_settings);
+	colormanage_display_settings_to_cache(&cache_display_settings, display_settings);
+
+	if (ibuf->invalid_rect.xmin != ibuf->invalid_rect.xmax) {
+		if ((ibuf->userflags & IB_DISPLAY_BUFFER_INVALID) == 0) {
+			IMB_partial_display_buffer_update(ibuf, ibuf->rect_float, (unsigned char *) ibuf->rect,
+			                                  ibuf->x, 0, 0, applied_view_settings, display_settings,
+			                                  ibuf->invalid_rect.xmin, ibuf->invalid_rect.ymin,
+			                                  ibuf->invalid_rect.xmax, ibuf->invalid_rect.ymax);
 		}
 
-		colormanage_view_settings_to_cache(ibuf, &cache_view_settings, applied_view_settings);
-		colormanage_display_settings_to_cache(&cache_display_settings, display_settings);
+		BLI_rcti_init(&ibuf->invalid_rect, 0, 0, 0, 0);
+	}
 
-		if (ibuf->invalid_rect.xmin != ibuf->invalid_rect.xmax) {
-			if ((ibuf->userflags & IB_DISPLAY_BUFFER_INVALID) == 0) {
-				IMB_partial_display_buffer_update(ibuf, ibuf->rect_float, (unsigned char *) ibuf->rect,
-				                                  ibuf->x, 0, 0, applied_view_settings, display_settings,
-				                                  ibuf->invalid_rect.xmin, ibuf->invalid_rect.ymin,
-				                                  ibuf->invalid_rect.xmax, ibuf->invalid_rect.ymax,
-				                                  false);
-			}
+	BLI_lock_thread(LOCK_COLORMANAGE);
 
-			BLI_rcti_init(&ibuf->invalid_rect, 0, 0, 0, 0);
-		}
+	/* ensure color management bit fields exists */
+	if (!ibuf->display_buffer_flags) {
+		ibuf->display_buffer_flags = MEM_callocN(sizeof(unsigned int) * global_tot_display, "imbuf display_buffer_flags");
+	}
+	else if (ibuf->userflags & IB_DISPLAY_BUFFER_INVALID) {
+		/* all display buffers were marked as invalid from other areas,
+		 * now propagate this flag to internal color management routines
+		 */
+		memset(ibuf->display_buffer_flags, 0, global_tot_display * sizeof(unsigned int));
 
-		BLI_lock_thread(LOCK_COLORMANAGE);
+		ibuf->userflags &= ~IB_DISPLAY_BUFFER_INVALID;
+	}
 
-		/* ensure color management bit fields exists */
-		if (!ibuf->display_buffer_flags) {
-			if (global_tot_display)
-				ibuf->display_buffer_flags = MEM_callocN(sizeof(unsigned int) * global_tot_display, "imbuf display_buffer_flags");
-		}
-		else if (ibuf->userflags & IB_DISPLAY_BUFFER_INVALID) {
-			/* all display buffers were marked as invalid from other areas,
-			 * now propagate this flag to internal color management routines
-			 */
-			memset(ibuf->display_buffer_flags, 0, global_tot_display * sizeof(unsigned int));
+	display_buffer = colormanage_cache_get(ibuf, &cache_view_settings, &cache_display_settings, cache_handle);
 
-			ibuf->userflags &= ~IB_DISPLAY_BUFFER_INVALID;
-		}
-
-		display_buffer = colormanage_cache_get(ibuf, &cache_view_settings, &cache_display_settings, cache_handle);
-
-		if (display_buffer) {
-			BLI_unlock_thread(LOCK_COLORMANAGE);
-			return display_buffer;
-		}
-
-		buffer_size = DISPLAY_BUFFER_CHANNELS * ibuf->x * ibuf->y * sizeof(char);
-		display_buffer = MEM_callocN(buffer_size, "imbuf display buffer");
-
-		colormanage_display_buffer_process(ibuf, display_buffer, applied_view_settings, display_settings);
-
-		colormanage_cache_put(ibuf, &cache_view_settings, &cache_display_settings, display_buffer, cache_handle);
-
+	if (display_buffer) {
 		BLI_unlock_thread(LOCK_COLORMANAGE);
-
 		return display_buffer;
 	}
+
+	buffer_size = DISPLAY_BUFFER_CHANNELS * ibuf->x * ibuf->y * sizeof(char);
+	display_buffer = MEM_callocN(buffer_size, "imbuf display buffer");
+
+	colormanage_display_buffer_process(ibuf, display_buffer, applied_view_settings, display_settings);
+
+	colormanage_cache_put(ibuf, &cache_view_settings, &cache_display_settings, display_buffer, cache_handle);
+
+	BLI_unlock_thread(LOCK_COLORMANAGE);
+
+	return display_buffer;
 }
 
 /* same as IMB_display_buffer_acquire but gets view and display settings from context */
@@ -2123,26 +2110,20 @@ void IMB_display_buffer_transform_apply(unsigned char *display_buffer, float *li
                                         int channels, const ColorManagedViewSettings *view_settings,
                                         const ColorManagedDisplaySettings *display_settings, bool predivide)
 {
-	if (global_tot_display == 0 || global_tot_view == 0) {
-		IMB_buffer_byte_from_float(display_buffer, linear_buffer, channels, 0.0f, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, FALSE,
-		                           width, height, width, width);
-	}
-	else {
-		float *buffer;
-		ColormanageProcessor *cm_processor = IMB_colormanagement_display_processor_new(view_settings, display_settings);
+	float *buffer;
+	ColormanageProcessor *cm_processor = IMB_colormanagement_display_processor_new(view_settings, display_settings);
 
-		buffer = MEM_callocN(channels * width * height * sizeof(float), "display transform temp buffer");
-		memcpy(buffer, linear_buffer, channels * width * height * sizeof(float));
+	buffer = MEM_callocN(channels * width * height * sizeof(float), "display transform temp buffer");
+	memcpy(buffer, linear_buffer, channels * width * height * sizeof(float));
 
-		IMB_colormanagement_processor_apply(cm_processor, buffer, width, height, channels, predivide);
+	IMB_colormanagement_processor_apply(cm_processor, buffer, width, height, channels, predivide);
 
-		IMB_colormanagement_processor_free(cm_processor);
+	IMB_colormanagement_processor_free(cm_processor);
 
-		IMB_buffer_byte_from_float(display_buffer, buffer, channels, 0.0f, IB_PROFILE_SRGB, IB_PROFILE_SRGB,
-		                           FALSE, width, height, width, width);
+	IMB_buffer_byte_from_float(display_buffer, buffer, channels, 0.0f, IB_PROFILE_SRGB, IB_PROFILE_SRGB,
+	                           FALSE, width, height, width, width);
 
-		MEM_freeN(buffer);
-	}
+	MEM_freeN(buffer);
 }
 
 void IMB_display_buffer_release(void *cache_handle)
@@ -2683,12 +2664,24 @@ static void partial_buffer_update_rect(ImBuf *ibuf, unsigned char *display_buffe
 	if (cm_processor) {
 		for (y = ymin; y < ymax; y++) {
 			for (x = xmin; x < xmax; x++) {
-				int display_index = (y * display_stride + x) * channels;
+				int display_index = (y * display_stride + x) * 4;
 				int linear_index = ((y - linear_offset_y) * linear_stride + (x - linear_offset_x)) * channels;
 				float pixel[4];
 
 				if (linear_buffer) {
-					copy_v4_v4(pixel, (float *) linear_buffer + linear_index);
+					if (channels == 4) {
+						copy_v4_v4(pixel, (float *) linear_buffer + linear_index);
+					}
+					else if (channels == 3) {
+						copy_v3_v3(pixel, (float *) linear_buffer + linear_index);
+						pixel[3] = 1.0f;
+					}
+					else if (channels == 1) {
+						pixel[0] = linear_buffer[linear_index];
+					}
+					else {
+						BLI_assert(!"Unsupported number of channels in partial buffer update");
+					}
 				}
 				else if (byte_buffer) {
 					rgba_uchar_to_float(pixel, byte_buffer + linear_index);
@@ -2697,18 +2690,38 @@ static void partial_buffer_update_rect(ImBuf *ibuf, unsigned char *display_buffe
 				}
 
 				if (!is_data) {
-					IMB_colormanagement_processor_apply_v4_predivide(cm_processor, pixel);
+					IMB_colormanagement_processor_apply_pixel(cm_processor, pixel, channels);
 				}
 
 				if (display_buffer_float) {
 					int index = ((y - ymin) * width + (x - xmin)) * channels;
 
-					copy_v4_v4(display_buffer_float + index, pixel);
+					if (channels == 4) {
+						copy_v4_v4(display_buffer_float + index, pixel);
+					}
+					else if (channels == 3) {
+						copy_v3_v3(display_buffer_float + index, pixel);
+					}
+					else /* if (channels == 1) */ {
+						display_buffer_float[index] = pixel[0];
+					}
 				}
 				else {
-					float pixel_straight[4];
-					premul_to_straight_v4_v4(pixel_straight, pixel);
-					rgba_float_to_uchar(display_buffer + display_index, pixel_straight);
+					if (channels == 4) {
+						float pixel_straight[4];
+						premul_to_straight_v4_v4(pixel_straight, pixel);
+						rgba_float_to_uchar(display_buffer + display_index, pixel_straight);
+					}
+					else if (channels == 3) {
+						rgb_float_to_uchar(display_buffer + display_index, pixel);
+						display_buffer[display_index + 3] = 255;
+					}
+					else /* if (channels == 1) */ {
+						display_buffer[display_index] =
+							display_buffer[display_index + 1] =
+							display_buffer[display_index + 2] =
+							display_buffer[display_index + 3] = FTOCHAR(pixel[0]);
+					}
 				}
 			}
 		}
@@ -2745,22 +2758,8 @@ static void partial_buffer_update_rect(ImBuf *ibuf, unsigned char *display_buffe
 void IMB_partial_display_buffer_update(ImBuf *ibuf, const float *linear_buffer, const unsigned char *byte_buffer,
                                        int stride, int offset_x, int offset_y, const ColorManagedViewSettings *view_settings,
                                        const ColorManagedDisplaySettings *display_settings,
-                                       int xmin, int ymin, int xmax, int ymax, bool update_orig_byte_buffer)
+                                       int xmin, int ymin, int xmax, int ymax)
 {
-	if ((ibuf->rect && ibuf->rect_float) || update_orig_byte_buffer) {
-		/* update byte buffer created by legacy color management */
-
-		unsigned char *rect = (unsigned char *) ibuf->rect;
-		int channels = ibuf->channels;
-		int width = xmax - xmin;
-		int height = ymax - ymin;
-		int rect_index = (ymin * ibuf->x + xmin) * channels;
-		int linear_index = ((ymin - offset_y) * stride + (xmin - offset_x)) * channels;
-
-		IMB_buffer_byte_from_float(rect + rect_index, linear_buffer + linear_index, channels, ibuf->dither,
-		                           IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, TRUE, width, height, ibuf->x, stride);
-	}
-
 	if (ibuf->display_buffer_flags) {
 		ColormanageCacheViewSettings cache_view_settings;
 		ColormanageCacheDisplaySettings cache_display_settings;
@@ -2906,6 +2905,24 @@ void IMB_colormanagement_processor_apply_v3(ColormanageProcessor *cm_processor, 
 
 	if (cm_processor->processor)
 		OCIO_processorApplyRGB(cm_processor->processor, pixel);
+}
+
+void IMB_colormanagement_processor_apply_pixel(struct ColormanageProcessor *cm_processor, float *pixel, int channels)
+{
+	if (channels == 4) {
+		IMB_colormanagement_processor_apply_v4_predivide(cm_processor, pixel);
+	}
+	else if (channels == 3) {
+		IMB_colormanagement_processor_apply_v3(cm_processor, pixel);
+	}
+	else if (channels == 1) {
+		if (cm_processor->curve_mapping) {
+			curve_mapping_apply_pixel(cm_processor->curve_mapping, pixel, 1);
+		}
+	}
+	else {
+		BLI_assert(!"Incorrect number of channels passed to IMB_colormanagement_processor_apply_pixel");
+	}
 }
 
 void IMB_colormanagement_processor_apply(ColormanageProcessor *cm_processor, float *buffer, int width, int height,

@@ -124,14 +124,6 @@ enum {
 #define PNL_GRID    (UI_UNIT_Y / 5) /* 4 default */
 #define PNL_HEADER  (UI_UNIT_Y + 4) /* 24 default */
 
-/* panel->flag */
-#define PNL_SELECT  1
-#define PNL_CLOSEDX 2
-#define PNL_CLOSEDY 4
-#define PNL_CLOSED  6
-/*#define PNL_TABBED	8*/ /*UNUSED*/
-#define PNL_OVERLAP 16
-
 /* Button text selection:
  * extension direction, selextend, inside ui_do_but_TEX */
 #define EXTEND_LEFT     1
@@ -401,15 +393,15 @@ extern bool ui_set_but_string(struct bContext *C, uiBut *but, const char *str);
 extern bool ui_set_but_string_eval_num(struct bContext *C, uiBut *but, const char *str, double *value);
 extern int  ui_get_but_string_max_length(uiBut *but);
 
-extern void ui_set_but_default(struct bContext *C, const bool all);
+extern void ui_set_but_default(struct bContext *C, const bool all, const bool use_afterfunc);
 
 extern void ui_check_but(uiBut *but);
-extern bool ui_is_but_float(uiBut *but);
-extern bool ui_is_but_bool(uiBut *but);
-extern bool ui_is_but_unit(uiBut *but);
+extern bool ui_is_but_float(const uiBut *but);
+extern bool ui_is_but_bool(const uiBut *but);
+extern bool ui_is_but_unit(const uiBut *but);
 extern bool ui_is_but_rna_valid(uiBut *but);
-extern bool ui_is_but_utf8(uiBut *but);
-extern bool ui_is_but_search_unlink_visible(uiBut *but);
+extern bool ui_is_but_utf8(const uiBut *but);
+extern bool ui_is_but_search_unlink_visible(const uiBut *but);
 
 extern int  ui_is_but_push_ex(uiBut *but, double *value);
 extern int  ui_is_but_push(uiBut *but);
@@ -505,7 +497,7 @@ struct AutoComplete;
 
 /* interface_panel.c */
 extern int ui_handler_panel_region(struct bContext *C, const struct wmEvent *event, struct ARegion *ar);
-extern void ui_draw_aligned_panel(struct uiStyle *style, uiBlock *block, const rcti *rect);
+extern void ui_draw_aligned_panel(struct uiStyle *style, uiBlock *block, const rcti *rect, const bool show_pin);
 
 /* interface_draw.c */
 extern void ui_dropshadow(const rctf *rct, float radius, float aspect, float alpha, int select);
@@ -523,6 +515,7 @@ void ui_draw_but_TRACKPREVIEW(ARegion *ar, uiBut *but, struct uiWidgetColors *wc
 void ui_draw_but_NODESOCKET(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, const rcti *rect);
 
 /* interface_handlers.c */
+PointerRNA *ui_handle_afterfunc_add_operator(struct wmOperatorType *ot, int opcontext, bool create_props);
 extern void ui_pan_to_scroll(const struct wmEvent *event, int *type, int *val);
 extern void ui_button_activate_do(struct bContext *C, struct ARegion *ar, uiBut *but);
 extern void ui_button_execute_do(struct bContext *C, struct ARegion *ar, uiBut *but);
@@ -531,6 +524,7 @@ extern bool ui_button_is_active(struct ARegion *ar);
 extern int ui_button_open_menu_direction(uiBut *but);
 extern void ui_button_text_password_hide(char password_str[UI_MAX_DRAW_STR], uiBut *but, int restore);
 void ui_button_clipboard_free(void);
+void ui_panel_menu(struct bContext *C, ARegion *ar, Panel *pa);
 
 /* interface_widgets.c */
 void ui_draw_anti_tria(float x1, float y1, float x2, float y2, float x3, float y3);

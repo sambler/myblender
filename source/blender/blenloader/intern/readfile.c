@@ -4492,6 +4492,16 @@ static void lib_link_object(FileData *fd, Main *main)
 				ob->rigidbody_constraint->ob1 = newlibadr(fd, ob->id.lib, ob->rigidbody_constraint->ob1);
 				ob->rigidbody_constraint->ob2 = newlibadr(fd, ob->id.lib, ob->rigidbody_constraint->ob2);
 			}
+
+			{
+				LodLevel *level;
+				for (level = ob->lodlevels.first; level; level = level->next) {
+					level->source = newlibadr(fd, ob->id.lib, level->source);
+
+					if (!level->source && level == ob->lodlevels.first)
+						level->source = ob;
+				}
+			}
 		}
 	}
 	
@@ -5026,6 +5036,9 @@ static void direct_link_object(FileData *fd, Object *ob)
 	if (ob->sculpt) {
 		ob->sculpt = MEM_callocN(sizeof(SculptSession), "reload sculpt session");
 	}
+
+	link_list(fd, &ob->lodlevels);
+	ob->currentlod = ob->lodlevels.first;
 }
 
 /* ************ READ SCENE ***************** */
@@ -6125,6 +6138,8 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 		pa->type = NULL;
 	}
 
+	link_list(fd, &ar->panels_category_active);
+
 	link_list(fd, &ar->ui_lists);
 
 	for (ui_list = ar->ui_lists.first; ui_list; ui_list = ui_list->next) {
@@ -6161,13 +6176,14 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 	ar->v2d.tab_num = 0;
 	ar->v2d.tab_cur = 0;
 	ar->v2d.sms = NULL;
+	ar->panels_category.first = ar->panels_category.last = NULL;
 	ar->handlers.first = ar->handlers.last = NULL;
 	ar->uiblocks.first = ar->uiblocks.last = NULL;
 	ar->headerstr = NULL;
 	ar->swinid = 0;
 	ar->type = NULL;
 	ar->swap = 0;
-	ar->do_draw = FALSE;
+	ar->do_draw = 0;
 	ar->regiontimer = NULL;
 	memset(&ar->drawrct, 0, sizeof(ar->drawrct));
 }
@@ -8393,6 +8409,12 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 		expand_doit(fd, mainvar, ob->rigidbody_constraint->ob2);
 	}
 
+	if (ob->currentlod) {
+		LodLevel *level;
+		for (level = ob->lodlevels.first; level; level = level->next) {
+			expand_doit(fd, mainvar, level->source);
+		}
+	}
 }
 
 static void expand_scene(FileData *fd, Main *mainvar, Scene *sce)

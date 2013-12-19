@@ -83,7 +83,7 @@ else ()
   SET(_openexr_FIND_COMPONENTS
     Half
     Iex-${_openexr_libs_ver}
-    IlmImf-${_openexr_libs_ver}
+    IlmImf-Imf_${_openexr_libs_ver}
     IlmThread-${_openexr_libs_ver}
     Imath-${_openexr_libs_ver}
   )

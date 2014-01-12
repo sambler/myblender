@@ -78,9 +78,6 @@
 
 #include "interface_intern.h"
 
-#define PRECISION_FLOAT_MAX 7
-#define PRECISION_FLOAT_MAX_POW 10000000 /* pow(10, PRECISION_FLOAT_MAX)  */
-
 /* avoid unneeded calls to ui_get_but_val */
 #define UI_BUT_VALUE_UNSET DBL_MAX
 #define UI_GET_BUT_VALUE_INIT(_but, _value) if (_value == DBL_MAX) {  (_value) = ui_get_but_val(_but); } (void)0
@@ -432,67 +429,21 @@ void uiExplicitBoundsBlock(uiBlock *block, int minx, int miny, int maxx, int max
 	block->bounds_type = UI_BLOCK_BOUNDS_NONE;
 }
 
-/* ************** LINK LINE DRAWING  ************* */
-
-/* link line drawing is not part of buttons or theme.. so we stick with it here */
-
 static int ui_but_float_precision(uiBut *but, double value)
 {
 	int prec;
-	const double pow10_neg[PRECISION_FLOAT_MAX + 1] = {1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001, 0.0000001};
 
 	/* first check if prec is 0 and fallback to a simple default */
 	if ((prec = (int)but->a2) == -1) {
 		prec = (but->hardmax < 10.001f) ? 3 : 2;
 	}
 
-	BLI_assert(prec <= PRECISION_FLOAT_MAX);
-	BLI_assert(pow10_neg[prec] == pow(10, -prec));
-
-	/* check on the number of decimal places need to display
-	 * the number, this is so 0.00001 is not displayed as 0.00,
-	 * _but_, this is only for small values si 10.0001 will not get
-	 * the same treatment */
-	value = ABS(value);
-	if ((value < pow10_neg[prec]) &&
-	    (value > (1.0 / PRECISION_FLOAT_MAX_POW)))
-	{
-		int value_i = (int)((value * PRECISION_FLOAT_MAX_POW) + 0.5);
-		if (value_i != 0) {
-			const int prec_span = 3; /* show: 0.01001, 5 would allow 0.0100001 for eg. */
-			int test_prec;
-			int prec_min = -1;
-			int dec_flag = 0;
-			int i = PRECISION_FLOAT_MAX;
-			while (i && value_i) {
-				if (value_i % 10) {
-					dec_flag |= 1 << i;
-					prec_min = i;
-				}
-				value_i /= 10;
-				i--;
-			}
-
-			/* even though its a small value, if the second last digit is not 0, use it */
-			test_prec = prec_min;
-
-			dec_flag = (dec_flag >> (prec_min + 1)) & ((1 << prec_span) - 1);
-
-			while (dec_flag) {
-				test_prec++;
-				dec_flag = dec_flag >> 1;
-			}
-
-			if (test_prec > prec) {
-				prec = test_prec;
-			}
-		}
-	}
-
-	CLAMP(prec, 0, PRECISION_FLOAT_MAX);
-
-	return prec;
+	return uiFloatPrecisionCalc(prec, value);
 }
+
+/* ************** LINK LINE DRAWING  ************* */
+
+/* link line drawing is not part of buttons or theme.. so we stick with it here */
 
 static void ui_draw_linkline(uiLinkLine *line, int highlightActiveLines)
 {
@@ -522,30 +473,31 @@ static void ui_draw_links(uiBlock *block)
 
 	/* Draw the inactive lines (lines with neither button being hovered over).
 	 * As we go, remember if we see any active or selected lines. */
-	int foundselectline = FALSE;
-	int foundactiveline = FALSE;
+	bool found_selectline = false;
+	bool found_activeline = false;
+
 	for (but = block->buttons.first; but; but = but->next) {
 		if (but->type == LINK && but->link) {
 			for (line = but->link->lines.first; line; line = line->next) {
 				if (!(line->from->flag & UI_ACTIVE) && !(line->to->flag & UI_ACTIVE))
 					ui_draw_linkline(line, 0);
 				else
-					foundactiveline = TRUE;
+					found_activeline = true;
 
 				if ((line->from->flag & UI_SELECT) || (line->to->flag & UI_SELECT))
-					foundselectline = TRUE;
+					found_selectline = true;
 			}
 		}
 	}
 
 	/* Draw any active lines (lines with either button being hovered over).
 	 * Do this last so they appear on top of inactive lines. */
-	if (foundactiveline) {
+	if (found_activeline) {
 		for (but = block->buttons.first; but; but = but->next) {
 			if (but->type == LINK && but->link) {
 				for (line = but->link->lines.first; line; line = line->next) {
 					if ((line->from->flag & UI_ACTIVE) || (line->to->flag & UI_ACTIVE))
-						ui_draw_linkline(line, !foundselectline);
+						ui_draw_linkline(line, !found_selectline);
 				}
 			}
 		}
@@ -741,8 +693,8 @@ void uiButExecute(const bContext *C, uiBut *but)
 }
 
 /* use to check if we need to disable undo, but don't make any changes
- * returns FALSE if undo needs to be disabled. */
-static int ui_is_but_rna_undo(const uiBut *but)
+ * returns false if undo needs to be disabled. */
+static bool ui_is_but_rna_undo(const uiBut *but)
 {
 	if (but->rnapoin.id.data) {
 		/* avoid undo push for buttons who's ID are screen or wm level
@@ -750,18 +702,18 @@ static int ui_is_but_rna_undo(const uiBut *but)
 		 * unforeseen consequences, so best check for ID's we _know_ are not
 		 * handled by undo - campbell */
 		ID *id = but->rnapoin.id.data;
-		if (ID_CHECK_UNDO(id) == FALSE) {
-			return FALSE;
+		if (ID_CHECK_UNDO(id) == false) {
+			return false;
 		}
 		else {
-			return TRUE;
+			return true;
 		}
 	}
 	else if (but->rnapoin.type && !RNA_struct_undo_check(but->rnapoin.type)) {
-		return FALSE;
+		return false;
 	}
 
-	return TRUE;
+	return true;
 }
 
 /* assigns automatic keybindings to menu items for fast access
@@ -1027,10 +979,10 @@ static void ui_menu_block_set_keymaps(const bContext *C, uiBlock *block)
 	for (but = block->buttons.first; but; but = but->next) {
 
 		if (ui_but_event_operator_string(C, but, buf, sizeof(buf))) {
-			ui_but_add_shortcut(but, buf, FALSE);
+			ui_but_add_shortcut(but, buf, false);
 		}
 		else if (ui_but_event_property_operator_string(C, but, buf, sizeof(buf))) {
-			ui_but_add_shortcut(but, buf, FALSE);
+			ui_but_add_shortcut(but, buf, false);
 		}
 	}
 }
@@ -1057,7 +1009,7 @@ void uiEndBlock(const bContext *C, uiBlock *block)
 
 			if (ot == NULL || WM_operator_poll_context((bContext *)C, ot, but->opcontext) == 0) {
 				but->flag |= UI_BUT_DISABLED;
-				but->lock = TRUE;
+				but->lock = true;
 			}
 
 			if (but->context)
@@ -1757,6 +1709,9 @@ static double ui_get_but_scale_unit(uiBut *but, double value)
 	else if (unit_type == PROP_UNIT_VOLUME) {
 		return value * pow(unit->scale_length, 3);
 	}
+	else if (unit_type == PROP_UNIT_MASS) {
+		return value * pow(unit->scale_length, 3);
+	}
 	else if (unit_type == PROP_UNIT_TIME) { /* WARNING - using evil_C :| */
 		Scene *scene = CTX_data_scene(but->block->evil_C);
 		return FRA2TIME(value);
@@ -1786,7 +1741,7 @@ void ui_convert_to_unit_alt_name(uiBut *but, char *str, size_t maxlen)
 /**
  * \param float_precision  Override the button precision.
  */
-static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double value, int pad, int float_precision)
+static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double value, bool pad, int float_precision)
 {
 	UnitSettings *unit = but->block->unit;
 	int do_split = unit->flag & USER_UNIT_OPT_SPLIT;
@@ -1799,7 +1754,7 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 	if (float_precision == -1) {
 		/* Sanity checks */
 		precision = (int)but->a2;
-		if      (precision > PRECISION_FLOAT_MAX) precision = PRECISION_FLOAT_MAX;
+		if      (precision > UI_PRECISION_FLOAT_MAX) precision = UI_PRECISION_FLOAT_MAX;
 		else if (precision == -1)                 precision = 2;
 	}
 	else {
@@ -1890,7 +1845,7 @@ void ui_get_but_string_ex(uiBut *but, char *str, const size_t maxlen, const int 
 
 		if (ui_is_but_float(but)) {
 			if (ui_is_but_unit(but)) {
-				ui_get_but_string_unit(but, str, maxlen, value, 0, float_precision);
+				ui_get_but_string_unit(but, str, maxlen, value, false, float_precision);
 			}
 			else {
 				const int prec = (float_precision == -1) ? ui_but_float_precision(but, value) : float_precision;
@@ -1920,7 +1875,7 @@ static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char 
 	bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), but->drawstr,
 	                    ui_get_but_scale_unit(but, 1.0), but->block->unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));
 
-	return (BPY_button_exec(C, str_unit_convert, value, TRUE) != -1);
+	return (BPY_button_exec(C, str_unit_convert, value, true) != -1);
 }
 
 #endif /* WITH_PYTHON */
@@ -1956,7 +1911,7 @@ bool ui_set_but_string_eval_num(bContext *C, uiBut *but, const char *str, double
 #else /* WITH_PYTHON */
 
 	*value = atof(str);
-	ok = TRUE;
+	ok = true;
 
 	(void)C;
 	(void)but;
@@ -2332,7 +2287,7 @@ uiBlock *uiBeginBlock(const bContext *C, ARegion *region, const char *name, shor
 	block->evil_C = (void *)C;  /* XXX */
 
 	if (scn) {
-		block->color_profile = TRUE;
+		block->color_profile = true;
 
 		/* store display device name, don't lookup for transformations yet
 		 * block could be used for non-color displays where looking up for transformation
@@ -2366,7 +2321,7 @@ uiBlock *uiBeginBlock(const bContext *C, ARegion *region, const char *name, shor
 		wm_subwindow_getsize(window, window->screen->mainwin, &getsizex, &getsizey);
 
 		block->aspect = 2.0f / fabsf(getsizex * block->winmat[0][0]);
-		block->auto_open = TRUE;
+		block->auto_open = true;
 		block->flag |= UI_BLOCK_LOOP; /* tag as menu */
 	}
 
@@ -2459,7 +2414,7 @@ void ui_check_but(uiBut *but)
 					/* support length type buttons */
 					else if (ui_is_but_unit(but)) {
 						char new_str[sizeof(but->drawstr)];
-						ui_get_but_string_unit(but, new_str, sizeof(new_str), value, TRUE, -1);
+						ui_get_but_string_unit(but, new_str, sizeof(new_str), value, true, -1);
 						slen += BLI_strncpy_rlen(but->drawstr + slen, new_str, sizeof(but->drawstr) - slen);
 					}
 					else {
@@ -2808,7 +2763,7 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
 	
 	/* we could do some more error checks here */
 	if ((type & BUTTYPE) == LABEL) {
-		BLI_assert((poin != NULL || min != 0.0f || max != 0.0f || (a1 == 0.0f && a2 != 0.0f) || (a1 != 0.0f && a1 != 1.0f)) == FALSE);
+		BLI_assert((poin != NULL || min != 0.0f || max != 0.0f || (a1 == 0.0f && a2 != 0.0f) || (a1 != 0.0f && a1 != 1.0f)) == false);
 	}
 
 	if (type & UI_BUT_POIN_TYPES) {  /* a pointer is required */
@@ -2893,7 +2848,7 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
 
 	but->drawflag |= (block->flag & UI_BUT_ALIGN);
 
-	if (but->lock == TRUE) {
+	if (but->lock == true) {
 		if (but->lockstr) {
 			but->flag |= UI_BUT_DISABLED;
 		}
@@ -2952,7 +2907,8 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 		if (type == MENU && proptype == PROP_ENUM) {
 			EnumPropertyItem *item;
 			DynStr *dynstr;
-			int i, totitem, value, free;
+			int i, totitem, value;
+			bool free;
 
 			RNA_property_enum_items_gettexted(block->evil_C, ptr, prop, &item, &totitem, &free);
 			value = RNA_property_enum_get(ptr, prop);
@@ -2985,7 +2941,7 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 		}
 		else if (ELEM(type, ROW, LISTROW) && proptype == PROP_ENUM) {
 			EnumPropertyItem *item, *item_array = NULL;
-			int free;
+			bool free;
 
 			/* get untranslated, then translate the single string we need */
 			RNA_property_enum_items(block->evil_C, ptr, prop, &item_array, NULL, &free);
@@ -3073,7 +3029,7 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 		ui_def_but_rna__disable(but);
 	}
 
-	if (but->flag & UI_BUT_UNDO && (ui_is_but_rna_undo(but) == FALSE)) {
+	if (but->flag & UI_BUT_UNDO && (ui_is_but_rna_undo(but) == false)) {
 		but->flag &= ~UI_BUT_UNDO;
 	}
 
@@ -3128,7 +3084,7 @@ static uiBut *ui_def_but_operator_ptr(uiBlock *block, int type, wmOperatorType *
 
 	if (!ot) {
 		but->flag |= UI_BUT_DISABLED;
-		but->lock = TRUE;
+		but->lock = true;
 		but->lockstr = "";
 	}
 
@@ -3900,7 +3856,7 @@ static void operator_enum_search_cb(const struct bContext *C, void *but, const c
 	else {
 		PointerRNA *ptr = uiButGetOperatorPtrRNA(but);  /* Will create it if needed! */
 		EnumPropertyItem *item, *item_array;
-		int do_free;
+		bool do_free;
 
 		RNA_property_enum_items((bContext *)C, ptr, prop, &item_array, NULL, &do_free);
 
@@ -3971,7 +3927,7 @@ void uiButSetFocusOnEnter(wmWindow *win, uiBut *but)
 	event.type = EVT_BUT_OPEN;
 	event.val = KM_PRESS;
 	event.customdata = but;
-	event.customdatafree = FALSE;
+	event.customdatafree = false;
 	
 	wm_event_add(win, &event);
 }
@@ -3982,7 +3938,8 @@ void uiButGetStrInfo(bContext *C, uiBut *but, ...)
 	uiStringInfo *si;
 
 	EnumPropertyItem *items = NULL, *item = NULL;
-	int totitems, free_items = FALSE;
+	int totitems;
+	bool free_items = false;
 
 	va_start(args, but);
 	while ((si = (uiStringInfo *) va_arg(args, void *))) {

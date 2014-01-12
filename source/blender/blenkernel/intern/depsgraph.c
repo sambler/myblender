@@ -42,6 +42,7 @@
 #include "BLI_utildefines.h"
 #include "BLI_listbase.h"
 #include "BLI_ghash.h"
+#include "BLI_threads.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_camera_types.h"
@@ -78,8 +79,22 @@
 #include "BKE_screen.h"
 #include "BKE_tracking.h"
 
+#include "atomic_ops.h"
+
 #include "depsgraph_private.h"
- 
+
+static SpinLock threaded_update_lock;
+
+void DAG_init(void)
+{
+	BLI_spin_init(&threaded_update_lock);
+}
+
+void DAG_exit(void)
+{
+	BLI_spin_end(&threaded_update_lock);
+}
+
 /* Queue and stack operations for dag traversal 
  *
  * the queue store a list of freenodes to avoid successive alloc/dealloc
@@ -418,22 +433,47 @@ static void dag_add_lamp_driver_relations(DagForest *dag, DagNode *node, Lamp *l
 	la->id.flag &= ~LIB_DOIT;
 }
 
+static void check_and_create_collision_relation(DagForest *dag, Object *ob, DagNode *node, Object *ob1, int skip_forcefield, bool no_collision)
+{
+	DagNode *node2;
+	if (ob1->pd && (ob1->pd->deflect || ob1->pd->forcefield) && (ob1 != ob)) {
+		if ((skip_forcefield && ob1->pd->forcefield == skip_forcefield) || (no_collision && ob1->pd->forcefield == 0))
+			return;
+		node2 = dag_get_node(dag, ob1);
+		dag_add_relation(dag, node2, node, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Field Collision");
+	}
+}
+
 static void dag_add_collision_field_relation(DagForest *dag, Scene *scene, Object *ob, DagNode *node, int skip_forcefield, bool no_collision)
 {
 	Base *base;
-	DagNode *node2;
+	ParticleSystem *particle_system;
+
+	for (particle_system = ob->particlesystem.first;
+	     particle_system;
+	     particle_system = particle_system->next)
+	{
+		EffectorWeights *effector_weights = particle_system->part->effector_weights;
+		if (effector_weights->group) {
+			GroupObject *group_object;
+
+			for (group_object = effector_weights->group->gobject.first;
+			     group_object;
+			     group_object = group_object->next)
+			{
+				if ((group_object->ob->lay & ob->lay)) {
+					check_and_create_collision_relation(dag, ob, node, group_object->ob, skip_forcefield, no_collision);
+				}
+			}
+		}
+	}
 
 	/* would be nice to have a list of colliders here
 	 * so for now walk all objects in scene check 'same layer rule' */
 	for (base = scene->base.first; base; base = base->next) {
-		if ((base->lay & ob->lay) && base->object->pd) {
+		if ((base->lay & ob->lay)) {
 			Object *ob1 = base->object;
-			if ((ob1->pd->deflect || ob1->pd->forcefield) && (ob1 != ob)) {
-				if ((skip_forcefield && ob1->pd->forcefield == skip_forcefield) || (no_collision && ob1->pd->forcefield == 0))
-					continue;
-				node2 = dag_get_node(dag, ob1);
-				dag_add_relation(dag, node2, node, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Field Collision");
-			}
+			check_and_create_collision_relation(dag, ob, node, ob1, skip_forcefield, no_collision);
 		}
 	}
 }
@@ -854,9 +894,9 @@ DagForest *build_dag(Main *bmain, Scene *sce, short mask)
 	}
 	
 	/* clear "LIB_DOIT" flag from all materials, to prevent infinite recursion problems later [#32017] */
-	tag_main_idcode(bmain, ID_MA, FALSE);
-	tag_main_idcode(bmain, ID_LA, FALSE);
-	tag_main_idcode(bmain, ID_GR, FALSE);
+	BKE_main_id_tag_idcode(bmain, ID_MA, false);
+	BKE_main_id_tag_idcode(bmain, ID_LA, false);
+	BKE_main_id_tag_idcode(bmain, ID_GR, false);
 	
 	/* add base node for scene. scene is always the first node in DAG */
 	scenenode = dag_add_node(dag, sce);
@@ -872,7 +912,7 @@ DagForest *build_dag(Main *bmain, Scene *sce, short mask)
 			build_dag_group(dag, scenenode, sce, ob->dup_group, mask);
 	}
 	
-	tag_main_idcode(bmain, ID_GR, FALSE);
+	BKE_main_id_tag_idcode(bmain, ID_GR, false);
 	
 	/* Now all relations were built, but we need to solve 1 exceptional case;
 	 * When objects have multiple "parents" (for example parent + constraint working on same object)
@@ -1963,7 +2003,7 @@ void DAG_scene_update_flags(Main *bmain, Scene *scene, unsigned int lay, const s
 	GroupObject *go;
 	Scene *sce_iter;
 
-	tag_main_idcode(bmain, ID_GR, FALSE);
+	BKE_main_id_tag_idcode(bmain, ID_GR, false);
 
 	/* set ob flags where animated systems are */
 	for (SETLOOPER(scene, sce_iter, base)) {
@@ -2031,7 +2071,7 @@ static void dag_current_scene_layers(Main *bmain, ListBase *lb)
 	/* if we have a windowmanager, look into windows */
 	if ((wm = bmain->wm.first)) {
 		
-		flag_listbase_ids(&bmain->scene, LIB_DOIT, 1);
+		BKE_main_id_flag_listbase(&bmain->scene, LIB_DOIT, 1);
 
 		for (win = wm->windows.first; win; win = win->next) {
 			if (win->screen && win->screen->scene->theDag) {
@@ -2106,7 +2146,7 @@ void DAG_on_visible_update(Main *bmain, const short do_time)
 		 * note armature poses or object matrices are preserved and do not
 		 * require updates, so we skip those */
 		dag_scene_flush_layers(scene, lay);
-		tag_main_idcode(bmain, ID_GR, FALSE);
+		BKE_main_id_tag_idcode(bmain, ID_GR, false);
 
 		for (SETLOOPER(scene, sce_iter, base)) {
 			ob = base->object;
@@ -2123,7 +2163,7 @@ void DAG_on_visible_update(Main *bmain, const short do_time)
 			}
 		}
 
-		tag_main_idcode(bmain, ID_GR, FALSE);
+		BKE_main_id_tag_idcode(bmain, ID_GR, false);
 
 		/* now tag update flags, to ensure deformers get calculated on redraw */
 		DAG_scene_update_flags(bmain, scene, lay, do_time);
@@ -2680,6 +2720,86 @@ void DAG_pose_sort(Object *ob)
 	ugly_hack_sorry = 1;
 }
 
+/* ************************  DAG FOR THREADED UPDATE  ********************* */
+
+/* Initialize run-time data in the graph needed for traversing it
+ * from multiple threads and start threaded tree traversal by adding
+ * the root node to the queue.
+ *
+ * This will mark DAG nodes as object/non-object and will calculate
+ * num_pending_parents of nodes (which is how many non-updated parents node
+ * have, which helps a lot checking whether node could be scheduled
+ * already or not).
+ */
+void DAG_threaded_update_begin(Scene *scene,
+                               void (*func)(void *node, void *user_data),
+                               void *user_data)
+{
+	DagNode *node;
+
+	/* We reset num_pending_parents to zero first and tag node as not scheduled yet... */
+	for (node = scene->theDag->DagNode.first; node; node = node->next) {
+		node->num_pending_parents = 0;
+		node->scheduled = false;
+	}
+
+	/* ... and then iterate over all the nodes and
+	 * increase num_pending_parents for node childs.
+	 */
+	for (node = scene->theDag->DagNode.first; node; node = node->next) {
+		DagAdjList *itA;
+
+		for (itA = node->child; itA; itA = itA->next) {
+			if (itA->node != node) {
+				itA->node->num_pending_parents++;
+			}
+		}
+	}
+
+	/* Add root nodes to the queue. */
+	BLI_spin_lock(&threaded_update_lock);
+	for (node = scene->theDag->DagNode.first; node; node = node->next) {
+		if (node->num_pending_parents == 0) {
+			node->scheduled = true;
+			func(node, user_data);
+		}
+	}
+	BLI_spin_unlock(&threaded_update_lock);
+}
+
+/* This function is called when handling node is done.
+ *
+ * This function updates num_pending_parents for all childs and
+ * schedules them if they're ready.
+ */
+void DAG_threaded_update_handle_node_updated(void *node_v,
+                                             void (*func)(void *node, void *user_data),
+                                             void *user_data)
+{
+	DagNode *node = node_v;
+	DagAdjList *itA;
+
+	for (itA = node->child; itA; itA = itA->next) {
+		DagNode *child_node = itA->node;
+		if (child_node != node) {
+			atomic_sub_uint32(&child_node->num_pending_parents, 1);
+
+			if (child_node->num_pending_parents == 0) {
+				bool need_schedule;
+
+				BLI_spin_lock(&threaded_update_lock);
+				need_schedule = child_node->scheduled == false;
+				child_node->scheduled = true;
+				BLI_spin_unlock(&threaded_update_lock);
+
+				if (need_schedule) {
+					func(child_node, user_data);
+				}
+			}
+		}
+	}
+}
+
 /* ************************ DAG DEBUGGING ********************* */
 
 void DAG_print_dependencies(Main *bmain, Scene *scene, Object *ob)
@@ -2699,3 +2819,26 @@ void DAG_print_dependencies(Main *bmain, Scene *scene, Object *ob)
 	dag_print_dependencies = 0;
 }
 
+/* ************************ DAG querying ********************* */
+
+/* Will return Object ID if node represents Object,
+ * and will return NULL otherwise.
+ */
+Object *DAG_get_node_object(void *node_v)
+{
+	DagNode *node = node_v;
+
+	if (node->type == ID_OB) {
+		return node->ob;
+	}
+
+	return NULL;
+}
+
+/* Returns node name, used for debug output only, atm. */
+const char *DAG_get_node_name(void *node_v)
+{
+	DagNode *node = node_v;
+
+	return dag_node_name(node);
+}

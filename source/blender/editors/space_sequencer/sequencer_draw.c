@@ -48,8 +48,8 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_main.h"
 #include "BKE_sequencer.h"
-
 #include "BKE_sound.h"
 
 #include "IMB_colormanagement.h"
@@ -838,7 +838,7 @@ ImBuf *sequencer_ibuf_get(struct Main *bmain, Scene *scene, SpaceSeq *sseq, int 
 	rectx = (render_size * (float)scene->r.xsch) / 100.0f + 0.5f;
 	recty = (render_size * (float)scene->r.ysch) / 100.0f + 0.5f;
 
-	context = BKE_sequencer_new_render_data(bmain, scene, rectx, recty, proxy_size);
+	context = BKE_sequencer_new_render_data(bmain->eval_ctx, bmain, scene, rectx, recty, proxy_size);
 
 	/* sequencer could start rendering, in this case we need to be sure it wouldn't be canceled
 	 * by Esc pressed somewhere in the past
@@ -965,12 +965,6 @@ void draw_image_seq(const bContext *C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
-	/* without this colors can flicker from previous opengl state */
-	glColor4ub(255, 255, 255, 255);
-
-	UI_view2d_totRect_set(v2d, viewrectx + 0.5f, viewrecty + 0.5f);
-	UI_view2d_curRect_validate(v2d);
-
 	/* only initialize the preview if a render is in progress */
 	if (G.is_rendering)
 		return;
@@ -1026,8 +1020,22 @@ void draw_image_seq(const bContext *C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 				break;
 		}
 
-		scopes->reference_ibuf = ibuf;
+		/* future files may have new scopes we don't catch above */
+		if (scope) {
+			scopes->reference_ibuf = ibuf;
+			viewrectx = scope->x;
+			viewrecty = scope->y;
+		}
+		else {
+			scopes->reference_ibuf = NULL;
+		}
 	}
+
+	/* without this colors can flicker from previous opengl state */
+	glColor4ub(255, 255, 255, 255);
+
+	UI_view2d_totRect_set(v2d, viewrectx + 0.5f, viewrecty + 0.5f);
+	UI_view2d_curRect_validate(v2d);
 
 	/* setting up the view - actual drawing starts here */
 	UI_view2d_view_ortho(v2d);

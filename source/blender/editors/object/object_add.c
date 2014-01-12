@@ -68,6 +68,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_displist.h"
 #include "BKE_effect.h"
+#include "BKE_font.h"
 #include "BKE_group.h"
 #include "BKE_image.h"
 #include "BKE_lamp.h"
@@ -1093,7 +1094,7 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	/* delete has to handle all open scenes */
-	flag_listbase_ids(&bmain->scene, LIB_DOIT, 1);
+	BKE_main_id_flag_listbase(&bmain->scene, LIB_DOIT, 1);
 	for (win = wm->windows.first; win; win = win->next) {
 		scene = win->screen->scene;
 		
@@ -1216,7 +1217,7 @@ static void copy_object_set_idnew(bContext *C, int dupflag)
 
 	set_sca_new_poins();
 
-	clear_id_newpoins();
+	BKE_main_id_clear_newpoins(bmain);
 }
 
 /********************* Make Duplicates Real ************************/
@@ -1234,7 +1235,7 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 	if (!(base->object->transflag & OB_DUPLI))
 		return;
 
-	lb = object_duplilist(scene, base->object, FALSE);
+	lb = object_duplilist(bmain->eval_ctx, scene, base->object);
 
 	if (use_hierarchy || use_base_parent) {
 		dupli_gh = BLI_ghash_ptr_new("make_object_duplilist_real dupli_gh");
@@ -1369,7 +1370,7 @@ static int object_duplicates_make_real_exec(bContext *C, wmOperator *op)
 	const short use_base_parent = RNA_boolean_get(op->ptr, "use_base_parent");
 	const short use_hierarchy = RNA_boolean_get(op->ptr, "use_hierarchy");
 
-	clear_id_newpoins();
+	BKE_main_id_clear_newpoins(bmain);
 
 	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
 	{
@@ -1584,8 +1585,11 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 			cu = newob->data;
 
-			if ( !newob->curve_cache || !newob->curve_cache->disp.first)
-				BKE_displist_make_curveTypes(scene, newob, 0);
+			/* TODO(sergey): Ideally DAG will create nurbs list for a curve data
+			 *               datablock, but for until we've got granular update
+			 *               lets take care by selves.
+			 */
+			BKE_vfont_to_curve(bmain, scene, newob, FO_EDIT);
 
 			newob->type = OB_CURVE;
 			cu->type = OB_CURVE;
@@ -1670,7 +1674,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			}
 
 			if (!baseob->curve_cache || !baseob->curve_cache->disp.first) {
-				BKE_displist_make_mball(scene, baseob);
+				BKE_displist_make_mball(bmain->eval_ctx, scene, baseob);
 			}
 
 			if (!(baseob->flag & OB_DONE)) {
@@ -2029,7 +2033,7 @@ Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag
 	Base *basen;
 	Object *ob;
 
-	clear_id_newpoins();
+	BKE_main_id_clear_newpoins(bmain);
 	clear_sca_new_poins();  /* sensor/contr/act */
 
 	basen = object_add_duplicate_internal(bmain, scene, base, dupflag);
@@ -2060,7 +2064,7 @@ static int duplicate_exec(bContext *C, wmOperator *op)
 	int linked = RNA_boolean_get(op->ptr, "linked");
 	int dupflag = (linked) ? 0 : U.dupflag;
 
-	clear_id_newpoins();
+	BKE_main_id_clear_newpoins(bmain);
 	clear_sca_new_poins();  /* sensor/contr/act */
 
 	CTX_DATA_BEGIN (C, Base *, base, selected_bases)
@@ -2141,7 +2145,7 @@ static int add_named_exec(bContext *C, wmOperator *op)
 	base->flag = ob->flag;
 
 	/* prepare dupli */
-	clear_id_newpoins();
+	BKE_main_id_clear_newpoins(bmain);
 	clear_sca_new_poins();  /* sensor/contr/act */
 
 	basen = object_add_duplicate_internal(bmain, scene, base, dupflag);

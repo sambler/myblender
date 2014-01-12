@@ -33,12 +33,16 @@ Integrator::Integrator()
 	max_diffuse_bounce = max_bounce;
 	max_glossy_bounce = max_bounce;
 	max_transmission_bounce = max_bounce;
+	max_volume_bounce = max_bounce;
 	probalistic_termination = true;
 
 	transparent_min_bounce = min_bounce;
 	transparent_max_bounce = max_bounce;
 	transparent_probalistic = true;
 	transparent_shadows = false;
+
+	volume_max_steps = 1024;
+	volume_step_size = 0.1;
 
 	no_caustics = false;
 	filter_glossy = 0.0f;
@@ -54,6 +58,7 @@ Integrator::Integrator()
 	ao_samples = 1;
 	mesh_light_samples = 1;
 	subsurface_samples = 1;
+	volume_samples = 1;
 	method = PATH;
 
 	sampling_pattern = SAMPLING_PATTERN_SOBOL;
@@ -85,6 +90,11 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 	kintegrator->max_glossy_bounce = max_glossy_bounce + 1;
 	kintegrator->max_transmission_bounce = max_transmission_bounce + 1;
 
+	if(kintegrator->use_volumes)
+		kintegrator->max_volume_bounce = max_volume_bounce + 1;
+	else
+		kintegrator->max_volume_bounce = 1;
+
 	kintegrator->transparent_max_bounce = transparent_max_bounce + 1;
 	if(transparent_probalistic)
 		kintegrator->transparent_min_bounce = transparent_min_bounce + 1;
@@ -92,6 +102,9 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 		kintegrator->transparent_min_bounce = kintegrator->transparent_max_bounce;
 
 	kintegrator->transparent_shadows = transparent_shadows;
+
+	kintegrator->volume_max_steps = volume_max_steps;
+	kintegrator->volume_step_size = volume_step_size;
 
 	kintegrator->no_caustics = no_caustics;
 	kintegrator->filter_glossy = (filter_glossy == 0.0f)? FLT_MAX: 1.0f/filter_glossy;
@@ -112,6 +125,7 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 	kintegrator->ao_samples = ao_samples;
 	kintegrator->mesh_light_samples = mesh_light_samples;
 	kintegrator->subsurface_samples = subsurface_samples;
+	kintegrator->volume_samples = volume_samples;
 
 	kintegrator->sampling_pattern = sampling_pattern;
 
@@ -124,6 +138,7 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 
 		max_samples = max(max_samples, max(diffuse_samples, max(glossy_samples, transmission_samples)));
 		max_samples = max(max_samples, max(ao_samples, max(mesh_light_samples, subsurface_samples)));
+		max_samples = max(max_samples, volume_samples);
 	}
 
 	max_samples *= (max_bounce + transparent_max_bounce + 3);
@@ -153,11 +168,14 @@ bool Integrator::modified(const Integrator& integrator)
 		max_diffuse_bounce == integrator.max_diffuse_bounce &&
 		max_glossy_bounce == integrator.max_glossy_bounce &&
 		max_transmission_bounce == integrator.max_transmission_bounce &&
+		max_volume_bounce == integrator.max_volume_bounce &&
 		probalistic_termination == integrator.probalistic_termination &&
 		transparent_min_bounce == integrator.transparent_min_bounce &&
 		transparent_max_bounce == integrator.transparent_max_bounce &&
 		transparent_probalistic == integrator.transparent_probalistic &&
 		transparent_shadows == integrator.transparent_shadows &&
+		volume_max_steps == integrator.volume_max_steps &&
+		volume_step_size == integrator.volume_step_size &&
 		no_caustics == integrator.no_caustics &&
 		filter_glossy == integrator.filter_glossy &&
 		layer_flag == integrator.layer_flag &&
@@ -171,6 +189,7 @@ bool Integrator::modified(const Integrator& integrator)
 		ao_samples == integrator.ao_samples &&
 		mesh_light_samples == integrator.mesh_light_samples &&
 		subsurface_samples == integrator.subsurface_samples &&
+		volume_samples == integrator.volume_samples &&
 		motion_blur == integrator.motion_blur &&
 		sampling_pattern == integrator.sampling_pattern);
 }

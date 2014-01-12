@@ -107,7 +107,8 @@ typedef enum NodeType {
 
 typedef enum NodeAttributeType {
 	NODE_ATTR_FLOAT = 0,
-	NODE_ATTR_FLOAT3
+	NODE_ATTR_FLOAT3,
+	NODE_ATTR_MATRIX
 } NodeAttributeType;
 
 typedef enum NodeGeometry {
@@ -154,6 +155,7 @@ typedef enum NodeLightPath {
 	NODE_LP_singular,
 	NODE_LP_reflection,
 	NODE_LP_transmission,
+	NODE_LP_volume_scatter,
 	NODE_LP_backfacing,
 	NODE_LP_ray_length,
 	NODE_LP_ray_depth
@@ -172,7 +174,8 @@ typedef enum NodeTexCoord {
 	NODE_TEXCO_WINDOW,
 	NODE_TEXCO_REFLECTION,
 	NODE_TEXCO_DUPLI_GENERATED,
-	NODE_TEXCO_DUPLI_UV
+	NODE_TEXCO_DUPLI_UV,
+	NODE_TEXCO_VOLUME_GENERATED
 } NodeTexCoord;
 
 typedef enum NodeMix {
@@ -389,8 +392,8 @@ typedef enum ClosureType {
 
 	/* Volume */
 	CLOSURE_VOLUME_ID,
-	CLOSURE_VOLUME_TRANSPARENT_ID,
-	CLOSURE_VOLUME_ISOTROPIC_ID,
+	CLOSURE_VOLUME_ABSORPTION_ID,
+	CLOSURE_VOLUME_HENYEY_GREENSTEIN_ID,
 
 	NBUILTIN_CLOSURES
 } ClosureType;
@@ -402,11 +405,14 @@ typedef enum ClosureType {
 #define CLOSURE_IS_BSDF_TRANSMISSION(type) (type >= CLOSURE_BSDF_TRANSMISSION_ID && type <= CLOSURE_BSDF_HAIR_TRANSMISSION_ID)
 #define CLOSURE_IS_BSDF_BSSRDF(type) (type == CLOSURE_BSDF_BSSRDF_ID)
 #define CLOSURE_IS_BSSRDF(type) (type >= CLOSURE_BSSRDF_CUBIC_ID && type <= CLOSURE_BSSRDF_GAUSSIAN_ID)
-#define CLOSURE_IS_VOLUME(type) (type >= CLOSURE_VOLUME_ID && type <= CLOSURE_VOLUME_ISOTROPIC_ID)
+#define CLOSURE_IS_VOLUME(type) (type >= CLOSURE_VOLUME_ID && type <= CLOSURE_VOLUME_HENYEY_GREENSTEIN_ID)
 #define CLOSURE_IS_EMISSION(type) (type == CLOSURE_EMISSION_ID)
 #define CLOSURE_IS_HOLDOUT(type) (type == CLOSURE_HOLDOUT_ID)
 #define CLOSURE_IS_BACKGROUND(type) (type == CLOSURE_BACKGROUND_ID)
 #define CLOSURE_IS_AMBIENT_OCCLUSION(type) (type == CLOSURE_AMBIENT_OCCLUSION_ID)
+#define CLOSURE_IS_PHASE(type) (type == CLOSURE_VOLUME_HENYEY_GREENSTEIN_ID)
+
+#define CLOSURE_WEIGHT_CUTOFF 1e-5f
 
 CCL_NAMESPACE_END
 

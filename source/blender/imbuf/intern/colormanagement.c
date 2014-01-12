@@ -745,8 +745,8 @@ void IMB_colormanagement_display_settings_from_ctx(const bContext *C,
 	}
 }
 
-static const char *display_transform_get_colorspace_name(const ColorManagedViewSettings *view_settings,
-                                                         const ColorManagedDisplaySettings *display_settings)
+const char *IMB_colormanagement_get_display_colorspace_name(const ColorManagedViewSettings *view_settings,
+                                                            const ColorManagedDisplaySettings *display_settings)
 {
 	OCIO_ConstConfigRcPtr *config = OCIO_getCurrentConfig();
 
@@ -764,7 +764,7 @@ static const char *display_transform_get_colorspace_name(const ColorManagedViewS
 static ColorSpace *display_transform_get_colorspace(const ColorManagedViewSettings *view_settings,
                                                     const ColorManagedDisplaySettings *display_settings)
 {
-	const char *colorspace_name = display_transform_get_colorspace_name(view_settings, display_settings);
+	const char *colorspace_name = IMB_colormanagement_get_display_colorspace_name(view_settings, display_settings);
 
 	if (colorspace_name)
 		return colormanage_colorspace_get_named(colorspace_name);
@@ -1318,13 +1318,11 @@ static void display_buffer_init_handle(void *handle_v, int start_line, int tot_l
 	handle->float_colorspace = init_data->float_colorspace;
 }
 
-static void display_buffer_apply_get_linear_buffer(DisplayBufferThread *handle, int start_scanline, int num_scanlines,
+static void display_buffer_apply_get_linear_buffer(DisplayBufferThread *handle, int height,
                                                    float *linear_buffer, bool *is_straight_alpha)
 {
 	int channels = handle->channels;
 	int width = handle->width;
-	int height = num_scanlines;
-	int scanline_offset = channels * start_scanline * width;
 
 	int buffer_size = channels * width * height;
 
@@ -1342,7 +1340,7 @@ static void display_buffer_apply_get_linear_buffer(DisplayBufferThread *handle, 
 		int i;
 
 		/* first convert byte buffer to float, keep in image space */
-		for (i = 0, fp = linear_buffer, cp = byte_buffer + scanline_offset;
+		for (i = 0, fp = linear_buffer, cp = byte_buffer;
 		     i < width * height;
 		     i++, fp += channels, cp += channels)
 		{
@@ -1375,7 +1373,7 @@ static void display_buffer_apply_get_linear_buffer(DisplayBufferThread *handle, 
 		const char *from_colorspace = handle->float_colorspace;
 		const char *to_colorspace = global_role_scene_linear;
 
-		memcpy(linear_buffer, handle->buffer + scanline_offset, buffer_size * sizeof(float));
+		memcpy(linear_buffer, handle->buffer, buffer_size * sizeof(float));
 
 		if (!is_data && !is_data_display) {
 			IMB_colormanagement_transform(linear_buffer, width, height, channels,
@@ -1391,7 +1389,7 @@ static void display_buffer_apply_get_linear_buffer(DisplayBufferThread *handle, 
 		 * using duplicated buffer here
 		 */
 
-		memcpy(linear_buffer, handle->buffer + scanline_offset, buffer_size * sizeof(float));
+		memcpy(linear_buffer, handle->buffer, buffer_size * sizeof(float));
 
 		*is_straight_alpha = false;
 	}
@@ -1421,69 +1419,50 @@ static void *do_display_buffer_apply_thread(void *handle_v)
 		}
 	}
 	else {
-#define SCANLINE_BLOCK_SIZE 64
-		/* TODO(sergey): Instead of nasty scanline-blocking in per-scanline-block thread we might
-		 *               better to use generic task scheduler, but that would need extra testing
-		 *               before deploying into production.
-		 */
-
-		int scanlines = (height + SCANLINE_BLOCK_SIZE - 1) / SCANLINE_BLOCK_SIZE;
-		int i;
-		float *linear_buffer = MEM_mallocN(channels * width * SCANLINE_BLOCK_SIZE * sizeof(float),
+		bool is_straight_alpha, predivide;
+		float *linear_buffer = MEM_mallocN(channels * width * height * sizeof(float),
 		                                   "color conversion linear buffer");
 
-		for (i = 0; i < scanlines; i ++) {
-			int start_scanline = i * SCANLINE_BLOCK_SIZE;
-			int num_scanlines = (i == scanlines - 1) ?
-			                    (height - SCANLINE_BLOCK_SIZE * i) :
-			                    SCANLINE_BLOCK_SIZE;
-			int scanline_offset = channels * start_scanline * width;
-			int scanline_offset4 = 4 * start_scanline * width;
-			bool is_straight_alpha, predivide;
+		display_buffer_apply_get_linear_buffer(handle, height, linear_buffer, &is_straight_alpha);
 
-			display_buffer_apply_get_linear_buffer(handle, start_scanline, num_scanlines,
-			                                       linear_buffer, &is_straight_alpha);
-			predivide = is_straight_alpha == false;
+		predivide = is_straight_alpha == false;
 
-			if (is_data) {
-				/* special case for data buffers - no color space conversions,
-				 * only generate byte buffers
-				 */
-			}
-			else {
-				/* apply processor */
-				IMB_colormanagement_processor_apply(cm_processor, linear_buffer, width, num_scanlines, channels,
-				                                    predivide);
-			}
+		if (is_data) {
+			/* special case for data buffers - no color space conversions,
+			 * only generate byte buffers
+			 */
+		}
+		else {
+			/* apply processor */
+			IMB_colormanagement_processor_apply(cm_processor, linear_buffer, width, height, channels,
+			                                    predivide);
+		}
 
-			/* copy result to output buffers */
-			if (display_buffer_byte) {
-				/* do conversion */
-				IMB_buffer_byte_from_float(display_buffer_byte + scanline_offset4, linear_buffer,
-				                           channels, dither, IB_PROFILE_SRGB, IB_PROFILE_SRGB,
-				                           predivide, width, num_scanlines, width, width);
-			}
+		/* copy result to output buffers */
+		if (display_buffer_byte) {
+			/* do conversion */
+			IMB_buffer_byte_from_float(display_buffer_byte, linear_buffer,
+			                           channels, dither, IB_PROFILE_SRGB, IB_PROFILE_SRGB,
+			                           predivide, width, height, width, width);
+		}
 
-			if (display_buffer) {
-				memcpy(display_buffer + scanline_offset, linear_buffer, width * num_scanlines * channels * sizeof(float));
+		if (display_buffer) {
+			memcpy(display_buffer, linear_buffer, width * height * channels * sizeof(float));
 
-				if (is_straight_alpha && channels == 4) {
-					int i;
-					float *fp;
+			if (is_straight_alpha && channels == 4) {
+				int i;
+				float *fp;
 
-					for (i = 0, fp = display_buffer;
-					     i < width * num_scanlines;
-					     i++, fp += channels)
-					{
-						straight_to_premul_v4(fp);
-					}
+				for (i = 0, fp = display_buffer;
+				     i < width * height;
+				     i++, fp += channels)
+				{
+					straight_to_premul_v4(fp);
 				}
 			}
 		}
 
 		MEM_freeN(linear_buffer);
-
-#undef SCANLINE_BLOCK_SIZE
 	}
 
 	return NULL;
@@ -1531,7 +1510,7 @@ static bool is_ibuf_rect_in_display_space(ImBuf *ibuf, const ColorManagedViewSet
 	    view_settings->gamma == 1.0f)
 	{
 		const char *from_colorspace = ibuf->rect_colorspace->name;
-		const char *to_colorspace = display_transform_get_colorspace_name(view_settings, display_settings);
+		const char *to_colorspace = IMB_colormanagement_get_display_colorspace_name(view_settings, display_settings);
 
 		if (to_colorspace && !strcmp(from_colorspace, to_colorspace))
 			return true;
@@ -2055,7 +2034,8 @@ unsigned char *IMB_display_buffer_acquire(ImBuf *ibuf, const ColorManagedViewSet
 			IMB_partial_display_buffer_update(ibuf, ibuf->rect_float, (unsigned char *) ibuf->rect,
 			                                  ibuf->x, 0, 0, applied_view_settings, display_settings,
 			                                  ibuf->invalid_rect.xmin, ibuf->invalid_rect.ymin,
-			                                  ibuf->invalid_rect.xmax, ibuf->invalid_rect.ymax);
+			                                  ibuf->invalid_rect.xmax, ibuf->invalid_rect.ymax,
+			                                  false);
 		}
 
 		BLI_rcti_init(&ibuf->invalid_rect, 0, 0, 0, 0);
@@ -2756,16 +2736,20 @@ static void partial_buffer_update_rect(ImBuf *ibuf, unsigned char *display_buffe
 }
 
 void IMB_partial_display_buffer_update(ImBuf *ibuf, const float *linear_buffer, const unsigned char *byte_buffer,
-                                       int stride, int offset_x, int offset_y, const ColorManagedViewSettings *view_settings,
+                                       int stride, int offset_x, int offset_y,
+                                       const ColorManagedViewSettings *view_settings,
                                        const ColorManagedDisplaySettings *display_settings,
-                                       int xmin, int ymin, int xmax, int ymax)
+                                       int xmin, int ymin, int xmax, int ymax,
+                                       bool copy_display_to_byte_buffer)
 {
+	ColormanageCacheViewSettings cache_view_settings;
+	ColormanageCacheDisplaySettings cache_display_settings;
+	void *cache_handle = NULL;
+	unsigned char *display_buffer = NULL;
+	int buffer_width = ibuf->x;
+
 	if (ibuf->display_buffer_flags) {
-		ColormanageCacheViewSettings cache_view_settings;
-		ColormanageCacheDisplaySettings cache_display_settings;
-		void *cache_handle = NULL;
-		unsigned char *display_buffer = NULL;
-		int view_flag, display_index, buffer_width;
+		int view_flag, display_index;
 
 		colormanage_view_settings_to_cache(ibuf, &cache_view_settings, view_settings);
 		colormanage_display_settings_to_cache(&cache_display_settings, display_settings);
@@ -2774,6 +2758,7 @@ void IMB_partial_display_buffer_update(ImBuf *ibuf, const float *linear_buffer, 
 		display_index = cache_display_settings.display - 1;
 
 		BLI_lock_thread(LOCK_COLORMANAGE);
+
 		if ((ibuf->userflags & IB_DISPLAY_BUFFER_INVALID) == 0)
 			display_buffer = colormanage_cache_get(ibuf, &cache_view_settings, &cache_display_settings, &cache_handle);
 
@@ -2788,28 +2773,42 @@ void IMB_partial_display_buffer_update(ImBuf *ibuf, const float *linear_buffer, 
 		ibuf->display_buffer_flags[display_index] |= view_flag;
 
 		BLI_unlock_thread(LOCK_COLORMANAGE);
+	}
 
-		if (display_buffer) {
-			ColormanageProcessor *cm_processor = NULL;
-			bool skip_transform = false;
+	if (display_buffer == NULL) {
+		if (copy_display_to_byte_buffer) {
+			display_buffer = (unsigned char *) ibuf->rect;
+		}
+	}
 
-			/* byte buffer is assumed to be in imbuf's rect space, so if byte buffer
-			 * is known we could skip display->linear->display conversion in case
-			 * display color space matches imbuf's rect space
-			 */
-			if (byte_buffer != NULL)
-				skip_transform = is_ibuf_rect_in_display_space(ibuf, view_settings, display_settings);
+	if (display_buffer) {
+		ColormanageProcessor *cm_processor = NULL;
+		bool skip_transform = false;
 
-			if (!skip_transform)
-				cm_processor = IMB_colormanagement_display_processor_new(view_settings, display_settings);
+		/* byte buffer is assumed to be in imbuf's rect space, so if byte buffer
+		 * is known we could skip display->linear->display conversion in case
+		 * display color space matches imbuf's rect space
+		 */
+		if (byte_buffer != NULL)
+			skip_transform = is_ibuf_rect_in_display_space(ibuf, view_settings, display_settings);
 
-			partial_buffer_update_rect(ibuf, display_buffer, linear_buffer, byte_buffer, buffer_width, stride,
-			                           offset_x, offset_y, cm_processor, xmin, ymin, xmax, ymax);
+		if (!skip_transform)
+			cm_processor = IMB_colormanagement_display_processor_new(view_settings, display_settings);
 
-			if (cm_processor)
-				IMB_colormanagement_processor_free(cm_processor);
+		partial_buffer_update_rect(ibuf, display_buffer, linear_buffer, byte_buffer, buffer_width, stride,
+		                           offset_x, offset_y, cm_processor, xmin, ymin, xmax, ymax);
 
-			IMB_display_buffer_release(cache_handle);
+		if (cm_processor)
+			IMB_colormanagement_processor_free(cm_processor);
+
+		IMB_display_buffer_release(cache_handle);
+	}
+
+	if (copy_display_to_byte_buffer && (unsigned char *) ibuf->rect != display_buffer) {
+		int y;
+		for (y = ymin; y < ymax; y++) {
+			int index = y * buffer_width * 4;
+			memcpy(ibuf->rect + index, display_buffer + index, (xmax - xmin) * 4);
 		}
 	}
 }

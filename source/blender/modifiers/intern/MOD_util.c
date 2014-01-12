@@ -183,7 +183,7 @@ DerivedMesh *get_dm(Object *ob, struct BMEditMesh *em, DerivedMesh *dm,
 	}
 	else if (ob->type == OB_MESH) {
 		if (em) dm = CDDM_from_editbmesh(em, FALSE, FALSE);
-		else dm = CDDM_from_mesh((struct Mesh *)(ob->data), ob);
+		else dm = CDDM_from_mesh((struct Mesh *)(ob->data));
 
 		if (vertexCos) {
 			CDDM_apply_vert_coords(dm, vertexCos);
@@ -205,6 +205,20 @@ DerivedMesh *get_dm(Object *ob, struct BMEditMesh *em, DerivedMesh *dm,
 	}
 
 	return dm;
+}
+
+/* Get derived mesh for other object, which is used as an operand for the modifier,
+ * i.e. second operand for boolean modifier.
+ */
+DerivedMesh *get_dm_for_modifier(Object *ob, ModifierApplyFlag flag)
+{
+	if (flag & MOD_APPLY_RENDER) {
+		/* TODO(sergey): Use proper derived render in the future. */
+		return ob->derivedFinal;
+	}
+	else {
+		return ob->derivedFinal;
+	}
 }
 
 void modifier_get_vgroup(Object *ob, DerivedMesh *dm, const char *name, MDeformVert **dvert, int *defgrp_index)

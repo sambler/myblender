@@ -422,11 +422,11 @@ static ShaderNode *add_node(Scene *scene, BL::BlendData b_data, BL::Scene b_scen
 	else if (b_node.is_a(&RNA_ShaderNodeAmbientOcclusion)) {
 		node = new AmbientOcclusionNode();
 	}
-	else if (b_node.is_a(&RNA_ShaderNodeVolumeIsotropic)) {
-		node = new IsotropicVolumeNode();
+	else if (b_node.is_a(&RNA_ShaderNodeVolumeScatter)) {
+		node = new ScatterVolumeNode();
 	}
-	else if (b_node.is_a(&RNA_ShaderNodeVolumeTransparent)) {
-		node = new TransparentVolumeNode();
+	else if (b_node.is_a(&RNA_ShaderNodeVolumeAbsorption)) {
+		node = new AbsorptionVolumeNode();
 	}
 	else if (b_node.is_a(&RNA_ShaderNodeNewGeometry)) {
 		node = new GeometryNode();
@@ -921,7 +921,7 @@ void BlenderSync::sync_materials(bool update_all)
 			PointerRNA cmat = RNA_pointer_get(&b_mat->ptr, "cycles");
 			shader->use_mis = get_boolean(cmat, "sample_as_light");
 			shader->use_transparent_shadow = get_boolean(cmat, "use_transparent_shadow");
-			shader->homogeneous_volume = get_boolean(cmat, "homogeneous_volume");
+			shader->heterogeneous_volume = !get_boolean(cmat, "homogeneous_volume");
 
 			shader->set_graph(graph);
 			shader->tag_update(scene);
@@ -947,6 +947,10 @@ void BlenderSync::sync_world(bool update_all)
 			BL::ShaderNodeTree b_ntree(b_world.node_tree());
 
 			add_nodes(scene, b_data, b_scene, graph, b_ntree);
+			
+			/* volume */
+			PointerRNA cworld = RNA_pointer_get(&b_world.ptr, "cycles");
+			shader->heterogeneous_volume = !get_boolean(cworld, "homogeneous_volume");
 		}
 		else if(b_world) {
 			ShaderNode *closure, *out;
@@ -983,6 +987,7 @@ void BlenderSync::sync_world(bool update_all)
 
 		shader->set_graph(graph);
 		shader->tag_update(scene);
+		background->tag_update(scene);
 	}
 
 	PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");

@@ -59,6 +59,7 @@
 #include "BKE_image.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
+#include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_material.h"
 #include "BKE_mball.h"
@@ -4056,7 +4057,7 @@ static bool drawDispList_nobackface(Scene *scene, View3D *v3d, RegionView3D *rv3
 			if (BKE_mball_is_basis(ob)) {
 				lb = ob->curve_cache ? &ob->curve_cache->disp : NULL;
 				if (ELEM(NULL, lb, lb->first)) {
-					BKE_displist_make_mball(scene, ob);
+					BKE_displist_make_mball(G.main->eval_ctx, scene, ob);
 					lb = &ob->curve_cache->disp;
 				}
 				if (lb->first == NULL) {
@@ -6200,7 +6201,7 @@ static void get_local_bounds(Object *ob, float center[3], float size[3])
 }
 #endif
 
-static void draw_bb_quadric(BoundBox *bb, char type)
+static void draw_bb_quadric(BoundBox *bb, char type, bool around_origin)
 {
 	float size[3], cent[3];
 	GLUquadricObj *qobj = gluNewQuadric();
@@ -6211,9 +6212,14 @@ static void draw_bb_quadric(BoundBox *bb, char type)
 	size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
 	size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
 
-	cent[0] = 0.5f * (bb->vec[0][0] + bb->vec[4][0]);
-	cent[1] = 0.5f * (bb->vec[0][1] + bb->vec[2][1]);
-	cent[2] = 0.5f * (bb->vec[0][2] + bb->vec[1][2]);
+	if (around_origin) {
+		zero_v3(cent);
+	}
+	else {
+		cent[0] = 0.5f * (bb->vec[0][0] + bb->vec[4][0]);
+		cent[1] = 0.5f * (bb->vec[0][1] + bb->vec[2][1]);
+		cent[2] = 0.5f * (bb->vec[0][2] + bb->vec[1][2]);
+	}
 	
 	glPushMatrix();
 	if (type == OB_BOUND_SPHERE) {
@@ -6263,7 +6269,7 @@ static void draw_bounding_volume(Scene *scene, Object *ob, char type)
 		if (BKE_mball_is_basis(ob)) {
 			bb = ob->bb;
 			if (bb == NULL) {
-				BKE_displist_make_mball(scene, ob);
+				BKE_displist_make_mball(G.main->eval_ctx, scene, ob);
 				bb = ob->bb;
 			}
 		}
@@ -6277,11 +6283,37 @@ static void draw_bounding_volume(Scene *scene, Object *ob, char type)
 		BKE_boundbox_init_from_minmax(bb, min, max);
 	}
 	
-	if (bb == NULL) return;
+	if (bb == NULL)
+		return;
 	
-	if (type == OB_BOUND_BOX) draw_box(bb->vec);
-	else draw_bb_quadric(bb, type);
-	
+	if (ob->gameflag & OB_BOUNDS) { /* bounds need to be drawn around origin for game engine */
+
+		if (type == OB_BOUND_BOX) {
+			float vec[8][3], size[3];
+			
+			size[0] = 0.5f * fabsf(bb->vec[0][0] - bb->vec[4][0]);
+			size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
+			size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
+			
+			vec[0][0] = vec[1][0] = vec[2][0] = vec[3][0] = -size[0];
+			vec[4][0] = vec[5][0] = vec[6][0] = vec[7][0] = +size[0];
+			vec[0][1] = vec[1][1] = vec[4][1] = vec[5][1] = -size[1];
+			vec[2][1] = vec[3][1] = vec[6][1] = vec[7][1] = +size[1];
+			vec[0][2] = vec[3][2] = vec[4][2] = vec[7][2] = -size[2];
+			vec[1][2] = vec[2][2] = vec[5][2] = vec[6][2] = +size[2];
+			
+			draw_box(vec);
+		}
+		else {
+			draw_bb_quadric(bb, type, true);
+		}
+	}
+	else {
+		if (type == OB_BOUND_BOX)
+			draw_box(bb->vec);
+		else
+			draw_bb_quadric(bb, type, false);
+	}
 }
 
 static void drawtexspace(Object *ob)
@@ -6334,7 +6366,7 @@ static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
 		bool has_faces = false;
 
 		if (dm) {
-			has_faces = dm->getNumTessFaces(dm);
+			has_faces = dm->getNumTessFaces(dm) > 0;
 		}
 		else {
 			has_faces = BKE_displist_has_faces(&ob->curve_cache->disp);
@@ -6564,6 +6596,48 @@ static void draw_object_matcap_check(Scene *scene, View3D *v3d, Object *ob)
 
 }
 
+static void draw_rigidbody_shape(Object *ob)
+{
+	BoundBox *bb = NULL;
+	float size[3], vec[8][3];
+
+	if (ob->type == OB_MESH) {
+		bb = BKE_mesh_boundbox_get(ob);
+	}
+
+	if (bb == NULL)
+		return;
+
+	switch (ob->rigidbody_object->shape) {
+		case RB_SHAPE_BOX:
+			size[0] = 0.5f * fabsf(bb->vec[0][0] - bb->vec[4][0]);
+			size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
+			size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
+			
+			vec[0][0] = vec[1][0] = vec[2][0] = vec[3][0] = -size[0];
+			vec[4][0] = vec[5][0] = vec[6][0] = vec[7][0] = +size[0];
+			vec[0][1] = vec[1][1] = vec[4][1] = vec[5][1] = -size[1];
+			vec[2][1] = vec[3][1] = vec[6][1] = vec[7][1] = +size[1];
+			vec[0][2] = vec[3][2] = vec[4][2] = vec[7][2] = -size[2];
+			vec[1][2] = vec[2][2] = vec[5][2] = vec[6][2] = +size[2];
+			
+			draw_box(vec);
+			break;
+		case RB_SHAPE_SPHERE:
+			draw_bb_quadric(bb, OB_BOUND_SPHERE, true);
+			break;
+		case RB_SHAPE_CONE:
+			draw_bb_quadric(bb, OB_BOUND_CONE, true);
+			break;
+		case RB_SHAPE_CYLINDER:
+			draw_bb_quadric(bb, OB_BOUND_CYLINDER, true);
+			break;
+		case RB_SHAPE_CAPSULE:
+			draw_bb_quadric(bb, OB_BOUND_CAPSULE, true);
+			break;
+	}
+}
+
 /**
  * main object drawing function, draws in selection
  * \param dflag (draw flag) can be DRAW_PICKING and/or DRAW_CONSTCOLOR, DRAW_SCENESET
@@ -6741,7 +6815,9 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 			case OB_FONT:
 				cu = ob->data;
 				if (cu->editfont) {
-					draw_textcurs(rv3d, cu->editfont->textcurs);
+					EditFont *ef = cu->editfont;
+
+					draw_textcurs(rv3d, ef->textcurs);
 
 					if (cu->flag & CU_FAST) {
 						cpack(0xFFFFFF);
@@ -6792,28 +6868,68 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 					setlinestyle(0);
 
 
-					if (BKE_vfont_select_get(ob, &selstart, &selend) && cu->selboxes) {
+					if (BKE_vfont_select_get(ob, &selstart, &selend) && ef->selboxes) {
+						const int seltot = selend - selstart;
 						float selboxw;
 
 						cpack(0xffffff);
 						set_inverted_drawing(1);
-						for (i = 0; i <= (selend - selstart); i++) {
-							SelBox *sb = &(cu->selboxes[i]);
+						for (i = 0; i <= seltot; i++) {
+							EditFontSelBox *sb = &ef->selboxes[i];
+							float tvec[3];
 
-							if (i < (selend - selstart)) {
-								if (cu->selboxes[i + 1].y == sb->y)
-									selboxw = cu->selboxes[i + 1].x - sb->x;
+							if (i != seltot) {
+								if (ef->selboxes[i + 1].y == sb->y)
+									selboxw = ef->selboxes[i + 1].x - sb->x;
 								else
 									selboxw = sb->w;
 							}
 							else {
 								selboxw = sb->w;
 							}
+
+							/* fill in xy below */
+							tvec[2] = 0.001;
+
 							glBegin(GL_QUADS);
-							glVertex3f(sb->x, sb->y, 0.001);
-							glVertex3f(sb->x + selboxw, sb->y, 0.001);
-							glVertex3f(sb->x + selboxw, sb->y + sb->h, 0.001);
-							glVertex3f(sb->x, sb->y + sb->h, 0.001);
+
+							if (sb->rot == 0.0f) {
+								copy_v2_fl2(tvec, sb->x, sb->y);
+								glVertex3fv(tvec);
+
+								copy_v2_fl2(tvec, sb->x + selboxw, sb->y);
+								glVertex3fv(tvec);
+
+								copy_v2_fl2(tvec, sb->x + selboxw, sb->y + sb->h);
+								glVertex3fv(tvec);
+
+								copy_v2_fl2(tvec, sb->x, sb->y + sb->h);
+								glVertex3fv(tvec);
+							}
+							else {
+								float mat[2][2];
+
+								angle_to_mat2(mat, sb->rot);
+
+								copy_v2_fl2(tvec, sb->x, sb->y);
+								glVertex3fv(tvec);
+
+								copy_v2_fl2(tvec, selboxw, 0.0f);
+								mul_m2v2(mat, tvec);
+								add_v2_v2(tvec, &sb->x);
+								glVertex3fv(tvec);
+
+								copy_v2_fl2(tvec, selboxw, sb->h);
+								mul_m2v2(mat, tvec);
+								add_v2_v2(tvec, &sb->x);
+								glVertex3fv(tvec);
+
+								copy_v2_fl2(tvec, 0.0f, sb->h);
+								mul_m2v2(mat, tvec);
+								add_v2_v2(tvec, &sb->x);
+								glVertex3fv(tvec);
+							}
+
 							glEnd();
 						}
 						set_inverted_drawing(0);
@@ -7127,6 +7243,9 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				draw_bounding_volume(scene, ob, ob->collision_boundtype);
 				setlinestyle(0);
 			}
+		}
+		if (ob->rigidbody_object) {
+			draw_rigidbody_shape(ob);
 		}
 
 		/* draw extra: after normal draw because of makeDispList */

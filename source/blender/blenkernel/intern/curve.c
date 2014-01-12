@@ -112,12 +112,12 @@ void BKE_curve_editfont_free(Curve *cu)
 			MEM_freeN(ef->copybuf);
 		if (ef->copybufinfo)
 			MEM_freeN(ef->copybufinfo);
+		if (ef->selboxes)
+			MEM_freeN(ef->selboxes);
 
 		MEM_freeN(ef);
 		cu->editfont = NULL;
 	}
-
-	MEM_SAFE_FREE(cu->selboxes);
 }
 
 void BKE_curve_editNurb_keyIndex_free(EditNurb *editnurb)
@@ -190,7 +190,7 @@ Curve *BKE_curve_add(Main *bmain, const char *name, int type)
 		cu->vfont->id.us += 4;
 		cu->str = MEM_mallocN(12, "str");
 		BLI_strncpy(cu->str, "Text", 12);
-		cu->len = cu->pos = 4;
+		cu->len = cu->len_wchar = cu->pos = 4;
 		cu->strinfo = MEM_callocN(12 * sizeof(CharInfo), "strinfo new");
 		cu->totbox = cu->actbox = 1;
 		cu->tb = MEM_callocN(MAXTEXTBOX * sizeof(TextBox), "textbox");
@@ -224,7 +224,6 @@ Curve *BKE_curve_copy(Curve *cu)
 
 	cun->editnurb = NULL;
 	cun->editfont = NULL;
-	cun->selboxes = NULL;
 	cun->lastsel = NULL;
 
 #if 0   // XXX old animation system
@@ -3254,12 +3253,12 @@ void BKE_nurb_handles_autocalc(Nurb *nu, int flag)
 			}
 			else {
 				/* aligned handle? */
-				if (dist_to_line_v2(bezt1->vec[1], bezt1->vec[0], bezt1->vec[2]) < eps) {
+				if (dist_squared_to_line_v3(bezt1->vec[1], bezt1->vec[0], bezt1->vec[2]) < eps_sq) {
 					align = true;
 					bezt1->h1 = HD_ALIGN;
 				}
 				/* or vector handle? */
-				if (dist_to_line_v2(bezt1->vec[0], bezt1->vec[1], bezt0->vec[1]) < eps)
+				if (dist_squared_to_line_v3(bezt1->vec[0], bezt1->vec[1], bezt0->vec[1]) < eps_sq)
 					bezt1->h1 = HD_VECT;
 			}
 		}
@@ -3276,7 +3275,7 @@ void BKE_nurb_handles_autocalc(Nurb *nu, int flag)
 				if (align) bezt1->h2 = HD_ALIGN;
 
 				/* or vector handle? */
-				if (dist_to_line_v2(bezt1->vec[2], bezt1->vec[1], bezt2->vec[1]) < eps)
+				if (dist_squared_to_line_v3(bezt1->vec[2], bezt1->vec[1], bezt2->vec[1]) < eps_sq)
 					bezt1->h2 = HD_VECT;
 			}
 		}
@@ -4041,7 +4040,7 @@ void BKE_curve_material_index_remove(Curve *cu, int index)
 	if (curvetype == OB_FONT) {
 		struct CharInfo *info = cu->strinfo;
 		int i;
-		for (i = cu->len - 1; i >= 0; i--, info++) {
+		for (i = cu->len_wchar - 1; i >= 0; i--, info++) {
 			if (info->mat_nr && info->mat_nr >= index) {
 				info->mat_nr--;
 			}
@@ -4068,7 +4067,7 @@ void BKE_curve_material_index_clear(Curve *cu)
 	if (curvetype == OB_FONT) {
 		struct CharInfo *info = cu->strinfo;
 		int i;
-		for (i = cu->len - 1; i >= 0; i--, info++) {
+		for (i = cu->len_wchar - 1; i >= 0; i--, info++) {
 			info->mat_nr = 0;
 		}
 	}

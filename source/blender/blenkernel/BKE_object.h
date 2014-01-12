@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 struct Base;
+struct EvaluationContext;
 struct Scene;
 struct Object;
 struct Camera;
@@ -65,6 +66,7 @@ void BKE_object_free_curve_cache(struct Object *ob);
 void BKE_object_update_base_layer(struct Scene *scene, struct Object *ob);
 
 void BKE_object_free(struct Object *ob);
+void BKE_object_free_ex(struct Object *ob, bool do_id_user);
 void BKE_object_free_derived_caches(struct Object *ob);
 
 void BKE_object_modifier_hook_reset(struct Object *ob, struct HookModifierData *hmd);
@@ -117,7 +119,6 @@ void BKE_object_where_is_calc_ex(struct Scene *scene, struct RigidBodyWorld *rbw
 void BKE_object_where_is_calc_time(struct Scene *scene, struct Object *ob, float ctime);
 void BKE_object_where_is_calc_time_ex(struct Scene *scene, struct Object *ob, float ctime,
                                       struct RigidBodyWorld *rbw, float r_originmat[3][3]);
-void BKE_object_where_is_calc_simul(struct Scene *scene, struct Object *ob);
 void BKE_object_where_is_calc_mat4(struct Scene *scene, struct Object *ob, float obmat[4][4]);
 
 /* possibly belong in own moduke? */
@@ -161,8 +162,9 @@ void BKE_object_tfm_protected_restore(struct Object *ob,
                                       const ObjectTfmProtectedChannels *obtfm,
                                       const short protectflag);
 
-void BKE_object_handle_update(struct Scene *scene, struct Object *ob);
-void BKE_object_handle_update_ex(struct Scene *scene, struct Object *ob,
+void BKE_object_handle_update(struct EvaluationContext *eval_ctx, struct Scene *scene, struct Object *ob);
+void BKE_object_handle_update_ex(struct EvaluationContext *eval_ctx,
+                                 struct Scene *scene, struct Object *ob,
                                  struct RigidBodyWorld *rbw);
 void BKE_object_sculpt_modifiers_changed(struct Object *ob);
 

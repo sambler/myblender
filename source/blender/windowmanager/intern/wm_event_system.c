@@ -370,7 +370,7 @@ void wm_event_do_notifiers(bContext *C)
 			/* XXX, hack so operators can enforce datamasks [#26482], gl render */
 			win->screen->scene->customdata_mask |= win->screen->scene->customdata_mask_modal;
 
-			BKE_scene_update_tagged(bmain, win->screen->scene);
+			BKE_scene_update_tagged(bmain->eval_ctx, bmain, win->screen->scene);
 		}
 	}
 
@@ -893,6 +893,8 @@ bool WM_operator_last_properties_init(wmOperator *op)
 	bool changed = false;
 
 	if (op->type->last_properties) {
+		IDPropertyTemplate val = {0};
+		IDProperty *replaceprops = IDP_New(IDP_GROUP, &val, "wmOperatorProperties");
 		PropertyRNA *iterprop;
 
 		if (G.debug & G_DEBUG_WM) {
@@ -915,13 +917,19 @@ bool WM_operator_last_properties_init(wmOperator *op)
 						 * but for now RNA doesn't access nested operators */
 						idp_dst->flag |= IDP_FLAG_GHOST;
 
-						IDP_ReplaceInGroup(op->properties, idp_dst);
+						/* add to temporary group instead of immediate replace,
+						 * because we are iterating over this group */
+						IDP_AddToGroup(replaceprops, idp_dst);
 						changed = true;
 					}
 				}
 			}
 		}
 		RNA_PROP_END;
+
+		IDP_MergeGroup(op->properties, replaceprops, true);
+		IDP_FreeProperty(replaceprops);
+		MEM_freeN(replaceprops);
 	}
 
 	return changed;
@@ -2905,6 +2913,19 @@ static bool wm_event_is_double_click(wmEvent *event, wmEvent *event_state)
 	return false;
 }
 
+static void wm_event_add_mousemove(wmWindow *win, const wmEvent *event)
+{
+	wmEvent *event_last = win->queue.last;
+
+	/* some painting operators want accurate mouse events, they can
+	 * handle in between mouse move moves, others can happily ignore
+	 * them for better performance */
+	if (event_last && event_last->type == MOUSEMOVE)
+		event_last->type = INBETWEEN_MOUSEMOVE;
+
+	wm_event_add(win, event);
+}
+
 /* windows store own event queues, no bContext here */
 /* time is in 1000s of seconds, from ghost */
 void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int UNUSED(time), void *customdata)
@@ -2920,7 +2941,6 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 		case GHOST_kEventCursorMove:
 		{
 			GHOST_TEventCursorData *cd = customdata;
-			wmEvent *lastevent = win->queue.last;
 			
 			evt->x = cd->x;
 			evt->y = cd->y;
@@ -2929,14 +2949,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 			event.y = evt->y;
 
 			event.type = MOUSEMOVE;
-
-			/* some painting operators want accurate mouse events, they can
-			 * handle in between mouse move moves, others can happily ignore
-			 * them for better performance */
-			if (lastevent && lastevent->type == MOUSEMOVE)
-				lastevent->type = INBETWEEN_MOUSEMOVE;
-
-			wm_event_add(win, &event);
+			wm_event_add_mousemove(win, &event);
 			
 			/* also add to other window if event is there, this makes overdraws disappear nicely */
 			/* it remaps mousecoord to other window in event */
@@ -2947,8 +2960,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 				oevent.x = owin->eventstate->x = event.x;
 				oevent.y = owin->eventstate->y = event.y;
 				oevent.type = MOUSEMOVE;
-				
-				wm_event_add(owin, &oevent);
+				wm_event_add_mousemove(owin, &oevent);
 			}
 				
 			break;
@@ -2999,6 +3011,10 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 				event.type = BUTTON4MOUSE;
 			else if (bd->button == GHOST_kButtonMaskButton5)
 				event.type = BUTTON5MOUSE;
+			else if (bd->button == GHOST_kButtonMaskButton6)
+				event.type = BUTTON6MOUSE;
+			else if (bd->button == GHOST_kButtonMaskButton7)
+				event.type = BUTTON7MOUSE;
 			else
 				event.type = MIDDLEMOUSE;
 			

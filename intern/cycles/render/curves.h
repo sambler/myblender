@@ -52,12 +52,6 @@ typedef enum curve_lines {
 	CURVE_UNCORRECTED
 } curve_lines;
 
-typedef enum curve_interpolation {
-	CURVE_LINEAR,
-	CURVE_CARDINAL,
-	CURVE_BSPLINE
-} curve_interpolation;
-
 class ParticleCurveData {
 
 public:
@@ -103,7 +97,6 @@ public:
 	bool use_curves;
 	bool use_encasing;
 	bool use_backfacing;
-	bool use_tangent_normal;
 	bool use_tangent_normal_geometry;
 
 	bool need_update;

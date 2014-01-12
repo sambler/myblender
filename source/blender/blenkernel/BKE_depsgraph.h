@@ -48,6 +48,21 @@ struct ID;
 struct Main;
 struct Object;
 struct Scene;
+struct ListBase;
+
+/* Dependency graph evaluation context
+ *
+ * This structure stores all the local dependency graph data,
+ * which is needed for it's evaluation,
+ */
+typedef struct EvaluationContext {
+	bool for_render;  /* Set to true if evaluation shall be performed for render purposes,
+	                     keep at false if update shall happen for the viewport. */
+} EvaluationContext;
+
+/* Global initialization/deinitialization */
+void DAG_init(void);
+void DAG_exit(void);
 
 /* Build and Update
  *
@@ -115,9 +130,25 @@ void DAG_pose_sort(struct Object *ob);
 void DAG_editors_update_cb(void (*id_func)(struct Main *bmain, struct ID *id),
                            void (*scene_func)(struct Main *bmain, struct Scene *scene, int updated));
 
+/* ** Threaded update ** */
+
+/* Initialize the DAG for threaded update. */
+void DAG_threaded_update_begin(struct Scene *scene,
+                               void (*func)(void *node, void *user_data),
+                               void *user_data);
+
+void DAG_threaded_update_handle_node_updated(void *node_v,
+                                             void (*func)(void *node, void *user_data),
+                                             void *user_data);
+
 /* Debugging: print dependency graph for scene or armature object to console */
 
 void DAG_print_dependencies(struct Main *bmain, struct Scene *scene, struct Object *ob);
+
+/* ************************ DAG querying ********************* */
+
+struct Object *DAG_get_node_object(void *node_v);
+const char *DAG_get_node_name(void *node_v);
 
 #ifdef __cplusplus
 }

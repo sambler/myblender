@@ -80,7 +80,7 @@ EnumPropertyItem modifier_type_items[] = {
 	{eModifierType_Solidify, "SOLIDIFY", ICON_MOD_SOLIDIFY, "Solidify", ""},
 	{eModifierType_Subsurf, "SUBSURF", ICON_MOD_SUBSURF, "Subdivision Surface", ""},
 	{eModifierType_Triangulate, "TRIANGULATE", ICON_MOD_TRIANGULATE, "Triangulate", ""},
-	{eModifierType_Wireframe, "WIREFRAME", ICON_MOD_WIREFRAME, "Wireframe", "Generates a wireframe on the edges of a mesh"},
+	{eModifierType_Wireframe, "WIREFRAME", ICON_MOD_WIREFRAME, "Wireframe", "Generate a wireframe on the edges of a mesh"},
 	{0, "", 0, N_("Deform"), ""},
 	{eModifierType_Armature, "ARMATURE", ICON_MOD_ARMATURE, "Armature", ""},
 	{eModifierType_Cast, "CAST", ICON_MOD_CAST, "Cast", ""},
@@ -1191,7 +1191,7 @@ static void rna_def_modifier_decimate(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	/* (mode == MOD_DECIM_MODE_COLLAPSE) */
-	prop = RNA_def_property(srna, "ratio", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "ratio", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "percent");
 	RNA_def_property_range(prop, 0, 1);
 	RNA_def_property_ui_range(prop, 0, 1, 1, 4);
@@ -2937,7 +2937,7 @@ static void rna_def_modifier_weightvg_mask(BlenderRNA *UNUSED(brna), StructRNA *
 
 	PropertyRNA *prop;
 
-	prop = RNA_def_property(srna, "mask_constant", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "mask_constant", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, -1);
 	RNA_def_property_ui_text(prop, "Influence", "Global influence of current modifications on vgroup");
@@ -3027,7 +3027,7 @@ static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 	                         "from vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_property(srna, "default_weight", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "default_weight", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0, 1.0f);
 	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, -1);
 	RNA_def_property_ui_text(prop, "Default Weight", "Default weight a vertex will have if "
@@ -3478,7 +3478,7 @@ static void rna_def_modifier_skin(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "SkinModifierData");
 	RNA_def_struct_ui_icon(srna, ICON_MOD_SKIN);
 
-	prop = RNA_def_property(srna, "branch_smoothing", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "branch_smoothing", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_ui_text(prop, "Branch Smoothing", "Smooth complex geometry around branches");
 	RNA_def_property_ui_range(prop, 0, 1, 1, -1);
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");

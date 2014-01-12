@@ -779,7 +779,7 @@ static int set_audio(int argc, const char **argv, void *UNUSED(data))
 static int set_output(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
-	if (argc >= 1) {
+	if (argc > 1) {
 		Scene *scene = CTX_data_scene(C);
 		if (scene) {
 			BLI_strncpy(scene->r.pic, argv[1], sizeof(scene->r.pic));
@@ -897,7 +897,7 @@ static int set_verbosity(int argc, const char **argv, void *UNUSED(data))
 static int set_extension(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
-	if (argc >= 1) {
+	if (argc > 1) {
 		Scene *scene = CTX_data_scene(C);
 		if (scene) {
 			if (argv[1][0] == '0') {
@@ -1258,6 +1258,7 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 		 * pointcache works */
 		if (retval != BKE_READ_FILE_FAIL) {
 			wmWindowManager *wm = CTX_wm_manager(C);
+			Main *bmain = CTX_data_main(C);
 
 			/* special case, 2.4x files */
 			if (wm == NULL && CTX_data_main(C)->wm.first == NULL) {
@@ -1273,8 +1274,8 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 			G.relbase_valid = 1;
 			if (CTX_wm_manager(C) == NULL) CTX_wm_manager_set(C, wm);  /* reset wm */
 
-			DAG_on_visible_update(CTX_data_main(C), TRUE);
-			BKE_scene_update_tagged(CTX_data_main(C), CTX_data_scene(C));
+			DAG_on_visible_update(bmain, TRUE);
+			BKE_scene_update_tagged(bmain->eval_ctx, bmain, CTX_data_scene(C));
 		}
 		else {
 			/* failed to load file, stop processing arguments */
@@ -1582,6 +1583,7 @@ int main(int argc, const char **argv)
 	IMB_init();
 	BKE_images_init();
 	BKE_modifier_init();
+	DAG_init();
 
 	BKE_brush_system_init();
 

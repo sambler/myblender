@@ -2773,6 +2773,7 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	int channels, layer, pass;
 	ImBuf *ibuf;
 	int from_render = (ima->render_slot == ima->last_render_slot);
+	bool byte_buffer_in_display_space = false;
 
 	if (!(iuser && iuser->scene))
 		return NULL;
@@ -2835,6 +2836,13 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 			/* there's no combined pass, is in renderlayer itself */
 			if (pass == 0) {
 				rectf = rl->rectf;
+				if (rectf == NULL) {
+					/* Happens when Save Buffers is enabled.
+					 * Use display buffer stored in the render layer.
+					 */
+					rect = (unsigned int *) rl->display_buffer;
+					byte_buffer_in_display_space = true;
+				}
 			}
 			else {
 				rpass = BLI_findlink(&rl->passes, pass - 1);
@@ -2857,6 +2865,27 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	if (ibuf == NULL) {
 		ibuf = IMB_allocImBuf(rres.rectx, rres.recty, 32, 0);
 		image_assign_ibuf(ima, ibuf, IMA_NO_INDEX, 0);
+	}
+
+	/* Set color space settings for a byte buffer.
+	 *
+	 * This is mainly to make it so color management treats byte buffer
+	 * from render result with Save Buffers enabled as final display buffer
+	 * and doesnt' apply any color management on it.
+	 *
+	 * For other cases we need to be sure it stays to default byte buffer space.
+	 */
+	if (ibuf->rect != rect) {
+		if (byte_buffer_in_display_space) {
+			const char *colorspace =
+				IMB_colormanagement_get_display_colorspace_name(&iuser->scene->view_settings,
+			                                                    &iuser->scene->display_settings);
+			IMB_colormanagement_assign_rect_colorspace(ibuf, colorspace);
+		}
+		else {
+			const char *colorspace = IMB_colormanagement_role_colorspace_name_get(COLOR_ROLE_DEFAULT_BYTE);
+			IMB_colormanagement_assign_rect_colorspace(ibuf, colorspace);
+		}
 	}
 
 	/* invalidate color managed buffers if render result changed */
@@ -3582,7 +3611,9 @@ bool BKE_image_has_loaded_ibuf(Image *image)
 	return has_loaded_ibuf;
 }
 
-/* References the result, IMB_freeImBuf is to be called to de-reference. */
+/* References the result, BKE_image_release_ibuf is to be called to de-reference.
+ * Use lock=NULL when calling BKE_image_release_ibuf().
+ */
 ImBuf *BKE_image_get_ibuf_with_name(Image *image, const char *name)
 {
 	ImBuf *ibuf = NULL;
@@ -3606,7 +3637,8 @@ ImBuf *BKE_image_get_ibuf_with_name(Image *image, const char *name)
 	return ibuf;
 }
 
-/* References the result, IMB_freeImBuf is to be called to de-reference.
+/* References the result, BKE_image_release_ibuf is to be called to de-reference.
+ * Use lock=NULL when calling BKE_image_release_ibuf().
  *
  * TODO(sergey): This is actually "get first entry from the cache", which is
  *               not so much predictable. But using first loaded image buffer

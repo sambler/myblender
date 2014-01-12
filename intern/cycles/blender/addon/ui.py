@@ -64,6 +64,7 @@ def draw_samples_info(layout, cscene):
         ao = cscene.ao_samples
         ml = cscene.mesh_light_samples
         sss = cscene.subsurface_samples
+        vol = cscene.volume_samples
 
         if cscene.use_square_samples:
             aa = aa * aa
@@ -73,6 +74,7 @@ def draw_samples_info(layout, cscene):
             ao = ao * ao
             ml = ml * ml
             sss = sss * sss
+            vol = vol * vol
 
     # Draw interface
     # Do not draw for progressive, when Square Samples are disabled
@@ -87,8 +89,8 @@ def draw_samples_info(layout, cscene):
             col.label("%s AA, %s Diffuse, %s Glossy, %s Transmission" %
                       (aa, d * aa, g * aa, t * aa))
             col.separator()
-            col.label("%s AO, %s Mesh Light, %s Subsurface" %
-                      (ao * aa, ml * aa, sss * aa))
+            col.label("%s AO, %s Mesh Light, %s Subsurface, %s Volume" %
+                      (ao * aa, ml * aa, sss * aa, vol * aa))
 
 
 class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
@@ -139,6 +141,7 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
             sub.prop(cscene, "ao_samples", text="AO")
             sub.prop(cscene, "mesh_light_samples", text="Mesh Light")
             sub.prop(cscene, "subsurface_samples", text="Subsurface")
+            sub.prop(cscene, "volume_samples", text="Volume")
 
         if cscene.feature_set == 'EXPERIMENTAL' and (device_type == 'NONE' or cscene.device == 'CPU'):
             layout.row().prop(cscene, "sampling_pattern", text="Pattern")
@@ -150,6 +153,21 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
                 break
 
         draw_samples_info(layout, cscene)
+
+
+class CyclesRender_PT_volume_sampling(CyclesButtonsPanel, Panel):
+    bl_label = "Volume Sampling"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        cscene = scene.cycles
+
+        split = layout.split()
+        split.prop(cscene, "volume_step_size")
+        split.prop(cscene, "volume_max_steps")
 
 
 class CyclesRender_PT_light_paths(CyclesButtonsPanel, Panel):
@@ -193,6 +211,7 @@ class CyclesRender_PT_light_paths(CyclesButtonsPanel, Panel):
         sub.prop(cscene, "diffuse_bounces", text="Diffuse")
         sub.prop(cscene, "glossy_bounces", text="Glossy")
         sub.prop(cscene, "transmission_bounces", text="Transmission")
+        sub.prop(cscene, "volume_bounces", text="Volume")
 
 
 class CyclesRender_PT_motion_blur(CyclesButtonsPanel, Panel):
@@ -780,15 +799,16 @@ class CyclesWorld_PT_volume(CyclesButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        # world = context.world
-        # world and world.node_tree and CyclesButtonsPanel.poll(context)
-        return False
+        world = context.world
+        return world and world.node_tree and CyclesButtonsPanel.poll(context)
 
     def draw(self, context):
         layout = self.layout
 
         world = context.world
         panel_node_draw(layout, world, 'OUTPUT_WORLD', 'Volume')
+
+        layout.prop(world.cycles, "homogeneous_volume")
 
 
 class CyclesWorld_PT_ambient_occlusion(CyclesButtonsPanel, Panel):
@@ -926,9 +946,8 @@ class CyclesMaterial_PT_volume(CyclesButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        # mat = context.material
-        # mat and mat.node_tree and CyclesButtonsPanel.poll(context)
-        return False
+        mat = context.material
+        return mat and mat.node_tree and CyclesButtonsPanel.poll(context)
 
     def draw(self, context):
         layout = self.layout
@@ -1172,13 +1191,12 @@ class CyclesRender_PT_CurveRendering(CyclesButtonsPanel, Panel):
         layout.prop(ccscene, "primitive", text="Primitive")
         layout.prop(ccscene, "shape", text="Shape")
 
-        if ccscene.primitive == 'TRIANGLES':
-            if ccscene.shape == 'THICK':
-                layout.prop(ccscene, "resolution", text="Resolution")
-        elif ccscene.primitive == 'LINE_SEGMENTS':
+        if (ccscene.primitive in {'CURVE_SEGMENTS', 'LINE_SEGMENTS'} and ccscene.shape == 'RIBBONS') == False:
             layout.prop(ccscene, "cull_backfacing", text="Cull back-faces")
-        elif ccscene.primitive in {'CURVE_SEGMENTS', 'CURVE_RIBBONS'}:
-            layout.prop(ccscene, "cull_backfacing", text="Cull back-faces")
+
+        if ccscene.primitive == 'TRIANGLES' and ccscene.shape == 'THICK':
+            layout.prop(ccscene, "resolution", text="Resolution")
+        elif ccscene.primitive == 'CURVE_SEGMENTS':
             layout.prop(ccscene, "subdivisions", text="Curve subdivisions")
 
         row = layout.row()

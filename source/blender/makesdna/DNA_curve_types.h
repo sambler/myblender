@@ -210,39 +210,44 @@ typedef struct Curve {
 	int actnu;
 	/* edit, last selected point */
 	void *lastsel;
-	
+
+
 	/* font part */
-	/* WARNING: cu->len is...
-	 * - strlen(cu->str) object-mode (bytes).
-	 * - BLI_strlen_utf8(cu->str) in edit-mode.
-	 * This should be cleaned up and some point, see 'write_curves' - campbell */
-	short len, lines, pos, spacemode;
+	short lines;
+	char spacemode, pad1;
 	float spacing, linedist, shear, fsize, wordspace, ulpos, ulheight;
 	float xof, yof;
 	float linewidth;
 
+	/* copy of EditFont vars (wchar_t aligned),
+	 * warning! don't use in editmode (storage only) */
+	int pos;
+	int selstart, selend;
+
+	/* text data */
+	int len_wchar;  /* number of characters (strinfo) */
+	int len;        /* number of bytes (str - utf8) */
 	char *str;
-	struct SelBox *selboxes;  /* runtime variable for drawing selections (editmode data) */
 	struct EditFont *editfont;
-	
-	char family[24];
+
+	char family[64];
 	struct VFont *vfont;
 	struct VFont *vfontb;
 	struct VFont *vfonti;
 	struct VFont *vfontbi;
-
-	int sepchar;
 	
-	float ctime;			/* current evaltime - for use by Objects parented to curves */
-	int totbox, actbox;
 	struct TextBox *tb;
-	
-	int selstart, selend;
+	int totbox, actbox;
 	
 	struct CharInfo *strinfo;
 	struct CharInfo curinfo;
+	/* font part end */
 
+
+	float ctime;			/* current evaltime - for use by Objects parented to curves */
 	float bevfac1, bevfac2;
+
+	char pad[4];
 } Curve;
 
 /* **************** CURVE ********************* */

@@ -45,6 +45,7 @@
 #endif
 
 #include "ED_numinput.h"
+#include "UI_interface.h"
 
 
 /* NumInput.val_flag[] */
@@ -52,6 +53,8 @@ enum {
 	/* (1 << 8) and below are reserved for public flags! */
 	NUM_EDITED          = (1 << 9),    /* User has edited this value somehow. */
 	NUM_INVALID         = (1 << 10),   /* Current expression for this value is invalid. */
+	NUM_NEGATE          = (1 << 11),   /* Current expression's result has to be negated. */
+	NUM_INVERSE         = (1 << 12),   /* Current expression's result has to be inverted. */
 };
 
 /* ************************** Functions *************************** */
@@ -78,16 +81,29 @@ void outputNumInput(NumInput *n, char *str)
 {
 	short i, j;
 	const int ln = NUM_STR_REP_LEN;
-	const int prec = 4; /* draw-only, and avoids too much issues with radian->degrees conversion. */
+	int prec = 2; /* draw-only, and avoids too much issues with radian->degrees conversion. */
 
 	for (j = 0; j <= n->idx_max; j++) {
 		/* if AFFECTALL and no number typed and cursor not on number, use first number */
 		i = (n->flag & NUM_AFFECT_ALL && n->idx != j && !(n->val_flag[j] & NUM_EDITED)) ? 0 : j;
 
 		if (n->val_flag[i] & NUM_EDITED) {
-			if (i == n->idx && n->str[0]) {
+			/* Get the best precision, allows us to draw '10.0001' as '10' instead! */
+			prec = uiFloatPrecisionCalc(prec, (double)n->val[i]);
+			if (i == n->idx) {
+				const char *heading_exp = "", *trailing_exp = "";
 				char before_cursor[NUM_STR_REP_LEN];
 				char val[16];
+
+				if (n->val_flag[i] & NUM_NEGATE) {
+					heading_exp = (n->val_flag[i] & NUM_INVERSE) ? "-1/(" : "-(";
+					trailing_exp = ")";
+				}
+				else if (n->val_flag[i] & NUM_INVERSE) {
+					heading_exp = "1/(";
+					trailing_exp = ")";
+				}
+
 				if (n->val_flag[i] & NUM_INVALID) {
 					BLI_strncpy(val, "Invalid", sizeof(val));
 				}
@@ -95,8 +111,10 @@ void outputNumInput(NumInput *n, char *str)
 					bUnit_AsString(val, sizeof(val), (double)n->val[i], prec,
 					               n->unit_sys, n->unit_type[i], true, false);
 				}
+
 				BLI_strncpy(before_cursor, n->str, n->str_cur + 1);  /* +1 because of trailing '\0' */
-				BLI_snprintf(&str[j * ln], ln, "[%s|%s] = %s", before_cursor, &n->str[n->str_cur], val);
+				BLI_snprintf(&str[j * ln], ln, "[%s%s|%s%s] = %s",
+				             heading_exp, before_cursor, &n->str[n->str_cur], trailing_exp, val);
 			}
 			else {
 				const char *cur = (i == n->idx) ? "|" : "";
@@ -115,6 +133,8 @@ void outputNumInput(NumInput *n, char *str)
 			const char *cur = (i == n->idx) ? "|" : "";
 			BLI_snprintf(&str[j * ln], ln, "%sNONE%s", cur, cur);
 		}
+		/* We might have cut some multi-bytes utf8 chars (e.g. trailing '°' of degrees values can become only 'A')... */
+		BLI_utf8_invalid_strip(&str[j * ln], strlen(&str[j * ln]));
 	}
 }
 
@@ -166,9 +186,8 @@ void applyNumInput(NumInput *n, float *vec)
 static void value_to_editstr(NumInput *n, int idx)
 {
 	const int prec = 6; /* editing, higher precision needed. */
-	bUnit_AsString(n->str, NUM_STR_REP_LEN, (double)n->val[idx], prec,
-	               n->unit_sys, n->unit_type[idx], true, false);
-	n->str_cur = strlen(n->str);
+	n->str_cur = bUnit_AsString(n->str, NUM_STR_REP_LEN, (double)n->val[idx], prec,
+	                            n->unit_sys, n->unit_type[idx], true, false);
 }
 
 static bool editstr_insert_at_cursor(NumInput *n, const char *buf, const int buf_len)
@@ -281,6 +300,7 @@ bool handleNumInput(bContext *C, NumInput *n, const wmEvent *event)
 			return false;
 		case TABKEY:
 			n->val_org[idx] = n->val[idx];
+			n->val_flag[idx] &= ~(NUM_NEGATE | NUM_INVERSE);
 
 			idx += event->ctrl ? -1 : 1;
 			idx %= idx_max + 1;
@@ -294,6 +314,25 @@ bool handleNumInput(bContext *C, NumInput *n, const wmEvent *event)
 				n->str_cur = 0;
 			}
 			return true;
+		case PADPERIOD:
+			/* Force numdot, some OSs/countries generate a comma char in this case, sic...  (T37992) */
+			ascii[0] = '.';
+			utf8_buf = ascii;
+			break;
+		case PADMINUS:
+			if (event->ctrl) {
+				n->val_flag[idx] ^= NUM_NEGATE;
+				updated = true;
+				break;
+			}
+			/* fall-through */
+		case PADSLASHKEY:
+			if (event->ctrl) {
+				n->val_flag[idx] ^= NUM_INVERSE;
+				updated = true;
+				break;
+			}
+			/* fall-through */
 		case CKEY:
 			if (event->ctrl) {
 				/* Copy current str to the copypaste buffer. */
@@ -305,17 +344,13 @@ bool handleNumInput(bContext *C, NumInput *n, const wmEvent *event)
 		case VKEY:
 			if (event->ctrl) {
 				/* extract the first line from the clipboard */
-				char *pbuf = WM_clipboard_text_get(0);
+				int pbuf_len;
+				char *pbuf = WM_clipboard_text_get_firstline(false, &pbuf_len);
 
 				if (pbuf) {
 					bool success;
-					/* Only copy string until first of this char. */
-					char *cr = strchr(pbuf, '\r');
-					char *cn = strchr(pbuf, '\n');
-					if (cn && cn < cr) cr = cn;
-					if (cr) *cr = '\0';
 
-					success = editstr_insert_at_cursor(n, pbuf, strlen(pbuf));
+					success = editstr_insert_at_cursor(n, pbuf, pbuf_len);
 
 					MEM_freeN(pbuf);
 					if (!success) {
@@ -376,6 +411,13 @@ bool handleNumInput(bContext *C, NumInput *n, const wmEvent *event)
 #else  /* Very unlikely, but does not harm... */
 		n->val[idx] = (float)atof(n->str);
 #endif  /* WITH_PYTHON */
+
+		if (n->val_flag[idx] & NUM_NEGATE) {
+			n->val[idx] = -n->val[idx];
+		}
+		if (n->val_flag[idx] & NUM_INVERSE) {
+			n->val[idx] = 1.0f / n->val[idx];
+		}
 	}
 
 	/* REDRAW SINCE NUMBERS HAVE CHANGED */

@@ -17,6 +17,7 @@
 #include "attribute.h"
 #include "graph.h"
 #include "nodes.h"
+#include "shader.h"
 
 #include "util_algorithm.h"
 #include "util_debug.h"
@@ -116,14 +117,20 @@ ShaderOutput *ShaderNode::add_output(const char *name, ShaderSocketType type)
 	return output;
 }
 
-void ShaderNode::attributes(AttributeRequestSet *attributes)
+void ShaderNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
 	foreach(ShaderInput *input, inputs) {
 		if(!input->link) {
-			if(input->default_value == ShaderInput::TEXTURE_GENERATED)
-				attributes->add(ATTR_STD_GENERATED);
-			else if(input->default_value == ShaderInput::TEXTURE_UV)
-				attributes->add(ATTR_STD_UV);
+			if(input->default_value == ShaderInput::TEXTURE_GENERATED) {
+				if(shader->has_surface)
+					attributes->add(ATTR_STD_GENERATED);
+				if(shader->has_volume)
+					attributes->add(ATTR_STD_GENERATED_TRANSFORM);
+			}
+			else if(input->default_value == ShaderInput::TEXTURE_UV) {
+				if(shader->has_surface)
+					attributes->add(ATTR_STD_UV);
+			}
 		}
 	}
 }
@@ -151,9 +158,9 @@ ShaderNode *ShaderGraph::add(ShaderNode *node)
 	return node;
 }
 
-ShaderNode *ShaderGraph::output()
+OutputNode *ShaderGraph::output()
 {
-	return nodes.front();
+	return (OutputNode*)nodes.front();
 }
 
 ShaderGraph *ShaderGraph::copy()

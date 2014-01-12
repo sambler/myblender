@@ -52,6 +52,8 @@ extern "C"
 {
 #endif  // __cplusplus
 #include "MEM_guardedalloc.h"
+#include "MEM_CacheLimiterC-Api.h"
+
 #include "BLI_threads.h"
 #include "BLI_mempool.h"
 #include "BLI_blenlib.h"
@@ -434,12 +436,14 @@ int main(int argc, char** argv)
 
 	U.gameflags |= USER_DISABLE_VBO;
 	// We load our own G.main, so free the one that initglobals() gives us
-	free_main(G.main);
+	BKE_main_free(G.main);
 	G.main = NULL;
 
+	MEM_CacheLimiter_set_disabled(true);
 	IMB_init();
 	BKE_images_init();
 	BKE_modifier_init();
+	DAG_init();
 
 #ifdef WITH_FFMPEG
 	IMB_ffmpeg_init();
@@ -655,6 +659,9 @@ int main(int argc, char** argv)
 					}
 					else if (!strcmp(argv[i], "syncdoubling"))
 						stereomode = RAS_IRasterizer::RAS_STEREO_ABOVEBELOW;
+
+					else if (!strcmp(argv[i], "3dtvtopbottom"))
+						stereomode = RAS_IRasterizer::RAS_STEREO_3DTVTOPBOTTOM;
 
 					else if (!strcmp(argv[i], "anaglyph"))
 						stereomode = RAS_IRasterizer::RAS_STEREO_ANAGLYPH;
@@ -1063,6 +1070,7 @@ int main(int argc, char** argv)
 
 	IMB_exit();
 	BKE_images_exit();
+	DAG_exit();
 
 	SYS_DeleteSystem(syshandle);
 

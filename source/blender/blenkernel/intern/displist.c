@@ -41,6 +41,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 #include "DNA_material_types.h"
+#include "DNA_vfont_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_memarena.h"
@@ -49,9 +50,11 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_global.h"
+#include "BKE_depsgraph.h"
 #include "BKE_displist.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_object.h"
+#include "BKE_main.h"
 #include "BKE_mball.h"
 #include "BKE_material.h"
 #include "BKE_curve.h"
@@ -645,10 +648,7 @@ static void bevels_to_filledpoly(Curve *cu, ListBase *dispbase)
 
 static void curve_to_filledpoly(Curve *cu, ListBase *UNUSED(nurb), ListBase *dispbase)
 {
-	if (cu->flag & CU_3D)
-		return;
-
-	if ((cu->flag & (CU_FRONT | CU_BACK)) == 0)
+	if (!CU_DO_2DFILL(cu))
 		return;
 
 	if (dispbase->first && ((DispList *) dispbase->first)->type == DL_SURF) {
@@ -712,7 +712,7 @@ float BKE_displist_calc_taper(Scene *scene, Object *taperobj, int cur, int tot)
 	return displist_calc_taper(scene, taperobj, fac);
 }
 
-void BKE_displist_make_mball(Scene *scene, Object *ob)
+void BKE_displist_make_mball(EvaluationContext *eval_ctx, Scene *scene, Object *ob)
 {
 	if (!ob || ob->type != OB_MBALL)
 		return;
@@ -726,7 +726,7 @@ void BKE_displist_make_mball(Scene *scene, Object *ob)
 
 	if (ob->type == OB_MBALL) {
 		if (ob == BKE_mball_basis_find(scene, ob)) {
-			BKE_mball_polygonize(scene, ob, &ob->curve_cache->disp, false);
+			BKE_mball_polygonize(eval_ctx, scene, ob, &ob->curve_cache->disp);
 			BKE_mball_texspace_calc(ob);
 
 			object_deform_mball(ob, &ob->curve_cache->disp);
@@ -736,9 +736,9 @@ void BKE_displist_make_mball(Scene *scene, Object *ob)
 	}
 }
 
-void BKE_displist_make_mball_forRender(Scene *scene, Object *ob, ListBase *dispbase)
+void BKE_displist_make_mball_forRender(EvaluationContext *eval_ctx, Scene *scene, Object *ob, ListBase *dispbase)
 {
-	BKE_mball_polygonize(scene, ob, dispbase, true);
+	BKE_mball_polygonize(eval_ctx, scene, ob, dispbase);
 	BKE_mball_texspace_calc(ob);
 
 	object_deform_mball(ob, dispbase);
@@ -1374,10 +1374,12 @@ static void do_makeDispListCurveTypes(Scene *scene, Object *ob, ListBase *dispba
 		if (ob->curve_cache->path) free_path(ob->curve_cache->path);
 		ob->curve_cache->path = NULL;
 
-		if (ob->type == OB_FONT)
-			BKE_vfont_to_curve(G.main, scene, ob, 0);
-
-		BKE_nurbList_duplicate(&nubase, BKE_curve_nurbs_get(cu));
+		if (ob->type == OB_FONT) {
+			BKE_vfont_to_curve_nubase(G.main, scene, ob, FO_EDIT, &nubase);
+		}
+		else {
+			BKE_nurbList_duplicate(&nubase, BKE_curve_nurbs_get(cu));
+		}
 
 		if (!forOrco)
 			curve_calc_modifiers_pre(scene, ob, &nubase, forRender, renderResolution);

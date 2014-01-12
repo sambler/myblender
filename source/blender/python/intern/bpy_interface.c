@@ -213,6 +213,7 @@ static struct _inittab bpy_internal_modules[] = {
 	{(char *)"mathutils", PyInit_mathutils},
 //	{(char *)"mathutils.geometry", PyInit_mathutils_geometry},
 //	{(char *)"mathutils.noise", PyInit_mathutils_noise},
+//	{(char *)"mathutils.kdtree", PyInit_mathutils_kdtree},
 	{(char *)"_bpy_path", BPyInit__bpy_path},
 	{(char *)"bgl", BPyInit_bgl},
 	{(char *)"blf", BPyInit_blf},
@@ -408,31 +409,6 @@ void BPY_python_reset(bContext *C)
 	BPY_modules_load_user(C);
 }
 
-/* wrapper functions related to global interpreter lock. these functions
- * are slightly different from the original Python API, don't throw
- * SIGABRT even if the thread state is NULL. */
-
-/* analogue of PyEval_SaveThread() */
-BPy_ThreadStatePtr BPY_thread_save(void)
-{
-	PyThreadState *tstate = PyThreadState_Swap(NULL);
-	/* note: tstate can be NULL when quitting Blender */
-
-	if (tstate && PyEval_ThreadsInitialized()) {
-		PyEval_ReleaseLock();
-	}
-
-	return (BPy_ThreadStatePtr)tstate;
-}
-
-/* analogue of PyEval_RestoreThread() */
-void BPY_thread_restore(BPy_ThreadStatePtr tstate)
-{
-	if (tstate) {
-		PyEval_RestoreThread((PyThreadState *)tstate);
-	}
-}
-
 static void python_script_error_jump_text(struct Text *text)
 {
 	int lineno;
@@ -605,7 +581,7 @@ void BPY_DECREF_RNA_INVALIDATE(void *pyob_ptr)
 
 
 /* return -1 on error, else 0 */
-int BPY_button_exec(bContext *C, const char *expr, double *value, const short verbose)
+int BPY_button_exec(bContext *C, const char *expr, double *value, const bool verbose)
 {
 	PyGILState_STATE gilstate;
 	PyObject *py_dict, *mod, *retval;

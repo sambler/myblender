@@ -29,11 +29,13 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
-#include "BKE_unit.h"
 
+#include "BLI_sys_types.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
+
+#include "BKE_unit.h"  /* own include */
 
 #ifdef WIN32
 #  include "BLI_winstuff.h"
@@ -69,6 +71,7 @@
 #define UN_SC_HG	0.1f
 #define UN_SC_DAG	0.01f
 #define UN_SC_G		0.001f
+#define UN_SC_MG	0.000001f
 
 #define UN_SC_ITON	907.18474f /* imperial ton */
 #define UN_SC_CWT	45.359237f
@@ -200,6 +203,7 @@ static struct bUnitDef buMetricMassDef[] = {
 	{"hectogram", "hectograms", "hg",  NULL, "Hectograms", UN_SC_HG, 0.0,        B_UNIT_DEF_SUPPRESS},
 	{"dekagram", "dekagrams",   "dag", NULL, "10 Grams", UN_SC_DAG, 0.0,         B_UNIT_DEF_SUPPRESS},
 	{"gram", "grams",           "g",   NULL, "Grams", UN_SC_G, 0.0,              B_UNIT_DEF_NONE},
+	{"milligram", "milligrams", "mg",  NULL, "Milligrams", UN_SC_MG, 0.0,        B_UNIT_DEF_NONE},
 	{NULL, NULL, NULL,  NULL, NULL, 0.0, 0.0}
 };
 static struct bUnitCollection buMetricMassCollection = {buMetricMassDef, 2, 0, sizeof(buMetricMassDef) / sizeof(bUnitDef)};
@@ -419,7 +423,7 @@ static size_t unit_as_string(char *str, int len_max, double value, int prec, bUn
 /* Used for drawing number buttons, try keep fast.
  * Return the length of the generated string.
  */
-size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, int split, int pad)
+size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, int split, bool pad)
 {
 	bUnitCollection *usys = unit_get_system(system, type);
 

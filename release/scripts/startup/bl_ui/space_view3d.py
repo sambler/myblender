@@ -51,7 +51,7 @@ class VIEW3D_HT_header(Header):
                     sub.menu("VIEW3D_MT_select_paint_mask")
                 elif mesh.use_paint_mask_vertex and mode_string == 'PAINT_WEIGHT':
                     sub.menu("VIEW3D_MT_select_paint_mask_vertex")
-            elif mode_string not in {'EDIT_TEXT', 'SCULPT'}:
+            elif mode_string not in {'SCULPT'}:
                 sub.menu("VIEW3D_MT_select_%s" % mode_string.lower())
 
             if mode_string == 'OBJECT':
@@ -251,11 +251,12 @@ class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base):
         layout.separator()
 
         obj = context.object
-        if (obj.type == 'ARMATURE' and obj.mode in {'EDIT', 'POSE'} and
-            obj.data.draw_type in {'BBONE', 'ENVELOPE'}
-            ):
-
-            layout.operator("transform.transform", text="Scale Envelope/BBone").mode = 'BONE_SIZE'
+        if obj.type == 'ARMATURE' and obj.mode in {'EDIT', 'POSE'}:
+            if obj.data.draw_type == 'BBONE':
+                layout.operator("transform.transform", text="Scale BBone").mode = 'BONE_SIZE'
+            elif obj.data.draw_type == 'ENVELOPE':
+                layout.operator("transform.transform", text="Scale Envelope Distance").mode = 'BONE_SIZE'
+                layout.operator("transform.transform", text="Scale Radius").mode = 'BONE_ENVELOPE'
 
         if context.edit_object and context.edit_object.type == 'ARMATURE':
             layout.operator("armature.align")
@@ -714,6 +715,28 @@ class VIEW3D_MT_select_edit_surface(Menu):
         layout.operator("curve.select_less")
 
 
+class VIEW3D_MT_select_edit_text(Menu):
+    # intentional name mis-match
+    # select menu for 3d-text doesn't make sense
+    bl_label = "Edit"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator("font.text_copy", text="Copy")
+        layout.operator("font.text_cut", text="Cut")
+        layout.operator("font.text_paste", text="Paste")
+
+        layout.separator()
+
+        layout.operator("font.text_paste_from_file")
+        layout.operator("font.text_paste_from_clipboard")
+
+        layout.separator()
+
+        layout.operator("font.select_all")
+
+
 class VIEW3D_MT_select_edit_metaball(Menu):
     bl_label = "Select"
 
@@ -900,6 +923,22 @@ class INFO_MT_metaball_add(Menu):
 
         layout.operator_context = 'INVOKE_REGION_WIN'
         layout.operator_enum("object.metaball_add", "type")
+
+
+class INFO_MT_edit_curve_add(Menu):
+    bl_idname = "INFO_MT_edit_curve_add"
+    bl_label = "Add"
+
+    def draw(self, context):
+        is_surf = context.active_object.type == 'SURFACE'
+
+        layout = self.layout
+        layout.operator_context = 'EXEC_REGION_WIN'
+
+        if is_surf:
+            INFO_MT_surface_add.draw(self, context)
+        else:
+            INFO_MT_curve_add.draw(self, context)
 
 
 class INFO_MT_edit_armature_add(Menu):
@@ -2401,10 +2440,6 @@ class VIEW3D_MT_edit_font(Menu):
 
     def draw(self, context):
         layout = self.layout
-
-        layout.operator("font.file_paste")
-
-        layout.separator()
 
         layout.menu("VIEW3D_MT_edit_text_chars")
 

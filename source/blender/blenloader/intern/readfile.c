@@ -449,6 +449,7 @@ void blo_join_main(ListBase *mainlist)
 	while ((tojoin = mainl->next)) {
 		add_main_to_main(mainl, tojoin);
 		BLI_remlink(mainlist, tojoin);
+		MEM_freeN(tojoin->eval_ctx);
 		MEM_freeN(tojoin);
 	}
 }
@@ -492,7 +493,7 @@ void blo_split_main(ListBase *mainlist, Main *main)
 		return;
 	
 	for (lib = main->library.first; lib; lib = lib->id.next) {
-		Main *libmain = MEM_callocN(sizeof(Main), "libmain");
+		Main *libmain = BKE_main_new();
 		libmain->curlib = lib;
 		BLI_addtail(mainlist, libmain);
 	}
@@ -545,7 +546,7 @@ static Main *blo_find_main(FileData *fd, const char *filepath, const char *relab
 		}
 	}
 	
-	m = MEM_callocN(sizeof(Main), "find_main");
+	m = BKE_main_new();
 	BLI_addtail(mainlist, m);
 	
 	lib = BKE_libblock_alloc(&m->library, ID_LI, "lib");
@@ -1354,7 +1355,13 @@ void blo_end_image_pointer_map(FileData *fd, Main *oldmain)
 	}
 	
 	for (; ima; ima = ima->id.next) {
-		ima->cache = newmclipadr(fd, ima->cache);
+		ima->cache = newimaadr(fd, ima->cache);
+		if (ima->cache == NULL) {
+			ima->bindcode = 0;
+			ima->tpageflag &= ~IMA_GLBIND_IS_DATA;
+			ima->gputexture = NULL;
+			ima->rr = NULL;
+		}
 		for (i = 0; i < IMA_MAX_RENDER_SLOT; i++)
 			ima->renders[i] = newimaadr(fd, ima->renders[i]);
 		
@@ -2022,7 +2029,6 @@ static void direct_link_fmodifiers(FileData *fd, ListBase *list)
 	for (fcm = list->first; fcm; fcm = fcm->next) {
 		/* relink general data */
 		fcm->data  = newdataadr(fd, fcm->data);
-		fcm->edata = NULL;
 		
 		/* do relinking of data for specific types */
 		switch (fcm->type) {
@@ -3277,7 +3283,7 @@ static void direct_link_image(FileData *fd, Image *ima)
 		ima->cache = NULL;
 
 	/* if not restored, we keep the binded opengl index */
-	if (!fd->imamap) {
+	if (!ima->cache) {
 		ima->bindcode = 0;
 		ima->tpageflag &= ~IMA_GLBIND_IS_DATA;
 		ima->gputexture = NULL;
@@ -3329,8 +3335,6 @@ static void lib_link_curve(FileData *fd, Main *main)
 			
 			cu->ipo = newlibadr_us(fd, cu->id.lib, cu->ipo); // XXX deprecated - old animation system
 			cu->key = newlibadr_us(fd, cu->id.lib, cu->key);
-
-			cu->selboxes = NULL;  /* runtime, clear */
 			
 			cu->id.flag -= LIB_NEED_LINK;
 		}
@@ -6542,7 +6546,7 @@ static void direct_link_library(FileData *fd, Library *lib, Main *main)
 	lib->packedfile = direct_link_packedfile(fd, lib->packedfile);
 	
 	/* new main */
-	newmain= MEM_callocN(sizeof(Main), "directlink");
+	newmain = BKE_main_new();
 	BLI_addtail(fd->mainlist, newmain);
 	newmain->curlib = lib;
 	
@@ -7566,7 +7570,7 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 	ListBase mainlist = {NULL, NULL};
 	
 	bfd = MEM_callocN(sizeof(BlendFileData), "blendfiledata");
-	bfd->main = MEM_callocN(sizeof(Main), "readfile_Main");
+	bfd->main = BKE_main_new();
 	BLI_addtail(&mainlist, bfd->main);
 	fd->mainlist = &mainlist;
 	
@@ -8940,7 +8944,7 @@ static Main *library_append_begin(Main *mainvar, FileData **fd, const char *file
 	(*fd)->mainlist = MEM_callocN(sizeof(ListBase), "FileData.mainlist");
 	
 	/* clear for group instancing tag */
-	tag_main_lb(&(mainvar->group), 0);
+	BKE_main_id_tag_listbase(&(mainvar->group), false);
 
 	/* make mains */
 	blo_split_main((*fd)->mainlist, mainvar);
@@ -9020,7 +9024,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 	}
 
 	/* clear group instancing tag */
-	tag_main_lb(&(mainvar->group), 0);
+	BKE_main_id_tag_listbase(&(mainvar->group), false);
 	
 	/* has been removed... erm, why? s..ton) */
 	/* 20040907: looks like they are give base already in append_named_part(); -Nathan L */

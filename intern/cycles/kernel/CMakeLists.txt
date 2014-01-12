@@ -46,10 +46,12 @@ set(SRC_HEADERS
 	kernel_projection.h
 	kernel_random.h
 	kernel_shader.h
+	kernel_shadow.h
 	kernel_subsurface.h
 	kernel_textures.h
 	kernel_triangle.h
 	kernel_types.h
+	kernel_volume.h
 )
 
 set(SRC_CLOSURE_HEADERS
@@ -197,7 +199,9 @@ endif()
 
 if(WITH_CYCLES_OPTIMIZED_KERNEL_SSE41)
 	set_source_files_properties(kernel_sse41.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_SSE41_KERNEL_FLAGS}")
-	list(APPEND SRC kernel_sse41.cpp)
+	list(APPEND SRC
+		kernel_sse41.cpp
+	)
 endif()
 
 add_library(cycles_kernel ${SRC} ${SRC_HEADERS} ${SRC_CLOSURE_HEADERS} ${SRC_SVM_HEADERS})

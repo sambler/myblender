@@ -1396,21 +1396,16 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 {
 	char buf[UI_MAX_DRAW_STR + 1] = {0};
 
-	if (mode == 'v' && but->lock  == TRUE) {
+	if (mode == 'v' && but->lock  == true) {
 		return;
 	}
 
 	if (mode == 'v') {
 		/* extract first line from clipboard in case of multi-line copies */
-		char *p, *pbuf = WM_clipboard_text_get(0);
-		p = pbuf;
-		if (p) {
-			int i = 0;
-			while (*p && *p != '\r' && *p != '\n' && i < UI_MAX_DRAW_STR) {
-				buf[i++] = *p;
-				p++;
-			}
-			buf[i] = 0;
+		int pbuf_len;
+		char *pbuf = WM_clipboard_text_get_firstline(false, &pbuf_len);
+		if (pbuf) {
+			BLI_strncpy(buf, pbuf, sizeof(buf));
 			MEM_freeN(pbuf);
 		}
 	}
@@ -1628,7 +1623,7 @@ static int ui_text_position_to_hidden(uiBut *but, int pos)
 	return BLI_strnlen_utf8(but->drawstr, pos);
 }
 
-void ui_button_text_password_hide(char password_str[UI_MAX_DRAW_STR], uiBut *but, int restore)
+void ui_button_text_password_hide(char password_str[UI_MAX_DRAW_STR], uiBut *but, const bool restore)
 {
 	if (!(but->rnaprop && RNA_property_subtype(but->rnaprop) == PROP_PASSWORD))
 		return;
@@ -1699,7 +1694,7 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, con
 	if (fstyle->kerning == 1) /* for BLF_width */
 		BLF_enable(fstyle->uifont_id, BLF_KERNING_DEFAULT);
 	
-	ui_button_text_password_hide(password_str, but, FALSE);
+	ui_button_text_password_hide(password_str, but, false);
 
 	origstr = MEM_mallocN(sizeof(char) * data->maxlen, "ui_textedit origstr");
 
@@ -1779,7 +1774,7 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, con
 	if (fstyle->kerning == 1)
 		BLF_disable(fstyle->uifont_id, BLF_KERNING_DEFAULT);
 	
-	ui_button_text_password_hide(password_str, but, TRUE);
+	ui_button_text_password_hide(password_str, but, true);
 
 	MEM_freeN(origstr);
 
@@ -1997,7 +1992,7 @@ enum {
 
 static bool ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, const int mode)
 {
-	char *str, *p, *pbuf;
+	char *str, *pbuf;
 	int x;
 	bool changed = false;
 	int str_len, buf_len;
@@ -2009,17 +2004,13 @@ static bool ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, const in
 	if (mode == UI_TEXTEDIT_PASTE) {
 		/* TODO, ensure UTF8 ui_is_but_utf8() - campbell */
 		/* extract the first line from the clipboard */
-		p = pbuf = WM_clipboard_text_get(0);
+		pbuf = WM_clipboard_text_get_firstline(false, &buf_len);
 
-		if (p && p[0]) {
+		if (pbuf) {
 			char buf[UI_MAX_DRAW_STR] = {0};
 			unsigned int y;
-			buf_len = 0;
-			while (*p && *p != '\r' && *p != '\n' && buf_len < UI_MAX_DRAW_STR - 1) {
-				buf[buf_len++] = *p;
-				p++;
-			}
-			buf[buf_len] = 0;
+
+			buf_len = BLI_strncpy_rlen(buf, pbuf, sizeof(buf));
 
 			/* paste over the current selection */
 			if ((but->selend - but->selsta) > 0) {
@@ -3461,8 +3452,8 @@ static int ui_do_but_SLI(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
 		if (event->type == ESCKEY || event->type == RIGHTMOUSE) {
 			if (event->val == KM_PRESS) {
-				data->cancel = TRUE;
-				data->escapecancel = TRUE;
+				data->cancel = true;
+				data->escapecancel = true;
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 			}
 		}
@@ -4623,7 +4614,7 @@ static bool ui_numedit_but_CURVE(uiBlock *block, uiBut *but, uiHandleButtonData 
 			}
 		}
 
-		curvemapping_changed(cumap, FALSE);
+		curvemapping_changed(cumap, false);
 		
 		if (moved_point) {
 			data->draglastx = evtx;
@@ -4704,7 +4695,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 				fy = ((float)my - but->rect.ymin) / zoomy + offsy;
 				
 				curvemap_insert(cuma, fx, fy);
-				curvemapping_changed(cumap, FALSE);
+				curvemapping_changed(cumap, false);
 				changed = true;
 			}
 
@@ -4738,7 +4729,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 					{
 					
 						curvemap_insert(cuma, fx, fy);
-						curvemapping_changed(cumap, FALSE);
+						curvemapping_changed(cumap, false);
 
 						changed = true;
 						
@@ -4758,7 +4749,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 			if (sel != -1) {
 				/* ok, we move a point */
 				/* deselect all if this one is deselect. except if we hold shift */
-				if (event->shift == FALSE) {
+				if (!event->shift) {
 					for (a = 0; a < cuma->totpoint; a++) {
 						cmp[a].flag &= ~CUMA_SELECT;
 					}
@@ -4800,7 +4791,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 
 				if (data->dragchange == false) {
 					/* deselect all, select one */
-					if (event->shift == FALSE) {
+					if (!event->shift) {
 						for (a = 0; a < cuma->totpoint; a++)
 							cmp[a].flag &= ~CUMA_SELECT;
 						cmp[data->dragsel].flag |= CUMA_SELECT;
@@ -5325,7 +5316,7 @@ void ui_panel_menu(bContext *C, ARegion *ar, Panel *pa)
 	pup = uiPupMenuBegin(C, IFACE_("Panel"), ICON_NONE);
 	layout = uiPupMenuLayout(pup);
 	if (UI_panel_category_is_visible(ar)) {
-		uiItemR(layout, &ptr, "use_pin", 0, "Pin" UI_SEP_CHAR_S "Alt+Left Mouse", ICON_NONE);
+		uiItemR(layout, &ptr, "use_pin", 0, "Pin" UI_SEP_CHAR_S "Shift+Left Mouse", ICON_NONE);
 	}
 	uiPupMenuEnd(C, pup);
 }
@@ -5594,7 +5585,7 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 			RNA_string_set(&ptr_props, "doc_new", RNA_property_description(but->rnaprop));
 
 			uiItemFullO(layout, "WM_OT_doc_edit", "Submit Description", ICON_NONE, ptr_props.data, WM_OP_INVOKE_DEFAULT, 0);
- #endif
+#endif
 		}
 		else if (but->optype) {
 			WM_operator_py_idname(buf, but->optype->idname);
@@ -5963,7 +5954,7 @@ static bool ui_mouse_inside_region(ARegion *ar, int x, int y)
 	/* check if the mouse is in the region */
 	if (!BLI_rcti_isect_pt(&ar->winrct, x, y)) {
 		for (block = ar->uiblocks.first; block; block = block->next)
-			block->auto_open = FALSE;
+			block->auto_open = false;
 		
 		return false;
 	}
@@ -6313,7 +6304,7 @@ static void button_activate_init(bContext *C, ARegion *ar, uiBut *but, uiButtonA
 	 * in between going over to the other button, but only for a short while */
 	if (type == BUTTON_ACTIVATE_OVER && but->block->auto_open == true)
 		if (but->block->auto_open_last + BUTTON_AUTO_OPEN_THRESH < PIL_check_seconds_timer())
-			but->block->auto_open = FALSE;
+			but->block->auto_open = false;
 
 	if (type == BUTTON_ACTIVATE_OVER) {
 		data->used_mouse = true;
@@ -6433,7 +6424,7 @@ void ui_button_active_free(const bContext *C, uiBut *but)
 	 * case cleanly anyway in case it happens */
 	if (but->active) {
 		data = but->active;
-		data->cancel = TRUE;
+		data->cancel = true;
 		button_activate_exit((bContext *)C, but, data, false, true);
 	}
 }
@@ -6660,7 +6651,7 @@ void ui_button_activate_do(bContext *C, ARegion *ar, uiBut *but)
 	event.type = EVT_BUT_OPEN;
 	event.val = KM_PRESS;
 	event.customdata = but;
-	event.customdatafree = FALSE;
+	event.customdatafree = false;
 	
 	ui_do_button(C, but->block, but, &event);
 }
@@ -6688,7 +6679,7 @@ static void ui_handle_button_activate(bContext *C, ARegion *ar, uiBut *but, uiBu
 	oldbut = ui_but_find_activated(ar);
 	if (oldbut) {
 		data = oldbut->active;
-		data->cancel = TRUE;
+		data->cancel = true;
 		button_activate_exit(C, oldbut, data, false, false);
 	}
 
@@ -6714,18 +6705,18 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 		switch (event->type) {
 			case WINDEACTIVATE:
 			case EVT_BUT_CANCEL:
-				data->cancel = TRUE;
+				data->cancel = true;
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 				retval = WM_UI_HANDLER_CONTINUE;
 				break;
 			case MOUSEMOVE:
 				/* verify if we are still over the button, if not exit */
 				if (!ui_mouse_inside_button(ar, but, event->x, event->y)) {
-					data->cancel = TRUE;
+					data->cancel = true;
 					button_activate_state(C, but, BUTTON_STATE_EXIT);
 				}
 				else if (ui_but_find_mouse_over(ar, event) != but) {
-					data->cancel = TRUE;
+					data->cancel = true;
 					button_activate_state(C, but, BUTTON_STATE_EXIT);
 				}
 				else if (event->x != event->prevx || event->y != event->prevy) {
@@ -6773,7 +6764,7 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 	else if (data->state == BUTTON_STATE_WAIT_RELEASE) {
 		switch (event->type) {
 			case WINDEACTIVATE:
-				data->cancel = TRUE;
+				data->cancel = true;
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 				break;
 
@@ -6790,14 +6781,14 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 					if (ui_mouse_inside_button(ar, but, event->x, event->y)) {
 						if (!(but->flag & UI_SELECT)) {
 							but->flag |= (UI_SELECT | UI_ACTIVE);
-							data->cancel = FALSE;
+							data->cancel = false;
 							ED_region_tag_redraw(data->region);
 						}
 					}
 					else {
 						if (but->flag & UI_SELECT) {
 							but->flag &= ~(UI_SELECT | UI_ACTIVE);
-							data->cancel = TRUE;
+							data->cancel = true;
 							ED_region_tag_redraw(data->region);
 						}
 					}
@@ -6841,7 +6832,7 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 				
 				if (bt && bt->active != data) {
 					if (but->type != COLOR) {  /* exception */
-						data->cancel = TRUE;
+						data->cancel = true;
 					}
 					button_activate_state(C, but, BUTTON_STATE_EXIT);
 				}
@@ -7087,7 +7078,7 @@ static void ui_handle_button_return_submenu(bContext *C, const wmEvent *event, u
 	/* now change button state or exit, which will close the submenu */
 	if ((menu->menuretval & UI_RETURN_OK) || (menu->menuretval & UI_RETURN_CANCEL)) {
 		if (menu->menuretval != UI_RETURN_OK)
-			data->cancel = TRUE;
+			data->cancel = true;
 
 		button_activate_exit(C, but, data, true, false);
 	}
@@ -7102,7 +7093,7 @@ static void ui_handle_button_return_submenu(bContext *C, const wmEvent *event, u
 				button_activate_state(C, but, BUTTON_STATE_HIGHLIGHT);
 			}
 			else {
-				data->cancel = TRUE;
+				data->cancel = true;
 				button_activate_exit(C, but, data, true, false);
 			}
 		}
@@ -7582,7 +7573,7 @@ static int ui_handle_menu_event(bContext *C, const wmEvent *event, uiPopupBlockH
 
 						count = 0;
 						for (but = block->buttons.first; but; but = but->next) {
-							int doit = FALSE;
+							bool doit = false;
 							
 							if (!ELEM(but->type, LABEL, SEPR))
 								count++;
@@ -7591,11 +7582,11 @@ static int ui_handle_menu_event(bContext *C, const wmEvent *event, uiPopupBlockH
 							if (but->rnapoin.data && but->rnaprop) {
 								if (ELEM(RNA_property_subtype(but->rnaprop), PROP_LAYER, PROP_LAYER_MEMBER)) {
 									if (but->rnaindex == act - 1)
-										doit = TRUE;
+										doit = true;
 								}
 							}
 							else if (count == act) {
-								doit = TRUE;
+								doit = true;
 							}
 							
 							if (doit) {
@@ -7646,9 +7637,9 @@ static int ui_handle_menu_event(bContext *C, const wmEvent *event, uiPopupBlockH
 				case ZKEY:
 				{
 					if ((event->val  == KM_PRESS || event->val == KM_DBL_CLICK) &&
-					    (event->shift == FALSE) &&
-					    (event->ctrl  == FALSE) &&
-					    (event->oskey == FALSE))
+					    (event->shift == 0) &&
+					    (event->ctrl  == 0) &&
+					    (event->oskey == 0))
 					{
 						if (ui_menu_pass_event_to_parent_if_nonactive(menu, but, level, retval))
 							break;
@@ -8082,7 +8073,7 @@ static void ui_handler_remove_popup(bContext *C, void *userdata)
 
 void UI_add_region_handlers(ListBase *handlers)
 {
-	WM_event_remove_ui_handler(handlers, ui_handler_region, ui_handler_remove_region, NULL, FALSE);
+	WM_event_remove_ui_handler(handlers, ui_handler_region, ui_handler_remove_region, NULL, false);
 	WM_event_add_ui_handler(NULL, handlers, ui_handler_region, ui_handler_remove_region, NULL);
 }
 
@@ -8093,7 +8084,7 @@ void UI_add_popup_handlers(bContext *C, ListBase *handlers, uiPopupBlockHandle *
 
 void UI_remove_popup_handlers(ListBase *handlers, uiPopupBlockHandle *popup)
 {
-	WM_event_remove_ui_handler(handlers, ui_handler_popup, ui_handler_remove_popup, popup, FALSE);
+	WM_event_remove_ui_handler(handlers, ui_handler_popup, ui_handler_remove_popup, popup, false);
 }
 
 void UI_remove_popup_handlers_all(bContext *C, ListBase *handlers)

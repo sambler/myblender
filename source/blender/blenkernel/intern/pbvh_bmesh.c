@@ -91,12 +91,9 @@ static void pbvh_bmesh_node_finalize(PBVH *bvh, int node_index)
 
 	n->orig_vb = n->vb;
 
-	/* Build GPU buffers */
-	if (!G.background) {
-		int smooth = bvh->flags & PBVH_DYNTOPO_SMOOTH_SHADING;
-		n->draw_buffers = GPU_build_bmesh_buffers(smooth);
-		n->flag |= PBVH_UpdateDrawBuffers | PBVH_UpdateNormals;
-	}
+	/* Build GPU buffers for new node and update vertex normals */
+	BKE_pbvh_node_mark_rebuild_draw(n);
+	n->flag |= PBVH_UpdateNormals;
 }
 
 /* Recursively split the node if it exceeds the leaf_limit */
@@ -207,7 +204,7 @@ static void pbvh_bmesh_node_split(PBVH *bvh, GHash *prim_bbc, int node_index)
 	n->layer_disp = NULL;
 	
 	if (n->draw_buffers) {
-		GPU_free_buffers(n->draw_buffers);
+		GPU_free_pbvh_buffers(n->draw_buffers);
 		n->draw_buffers = NULL;
 	}
 	n->flag &= ~PBVH_Leaf;
@@ -1496,7 +1493,7 @@ void pbvh_bmesh_verify(PBVH *bvh)
 		}
 		BLI_assert(found);
 
-		#if 1
+#if 1
 		/* total freak stuff, check if node exists somewhere else */
 		/* Slow */
 		for (i = 0; i < bvh->totnode; i++) {
@@ -1505,10 +1502,10 @@ void pbvh_bmesh_verify(PBVH *bvh)
 				BLI_assert(!BLI_gset_haskey(n->bm_unique_verts, v));
 		}
 
-		#endif
+#endif
 	}
 
-	#if 0
+#if 0
 	/* check that every vert belongs somewhere */
 	/* Slow */
 	BM_ITER_MESH (vi, &iter, bvh->bm, BM_VERTS_OF_MESH) {
@@ -1524,7 +1521,7 @@ void pbvh_bmesh_verify(PBVH *bvh)
 
 	/* if totvert differs from number of verts inside the hash. hash-totvert is checked above  */
 	BLI_assert(vert_count == bvh->bm->totvert);
-	#endif
+#endif
 
 	/* Check that node elements are recorded in the top level */
 	for (i = 0; i < bvh->totnode; i++) {
@@ -1532,11 +1529,11 @@ void pbvh_bmesh_verify(PBVH *bvh)
 		if (n->flag & PBVH_Leaf) {
 			/* Check for duplicate entries */
 			/* Slow */
-			#if 0
+#if 0
 			bli_ghash_duplicate_key_check(n->bm_faces);
 			bli_gset_duplicate_key_check(n->bm_unique_verts);
 			bli_gset_duplicate_key_check(n->bm_other_verts);
-			#endif
+#endif
 
 			GHASH_ITER (gh_iter, n->bm_faces) {
 				BMFace *f = BLI_ghashIterator_getKey(&gh_iter);

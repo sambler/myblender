@@ -330,27 +330,9 @@ static void build_mesh_leaf_node(PBVH *bvh, PBVHNode *node)
 		}
 	}
 
-	if (!G.background) {
-		node->draw_buffers =
-		        GPU_build_mesh_buffers(node->face_vert_indices,
-		                               bvh->faces, bvh->verts,
-		                               node->prim_indices,
-		                               node->totprim);
-	}
-
-	node->flag |= PBVH_UpdateDrawBuffers;
+	BKE_pbvh_node_mark_rebuild_draw(node);
 
 	BLI_ghash_free(map, NULL, NULL);
-}
-
-static void build_grids_leaf_node(PBVH *bvh, PBVHNode *node)
-{
-	if (!G.background) {
-		node->draw_buffers =
-		    GPU_build_grid_buffers(node->prim_indices,
-		                           node->totprim, bvh->grid_hidden, bvh->gridkey.grid_size);
-	}
-	node->flag |= PBVH_UpdateDrawBuffers;
 }
 
 static void update_vb(PBVH *bvh, PBVHNode *node, BBC *prim_bbc,
@@ -379,7 +361,7 @@ static void build_leaf(PBVH *bvh, int node_index, BBC *prim_bbc,
 	if (bvh->faces)
 		build_mesh_leaf_node(bvh, bvh->nodes + node_index);
 	else
-		build_grids_leaf_node(bvh, bvh->nodes + node_index);
+		BKE_pbvh_node_mark_rebuild_draw(bvh->nodes + node_index);
 }
 
 /* Return zero if all primitives in the node can be drawn with the
@@ -604,7 +586,7 @@ void BKE_pbvh_free(PBVH *bvh)
 
 		if (node->flag & PBVH_Leaf) {
 			if (node->draw_buffers)
-				GPU_free_buffers(node->draw_buffers);
+				GPU_free_pbvh_buffers(node->draw_buffers);
 			if (node->vert_indices)
 				MEM_freeN(node->vert_indices);
 			if (node->face_vert_indices)
@@ -936,7 +918,7 @@ static void pbvh_update_normals(PBVH *bvh, PBVHNode **nodes,
 	 *   can only update vertices marked with ME_VERT_PBVH_UPDATE.
 	 */
 
-	#pragma omp parallel for private(n) schedule(static)
+#pragma omp parallel for private(n) schedule(static)
 	for (n = 0; n < totnode; n++) {
 		PBVHNode *node = nodes[n];
 
@@ -965,11 +947,11 @@ static void pbvh_update_normals(PBVH *bvh, PBVHNode **nodes,
 					if (bvh->verts[v].flag & ME_VERT_PBVH_UPDATE) {
 						/* this seems like it could be very slow but profile
 						 * does not show this, so just leave it for now? */
-						#pragma omp atomic
+#pragma omp atomic
 						vnor[v][0] += fn[0];
-						#pragma omp atomic
+#pragma omp atomic
 						vnor[v][1] += fn[1];
-						#pragma omp atomic
+#pragma omp atomic
 						vnor[v][2] += fn[2];
 					}
 				}
@@ -980,7 +962,7 @@ static void pbvh_update_normals(PBVH *bvh, PBVHNode **nodes,
 		}
 	}
 
-	#pragma omp parallel for private(n) schedule(static)
+#pragma omp parallel for private(n) schedule(static)
 	for (n = 0; n < totnode; n++) {
 		PBVHNode *node = nodes[n];
 
@@ -1017,7 +999,7 @@ void pbvh_update_BB_redraw(PBVH *bvh, PBVHNode **nodes, int totnode, int flag)
 	int n;
 
 	/* update BB, redraw flag */
-	#pragma omp parallel for private(n) schedule(static)
+#pragma omp parallel for private(n) schedule(static)
 	for (n = 0; n < totnode; n++) {
 		PBVHNode *node = nodes[n];
 
@@ -1043,25 +1025,25 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 		node = nodes[n];
 
 		if (node->flag & PBVH_RebuildDrawBuffers) {
-			GPU_free_buffers(node->draw_buffers);
+			GPU_free_pbvh_buffers(node->draw_buffers);
 			switch (bvh->type) {
 				case PBVH_GRIDS:
 					node->draw_buffers =
-					    GPU_build_grid_buffers(node->prim_indices,
+						GPU_build_grid_pbvh_buffers(node->prim_indices,
 					                           node->totprim,
 					                           bvh->grid_hidden,
 					                           bvh->gridkey.grid_size);
 					break;
 				case PBVH_FACES:
 					node->draw_buffers =
-					    GPU_build_mesh_buffers(node->face_vert_indices,
+						GPU_build_pbvh_mesh_buffers(node->face_vert_indices,
 					                           bvh->faces, bvh->verts,
 					                           node->prim_indices,
 					                           node->totprim);
 					break;
 				case PBVH_BMESH:
 					node->draw_buffers =
-					    GPU_build_bmesh_buffers(bvh->flags &
+						GPU_build_bmesh_pbvh_buffers(bvh->flags &
 					                            PBVH_DYNTOPO_SMOOTH_SHADING);
 					break;
 			}
@@ -1072,7 +1054,7 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 		if (node->flag & PBVH_UpdateDrawBuffers) {
 			switch (bvh->type) {
 				case PBVH_GRIDS:
-					GPU_update_grid_buffers(node->draw_buffers,
+					GPU_update_grid_pbvh_buffers(node->draw_buffers,
 					                        bvh->grids,
 					                        bvh->grid_flag_mats,
 					                        node->prim_indices,
@@ -1081,7 +1063,7 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 					                        bvh->show_diffuse_color);
 					break;
 				case PBVH_FACES:
-					GPU_update_mesh_buffers(node->draw_buffers,
+					GPU_update_mesh_pbvh_buffers(node->draw_buffers,
 					                        bvh->verts,
 					                        node->vert_indices,
 					                        node->uniq_verts +
@@ -1092,7 +1074,7 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 					                        bvh->show_diffuse_color);
 					break;
 				case PBVH_BMESH:
-					GPU_update_bmesh_buffers(node->draw_buffers,
+					GPU_update_bmesh_pbvh_buffers(node->draw_buffers,
 					                         bvh->bm,
 					                         node->bm_faces,
 					                         node->bm_unique_verts,
@@ -1613,7 +1595,7 @@ void BKE_pbvh_node_draw(PBVHNode *node, void *data_v)
 #endif
 
 	if (!(node->flag & PBVH_FullyHidden)) {
-		GPU_draw_buffers(node->draw_buffers,
+		GPU_draw_pbvh_buffers(node->draw_buffers,
 		                 data->setMaterial,
 		                 data->wireframe);
 	}
@@ -1680,7 +1662,7 @@ static void pbvh_node_check_diffuse_changed(PBVH *bvh, PBVHNode *node)
 	if (!node->draw_buffers)
 		return;
 
-	if (GPU_buffers_diffuse_changed(node->draw_buffers, bvh->show_diffuse_color))
+	if (GPU_pbvh_buffers_diffuse_changed(node->draw_buffers, bvh->show_diffuse_color))
 		node->flag |= PBVH_UpdateDrawBuffers;
 }
 
@@ -1816,7 +1798,7 @@ PBVHProxyNode *BKE_pbvh_node_add_proxy(PBVH *bvh, PBVHNode *node)
 {
 	int index, totverts;
 
-	#pragma omp critical
+#pragma omp critical
 	{
 
 		index = node->proxy_count;
@@ -1837,7 +1819,7 @@ PBVHProxyNode *BKE_pbvh_node_add_proxy(PBVH *bvh, PBVHNode *node)
 
 void BKE_pbvh_node_free_proxies(PBVHNode *node)
 {
-	#pragma omp critical
+#pragma omp critical
 	{
 		int p;
 

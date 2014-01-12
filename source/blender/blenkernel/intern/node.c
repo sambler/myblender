@@ -1204,7 +1204,7 @@ static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool do_
 	}
 	
 	/* node tree will generate its own interface type */
-	ntree->interface_type = NULL;
+	newtree->interface_type = NULL;
 	
 	return newtree;
 }
@@ -1676,14 +1676,19 @@ static void free_localized_node_groups(bNodeTree *ntree)
 {
 	bNode *node;
 	
+	/* Only localized node trees store a copy for each node group tree.
+	 * Each node group tree in a localized node tree can be freed,
+	 * since it is a localized copy itself (no risk of accessing free'd
+	 * data in main, see [#37939]).
+	 */
+	if (!(ntree->flag & NTREE_IS_LOCALIZED))
+		return;
+	
 	for (node = ntree->nodes.first; node; node = node->next) {
 		if (node->type == NODE_GROUP && node->id) {
 			bNodeTree *ngroup = (bNodeTree *)node->id;
-			if (ngroup->flag & NTREE_IS_LOCALIZED) {
-				/* ntree is a localized copy: free it */
-				ntreeFreeTree_ex(ngroup, false);
-				MEM_freeN(ngroup);
-			}
+			ntreeFreeTree_ex(ngroup, false);
+			MEM_freeN(ngroup);
 		}
 	}
 }
@@ -3136,7 +3141,7 @@ void node_type_base(bNodeType *ntype, int type, const char *name, short nclass, 
 	 * created in makesrna, which can not be associated to a bNodeType immediately,
 	 * since bNodeTypes are registered afterward ...
 	 */
-	#define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc) \
+#define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc) \
 		case ID: \
 			BLI_strncpy(ntype->idname, #Category #StructName, sizeof(ntype->idname)); \
 			ntype->ext.srna = RNA_struct_find(#Category #StructName); \
@@ -3145,7 +3150,7 @@ void node_type_base(bNodeType *ntype, int type, const char *name, short nclass, 
 			break;
 	
 	switch (type) {
-	#include "NOD_static_types.h"
+#include "NOD_static_types.h"
 	}
 	
 	/* make sure we have a valid type (everything registered) */
@@ -3494,8 +3499,8 @@ static void registerShaderNodes(void)
 	register_node_type_sh_bsdf_hair();
 	register_node_type_sh_emission();
 	register_node_type_sh_holdout();
-	//register_node_type_sh_volume_transparent();
-	//register_node_type_sh_volume_isotropic();
+	register_node_type_sh_volume_absorption();
+	register_node_type_sh_volume_scatter();
 	register_node_type_sh_subsurface_scattering();
 	register_node_type_sh_mix_shader();
 	register_node_type_sh_add_shader();

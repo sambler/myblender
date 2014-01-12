@@ -430,6 +430,9 @@ if env['OURPLATFORM']=='darwin':
         else:
             env['WITH_BF_OPENMP'] = 0
             print B.bc.OKGREEN + "Disabled OpenMP, not supported by compiler"
+            
+    if env['WITH_BF_CYCLES'] and env['WITH_CYCLES_OPTIMIZED_KERNEL_SSE41']:
+        print B.bc.OKGREEN + 'Using Cycles SSE 4.1 option'
 
     if env['WITH_BF_CYCLES_OSL'] == 1:
         OSX_OSL_LIBPATH = Dir(env.subst(env['BF_OSL_LIBPATH'])).abspath
@@ -486,6 +489,9 @@ if 'blenderplayer' in B.targets:
 
 if 'blendernogame' in B.targets:
     env['WITH_BF_GAMEENGINE'] = False
+
+if not env['WITH_BF_GAMEENGINE']:
+    env['WITH_BF_PLAYER'] = False
 
 # build without elbeem (fluidsim)?
 if env['WITH_BF_FLUID'] == 1:

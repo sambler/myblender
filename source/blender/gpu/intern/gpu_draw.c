@@ -187,7 +187,7 @@ void GPU_render_text(MTFace *tface, int mode,
 		}
 		glPopMatrix();
 
-		IMB_freeImBuf(first_ibuf);
+		BKE_image_release_ibuf(ima, first_ibuf, NULL);
 	}
 }
 
@@ -1766,8 +1766,6 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 		/* setup lamp transform */
 		glPushMatrix();
 		glLoadMatrixf((float *)viewmat);
-		
-		BKE_object_where_is_calc_simul(scene, base->object);
 		
 		if (la->type==LA_SUN) {
 			/* sun lamp */

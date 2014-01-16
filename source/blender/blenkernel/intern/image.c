@@ -137,6 +137,9 @@ static void imagecache_put(Image *image, int index, ImBuf *ibuf)
 	ImageCacheKey key;
 
 	if (image->cache == NULL) {
+		// char cache_name[64];
+		// BLI_snprintf(cache_name, sizeof(cache_name), "Image Datablock %s", image->id.name);
+
 		image->cache = IMB_moviecache_create("Image Datablock Cache", sizeof(ImageCacheKey),
 		                                     imagecache_hashhash, imagecache_hashcmp);
 	}
@@ -292,7 +295,7 @@ static Image *image_alloc(Main *bmain, const char *name, short source, short typ
 {
 	Image *ima;
 
-	ima = BKE_libblock_alloc(&bmain->image, ID_IM, name);
+	ima = BKE_libblock_alloc(bmain, ID_IM, name);
 	if (ima) {
 		ima->ok = IMA_OK;
 
@@ -552,7 +555,7 @@ void BKE_image_merge(Image *dest, Image *source)
 		}
 		BLI_spin_unlock(&image_spin);
 
-		BKE_libblock_free(&G.main->image, source);
+		BKE_libblock_free(G.main, source);
 	}
 }
 
@@ -1007,7 +1010,7 @@ void BKE_image_all_free_anim_ibufs(int cfra)
 	Image *ima;
 
 	for (ima = G.main->image.first; ima; ima = ima->id.next)
-		if (ELEM(ima->source, IMA_SRC_SEQUENCE, IMA_SRC_MOVIE))
+		if (BKE_image_is_animated(ima))
 			BKE_image_free_anim_ibufs(ima, cfra);
 }
 
@@ -2251,7 +2254,7 @@ static void image_tag_frame_recalc(Image *ima, ImageUser *iuser, void *customdat
 {
 	Image *changed_image = customdata;
 
-	if (ima == changed_image && ELEM(ima->source, IMA_SRC_MOVIE, IMA_SRC_SEQUENCE)) {
+	if (ima == changed_image && BKE_image_is_animated(ima)) {
 		iuser->flag |= IMA_NEED_FRAME_RECALC;
 	}
 }
@@ -3099,6 +3102,9 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 				/* always verify entirely, and potentially
 				 * returns pointer to release later */
 				ibuf = image_get_render_result(ima, iuser, lock_r);
+				if (ibuf) {
+					ibuf->userflags |= IB_PERSISTENT;
+				}
 			}
 			else if (ima->type == IMA_TYPE_COMPOSITE) {
 				/* requires lock/unlock, otherwise don't return image */
@@ -3117,6 +3123,7 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 						ibuf = IMB_allocImBuf(256, 256, 32, IB_rect);
 						image_assign_ibuf(ima, ibuf, 0, frame);
 					}
+					ibuf->userflags |= IB_PERSISTENT;
 				}
 			}
 		}
@@ -3543,6 +3550,16 @@ int BKE_image_sequence_guess_offset(Image *image)
 	BLI_strncpy(num, image->name + strlen(head), numlen + 1);
 
 	return atoi(num);
+}
+
+/**
+ * Checks the image buffer changes (not keyframed values)
+ *
+ * to see if we need to call #BKE_image_user_check_frame_calc
+ */
+bool BKE_image_is_animated(Image *image)
+{
+	return ELEM(image->source, IMA_SRC_MOVIE, IMA_SRC_SEQUENCE);
 }
 
 bool BKE_image_is_dirty(Image *image)

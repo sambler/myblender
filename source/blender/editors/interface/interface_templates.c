@@ -2816,6 +2816,12 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 	}
 	dyn_data->items_len = dyn_data->items_shown = -1;
 
+	/* When active item changed since last draw, scroll to it. */
+	if (activei != ui_list->list_last_activei) {
+		ui_list->flag |= UILST_SCROLL_TO_ACTIVE_ITEM;
+		ui_list->list_last_activei = activei;
+	}
+
 	/* Filter list items! (not for compact layout, though) */
 	if (dataptr->data && prop) {
 		int filter_exclude = ui_list->filter_flag & UILST_FLT_EXCLUDE;
@@ -2842,7 +2848,7 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 			RNA_PROP_BEGIN (dataptr, itemptr, prop)
 			{
 				if (!dyn_data->items_filter_flags ||
-					((dyn_data->items_filter_flags[i] & UILST_FLT_ITEM) ^ filter_exclude))
+				    ((dyn_data->items_filter_flags[i] & UILST_FLT_ITEM) ^ filter_exclude))
 				{
 					int ii;
 					if (dyn_data->items_filter_neworder) {
@@ -2919,8 +2925,7 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 					sub = uiLayoutRow(overlap, false);
 
 					but = uiDefButR_prop(subblock, LISTROW, 0, "", 0, 0, UI_UNIT_X * 10, UI_UNIT_Y,
-					                     active_dataptr, activeprop, 0, 0, org_i, 0, 0, NULL);
-					uiButSetDrawFlag(but, UI_BUT_NO_TOOLTIP);
+					                     active_dataptr, activeprop, 0, 0, org_i, 0, 0, "Double click to rename");
 
 					sub = uiLayoutRow(overlap, false);
 

@@ -430,9 +430,6 @@ if env['OURPLATFORM']=='darwin':
         else:
             env['WITH_BF_OPENMP'] = 0
             print B.bc.OKGREEN + "Disabled OpenMP, not supported by compiler"
-            
-    if env['WITH_BF_CYCLES'] and env['WITH_CYCLES_OPTIMIZED_KERNEL_SSE41']:
-        print B.bc.OKGREEN + 'Using Cycles SSE 4.1 option'
 
     if env['WITH_BF_CYCLES_OSL'] == 1:
         OSX_OSL_LIBPATH = Dir(env.subst(env['BF_OSL_LIBPATH'])).abspath
@@ -653,6 +650,27 @@ def data_to_c_simple(FILE_FROM):
 	data_to_c(FILE_FROM, FILE_TO, VAR_NAME)
 
 
+def data_to_c_simple_icon(PATH_FROM):
+
+    # first handle import
+    import sys
+    path = "source/blender/datatoc"
+    if path not in sys.path:
+        sys.path.append(path)
+
+    # convert the pixmaps to a png
+    import datatoc_icon
+
+    filename_only = os.path.basename(PATH_FROM)
+    FILE_TO_PNG = os.path.join(env['DATA_SOURCES'], filename_only + ".png")
+    FILE_TO = FILE_TO_PNG + ".c"
+    argv = [PATH_FROM, FILE_TO_PNG]
+    datatoc_icon.main_ex(argv)
+
+    # then the png to a c file
+    data_to_c_simple(FILE_TO_PNG)
+
+
 if B.targets != ['cudakernels']:
     data_to_c("source/blender/compositor/operations/COM_OpenCLKernels.cl",
               B.root_build_dir + "data_headers/COM_OpenCLKernels.cl.h",
@@ -680,8 +698,12 @@ if B.targets != ['cudakernels']:
     data_to_c_simple("release/datafiles/bmonofont.ttf")
 
     data_to_c_simple("release/datafiles/splash.png")
-    data_to_c_simple("release/datafiles/blender_icons16.png")
-    data_to_c_simple("release/datafiles/blender_icons32.png")
+
+    # data_to_c_simple("release/datafiles/blender_icons16.png")
+    # data_to_c_simple("release/datafiles/blender_icons32.png")
+    data_to_c_simple_icon("release/datafiles/blender_icons16")
+    data_to_c_simple_icon("release/datafiles/blender_icons32")
+
     data_to_c_simple("release/datafiles/prvicons.png")
 
     data_to_c_simple("release/datafiles/brushicons/add.png")

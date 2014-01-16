@@ -549,7 +549,7 @@ static Main *blo_find_main(FileData *fd, const char *filepath, const char *relab
 	m = BKE_main_new();
 	BLI_addtail(mainlist, m);
 	
-	lib = BKE_libblock_alloc(&m->library, ID_LI, "lib");
+	lib = BKE_libblock_alloc(m, ID_LI, "lib");
 	BLI_strncpy(lib->name, filepath, sizeof(lib->name));
 	BLI_strncpy(lib->filepath, name1, sizeof(lib->filepath));
 	
@@ -5024,6 +5024,11 @@ static void direct_link_object(FileData *fd, Object *ob)
 		MEM_freeN(hook);
 	}
 	
+	ob->iuser = newdataadr(fd, ob->iuser);
+	if (ob->type == OB_EMPTY && ob->empty_drawtype == OB_EMPTY_IMAGE && !ob->iuser) {
+		BKE_object_empty_draw_type_set(ob, ob->empty_drawtype);
+	}
+
 	ob->customdata_mask = 0;
 	ob->bb = NULL;
 	ob->derivedDeform = NULL;
@@ -7297,7 +7302,7 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, int flag, ID
 	oldnewmap_clear(fd->datamap);
 	
 	if (wrong_id) {
-		BKE_libblock_free(lb, id);
+		BKE_libblock_free(main, id);
 	}
 	
 	return (bhead);

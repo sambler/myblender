@@ -444,7 +444,7 @@ Mesh *BKE_mesh_add(Main *bmain, const char *name)
 {
 	Mesh *me;
 	
-	me = BKE_libblock_alloc(&bmain->mesh, ID_ME, name);
+	me = BKE_libblock_alloc(bmain, ID_ME, name);
 	
 	me->size[0] = me->size[1] = me->size[2] = 1.0;
 	me->smoothresh = 30;
@@ -647,8 +647,13 @@ bool BKE_mesh_uv_cdlayer_rename_index(Mesh *me, const int poly_index, const int 
 	cdlu = &ldata->layers[loop_index];
 	cdlf = fdata && do_tessface ? &fdata->layers[face_index] : NULL;
 
-	BLI_strncpy(cdlp->name, new_name, sizeof(cdlp->name));
-	CustomData_set_layer_unique_name(pdata, cdlp - pdata->layers);
+	if (cdlp->name != new_name) {
+		/* Mesh validate passes a name from the CD layer as the new name,
+		 * Avoid memcpy from self to self in this case.
+		 */
+		BLI_strncpy(cdlp->name, new_name, sizeof(cdlp->name));
+		CustomData_set_layer_unique_name(pdata, cdlp - pdata->layers);
+	}
 
 	/* Loop until we do have exactly the same name for all layers! */
 	for (i = 1; (strcmp(cdlp->name, cdlu->name) != 0 || (cdlf && strcmp(cdlp->name, cdlf->name) != 0)); i++) {
@@ -1451,7 +1456,7 @@ void BKE_mesh_from_nurbs_displist(Object *ob, ListBase *dispbase, const bool use
 	cu->totcol = 0;
 
 	if (ob->data) {
-		BKE_libblock_free(&bmain->curve, ob->data);
+		BKE_libblock_free(bmain, ob->data);
 	}
 	ob->data = me;
 	ob->type = OB_MESH;
@@ -1997,7 +2002,7 @@ int BKE_mesh_mselect_find(Mesh *me, int index, int type)
 
 	for (i = 0; i < me->totselect; i++) {
 		if ((me->mselect[i].index == index) &&
-			(me->mselect[i].type == type))
+		    (me->mselect[i].type == type))
 		{
 			return i;
 		}

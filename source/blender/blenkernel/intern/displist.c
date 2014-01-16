@@ -1375,7 +1375,7 @@ static void do_makeDispListCurveTypes(Scene *scene, Object *ob, ListBase *dispba
 		ob->curve_cache->path = NULL;
 
 		if (ob->type == OB_FONT) {
-			BKE_vfont_to_curve_nubase(G.main, scene, ob, FO_EDIT, &nubase);
+			BKE_vfont_to_curve_nubase(G.main, ob, FO_EDIT, &nubase);
 		}
 		else {
 			BKE_nurbList_duplicate(&nubase, BKE_curve_nurbs_get(cu));
@@ -1566,8 +1566,13 @@ static void do_makeDispListCurveTypes(Scene *scene, Object *ob, ListBase *dispba
 			curve_to_filledpoly(cu, &nubase, dispbase);
 		}
 
-		if ((cu->flag & CU_PATH) && !forOrco)
-			calc_curvepath(ob, &nubase);
+		if (!forOrco) {
+			if ((cu->flag & CU_PATH) ||
+			    DAG_get_eval_flags_for_object(scene, ob) & DAG_EVAL_NEED_CURVE_PATH)
+			{
+				calc_curvepath(ob, &nubase);
+			}
+		}
 
 		if (!forOrco)
 			curve_calc_modifiers_post(scene, ob, &nubase, dispbase, derivedFinal, forRender, renderResolution);

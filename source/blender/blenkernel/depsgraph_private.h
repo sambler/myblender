@@ -100,6 +100,13 @@ typedef struct DagNode {
 	                                * updated aready.
 	                                */
 	bool scheduled;
+
+	/* Runtime flags mainly used to determine which extra data is to be evaluated
+	 * during object_handle_update(). Such an extra data is what depends on the
+	 * DAG topology, meaning this flags indicates the data evaluation of which
+	 * depends on the node dependencies.
+	 */
+	short eval_flags;
 } DagNode;
 
 typedef struct DagNodeQueueElem {
@@ -120,10 +127,9 @@ typedef struct DagForest {
 	ListBase DagNode;
 	struct GHash *nodeHash;
 	int numNodes;
-	int is_acyclic;
+	bool is_acyclic;
 	int time;  /* for flushing/tagging, compare with node->lasttime */
 } DagForest;
-
 
 // queue operations
 DagNodeQueue *queue_create(int slots);

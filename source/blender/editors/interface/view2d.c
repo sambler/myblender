@@ -404,23 +404,26 @@ static void ui_view2d_curRect_validate_resize(View2D *v2d, int resize, int mask_
 	 * NOTE: in general, it is not expected that the lock-zoom will be used in conjunction with this
 	 */
 	else if (v2d->keepzoom & V2D_LIMITZOOM) {
-		float zoom, fac;
 		
 		/* check if excessive zoom on x-axis */
 		if ((v2d->keepzoom & V2D_LOCKZOOM_X) == 0) {
-			zoom = winx / width;
-			if ((zoom < v2d->minzoom) || (zoom > v2d->maxzoom)) {
-				fac = (zoom < v2d->minzoom) ? (zoom / v2d->minzoom) : (zoom / v2d->maxzoom);
-				width *= fac;
+			const float zoom = winx / width;
+			if (zoom < v2d->minzoom) {
+				width = winx / v2d->minzoom;
+			}
+			else if (zoom > v2d->maxzoom) {
+				width = winx / v2d->maxzoom;
 			}
 		}
 		
 		/* check if excessive zoom on y-axis */
 		if ((v2d->keepzoom & V2D_LOCKZOOM_Y) == 0) {
-			zoom = winy / height;
-			if ((zoom < v2d->minzoom) || (zoom > v2d->maxzoom)) {
-				fac = (zoom < v2d->minzoom) ? (zoom / v2d->minzoom) : (zoom / v2d->maxzoom);
-				height *= fac;
+			const float zoom = winy / height;
+			if (zoom < v2d->minzoom) {
+				height = winy / v2d->minzoom;
+			}
+			else if (zoom > v2d->maxzoom) {
+				height = winy / v2d->maxzoom;
 			}
 		}
 	}
@@ -1016,8 +1019,9 @@ static void view2d_map_cur_using_mask(View2D *v2d, rctf *curmasked)
 void UI_view2d_view_ortho(View2D *v2d)
 {
 	rctf curmasked;
-	int sizex = BLI_rcti_size_x(&v2d->mask);
-	int sizey = BLI_rcti_size_y(&v2d->mask);
+	const int sizex = BLI_rcti_size_x(&v2d->mask);
+	const int sizey = BLI_rcti_size_y(&v2d->mask);
+	const float eps = 0.001f;
 	float xofs = 0.0f, yofs = 0.0f;
 	
 	/* pixel offsets (-GLA_PIXEL_OFS) are needed to get 1:1 correspondence with pixels for smooth UI drawing,
@@ -1026,9 +1030,9 @@ void UI_view2d_view_ortho(View2D *v2d)
 	/* XXX brecht: instead of zero at least use a tiny offset, otherwise
 	 * pixel rounding is effectively random due to float inaccuracy */
 	if (sizex > 0)
-		xofs = 0.001f * BLI_rctf_size_x(&v2d->cur) / BLI_rcti_size_x(&v2d->mask);
+		xofs = eps * BLI_rctf_size_x(&v2d->cur) / sizex;
 	if (sizey > 0)
-		yofs = 0.001f * BLI_rctf_size_y(&v2d->cur) / BLI_rcti_size_y(&v2d->mask);
+		yofs = eps * BLI_rctf_size_y(&v2d->cur) / sizey;
 	
 	/* apply mask-based adjustments to cur rect (due to scrollers), to eliminate scaling artifacts */
 	view2d_map_cur_using_mask(v2d, &curmasked);
@@ -1037,12 +1041,12 @@ void UI_view2d_view_ortho(View2D *v2d)
 	
 	/* XXX ton: this flag set by outliner, for icons */
 	if (v2d->flag & V2D_PIXELOFS_X) {
-		curmasked.xmin = floorf(curmasked.xmin) - (0.001f + xofs);
-		curmasked.xmax = floorf(curmasked.xmax) - (0.001f + xofs);
+		curmasked.xmin = floorf(curmasked.xmin) - (eps + xofs);
+		curmasked.xmax = floorf(curmasked.xmax) - (eps + xofs);
 	}
 	if (v2d->flag & V2D_PIXELOFS_Y) {
-		curmasked.ymin = floorf(curmasked.ymin) - (0.001f + yofs);
-		curmasked.ymax = floorf(curmasked.ymax) - (0.001f + yofs);
+		curmasked.ymin = floorf(curmasked.ymin) - (eps + yofs);
+		curmasked.ymax = floorf(curmasked.ymax) - (eps + yofs);
 	}
 	
 	/* set matrix on all appropriate axes */
@@ -1656,8 +1660,8 @@ void UI_view2d_scrollers_draw(const bContext *C, View2D *v2d, View2DScrollers *v
 		 *		and only the time-grids with their zoomability can do so)
 		 */
 		if ((v2d->keepzoom & V2D_LOCKZOOM_X) == 0 &&
-			(v2d->scroll & V2D_SCROLL_SCALE_HORIZONTAL) &&
-			(BLI_rcti_size_x(&slider) > V2D_SCROLLER_HANDLE_SIZE))
+		    (v2d->scroll & V2D_SCROLL_SCALE_HORIZONTAL) &&
+		    (BLI_rcti_size_x(&slider) > V2D_SCROLLER_HANDLE_SIZE))
 		{
 			state |= UI_SCROLL_ARROWS;
 		}
@@ -1768,8 +1772,8 @@ void UI_view2d_scrollers_draw(const bContext *C, View2D *v2d, View2DScrollers *v
 		 *		and only the time-grids with their zoomability can do so)
 		 */
 		if ((v2d->keepzoom & V2D_LOCKZOOM_Y) == 0 &&
-			(v2d->scroll & V2D_SCROLL_SCALE_VERTICAL) &&
-			(BLI_rcti_size_y(&slider) > V2D_SCROLLER_HANDLE_SIZE))
+		    (v2d->scroll & V2D_SCROLL_SCALE_VERTICAL) &&
+		    (BLI_rcti_size_y(&slider) > V2D_SCROLLER_HANDLE_SIZE))
 		{
 			state |= UI_SCROLL_ARROWS;
 		}

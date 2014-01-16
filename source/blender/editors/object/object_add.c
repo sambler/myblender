@@ -734,7 +734,8 @@ static int object_empty_add_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ob = ED_object_add_type(C, OB_EMPTY, loc, rot, FALSE, layer);
-	ob->empty_drawtype = type;
+
+	BKE_object_empty_draw_type_set(ob, type);
 
 	return OPERATOR_FINISHED;
 }
@@ -1046,7 +1047,7 @@ void ED_base_object_free_and_unlink(Main *bmain, Scene *scene, Base *base)
 	DAG_id_type_tag(bmain, ID_OB);
 	BKE_scene_base_unlink(scene, base);
 	object_delete_check_glsl_update(base->object);
-	BKE_libblock_free_us(&bmain->object, base->object);
+	BKE_libblock_free_us(bmain, base->object);
 	if (scene->basact == base) scene->basact = NULL;
 	MEM_freeN(base);
 }
@@ -1415,10 +1416,9 @@ static EnumPropertyItem convert_target_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-static void curvetomesh(Scene *scene, Object *ob) 
+static void curvetomesh(Object *ob) 
 {
-	if (ELEM(NULL, ob->curve_cache, ob->curve_cache->disp.first))
-		BKE_displist_make_curveTypes(scene, ob, 0);  /* force creation */
+	BLI_assert(ob->curve_cache != NULL);
 
 	BKE_mesh_from_nurbs(ob); /* also does users */
 
@@ -1589,7 +1589,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			 *               datablock, but for until we've got granular update
 			 *               lets take care by selves.
 			 */
-			BKE_vfont_to_curve(bmain, scene, newob, FO_EDIT);
+			BKE_vfont_to_curve(bmain, newob, FO_EDIT);
 
 			newob->type = OB_CURVE;
 			cu->type = OB_CURVE;
@@ -1630,7 +1630,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			BKE_curve_curve_dimension_update(cu);
 
 			if (target == OB_MESH) {
-				curvetomesh(scene, newob);
+				curvetomesh(newob);
 
 				/* meshes doesn't use displist */
 				BKE_object_free_curve_cache(newob);
@@ -1652,12 +1652,12 @@ static int convert_exec(bContext *C, wmOperator *op)
 				}
 				else {
 					newob = ob;
-
-					/* meshes doesn't use displist */
-					BKE_object_free_curve_cache(newob);
 				}
 
-				curvetomesh(scene, newob);
+				curvetomesh(newob);
+
+				/* meshes doesn't use displist */
+				BKE_object_free_curve_cache(newob);
 			}
 		}
 		else if (ob->type == OB_MBALL && target == OB_MESH) {
@@ -1671,10 +1671,6 @@ static int convert_exec(bContext *C, wmOperator *op)
 			if (ob != baseob) {
 				/* if motherball is converting it would be marked as done later */
 				ob->flag |= OB_DONE;
-			}
-
-			if (!baseob->curve_cache || !baseob->curve_cache->disp.first) {
-				BKE_displist_make_mball(bmain->eval_ctx, scene, baseob);
 			}
 
 			if (!(baseob->flag & OB_DONE)) {

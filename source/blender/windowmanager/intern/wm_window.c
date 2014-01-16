@@ -306,7 +306,7 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
 		/* if temp screen, delete it after window free (it stops jobs that can access it) */
 		if (screen->temp) {
 			Main *bmain = CTX_data_main(C);
-			BKE_libblock_free(&bmain->screen, screen);
+			BKE_libblock_free(bmain, screen);
 		}
 	}		
 }
@@ -1269,7 +1269,8 @@ void WM_clipboard_text_set(const char *buf, bool selection)
 	if (!G.background) {
 #ifdef _WIN32
 		/* do conversion from \n to \r\n on Windows */
-		char *p, *p2, *newbuf;
+		const char *p;
+		char *p2, *newbuf;
 		int newlen = 0;
 		
 		for (p = buf; *p; p++) {

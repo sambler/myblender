@@ -419,7 +419,7 @@ Scene *BKE_scene_add(Main *bmain, const char *name)
 	int a;
 	const char *colorspace_name;
 
-	sce = BKE_libblock_alloc(&bmain->scene, ID_SCE, name);
+	sce = BKE_libblock_alloc(bmain, ID_SCE, name);
 	sce->lay = sce->layact = 1;
 	
 	sce->r.mode = R_GAMMA | R_OSA | R_SHADOW | R_SSS | R_ENVMAP | R_RAYTRACE;
@@ -733,7 +733,7 @@ void BKE_scene_unlink(Main *bmain, Scene *sce, Scene *newsce)
 		if (sc->scene == sce)
 			sc->scene = newsce;
 
-	BKE_libblock_free(&bmain->scene, sce);
+	BKE_libblock_free(bmain, sce);
 }
 
 /* used by metaballs
@@ -1365,18 +1365,81 @@ static void print_threads_statistics(ThreadedObjectUpdateState *state)
 #endif
 }
 
-static void scene_update_objects(EvaluationContext *eval_ctx, Scene *scene, Scene *scene_parent)
+static bool scene_need_update_objects(Main *bmain)
+{
+	return
+		/* Object datablocks themselves (for OB_RECALC_OB) */
+		DAG_id_type_tagged(bmain, ID_OB) ||
+
+		/* Objects data datablocks (for OB_RECALC_DATA) */
+		DAG_id_type_tagged(bmain, ID_ME)  ||  /* Mesh */
+		DAG_id_type_tagged(bmain, ID_CU)  ||  /* Curve */
+		DAG_id_type_tagged(bmain, ID_MB)  ||  /* MetaBall */
+		DAG_id_type_tagged(bmain, ID_LA)  ||  /* Lamp */
+		DAG_id_type_tagged(bmain, ID_LT)  ||  /* Lattice */
+		DAG_id_type_tagged(bmain, ID_CA)  ||  /* Camera */
+		DAG_id_type_tagged(bmain, ID_KE)  ||  /* KE */
+		DAG_id_type_tagged(bmain, ID_SPK) ||  /* Speaker */
+		DAG_id_type_tagged(bmain, ID_AR);     /* Armature */
+}
+
+static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene *scene, Scene *scene_parent)
 {
 	TaskScheduler *task_scheduler = BLI_task_scheduler_get();
 	TaskPool *task_pool;
 	ThreadedObjectUpdateState state;
+	bool need_singlethread_pass;
+
+	/* Early check for whether we need to invoke all the task-based
+	 * tihngs (spawn new ppol, traverse dependency graph and so on).
+	 *
+	 * Basically if there's no ID datablocks tagged for update which
+	 * corresponds to object->recalc flags (which are checked in
+	 * BKE_object_handle_update() then we do nothing here.
+	 */
+	if (!scene_need_update_objects(bmain)) {
+		/* For debug builds we check whether early return didn't give
+		 * us any regressions in terms of missing updates.
+		 *
+		 * TODO(sergey): Remove once we're sure the check above is correct.
+		 */
+#ifndef NDEBUG
+		Base *base;
+
+		for (base = scene->base.first; base; base = base->next) {
+			Object *object = base->object;
+
+			BLI_assert((object->recalc & OB_RECALC_ALL) == 0);
+
+			if (object->proxy) {
+				BLI_assert((object->proxy->recalc & OB_RECALC_ALL) == 0);
+			}
+
+			if (object->dup_group && (object->transflag & OB_DUPLIGROUP)) {
+				GroupObject *go;
+				for (go = object->dup_group->gobject.first; go; go = go->next) {
+					if (go->ob) {
+						BLI_assert((go->ob->recalc & OB_RECALC_ALL) == 0);
+					}
+				}
+			}
+		}
+#endif
+
+		return;
+	}
 
 	state.eval_ctx = eval_ctx;
 	state.scene = scene;
 	state.scene_parent = scene_parent;
-	memset(state.statistics, 0, sizeof(state.statistics));
-	state.has_updated_objects = false;
-	state.base_time = PIL_check_seconds_timer();
+
+	/* Those are only needed when blender is run with --debug argument. */
+	if (G.debug & G_DEBUG) {
+		memset(state.statistics, 0, sizeof(state.statistics));
+		state.has_updated_objects = false;
+		state.base_time = PIL_check_seconds_timer();
+	}
+
 #ifdef MBALL_SINGLETHREAD_HACK
 	state.has_mballs = false;
 #endif
@@ -1391,11 +1454,28 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Scene *scene, Scen
 		print_threads_statistics(&state);
 	}
 
+	/* We do single thread pass to update all the objects which are in cyclic dependency.
+	 * Such objects can not be handled by a generic DAG traverse and it's really tricky
+	 * to detect whether cycle could be solved or not.
+	 *
+	 * In this situation we simply update all remaining objects in a single thread and
+	 * it'll happen in the same exact order as it was in single-threaded DAG.
+	 *
+	 * We couldn't use threaded update for objects which are in cycle because they might
+	 * access data of each other which is being re-evaluated.
+	 *
+	 * Also, as was explained above, for now we also update all the mballs in single thread.
+	 *
+	 *                                                                   - sergey -
+	 */
+	need_singlethread_pass = DAG_is_acyclic(scene) == false;
 #ifdef MBALL_SINGLETHREAD_HACK
-	if (state.has_mballs) {
+	need_singlethread_pass |= state.has_mballs;
+#endif
+
+	if (need_singlethread_pass) {
 		scene_update_all_bases(eval_ctx, scene, scene_parent);
 	}
-#endif
 }
 
 static void scene_update_tagged_recursive(EvaluationContext *eval_ctx, Main *bmain, Scene *scene, Scene *scene_parent)
@@ -1408,7 +1488,7 @@ static void scene_update_tagged_recursive(EvaluationContext *eval_ctx, Main *bma
 		scene_update_tagged_recursive(eval_ctx, bmain, scene->set, scene_parent);
 
 	/* scene objects */
-	scene_update_objects(eval_ctx, scene, scene_parent);
+	scene_update_objects(eval_ctx, bmain, scene, scene_parent);
 
 	/* scene drivers... */
 	scene_update_drivers(bmain, scene);
@@ -1458,13 +1538,32 @@ void BKE_scene_update_tagged(EvaluationContext *eval_ctx, Main *bmain, Scene *sc
 		if (adt && (adt->recalc & ADT_RECALC_ANIM))
 			BKE_animsys_evaluate_animdata(scene, &scene->id, adt, ctime, 0);
 	}
+
+	/* Extra call here to recalc aterial animation.
+	 *
+	 * Need to do this so changing material settings from the graph/dopesheet
+	 * will update suff in the viewport.
+	 */
+	if (DAG_id_type_tagged(bmain, ID_MA)) {
+		Material *material;
+		float ctime = BKE_scene_frame_get(scene);
+
+		for (material = bmain->mat.first;
+		     material;
+		     material = material->id.next)
+		{
+			AnimData *adt = BKE_animdata_from_id(&material->id);
+			if (adt && (adt->recalc & ADT_RECALC_ANIM))
+				BKE_animsys_evaluate_animdata(scene, &material->id, adt, ctime, 0);
+		}
+	}
 	
 	/* notify editors and python about recalc */
 	BLI_callback_exec(bmain, &scene->id, BLI_CB_EVT_SCENE_UPDATE_POST);
 	DAG_ids_check_recalc(bmain, scene, FALSE);
 
 	/* clear recalc flags */
-	DAG_ids_clear_recalc(bmain);
+	DAG_ids_clear_recalc(bmain, scene);
 }
 
 /* applies changes right away, does all sets too */
@@ -1540,7 +1639,7 @@ void BKE_scene_update_for_newframe(EvaluationContext *eval_ctx, Main *bmain, Sce
 	DAG_ids_check_recalc(bmain, sce, TRUE);
 
 	/* clear recalc flags */
-	DAG_ids_clear_recalc(bmain);
+	DAG_ids_clear_recalc(bmain, sce);
 
 #ifdef DETAILED_ANALYSIS_OUTPUT
 	fprintf(stderr, "frame update start_time %f duration %f\n", start_time, PIL_check_seconds_timer() - start_time);

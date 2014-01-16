@@ -1015,7 +1015,7 @@ static void createTransPose(TransInfo *t, Object *ob)
 
 	if (arm->flag & ARM_RESTPOS) {
 		if (ELEM(t->mode, TFM_DUMMY, TFM_BONESIZE) == 0) {
-			BKE_report(t->reports, RPT_ERROR, "Cannot select linked when sync selection is enabled");
+			BKE_report(t->reports, RPT_ERROR, "Cannot change Pose when 'Rest Position' is enabled");
 			return;
 		}
 	}
@@ -2429,7 +2429,7 @@ void flushTransSeq(TransInfo *t)
 		tdsq = (TransDataSeq *)td->extra;
 		seq = tdsq->seq;
 		old_start = seq->start;
-		new_frame = (int)floor(td2d->loc[0] + 0.5f);
+		new_frame = iroundf(td2d->loc[0]);
 
 		switch (tdsq->sel_flag) {
 			case SELECT:
@@ -2441,7 +2441,7 @@ void flushTransSeq(TransInfo *t)
 					seq->start = new_frame - tdsq->start_offset;
 #endif
 				if (seq->depth == 0) {
-					seq->machine = (int)floor(td2d->loc[1] + 0.5f);
+					seq->machine = iroundf(td2d->loc[1]);
 					CLAMP(seq->machine, 1, MAXSEQ);
 				}
 				break;
@@ -3390,7 +3390,7 @@ void flushTransIntFrameActionData(TransInfo *t)
 
 	/* flush data! */
 	for (i = 0; i < t->total; i++, tfd++) {
-		*(tfd->sdata) = (int)floor(tfd->val + 0.5f);
+		*(tfd->sdata) = iroundf(tfd->val);
 	}
 }
 
@@ -4905,9 +4905,12 @@ static void set_trans_object_base_flags(TransInfo *t)
 	/* makes sure base flags and object flags are identical */
 	BKE_scene_base_flag_to_objects(t->scene);
 
+	/* Make sure depsgraph is here. */
+	DAG_scene_relations_update(G.main, t->scene);
+
 	/* handle pending update events, otherwise they got copied below */
 	for (base = scene->base.first; base; base = base->next) {
-		if (base->object->recalc) {
+		if (base->object->recalc & OB_RECALC_ALL) {
 			/* TODO(sergey): Ideally, it's not needed. */
 			BKE_object_handle_update(G.main->eval_ctx, t->scene, base->object);
 		}
@@ -4943,13 +4946,11 @@ static void set_trans_object_base_flags(TransInfo *t)
 					base->flag |= BA_WAS_SEL;
 				}
 			}
-			/* used for flush, depgraph will change recalcs if needed :) */
-			ob->recalc |= OB_RECALC_OB;
+			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 		}
 	}
 
 	/* all recalc flags get flushed to all layers, so a layer flip later on works fine */
-	DAG_scene_relations_update(G.main, t->scene);
 	DAG_scene_flush_update(G.main, t->scene, -1, 0);
 
 	/* and we store them temporal in base (only used for transform code) */
@@ -5018,8 +5019,7 @@ static int count_proportional_objects(TransInfo *t)
 		    (BASE_EDITABLE_BGMODE(v3d, scene, base)))
 		{
 
-			/* used for flush, depgraph will change recalcs if needed :) */
-			ob->recalc |= OB_RECALC_OB;
+			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 
 			total += 1;
 		}
@@ -5833,7 +5833,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 			/* pointcache refresh */
 			if (BKE_ptcache_object_reset(t->scene, ob, PTCACHE_RESET_OUTDATED))
-				ob->recalc |= OB_RECALC_DATA;
+				DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 			/* Needed for proper updating of "quick cached" dynamics. */
 			/* Creates troubles for moving animated objects without */

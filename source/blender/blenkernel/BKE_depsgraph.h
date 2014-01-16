@@ -60,6 +60,15 @@ typedef struct EvaluationContext {
 	                     keep at false if update shall happen for the viewport. */
 } EvaluationContext;
 
+/* DagNode->eval_flags */
+enum {
+	/* Regardless to curve->path animation flag path is to be evaluated anyway,
+	 * to meet dependencies with such a things as curve modifier and other guys
+	 * who're using curve deform, where_on_path and so.
+	 */
+	DAG_EVAL_NEED_CURVE_PATH = 1,
+};
+
 /* Global initialization/deinitialization */
 void DAG_init(void);
 void DAG_exit(void);
@@ -119,7 +128,7 @@ int  DAG_id_type_tagged(struct Main *bmain, short idtype);
 void DAG_scene_flush_update(struct Main *bmain, struct Scene *sce, unsigned int lay, const short do_time);
 void DAG_ids_flush_tagged(struct Main *bmain);
 void DAG_ids_check_recalc(struct Main *bmain, struct Scene *scene, int time);
-void DAG_ids_clear_recalc(struct Main *bmain);
+void DAG_ids_clear_recalc(struct Main *bmain, struct Scene *scene);
 
 /* Armature: sorts the bones according to dependencies between them */
 
@@ -149,6 +158,8 @@ void DAG_print_dependencies(struct Main *bmain, struct Scene *scene, struct Obje
 
 struct Object *DAG_get_node_object(void *node_v);
 const char *DAG_get_node_name(void *node_v);
+short DAG_get_eval_flags_for_object(struct Scene *scene, void *object);
+bool DAG_is_acyclic(struct Scene *scene);
 
 #ifdef __cplusplus
 }

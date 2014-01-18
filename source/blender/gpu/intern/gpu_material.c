@@ -1381,7 +1381,7 @@ void GPU_shadeinput_set(GPUMaterial *mat, Material *ma, GPUShadeInput *shi)
 	GPU_link(mat, "set_rgb", GPU_uniform(&ma->specr), &shi->specrgb);
 	GPU_link(mat, "shade_norm", GPU_builtin(GPU_VIEW_NORMAL), &shi->vn);
 
-	if (ma->mode & MA_TRANSP)
+	if (mat->alpha)
 		GPU_link(mat, "set_value", GPU_uniform(&ma->alpha), &shi->alpha);
 	else
 		GPU_link(mat, "set_value", GPU_uniform(&one), &shi->alpha);
@@ -1412,9 +1412,6 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 		shi->rgb = shi->vcol;
 
 	do_material_tex(shi);
-
-	if ((ma->mode & MA_TRANSP) && (ma->mode & MA_ZTRANSP))
-		GPU_material_enable_alpha(mat);
 
 	if ((mat->scene->gm.flag & GAME_GLSL_NO_LIGHTS) || (ma->mode & MA_SHLESS)) {
 		GPU_link(mat, "set_rgb", shi->rgb, &shr->diff);
@@ -1488,7 +1485,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			GPU_uniform(&world->horr), &shr->combined);
 	}
 
-	if (!((ma->mode & MA_TRANSP) && (ma->mode & MA_ZTRANSP))) {
+	if (!mat->alpha) {
 		if (world && (GPU_link_changed(shr->alpha) || ma->alpha != 1.0f))
 			GPU_link(mat, "shade_world_mix", GPU_uniform(&world->horr),
 				shr->combined, &shr->combined);
@@ -1582,6 +1579,10 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma)
 	/* allocate material */
 	mat = GPU_material_construct_begin(ma);
 	mat->scene = scene;
+
+	/* render pipeline option */
+	if (ma->mode & MA_TRANSP)
+		GPU_material_enable_alpha(mat);
 
 	if (!(scene->gm.flag & GAME_GLSL_NO_NODES) && ma->nodetree && ma->use_nodes) {
 		/* create nodes */
@@ -1778,7 +1779,7 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	la = ob->data;
 	gpu_lamp_from_blender(scene, ob, par, la, lamp);
 
-	if ((la->type==LA_SPOT && (la->mode & LA_SHAD_BUF)) || (la->type==LA_SUN && (la->mode & LA_SHAD_RAY))) {
+	if ((la->type==LA_SPOT && (la->mode & (LA_SHAD_BUF | LA_SHAD_RAY))) || (la->type==LA_SUN && (la->mode & LA_SHAD_RAY))) {
 		/* opengl */
 		lamp->fb = GPU_framebuffer_create();
 		if (!lamp->fb) {

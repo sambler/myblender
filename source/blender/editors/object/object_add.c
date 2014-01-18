@@ -158,14 +158,46 @@ void ED_object_location_from_view(bContext *C, float loc[3])
 	copy_v3_v3(loc, cursor);
 }
 
-void ED_object_rotation_from_view(bContext *C, float rot[3])
+void ED_object_rotation_from_view(bContext *C, float rot[3], const char align_axis)
 {
 	RegionView3D *rv3d = CTX_wm_region_view3d(C);
+
+	BLI_assert(align_axis >= 'X' && align_axis <= 'Z');
+
 	if (rv3d) {
+		const float pi_2 = (float)M_PI / 2.0f;
 		float quat[4];
-		copy_qt_qt(quat, rv3d->viewquat);
-		quat[0] = -quat[0];
-		quat_to_eul(rot, quat);
+
+		switch (align_axis) {
+			case 'X':
+			{
+				float quat_y[4];
+				axis_angle_to_quat(quat_y, rv3d->viewinv[1], -pi_2);
+				mul_qt_qtqt(quat, rv3d->viewquat, quat_y);
+				quat[0] = -quat[0];
+
+				quat_to_eul(rot, quat);
+				break;
+			}
+			case 'Y':
+			{
+				copy_qt_qt(quat, rv3d->viewquat);
+				quat[0] = -quat[0];
+
+				quat_to_eul(rot, quat);
+				rot[0] -= pi_2;
+				break;
+			}
+			case 'Z':
+			{
+				copy_qt_qt(quat, rv3d->viewquat);
+				quat[0] = -quat[0];
+
+				quat_to_eul(rot, quat);
+				break;
+			}
+		}
+
 	}
 	else {
 		zero_v3(rot);
@@ -270,7 +302,8 @@ void ED_object_add_generic_props(wmOperatorType *ot, bool do_editmode)
 	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
-bool ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float loc[3], float rot[3],
+bool ED_object_add_generic_get_opts(bContext *C, wmOperator *op, const char view_align_axis,
+                                    float loc[3], float rot[3],
                                     bool *enter_editmode, unsigned int *layer, bool *is_view_aligned)
 {
 	View3D *v3d = CTX_wm_view3d(C);
@@ -356,7 +389,7 @@ bool ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float loc[3], f
 		}
 
 		if (*is_view_aligned) {
-			ED_object_rotation_from_view(C, rot);
+			ED_object_rotation_from_view(C, rot, view_align_axis);
 			RNA_float_set_array(op->ptr, "rotation", rot);
 		}
 		else
@@ -420,7 +453,7 @@ static int object_add_exec(bContext *C, wmOperator *op)
 	unsigned int layer;
 	float loc[3], rot[3];
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	ED_object_add_type(C, RNA_enum_get(op->ptr, "type"), loc, rot, enter_editmode, layer);
@@ -459,7 +492,7 @@ static int effector_add_exec(bContext *C, wmOperator *op)
 	float loc[3], rot[3];
 	float mat[4][4];
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	type = RNA_enum_get(op->ptr, "type");
@@ -527,7 +560,7 @@ static int object_camera_add_exec(bContext *C, wmOperator *op)
 	/* force view align for cameras */
 	RNA_boolean_set(op->ptr, "view_align", TRUE);
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	ob = ED_object_add_type(C, OB_CAMERA, loc, rot, FALSE, layer);
@@ -580,7 +613,7 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
 	float dia;
 
 	WM_operator_view3d_unit_defaults(C, op);
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	if (obedit == NULL || obedit->type != OB_MBALL) {
@@ -636,7 +669,7 @@ static int object_add_text_exec(bContext *C, wmOperator *op)
 	unsigned int layer;
 	float loc[3], rot[3];
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	if (obedit && obedit->type == OB_FONT)
@@ -677,7 +710,7 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 	float loc[3], rot[3];
 	bool view_aligned = rv3d && (U.flag & USER_ADD_VIEWALIGNED);
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	if ((obedit == NULL) || (obedit->type != OB_ARMATURE)) {
@@ -730,7 +763,7 @@ static int object_empty_add_exec(bContext *C, wmOperator *op)
 	unsigned int layer;
 	float loc[3], rot[3];
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, NULL, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, NULL, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	ob = ED_object_add_type(C, OB_EMPTY, loc, rot, FALSE, layer);
@@ -798,7 +831,7 @@ static int empty_drop_named_image_invoke(bContext *C, wmOperator *op, const wmEv
 		unsigned int layer;
 		float rot[3];
 
-		if (!ED_object_add_generic_get_opts(C, op, NULL, rot, NULL, &layer, NULL))
+		if (!ED_object_add_generic_get_opts(C, op, 'Z', NULL, rot, NULL, &layer, NULL))
 			return OPERATOR_CANCELLED;
 
 		ob = ED_object_add_type(C, OB_EMPTY, NULL, rot, FALSE, layer);
@@ -831,9 +864,9 @@ void OBJECT_OT_drop_named_image(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	prop = RNA_def_string(ot->srna, "filepath", "", FILE_MAX, "Filepath", "Path to image file");
+	prop = RNA_def_string(ot->srna, "filepath", NULL, FILE_MAX, "Filepath", "Path to image file");
 	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_string(ot->srna, "name", "", MAX_ID_NAME - 2, "Name", "Image name to assign");
+	prop = RNA_def_string(ot->srna, "name", NULL, MAX_ID_NAME - 2, "Name", "Image name to assign");
 	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 	ED_object_add_generic_props(ot, FALSE);
 }
@@ -862,7 +895,7 @@ static int object_lamp_add_exec(bContext *C, wmOperator *op)
 	unsigned int layer;
 	float loc[3], rot[3];
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, NULL, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, NULL, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	ob = ED_object_add_type(C, OB_LAMP, loc, rot, FALSE, layer);
@@ -926,7 +959,7 @@ static int group_instance_add_exec(bContext *C, wmOperator *op)
 	else
 		group = BLI_findlink(&CTX_data_main(C)->group, RNA_enum_get(op->ptr, "group"));
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, NULL, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, NULL, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	if (group) {
@@ -981,7 +1014,7 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
 	float loc[3], rot[3];
 	Scene *scene = CTX_data_scene(C);
 
-	if (!ED_object_add_generic_get_opts(C, op, loc, rot, NULL, &layer, NULL))
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, NULL, &layer, NULL))
 		return OPERATOR_CANCELLED;
 
 	ob = ED_object_add_type(C, OB_SPEAKER, loc, rot, FALSE, layer);
@@ -2191,7 +2224,7 @@ void OBJECT_OT_add_named(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data");
-	RNA_def_string(ot->srna, "name", "Cube", MAX_ID_NAME - 2, "Name", "Object name to add");
+	RNA_def_string(ot->srna, "name", NULL, MAX_ID_NAME - 2, "Name", "Object name to add");
 }
 
 /**************************** Join *************************/

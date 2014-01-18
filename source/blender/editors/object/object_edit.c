@@ -455,7 +455,7 @@ void ED_object_editmode_enter(bContext *C, int flag)
 	ob = base->object;
 
 	/* this checks actual object->data, for cases when other scenes have it in editmode context */
-	if ( BKE_object_is_in_editmode(ob) )
+	if (BKE_object_is_in_editmode(ob))
 		return;
 	
 	if (BKE_object_obdata_is_libdata(ob)) {
@@ -1731,7 +1731,7 @@ void OBJECT_OT_game_property_new(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	RNA_def_enum(ot->srna, "type", gameproperty_type_items, GPROP_FLOAT, "Type", "Type of game property to add");
-	RNA_def_string(ot->srna, "name", "", MAX_NAME, "Name", "Name of the game property to add");
+	RNA_def_string(ot->srna, "name", NULL, MAX_NAME, "Name", "Name of the game property to add");
 }
 
 static int game_property_remove_exec(bContext *C, wmOperator *op)

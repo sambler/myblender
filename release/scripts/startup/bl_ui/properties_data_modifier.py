@@ -160,6 +160,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col = split.column()
         col.prop(md, "frame_start")
         col.prop(md, "frame_duration")
+        col.prop(md, "use_reverse")
 
         col = split.column()
         col.prop(md, "use_random_order")
@@ -582,7 +583,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col = split.column()
         col.prop(md, "wave_alignment", text="Alignment")
         sub = col.column()
-        sub.active = md.wave_alignment > 0
+        sub.active = (md.wave_alignment > 0.0)
         sub.prop(md, "wave_direction", text="Direction")
         sub.prop(md, "damping")
 

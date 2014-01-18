@@ -111,6 +111,9 @@ static void rna_userdef_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Pointe
 /* also used by buffer swap switching */
 static void rna_userdef_dpi_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
+	/* font's are stored at each DPI level, without this we can easy load 100's of fonts */
+	BLF_cache_clear();
+
 	BKE_userdef_state();
 	WM_main_add_notifier(NC_WINDOW, NULL);      /* full redraw */
 	WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);    /* refresh region sizes */
@@ -1595,7 +1598,6 @@ static void rna_def_userdef_theme_space_graph(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	/* space_graph */
-
 	srna = RNA_def_struct(brna, "ThemeGraphEditor", NULL);
 	RNA_def_struct_sdna(srna, "ThemeSpace");
 	RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
@@ -1609,6 +1611,12 @@ static void rna_def_userdef_theme_space_graph(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Grid", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "frame_current", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "cframe");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Current Frame", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
 	prop = RNA_def_property(srna, "window_sliders", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "shade1");
 	RNA_def_property_array(prop, 3);
@@ -1621,28 +1629,16 @@ static void rna_def_userdef_theme_space_graph(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Channels Region", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
-	rna_def_userdef_theme_spaces_vertex(srna);
-	rna_def_userdef_theme_spaces_curves(srna, 0);
-
-	prop = RNA_def_property(srna, "frame_current", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "cframe");
+	prop = RNA_def_property(srna, "dopesheet_channel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "ds_channel");
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Current Frame", "");
+	RNA_def_property_ui_text(prop, "Dope Sheet Channel", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
-	prop = RNA_def_property(srna, "handle_vertex", PROP_FLOAT, PROP_COLOR_GAMMA);
+	
+	prop = RNA_def_property(srna, "dopesheet_subchannel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "ds_subchannel");
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Handle Vertex", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
-	prop = RNA_def_property(srna, "handle_vertex_select", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Handle Vertex Select", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
-	prop = RNA_def_property(srna, "handle_vertex_size", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 0, 255);
-	RNA_def_property_ui_text(prop, "Handle Vertex Size", "");
+	RNA_def_property_ui_text(prop, "Dope Sheet Sub-Channel", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
 	prop = RNA_def_property(srna, "channel_group", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -1657,16 +1653,22 @@ static void rna_def_userdef_theme_space_graph(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Active Channel Group", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
-	prop = RNA_def_property(srna, "dopesheet_channel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "ds_channel");
-	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Dope Sheet Channel", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	rna_def_userdef_theme_spaces_vertex(srna);
+	rna_def_userdef_theme_spaces_curves(srna, 0);
 	
-	prop = RNA_def_property(srna, "dopesheet_subchannel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "ds_subchannel");
+	prop = RNA_def_property(srna, "handle_vertex", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Dope Sheet Sub-Channel", "");
+	RNA_def_property_ui_text(prop, "Handle Vertex", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "handle_vertex_select", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Handle Vertex Select", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "handle_vertex_size", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 0, 255);
+	RNA_def_property_ui_text(prop, "Handle Vertex Size", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
@@ -2390,7 +2392,13 @@ static void rna_def_userdef_theme_space_action(BlenderRNA *brna)
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Grid", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
+	
+	prop = RNA_def_property(srna, "frame_current", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "cframe");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Current Frame", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
 	prop = RNA_def_property(srna, "value_sliders", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "face");
 	RNA_def_property_array(prop, 3);
@@ -2402,7 +2410,21 @@ static void rna_def_userdef_theme_space_action(BlenderRNA *brna)
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "View Sliders", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
+	
+	
+	prop = RNA_def_property(srna, "dopesheet_channel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "ds_channel");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Dope Sheet Channel", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "dopesheet_subchannel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "ds_subchannel");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Dope Sheet Sub-Channel", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	
 	prop = RNA_def_property(srna, "channels", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "shade2");
 	RNA_def_property_array(prop, 3);
@@ -2426,7 +2448,8 @@ static void rna_def_userdef_theme_space_action(BlenderRNA *brna)
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Active Channel Group", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
+	
+	
 	prop = RNA_def_property(srna, "long_key", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "strip");
 	RNA_def_property_array(prop, 3);
@@ -2439,23 +2462,68 @@ static void rna_def_userdef_theme_space_action(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Long Key Selected", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
-	prop = RNA_def_property(srna, "frame_current", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "cframe");
+	
+	
+	prop = RNA_def_property(srna, "keyframe", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_keyframe");
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Current Frame", "");
+	RNA_def_property_ui_text(prop, "Keyframe", "Color of Keyframe");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
-	prop = RNA_def_property(srna, "dopesheet_channel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "ds_channel");
+	prop = RNA_def_property(srna, "keyframe_selected", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_keyframe_select");
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Dope Sheet Channel", "");
+	RNA_def_property_ui_text(prop, "Keyframe Selected", "Color of selected keyframe");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
-	prop = RNA_def_property(srna, "dopesheet_subchannel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "ds_subchannel");
+	prop = RNA_def_property(srna, "keyframe_extreme", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_extreme");
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Dope Sheet Sub-Channel", "");
+	RNA_def_property_ui_text(prop, "Extreme Keyframe", "Color of extreme keyframe");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_extreme_selected", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_extreme_select");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Extreme Keyframe Selected", "Color of selected extreme keyframe");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_breakdown", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_breakdown");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Breakdown Keyframe", "Color of breakdown keyframe");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_breakdown_selected", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_breakdown_select");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Breakdown Keyframe Selected", "Color of selected breakdown keyframe");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_jitter", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_jitter");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Jitter Keyframe", "Color of jitter keyframe");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_jitter_selected", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keytype_jitter_select");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Jitter Keyframe Selected", "Color of selected jitter keyframe");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_border", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keyborder");
+	RNA_def_property_array(prop, 4);
+	RNA_def_property_ui_text(prop, "Keyframe Border", "Color of keyframe border");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_border_selected", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keyborder_select");
+	RNA_def_property_array(prop, 4);
+	RNA_def_property_ui_text(prop, "Keyframe Border Selected", "Color of selected keyframe border");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
 	
 	prop = RNA_def_property(srna, "summary", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "anim_active");
@@ -2470,7 +2538,6 @@ static void rna_def_userdef_theme_space_nla(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	/* space_nla */
-
 	srna = RNA_def_struct(brna, "ThemeNLAEditor", NULL);
 	RNA_def_struct_sdna(srna, "ThemeSpace");
 	RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
@@ -2564,7 +2631,19 @@ static void rna_def_userdef_theme_space_nla(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Tweak Duplicate Flag", 
 	                         "Warning/error indicator color for strips referencing the strip being tweaked");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
+	
+	prop = RNA_def_property(srna, "keyframe_border", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keyborder");
+	RNA_def_property_array(prop, 4);
+	RNA_def_property_ui_text(prop, "Keyframe Border", "Color of keyframe border");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "keyframe_border_selected", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "keyborder_select");
+	RNA_def_property_array(prop, 4);
+	RNA_def_property_ui_text(prop, "Keyframe Border Selected", "Color of selected keyframe border");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
 	prop = RNA_def_property(srna, "frame_current", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "cframe");
 	RNA_def_property_array(prop, 3);

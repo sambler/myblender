@@ -1270,8 +1270,6 @@ static void object_simplify_update(Object *ob)
 
 	for (md = ob->modifiers.first; md; md = md->next) {
 		if (ELEM3(md->type, eModifierType_Subsurf, eModifierType_Multires, eModifierType_ParticleSystem)) {
-			/* TODO(sergey): Figure out what da heck we're using PSYS flag on object.  */
-			ob->recalc |= PSYS_RECALC_CHILD;
 			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 		}
 	}
@@ -5371,7 +5369,7 @@ void RNA_def_scene(BlenderRNA *brna)
 
 	/* Statistics */
 	func = RNA_def_function(srna, "statistics", "ED_info_stats_string");
-	prop = RNA_def_string(func, "statistics", "", 0, "Statistics", "");
+	prop = RNA_def_string(func, "statistics", NULL, 0, "Statistics", "");
 	RNA_def_function_return(func, prop);
 	
 	/* Grease Pencil */

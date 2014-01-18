@@ -249,6 +249,9 @@ typedef struct ThemeSpace {
 	char handle_sel_free[4], handle_sel_auto[4], handle_sel_vect[4], handle_sel_align[4], handle_sel_auto_clamped[4];
 	
 	char ds_channel[4], ds_subchannel[4]; /* dopesheet */
+	char keytype_keyframe[4], keytype_extreme[4], keytype_breakdown[4], keytype_jitter[4]; /* keytypes */
+	char keytype_keyframe_select[4], keytype_extreme_select[4], keytype_breakdown_select[4], keytype_jitter_select[4]; /* keytypes */
+	char keyborder[4],keyborder_select[4];
 	
 	char console_output[4], console_input[4], console_info[4], console_error[4];
 	char console_cursor[4], console_select[4], pad1[4];
@@ -343,6 +346,7 @@ typedef struct bTheme {
 	ThemeUI tui;
 	
 	/* Individual Spacetypes */
+	/* note: ensure UI_THEMESPACE_END is updated when adding */
 	ThemeSpace tbuts;
 	ThemeSpace tv3d;
 	ThemeSpace tfile;
@@ -367,6 +371,9 @@ typedef struct bTheme {
 	
 	int active_theme_area, pad;
 } bTheme;
+
+#define UI_THEMESPACE_START(btheme)  (CHECK_TYPE_INLINE(btheme, bTheme *),  &((btheme)->tbuts))
+#define UI_THEMESPACE_END(btheme)    (CHECK_TYPE_INLINE(btheme, bTheme *), (&((btheme)->tclip) + 1))
 
 /* for the moment only the name. may want to store options with this later */
 typedef struct bAddon {

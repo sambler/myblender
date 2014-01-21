@@ -111,6 +111,7 @@
 #include "GHOST_Path-api.h"
 
 #include "UI_interface.h"
+#include "UI_view2d.h"
 
 #include "GPU_draw.h"
 
@@ -398,6 +399,8 @@ void WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 
 	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
 
+	UI_view2d_zoom_cache_reset();
+
 	/* first try to append data from exotic file formats... */
 	/* it throws error box when file doesn't exist and returns -1 */
 	/* note; it should set some error message somewhere... (ton) */
@@ -543,6 +546,8 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 	BLI_assert((from_memory && custom_file) == 0);
 
 	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
+
+	UI_view2d_zoom_cache_reset();
 
 	G.relbase_valid = 0;
 	if (!from_memory) {
@@ -865,6 +870,9 @@ bool write_crash_blend(void)
 	}
 }
 
+/**
+ * \see #wm_homefile_write_exec wraps #BLO_write_file in a similar way.
+ */
 int wm_file_write(bContext *C, const char *filepath, int fileflags, ReportList *reports)
 {
 	Library *li;
@@ -916,12 +924,11 @@ int wm_file_write(bContext *C, const char *filepath, int fileflags, ReportList *
 		packAll(G.main, reports);
 	}
 
-	ED_object_editmode_load(CTX_data_edit_object(C));
-	ED_sculpt_force_update(C);
-
 	/* don't forget not to return without! */
 	WM_cursor_wait(1);
 	
+	ED_editors_flush_edits(C, false);
+
 	fileflags |= G_FILE_HISTORY; /* write file history */
 
 	/* first time saving */
@@ -976,7 +983,9 @@ int wm_file_write(bContext *C, const char *filepath, int fileflags, ReportList *
 	return 0;
 }
 
-/* operator entry */
+/**
+ * \see #wm_file_write wraps #BLO_write_file in a similar way.
+ */
 int wm_homefile_write_exec(bContext *C, wmOperator *op)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
@@ -994,6 +1003,8 @@ int wm_homefile_write_exec(bContext *C, wmOperator *op)
 	BLI_make_file_string("/", filepath, BLI_get_folder_create(BLENDER_USER_CONFIG, NULL), BLENDER_STARTUP_FILE);
 	printf("trying to save homefile at %s ", filepath);
 	
+	ED_editors_flush_edits(C, false);
+
 	/*  force save as regular blend file */
 	fileflags = G.fileflags & ~(G_FILE_COMPRESS | G_FILE_AUTOPLAY | G_FILE_LOCK | G_FILE_SIGN | G_FILE_HISTORY);
 
@@ -1075,8 +1086,6 @@ void wm_autosave_timer(const bContext *C, wmWindowManager *wm, wmTimer *UNUSED(w
 	wmEventHandler *handler;
 	char filepath[FILE_MAX];
 	
-	Scene *scene = CTX_data_scene(C);
-
 	WM_event_remove_timer(wm, NULL, wm->autosavetimer);
 
 	/* if a modal operator is running, don't autosave, but try again in 10 seconds */
@@ -1089,12 +1098,7 @@ void wm_autosave_timer(const bContext *C, wmWindowManager *wm, wmTimer *UNUSED(w
 		}
 	}
 
-	if (scene) {
-		Object *ob = OBACT;
-
-		if (ob && ob->mode & OB_MODE_SCULPT)
-			multires_force_update(ob);
-	}
+	ED_editors_flush_edits(C, false);
 
 	wm_autosave_location(filepath);
 

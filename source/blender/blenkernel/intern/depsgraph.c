@@ -2088,16 +2088,35 @@ static void dag_current_scene_layers(Main *bmain, ListBase *lb)
 		for (win = wm->windows.first; win; win = win->next) {
 			if (win->screen && win->screen->scene->theDag) {
 				Scene *scene = win->screen->scene;
-				
+				DagSceneLayer *dsl;
+
 				if (scene->id.flag & LIB_DOIT) {
-					DagSceneLayer *dsl = MEM_mallocN(sizeof(DagSceneLayer), "dag scene layer");
-					
+					dsl = MEM_mallocN(sizeof(DagSceneLayer), "dag scene layer");
+
 					BLI_addtail(lb, dsl);
-					
+
 					dsl->scene = scene;
 					dsl->layer = BKE_screen_visible_layers(win->screen, scene);
-					
+
 					scene->id.flag &= ~LIB_DOIT;
+				}
+				else {
+					/* It is possible that multiple windows shares the same scene
+					 * and have different layers visible.
+					 *
+					 * Here we deal with such cases by squashing layers bits from
+					 * multiple windoew to the DagSceneLayer.
+					 *
+					 * TODO(sergey): Such a lookup could be optimized perhaps,
+					 * however should be fine for now since we usually have only
+					 * few open windows.
+					 */
+					for (dsl = lb->first; dsl; dsl = dsl->next) {
+						if (dsl->scene == scene) {
+							dsl->layer |= BKE_screen_visible_layers(win->screen, scene);
+							break;
+						}
+					}
 				}
 			}
 		}
@@ -2940,7 +2959,19 @@ const char *DAG_get_node_name(void *node_v)
 
 short DAG_get_eval_flags_for_object(struct Scene *scene, void *object)
 {
-	DagNode *node = dag_find_node(scene->theDag, object);;
+	DagNode *node;
+
+	if (scene->theDag == NULL) {
+		/* Happens when converting objects to mesh from a python script
+		 * after modifying scene graph.
+		 *
+		 * Currently harmless because it's only called for temporary
+		 * objects which are out of the DAG anyway.
+		 */
+		return 0;
+	}
+
+	node = dag_find_node(scene->theDag, object);;
 
 	if (node) {
 		return node->eval_flags;

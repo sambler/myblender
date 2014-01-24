@@ -96,7 +96,8 @@ void GPU_render_text(MTFace *tface, int mode,
 	if ((mode & GEMAT_TEXT) && (textlen>0) && tface->tpage) {
 		Image* ima = (Image *)tface->tpage;
 		ImBuf *first_ibuf;
-		int index, character;
+		const size_t textlen_st = textlen;
+		size_t index;
 		float centerx, centery, sizex, sizey, transx, transy, movex, movey, advance;
 		float advance_tab;
 		
@@ -127,11 +128,12 @@ void GPU_render_text(MTFace *tface, int mode,
 		advance_tab= advance * 4; /* tab width could also be an option */
 		
 		
-		for (index = 0; index < textlen; index++) {
+		for (index = 0; index < textlen_st; ) {
+			unsigned int character;
 			float uv[4][2];
 
 			// lets calculate offset stuff
-			character = textstr[index];
+			character = BLI_str_utf8_as_unicode_and_size_safe(textstr + index, &index);
 			
 			if (character=='\n') {
 				glTranslatef(line_start, -line_height, 0.0);
@@ -143,6 +145,10 @@ void GPU_render_text(MTFace *tface, int mode,
 				line_start -= advance_tab; /* so we can go back to the start of the line */
 				continue;
 				
+			}
+			else if (character > USHRT_MAX) {
+				/* not much we can do here bmfonts take ushort */
+				character = '?';
 			}
 			
 			// space starts at offset 1

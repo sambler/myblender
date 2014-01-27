@@ -223,28 +223,12 @@ static bool xml_read_enum(ustring *str, ShaderEnum& enm, pugi::xml_node node, co
 
 static void xml_read_film(const XMLReadState& state, pugi::xml_node node)
 {
-	Camera *cam = state.scene->camera;
+	Film *film = state.scene->film;
+	
+	xml_read_float(&film->exposure, node, "exposure");
 
-	xml_read_int(&cam->width, node, "width");
-	xml_read_int(&cam->height, node, "height");
-
-	float aspect = (float)cam->width/(float)cam->height;
-
-	if(cam->width >= cam->height) {
-		cam->viewplane.left = -aspect;
-		cam->viewplane.right = aspect;
-		cam->viewplane.bottom = -1.0f;
-		cam->viewplane.top = 1.0f;
-	}
-	else {
-		cam->viewplane.left = -1.0f;
-		cam->viewplane.right = 1.0f;
-		cam->viewplane.bottom = -1.0f/aspect;
-		cam->viewplane.top = 1.0f/aspect;
-	}
-
-	cam->need_update = true;
-	cam->update();
+	/* ToDo: Filter Type */
+	xml_read_float(&film->filter_width, node, "filter_width");
 }
 
 /* Integrator */
@@ -300,6 +284,24 @@ static void xml_read_integrator(const XMLReadState& state, pugi::xml_node node)
 static void xml_read_camera(const XMLReadState& state, pugi::xml_node node)
 {
 	Camera *cam = state.scene->camera;
+
+	xml_read_int(&cam->width, node, "width");
+	xml_read_int(&cam->height, node, "height");
+
+	float aspect = (float)cam->width/(float)cam->height;
+
+	if(cam->width >= cam->height) {
+		cam->viewplane.left = -aspect;
+		cam->viewplane.right = aspect;
+		cam->viewplane.bottom = -1.0f;
+		cam->viewplane.top = 1.0f;
+	}
+	else {
+		cam->viewplane.left = -1.0f;
+		cam->viewplane.right = 1.0f;
+		cam->viewplane.bottom = -1.0f/aspect;
+		cam->viewplane.top = 1.0f/aspect;
+	}
 
 	if(xml_read_float(&cam->fov, node, "fov"))
 		cam->fov *= M_PI/180.0f;
@@ -376,6 +378,32 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 			env->filename = path_join(state.base, env->filename);
 
 			snode = env;
+		}
+		else if(string_iequals(node.name(), "osl_shader")) {
+			OSLScriptNode *osl = new OSLScriptNode();
+
+			/* Source */
+			xml_read_string(&osl->filepath, node, "src");
+			osl->filepath = path_join(state.base, osl->filepath);
+
+			/* Outputs */
+			string output = "", output_type = "";
+			ShaderSocketType type = SHADER_SOCKET_FLOAT;
+
+			xml_read_string(&output, node, "output");
+			xml_read_string(&output_type, node, "output_type");
+			
+			if(output_type == "float")
+				type = SHADER_SOCKET_FLOAT;
+			else if(output_type == "closure color")
+				type = SHADER_SOCKET_CLOSURE;
+			else if(output_type == "color")
+				type = SHADER_SOCKET_COLOR;
+
+			osl->output_names.push_back(ustring(output));
+			osl->add_output(osl->output_names.back().c_str(), type);
+			
+			snode = osl;
 		}
 		else if(string_iequals(node.name(), "sky_texture")) {
 			SkyTextureNode *sky = new SkyTextureNode();

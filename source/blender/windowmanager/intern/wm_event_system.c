@@ -394,8 +394,8 @@ static int wm_handler_ui_call(bContext *C, wmEventHandler *handler, wmEvent *eve
 	ScrArea *area = CTX_wm_area(C);
 	ARegion *region = CTX_wm_region(C);
 	ARegion *menu = CTX_wm_menu(C);
-	static int do_wheel_ui = TRUE;
-	int is_wheel = ELEM3(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE, MOUSEPAN);
+	static bool do_wheel_ui = true;
+	const bool is_wheel = ELEM3(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE, MOUSEPAN);
 	int retval;
 	
 	/* UI code doesn't handle return values - it just always returns break. 
@@ -405,11 +405,11 @@ static int wm_handler_ui_call(bContext *C, wmEventHandler *handler, wmEvent *eve
 	
 	/* UI is quite aggressive with swallowing events, like scrollwheel */
 	/* I realize this is not extremely nice code... when UI gets keymaps it can be maybe smarter */
-	if (do_wheel_ui == FALSE) {
+	if (do_wheel_ui == false) {
 		if (is_wheel)
 			return WM_HANDLER_CONTINUE;
 		else if (wm_event_always_pass(event) == 0)
-			do_wheel_ui = TRUE;
+			do_wheel_ui = true;
 	}
 	
 	/* we set context to where ui handler came from */
@@ -437,7 +437,7 @@ static int wm_handler_ui_call(bContext *C, wmEventHandler *handler, wmEvent *eve
 	
 	/* event not handled in UI, if wheel then we temporarily disable it */
 	if (is_wheel)
-		do_wheel_ui = FALSE;
+		do_wheel_ui = false;
 	
 	return WM_HANDLER_CONTINUE;
 }
@@ -649,7 +649,7 @@ static bool wm_operator_register_check(wmWindowManager *wm, wmOperatorType *ot)
 	return wm && (wm->op_undo_depth == 0) && (ot->flag & OPTYPE_REGISTER);
 }
 
-static void wm_operator_finished(bContext *C, wmOperator *op, int repeat)
+static void wm_operator_finished(bContext *C, wmOperator *op, const bool repeat)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 
@@ -683,7 +683,7 @@ static void wm_operator_finished(bContext *C, wmOperator *op, int repeat)
 }
 
 /* if repeat is true, it doesn't register again, nor does it free */
-static int wm_operator_exec(bContext *C, wmOperator *op, int repeat)
+static int wm_operator_exec(bContext *C, wmOperator *op, const bool repeat, const bool store)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 	int retval = OPERATOR_CANCELLED;
@@ -714,7 +714,7 @@ static int wm_operator_exec(bContext *C, wmOperator *op, int repeat)
 		wm_operator_reports(C, op, retval, FALSE);
 	
 	if (retval & OPERATOR_FINISHED) {
-		if (repeat) {
+		if (store) {
 			if (wm->op_undo_depth == 0) { /* not called by py script */
 				WM_operator_last_properties_store(op);
 			}
@@ -743,12 +743,21 @@ static int wm_operator_exec_notest(bContext *C, wmOperator *op)
 	return retval;
 }
 
-/* for running operators with frozen context (modal handlers, menus)
+/**
+ * for running operators with frozen context (modal handlers, menus)
+ *
+ * \param store, Store settings for re-use.
  *
  * warning: do not use this within an operator to call its self! [#29537] */
+int WM_operator_call_ex(bContext *C, wmOperator *op,
+                        const bool store)
+{
+	return wm_operator_exec(C, op, false, store);
+}
+
 int WM_operator_call(bContext *C, wmOperator *op)
 {
-	return wm_operator_exec(C, op, 0);
+	return WM_operator_call_ex(C, op, false);
 }
 
 /* this is intended to be used when an invoke operator wants to call exec on its self
@@ -762,7 +771,7 @@ int WM_operator_call_notest(bContext *C, wmOperator *op)
 /* do this operator again, put here so it can share above code */
 int WM_operator_repeat(bContext *C, wmOperator *op)
 {
-	return wm_operator_exec(C, op, 1);
+	return wm_operator_exec(C, op, true, true);
 }
 /* TRUE if WM_operator_repeat can run
  * simple check for now but may become more involved.
@@ -985,7 +994,7 @@ static int wm_operator_invoke(bContext *C, wmOperatorType *ot, wmEvent *event,
 	if (WM_operator_poll(C, ot)) {
 		wmWindowManager *wm = CTX_wm_manager(C);
 		wmOperator *op = wm_operator_create(wm, ot, properties, reports); /* if reports == NULL, they'll be initialized */
-		const short is_nested_call = (wm->op_undo_depth != 0);
+		const bool is_nested_call = (wm->op_undo_depth != 0);
 		
 		op->flag |= OP_IS_INVOKE;
 
@@ -1254,7 +1263,7 @@ int WM_operator_name_call(bContext *C, const char *opstring, short context, Poin
  * - reports can be passed to this function (so python can report them as exceptions)
  */
 int WM_operator_call_py(bContext *C, wmOperatorType *ot, short context,
-                        PointerRNA *properties, ReportList *reports, short is_undo)
+                        PointerRNA *properties, ReportList *reports, const bool is_undo)
 {
 	int retval = OPERATOR_CANCELLED;
 
@@ -1446,7 +1455,7 @@ static int wm_eventmatch(wmEvent *winevent, wmKeyMapItem *kmi)
 
 
 /* operator exists */
-static void wm_event_modalkeymap(const bContext *C, wmOperator *op, wmEvent *event)
+static void wm_event_modalkeymap(const bContext *C, wmOperator *op, wmEvent *event, bool *dbl_click_disabled)
 {
 	/* support for modal keymap in macros */
 	if (op->opm)
@@ -1473,15 +1482,15 @@ static void wm_event_modalkeymap(const bContext *C, wmOperator *op, wmEvent *eve
 		 * handling typically swallows all events (OPERATOR_RUNNING_MODAL).
 		 * This bypass just disables support for double clicks in hardcoded modal handlers */
 		if (event->val == KM_DBL_CLICK) {
-			event->prevval = event->val;
 			event->val = KM_PRESS;
+			*dbl_click_disabled = true;
 		}
 	}
 }
 
 /* bad hacking event system... better restore event type for checking of KM_CLICK for example */
 /* XXX modal maps could use different method (ton) */
-static void wm_event_modalmap_end(wmEvent *event)
+static void wm_event_modalmap_end(wmEvent *event, bool dbl_click_disabled)
 {
 	if (event->type == EVT_MODAL_MAP) {
 		event->type = event->prevtype;
@@ -1489,7 +1498,7 @@ static void wm_event_modalmap_end(wmEvent *event)
 		event->val = event->prevval;
 		event->prevval = 0;
 	}
-	else if (event->prevval == KM_DBL_CLICK)
+	else if (dbl_click_disabled)
 		event->val = KM_DBL_CLICK;
 
 }
@@ -1510,10 +1519,11 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 			wmWindowManager *wm = CTX_wm_manager(C);
 			ScrArea *area = CTX_wm_area(C);
 			ARegion *region = CTX_wm_region(C);
-			
+			bool dbl_click_disabled = false;
+
 			wm_handler_op_context(C, handler);
 			wm_region_mouse_co(C, event);
-			wm_event_modalkeymap(C, op, event);
+			wm_event_modalkeymap(C, op, event, &dbl_click_disabled);
 			
 			if (ot->flag & OPTYPE_UNDO)
 				wm->op_undo_depth++;
@@ -1527,7 +1537,7 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 			 * the event, operator etc have all been freed. - campbell */
 			if (CTX_wm_manager(C) == wm) {
 
-				wm_event_modalmap_end(event);
+				wm_event_modalmap_end(event, dbl_click_disabled);
 
 				if (ot->flag & OPTYPE_UNDO)
 					wm->op_undo_depth--;
@@ -2148,7 +2158,7 @@ void wm_event_do_handlers(bContext *C)
 				int is_playing_sound = sound_scene_playing(win->screen->scene);
 				
 				if (is_playing_sound != -1) {
-					int is_playing_screen;
+					bool is_playing_screen;
 					CTX_wm_window_set(C, win);
 					CTX_wm_screen_set(C, win->screen);
 					CTX_data_scene_set(C, scene);

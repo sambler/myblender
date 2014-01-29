@@ -1209,7 +1209,7 @@ static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool do_
 	return newtree;
 }
 
-bNodeTree *ntreeCopyTree_ex(bNodeTree *ntree, const short do_id_user)
+bNodeTree *ntreeCopyTree_ex(bNodeTree *ntree, const bool do_id_user)
 {
 	return ntreeCopyTree_internal(ntree, G.main, do_id_user, TRUE, TRUE);
 }
@@ -1219,7 +1219,7 @@ bNodeTree *ntreeCopyTree(bNodeTree *ntree)
 }
 
 /* use when duplicating scenes */
-void ntreeSwitchID_ex(bNodeTree *ntree, ID *id_from, ID *id_to, const short do_id_user)
+void ntreeSwitchID_ex(bNodeTree *ntree, ID *id_from, ID *id_to, const bool do_id_user)
 {
 	bNode *node;
 
@@ -1702,7 +1702,7 @@ static void free_localized_node_groups(bNodeTree *ntree)
 }
 
 /* do not free ntree itself here, BKE_libblock_free calls this function too */
-void ntreeFreeTree_ex(bNodeTree *ntree, const short do_id_user)
+void ntreeFreeTree_ex(bNodeTree *ntree, const bool do_id_user)
 {
 	bNodeTree *tntree;
 	bNode *node, *next;
@@ -2289,7 +2289,7 @@ void ntreeInterfaceTypeUpdate(bNodeTree *ntree)
 
 /* ************ find stuff *************** */
 
-int ntreeHasType(bNodeTree *ntree, int type)
+bool ntreeHasType(const bNodeTree *ntree, int type)
 {
 	bNode *node;
 	
@@ -2298,6 +2298,21 @@ int ntreeHasType(bNodeTree *ntree, int type)
 			if (node->type == type)
 				return 1;
 	return 0;
+}
+
+bool ntreeHasTree(const bNodeTree *ntree, const bNodeTree *lookup)
+{
+	bNode *node;
+
+	if (ntree == lookup)
+		return true;
+
+	for (node = ntree->nodes.first; node; node = node->next)
+		if (node->type == NODE_GROUP && node->id)
+			if (ntreeHasTree((bNodeTree *)node->id, lookup))
+				return true;
+
+	return false;
 }
 
 bNodeLink *nodeFindLink(bNodeTree *ntree, bNodeSocket *from, bNodeSocket *to)
@@ -2537,9 +2552,9 @@ void BKE_node_clipboard_clear(void)
 }
 
 /* return FALSE when one or more ID's are lost */
-int BKE_node_clipboard_validate(void)
+bool BKE_node_clipboard_validate(void)
 {
-	int ok = TRUE;
+	bool ok = true;
 
 #ifdef USE_NODE_CB_VALIDATE
 	bNodeClipboardExtraInfo *node_info;
@@ -2570,7 +2585,7 @@ int BKE_node_clipboard_validate(void)
 				node->id = BLI_findstring(lb, node_info->id_name + 2, offsetof(ID, name) + 2);
 
 				if (node->id == NULL) {
-					ok = FALSE;
+					ok = false;
 				}
 			}
 		}

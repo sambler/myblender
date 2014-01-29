@@ -1854,7 +1854,7 @@ static void lattice_draw_verts(Lattice *lt, DispList *dl, BPoint *actbp, short s
 					if (bp->hide == 0) {
 						/* check for active BPoint and ensure selected */
 						if ((bp == actbp) && (bp->f1 & SELECT)) {
-							UI_ThemeColor(TH_LASTSEL_POINT);
+							UI_ThemeColor(TH_ACTIVE_VERT);
 							bglVertex3fv(dl ? co : bp->vec);
 							UI_ThemeColor(color);
 						}
@@ -2948,7 +2948,7 @@ static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMe
 		}
 
 		BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
-			const int is_face_sel = BM_elem_flag_test(efa, BM_ELEM_SELECT);
+			const bool is_face_sel = BM_elem_flag_test_bool(efa, BM_ELEM_SELECT);
 
 			if (is_face_sel || do_moving) {
 				BMIter liter;
@@ -5358,7 +5358,7 @@ static void drawhandlesN_active(Nurb *nu)
 	glLineWidth(1);
 }
 
-static void drawvertsN(Nurb *nu, const char sel, const bool hide_handles, void *lastsel)
+static void drawvertsN(Nurb *nu, const char sel, const bool hide_handles, const void *vert)
 {
 	BezTriple *bezt;
 	BPoint *bp;
@@ -5383,8 +5383,8 @@ static void drawvertsN(Nurb *nu, const char sel, const bool hide_handles, void *
 		a = nu->pntsu;
 		while (a--) {
 			if (bezt->hide == 0) {
-				if (sel == 1 && bezt == lastsel) {
-					UI_ThemeColor(TH_LASTSEL_POINT);
+				if (sel == 1 && bezt == vert) {
+					UI_ThemeColor(TH_ACTIVE_VERT);
 					bglVertex3fv(bezt->vec[1]);
 
 					if (!hide_handles) {
@@ -5411,8 +5411,8 @@ static void drawvertsN(Nurb *nu, const char sel, const bool hide_handles, void *
 		a = nu->pntsu * nu->pntsv;
 		while (a--) {
 			if (bp->hide == 0) {
-				if (bp == lastsel) {
-					UI_ThemeColor(TH_LASTSEL_POINT);
+				if (bp == vert) {
+					UI_ThemeColor(TH_ACTIVE_VERT);
 					bglVertex3fv(bp->vec);
 					UI_ThemeColor(color);
 				}
@@ -5621,6 +5621,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	Curve *cu = ob->data;
 	Nurb *nu;
 	BevList *bl;
+	const void *vert = BKE_curve_vert_active_get(cu);
 	const bool hide_handles = (cu->drawflag & CU_HIDE_HANDLES) != 0;
 	int index;
 	unsigned char wire_col[3];
@@ -5700,7 +5701,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	if (v3d->zbuf) glDepthFunc(GL_ALWAYS);
 	
 	for (nu = nurb; nu; nu = nu->next) {
-		drawvertsN(nu, 1, hide_handles, cu->lastsel);
+		drawvertsN(nu, 1, hide_handles, vert);
 	}
 	
 	if (v3d->zbuf) glDepthFunc(GL_LEQUAL);
@@ -6656,7 +6657,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	int i, selstart, selend, empty_object = 0;
 	short dtx;
 	char  dt;
-	short zbufoff = 0;
+	bool zbufoff = false, is_paint = false;
 	const bool is_obact = (ob == OBACT);
 	const bool render_override = (v3d->flag2 & V3D_RENDER_OVERRIDE) != 0;
 	bool particle_skip_object = false;  /* Draw particles but not their emitter object. */
@@ -6760,28 +6761,22 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				if (dt < OB_SOLID) {
 					zbufoff = 1;
 					dt = OB_SOLID;
+					is_paint = true;
 				}
 
 				if (ob->mode & (OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT)) {
 					dt = OB_PAINT;
+					is_paint = true;
 				}
 
 				glEnable(GL_DEPTH_TEST);
 			}
-			else {
-				if (dt < OB_SOLID) {
-					dt = OB_SOLID;
-					glEnable(GL_DEPTH_TEST);
-					zbufoff = 1;
-				}
-			}
 		}
-		else {
-			/* matcap check - only when not painting color */
-			if ((v3d->flag2 & V3D_SOLID_MATCAP) && (dt == OB_SOLID)) {
-				draw_object_matcap_check(v3d, ob);
-			}
-		}
+	}
+
+	/* matcap check - only when not painting color */
+	if ((v3d->flag2 & V3D_SOLID_MATCAP) && (dt == OB_SOLID) && (is_paint == false)) {
+		draw_object_matcap_check(v3d, ob);
 	}
 
 	/* draw-extra supported for boundbox drawmode too */

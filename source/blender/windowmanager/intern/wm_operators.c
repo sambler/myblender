@@ -1434,7 +1434,7 @@ static void dialog_exec_cb(bContext *C, void *arg1, void *arg2)
 	wmOpPopUp *data = arg1;
 	uiBlock *block = arg2;
 
-	WM_operator_call(C, data->op);
+	WM_operator_call_ex(C, data->op, true);
 
 	/* let execute handle freeing it */
 	//data->free_op = FALSE;
@@ -1548,7 +1548,7 @@ static void wm_operator_ui_popup_ok(struct bContext *C, void *arg, int retval)
 	wmOperator *op = data->op;
 
 	if (op && retval > 0)
-		WM_operator_call(C, op);
+		WM_operator_call_ex(C, op, true);
 	
 	MEM_freeN(data);
 }
@@ -2127,6 +2127,27 @@ static void WM_OT_read_factory_settings(wmOperatorType *ot)
 
 /* *************** open file **************** */
 
+/**
+ * Wrap #WM_file_read, shared by file reading operators.
+ */
+static bool wm_file_read_opwrap(bContext *C, const char *filepath, ReportList *reports,
+                                const bool autoexec_init)
+{
+	bool success;
+
+	/* XXX wm in context is not set correctly after WM_file_read -> crash */
+	/* do it before for now, but is this correct with multiple windows? */
+	WM_event_add_notifier(C, NC_WINDOW, NULL);
+
+	if (autoexec_init) {
+		WM_file_autoexec_init(filepath);
+	}
+
+	success = WM_file_read(C, filepath, reports);
+
+	return success;
+}
+
 /* currently fits in a pointer */
 struct FileRuntime {
 	bool is_untrusted;
@@ -2186,9 +2207,10 @@ static int wm_open_mainfile_invoke(bContext *C, wmOperator *op, const wmEvent *U
 
 static int wm_open_mainfile_exec(bContext *C, wmOperator *op)
 {
-	char path[FILE_MAX];
+	char filepath[FILE_MAX];
+	bool success;
 
-	RNA_string_get(op->ptr, "filepath", path);
+	RNA_string_get(op->ptr, "filepath", filepath);
 
 	/* re-use last loaded setting so we can reload a file without changing */
 	open_set_load_ui(op, false);
@@ -2204,20 +2226,17 @@ static int wm_open_mainfile_exec(bContext *C, wmOperator *op)
 	else
 		G.f &= ~G_SCRIPT_AUTOEXEC;
 	
-	/* XXX wm in context is not set correctly after WM_file_read -> crash */
-	/* do it before for now, but is this correct with multiple windows? */
-	WM_event_add_notifier(C, NC_WINDOW, NULL);
-
-	/* autoexec is already set correctly for invoke() for exec() though we need to initialize */
-	if (!RNA_struct_property_is_set(op->ptr, "use_scripts")) {
-		WM_file_autoexec_init(path);
-	}
-	WM_file_read(C, path, op->reports);
+	success = wm_file_read_opwrap(C, filepath, op->reports, !(G.f & G_SCRIPT_AUTOEXEC));
 
 	/* for file open also popup for warnings, not only errors */
 	BKE_report_print_level_set(op->reports, RPT_WARNING);
 
-	return OPERATOR_FINISHED;
+	if (success) {
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
 }
 
 static bool wm_open_mainfile_check(bContext *UNUSED(C), wmOperator *op)
@@ -2288,6 +2307,38 @@ static void WM_OT_open_mainfile(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "load_ui", 1, "Load UI", "Load user interface setup in the .blend file");
 	RNA_def_boolean(ot->srna, "use_scripts", 1, "Trusted Source",
 	                "Allow .blend file to execute scripts automatically, default available from system preferences");
+}
+
+
+/* *************** revert file **************** */
+
+static int wm_revert_mainfile_exec(bContext *C, wmOperator *op)
+{
+	bool success;
+
+	success = wm_file_read_opwrap(C, G.main->name, op->reports, true);
+
+	if (success) {
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
+}
+
+static int wm_revert_mainfile_poll(bContext *UNUSED(C))
+{
+	return G.relbase_valid;
+}
+
+static void WM_OT_revert_mainfile(wmOperatorType *ot)
+{
+	ot->name = "Revert";
+	ot->idname = "WM_OT_revert_mainfile";
+	ot->description = "Reload the saved file";
+
+	ot->exec = wm_revert_mainfile_exec;
+	ot->poll = wm_revert_mainfile_poll;
 }
 
 /* **************** link/append *************** */
@@ -2498,20 +2549,14 @@ static void WM_OT_link_append(wmOperatorType *ot)
 
 void WM_recover_last_session(bContext *C, ReportList *reports)
 {
-	char filename[FILE_MAX];
+	char filepath[FILE_MAX];
 	
-	BLI_make_file_string("/", filename, BLI_temporary_dir(), BLENDER_QUIT_FILE);
+	BLI_make_file_string("/", filepath, BLI_temporary_dir(), BLENDER_QUIT_FILE);
 	/* if reports==NULL, it's called directly without operator, we add a quick check here */
-	if (reports || BLI_exists(filename)) {
+	if (reports || BLI_exists(filepath)) {
 		G.fileflags |= G_FILE_RECOVER;
 		
-		/* XXX wm in context is not set correctly after WM_file_read -> crash */
-		/* do it before for now, but is this correct with multiple windows? */
-		WM_event_add_notifier(C, NC_WINDOW, NULL);
-		
-		/* load file */
-		WM_file_autoexec_init(filename);
-		WM_file_read(C, filename, reports);
+		wm_file_read_opwrap(C, filepath, reports, true);
 	
 		G.fileflags &= ~G_FILE_RECOVER;
 		
@@ -2545,23 +2590,23 @@ static void WM_OT_recover_last_session(wmOperatorType *ot)
 
 static int wm_recover_auto_save_exec(bContext *C, wmOperator *op)
 {
-	char path[FILE_MAX];
+	char filepath[FILE_MAX];
+	bool success;
 
-	RNA_string_get(op->ptr, "filepath", path);
+	RNA_string_get(op->ptr, "filepath", filepath);
 
 	G.fileflags |= G_FILE_RECOVER;
 
-	/* XXX wm in context is not set correctly after WM_file_read -> crash */
-	/* do it before for now, but is this correct with multiple windows? */
-	WM_event_add_notifier(C, NC_WINDOW, NULL);
-
-	/* load file */
-	WM_file_autoexec_init(path);
-	WM_file_read(C, path, op->reports);
+	success = wm_file_read_opwrap(C, filepath, op->reports, true);
 
 	G.fileflags &= ~G_FILE_RECOVER;
 	
-	return OPERATOR_FINISHED;
+	if (success) {
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
 }
 
 static int wm_recover_auto_save_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
@@ -4354,6 +4399,7 @@ void wm_operatortype_init(void)
 	WM_operatortype_append(WM_OT_window_fullscreen_toggle);
 	WM_operatortype_append(WM_OT_quit_blender);
 	WM_operatortype_append(WM_OT_open_mainfile);
+	WM_operatortype_append(WM_OT_revert_mainfile);
 	WM_operatortype_append(WM_OT_link_append);
 	WM_operatortype_append(WM_OT_recover_last_session);
 	WM_operatortype_append(WM_OT_recover_auto_save);

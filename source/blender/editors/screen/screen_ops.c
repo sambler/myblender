@@ -3046,9 +3046,9 @@ static int header_toggle_menus_exec(bContext *C, wmOperator *UNUSED(op))
 static void SCREEN_OT_header_toggle_menus(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Show/Hide Header Menus";
+	ot->name = "Expand/Collapse Header Menus";
 	ot->idname = "SCREEN_OT_header_toggle_menus";
-	ot->description = "Show or hide the header pulldown menus";
+	ot->description = "Expand or collapse the header pulldown menus";
 	
 	/* api callbacks */
 	ot->exec = header_toggle_menus_exec;
@@ -3069,10 +3069,9 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 	else
 		uiItemO(layout, IFACE_("Flip to Top"), ICON_NONE, "SCREEN_OT_header_flip");
 
-	if (sa->flag & HEADER_NO_PULLDOWN)
-		uiItemO(layout, IFACE_("Show Menus"), ICON_NONE, "SCREEN_OT_header_toggle_menus");
-	else
-		uiItemO(layout, IFACE_("Hide Menus"), ICON_NONE, "SCREEN_OT_header_toggle_menus");
+	uiItemO(layout, IFACE_("Collapse Menus"),
+	        (sa->flag & HEADER_NO_PULLDOWN) ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT,
+	        "SCREEN_OT_header_toggle_menus");
 
 	uiItemS(layout);
 
@@ -3754,7 +3753,7 @@ float ED_region_blend_factor(ARegion *ar)
 }
 
 /* assumes region has running region-blend timer */
-static void region_blend_end(bContext *C, ARegion *ar, int is_running)
+static void region_blend_end(bContext *C, ARegion *ar, const bool is_running)
 {
 	RegionAlphaInfo *rgi = ar->regiontimer->customdata;
 	
@@ -3790,7 +3789,7 @@ void region_blend_start(bContext *C, ScrArea *sa, ARegion *ar)
 	/* end running timer */
 	if (ar->regiontimer) {
 
-		region_blend_end(C, ar, 1);
+		region_blend_end(C, ar, true);
 	}
 	rgi = MEM_callocN(sizeof(RegionAlphaInfo), "RegionAlphaInfo");
 	
@@ -3836,7 +3835,7 @@ static int region_blend_invoke(bContext *C, wmOperator *UNUSED(op), const wmEven
 	
 	/* end timer? */
 	if (rgi->ar->regiontimer->duration > (double)TIMEOUT) {
-		region_blend_end(C, rgi->ar, 0);
+		region_blend_end(C, rgi->ar, false);
 		return (OPERATOR_FINISHED | OPERATOR_PASS_THROUGH);
 	}
 

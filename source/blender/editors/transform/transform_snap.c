@@ -1514,17 +1514,20 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 		BoundBox *bb;
 		float imat[4][4];
 		float timat[3][3]; /* transpose inverse matrix for normals */
-		float ray_start_local[3], ray_normal_local[3], len_diff = TRANSFORM_DIST_MAX_RAY;
+		float ray_start_local[3], ray_normal_local[3], local_scale, len_diff = TRANSFORM_DIST_MAX_RAY;
 
 		invert_m4_m4(imat, obmat);
 		copy_m3_m4(timat, imat);
 		transpose_m3(timat);
-		
+
 		copy_v3_v3(ray_start_local, ray_start);
 		copy_v3_v3(ray_normal_local, ray_normal);
-		
+
 		mul_m4_v3(imat, ray_start_local);
 		mul_mat3_m4_v3(imat, ray_normal_local);
+
+		/* local scale in normal direction */
+		local_scale = normalize_v3(ray_normal_local);
 
 		bb = BKE_object_boundbox_get(ob);
 		if (!BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, &len_diff)) {
@@ -1536,27 +1539,36 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 			{
 				BVHTreeRayHit hit;
 				BVHTreeFromMesh treeData;
-				float ray_org_local[3], local_scale;
 
-				copy_v3_v3(ray_org_local, ray_origin);
-				mul_m4_v3(imat, ray_org_local);
-
-				/* local scale in normal direction */
-				local_scale = len_v3(ray_normal_local);
-				normalize_v3(ray_normal_local);
-
-				/* We pass a temp ray_start, set from object's boundbox, to avoid precision issues with very far
-				 * away ray_start values (as returned in case of ortho view3d), see T38358.
+				/* Only use closer ray_start in case of ortho view! In perspective one, ray_start may already
+				 * been *inside* boundbox, leading to snap failures (see T38409).
 				 */
-				len_diff -= local_scale;  /* make temp start point a bit away from bbox hit point. */
-				madd_v3_v3v3fl(ray_start_local, ray_org_local, ray_normal_local,
-				               len_diff - len_v3v3(ray_start_local, ray_org_local));
+				if (!((RegionView3D *)ar->regiondata)->is_persp) {
+					float ray_org_local[3];
+
+					copy_v3_v3(ray_org_local, ray_origin);
+					mul_m4_v3(imat, ray_org_local);
+
+					/* We pass a temp ray_start, set from object's boundbox, to avoid precision issues with very far
+					 * away ray_start values (as returned in case of ortho view3d), see T38358.
+					 */
+					len_diff -= local_scale;  /* make temp start point a bit away from bbox hit point. */
+					madd_v3_v3v3fl(ray_start_local, ray_org_local, ray_normal_local,
+					               len_diff - len_v3v3(ray_start_local, ray_org_local));
+				}
+				else {
+					len_diff = 0.0f;
+				}
 
 				treeData.em_evil = em;
 				bvhtree_from_mesh_faces(&treeData, dm, 0.0f, 4, 6);
 
 				hit.index = -1;
-				hit.dist = *r_depth * (*r_depth == TRANSFORM_DIST_MAX_RAY ? 1.0f : local_scale);
+				hit.dist = *r_depth;
+				if (hit.dist != TRANSFORM_DIST_MAX_RAY) {
+					hit.dist *= local_scale;
+					hit.dist -= len_diff;
+				}
 
 				if (treeData.tree &&
 					BLI_bvhtree_ray_cast(treeData.tree, ray_start_local, ray_normal_local, 0.0f,

@@ -2073,8 +2073,8 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 	DLRBT_Tree keys;
 	ActKeyColumn *ak;
 	float cfra;
-	short next = RNA_boolean_get(op->ptr, "next");
-	short done = FALSE;
+	const bool next = RNA_boolean_get(op->ptr, "next");
+	bool done = false;
 	
 	/* sanity checks */
 	if (scene == NULL)
@@ -2164,7 +2164,7 @@ static int marker_jump_exec(bContext *C, wmOperator *op)
 	Scene *scene = CTX_data_scene(C);
 	TimeMarker *marker;
 	int closest = CFRA;
-	short next = RNA_boolean_get(op->ptr, "next");
+	const bool next = RNA_boolean_get(op->ptr, "next");
 	bool found = false;
 
 	/* find matching marker in the right direction */
@@ -2516,7 +2516,7 @@ static int area_join_modal(bContext *C, wmOperator *op, const wmEvent *event)
 			if (sa) {
 				if (jd->sa1 != sa) {
 					dir = area_getorientation(jd->sa1, sa);
-					if (dir >= 0) {
+					if (dir != -1) {
 						if (jd->sa2) jd->sa2->flag &= ~AREA_FLAG_DRAWJOINTO;
 						jd->sa2 = sa;
 						jd->sa2->flag |= AREA_FLAG_DRAWJOINTO;
@@ -2527,7 +2527,7 @@ static int area_join_modal(bContext *C, wmOperator *op, const wmEvent *event)
 						 * in this case we can swap areas.
 						 */
 						dir = area_getorientation(sa, jd->sa2);
-						if (dir >= 0) {
+						if (dir != -1) {
 							if (jd->sa1) jd->sa1->flag &= ~AREA_FLAG_DRAWJOINFROM;
 							if (jd->sa2) jd->sa2->flag &= ~AREA_FLAG_DRAWJOINTO;
 							jd->sa1 = jd->sa2;
@@ -2553,13 +2553,13 @@ static int area_join_modal(bContext *C, wmOperator *op, const wmEvent *event)
 						if (jd->sa1) jd->sa1->flag |= AREA_FLAG_DRAWJOINFROM;
 						if (jd->sa2) jd->sa2->flag |= AREA_FLAG_DRAWJOINTO;
 						dir = area_getorientation(jd->sa1, jd->sa2);
-						if (dir < 0) {
+						if (dir == -1) {
 							printf("oops, didn't expect that!\n");
 						}
 					}
 					else {
 						dir = area_getorientation(jd->sa1, sa);
-						if (dir >= 0) {
+						if (dir != -1) {
 							if (jd->sa2) jd->sa2->flag &= ~AREA_FLAG_DRAWJOINTO;
 							jd->sa2 = sa;
 							jd->sa2->flag |= AREA_FLAG_DRAWJOINTO;

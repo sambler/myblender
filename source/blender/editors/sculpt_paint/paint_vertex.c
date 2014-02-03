@@ -280,12 +280,13 @@ static void do_shared_vertex_tesscol(Mesh *me, bool *mfacetag)
 	MEM_freeN(scolmain);
 }
 
-static void do_shared_vertexcol(Mesh *me, bool *mlooptag, bool *mfacetag, int do_tessface)
+static void do_shared_vertexcol(Mesh *me, bool *mlooptag, bool *mfacetag, const bool do_tessface)
 {
 	const int use_face_sel = (me->editflag & ME_EDIT_PAINT_FACE_SEL);
 	MPoly *mp;
 	int (*scol)[4];
-	int i, j, has_shared = 0;
+	int i, j;
+	bool has_shared = false;
 
 	/* if no mloopcol: do not do */
 	/* if mtexpoly: only the involved faces, otherwise all */
@@ -917,11 +918,11 @@ static float calc_vp_strength_col_dl(VPaint *vp, ViewContext *vc, const float co
 	                                   co, co_ss,
 	                                   V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_NEAR) == V3D_PROJ_RET_OK)
 	{
-		const float dist_squared = len_squared_v2v2(mval, co_ss);
+		const float dist_sq = len_squared_v2v2(mval, co_ss);
 
-		if (dist_squared <= brush_size_pressure * brush_size_pressure) {
+		if (dist_sq <= brush_size_pressure * brush_size_pressure) {
 			Brush *brush = BKE_paint_brush(&vp->paint);
-			const float dist = sqrtf(dist_squared);
+			const float dist = sqrtf(dist_sq);
 			float factor;
 
 			if (brush->mtex.tex && rgba) {
@@ -1464,7 +1465,7 @@ static void multipaint_selection(MDeformVert *dvert, const int defbase_tot, floa
 static float redistribute_change(MDeformVert *ndv, const int defbase_tot,
                                  char *change_status, const char change_me, int changeto,
                                  float totchange, float total_valid,
-                                 char do_auto_normalize)
+                                 bool do_auto_normalize)
 {
 	bool changed;
 	float change;
@@ -1523,7 +1524,7 @@ static float get_mp_change(MDeformVert *odv, const int defbase_tot, const bool *
 static void enforce_locks(MDeformVert *odv, MDeformVert *ndv,
                           const int defbase_tot, const bool *defbase_sel,
                           const bool *lock_flags, const bool *vgroup_validmap,
-                          char do_auto_normalize, char do_multipaint)
+                          bool do_auto_normalize, bool do_multipaint)
 {
 	float totchange = 0.0f;
 	float totchange_allowed = 0.0f;
@@ -1697,9 +1698,9 @@ typedef struct WeightPaintInfo {
 	const bool *vgroup_validmap; /* same as WeightPaintData.vgroup_validmap,
 	                              * only added here for convenience */
 
-	char do_flip;
-	char do_multipaint;
-	char do_auto_normalize;
+	bool do_flip;
+	bool do_multipaint;
+	bool do_auto_normalize;
 
 	float brush_alpha_value;  /* result of BKE_brush_alpha_get() */
 } WeightPaintInfo;

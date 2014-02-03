@@ -358,8 +358,8 @@ void BKE_mask_spline_direction_switch(MaskLayer *masklay, MaskSpline *spline)
 float BKE_mask_spline_project_co(MaskSpline *spline, MaskSplinePoint *point,
                                  float start_u, const float co[2], const eMaskSign sign)
 {
-	const float proj_eps         = 1e-3;
-	const float proj_eps_squared = proj_eps * proj_eps;
+	const float proj_eps    = 1e-3;
+	const float proj_eps_sq = proj_eps * proj_eps;
 	const int N = 1000;
 	float u = -1.0f, du = 1.0f / N, u1 = start_u, u2 = start_u;
 	float ang = -1.0f;
@@ -381,7 +381,7 @@ float BKE_mask_spline_project_co(MaskSpline *spline, MaskSplinePoint *point,
 			    ((sign == MASK_PROJ_POS) && (dot_v2v2(v1, n1) >= 0.0f)))
 			{
 
-				if (len_squared_v2(v1) > proj_eps_squared) {
+				if (len_squared_v2(v1) > proj_eps_sq) {
 					ang1 = angle_v2v2(v1, n1);
 					if (ang1 > (float)M_PI / 2.0f)
 						ang1 = (float)M_PI - ang1;
@@ -408,7 +408,7 @@ float BKE_mask_spline_project_co(MaskSpline *spline, MaskSplinePoint *point,
 			    ((sign == MASK_PROJ_POS) && (dot_v2v2(v2, n2) >= 0.0f)))
 			{
 
-				if (len_squared_v2(v2) > proj_eps_squared) {
+				if (len_squared_v2(v2) > proj_eps_sq) {
 					ang2 = angle_v2v2(v2, n2);
 					if (ang2 > (float)M_PI / 2.0f)
 						ang2 = (float)M_PI - ang2;
@@ -434,7 +434,7 @@ float BKE_mask_spline_project_co(MaskSpline *spline, MaskSplinePoint *point,
 
 /* point */
 
-int BKE_mask_point_has_handle(MaskSplinePoint *point)
+bool BKE_mask_point_has_handle(MaskSplinePoint *point)
 {
 	BezTriple *bezt = &point->bezt;
 
@@ -671,7 +671,7 @@ void BKE_mask_point_add_uw(MaskSplinePoint *point, float u, float w)
 	BKE_mask_point_sort_uw(point, &point->uw[point->tot_uw - 1]);
 }
 
-void BKE_mask_point_select_set(MaskSplinePoint *point, const short do_select)
+void BKE_mask_point_select_set(MaskSplinePoint *point, const bool do_select)
 {
 	int i;
 
@@ -692,7 +692,7 @@ void BKE_mask_point_select_set(MaskSplinePoint *point, const short do_select)
 	}
 }
 
-void BKE_mask_point_select_set_handle(MaskSplinePoint *point, const short do_select)
+void BKE_mask_point_select_set_handle(MaskSplinePoint *point, const bool do_select)
 {
 	if (do_select) {
 		MASKPOINT_SEL_HANDLE(point);
@@ -1178,7 +1178,7 @@ static void mask_calc_point_handle(MaskSplinePoint *point, MaskSplinePoint *poin
 		sub_v3_v3v3(v2, bezt->vec[2], bezt->vec[1]);
 		add_v3_v3v3(vec, v1, v2);
 
-		if (len_v3(vec) > 1e-3) {
+		if (len_squared_v3(vec) > (1e-3f * 1e-3f)) {
 			h[0] = vec[1];
 			h[1] = -vec[0];
 			h[2] = 0.0f;
@@ -1298,7 +1298,7 @@ void BKE_mask_calc_handle_adjacent_interp(MaskSpline *spline, MaskSplinePoint *p
  * Useful for giving sane defaults.
  */
 void BKE_mask_calc_handle_point_auto(MaskSpline *spline, MaskSplinePoint *point,
-                                     const short do_recalc_length)
+                                     const bool do_recalc_length)
 {
 	MaskSplinePoint *point_prev, *point_next;
 	const char h_back[2] = {point->bezt.h1, point->bezt.h2};

@@ -1110,23 +1110,23 @@ static LodLevel *lod_level_select(Object *ob, const float cam_loc[3])
 {
 	LodLevel *current = ob->currentlod;
 	float ob_loc[3], delta[3];
-	float distance2;
+	float dist_sq;
 
 	if (!current) return NULL;
 
 	copy_v3_v3(ob_loc, ob->obmat[3]);
 	sub_v3_v3v3(delta, ob_loc, cam_loc);
-	distance2 = len_squared_v3(delta);
+	dist_sq = len_squared_v3(delta);
 
-	if (distance2 < current->distance * current->distance) {
+	if (dist_sq < current->distance * current->distance) {
 		/* check for higher LoD */
-		while (current->prev && distance2 < (current->distance * current->distance)) {
+		while (current->prev && dist_sq < (current->distance * current->distance)) {
 			current = current->prev;
 		}
 	}
 	else {
 		/* check for lower LoD */
-		while (current->next && distance2 > (current->next->distance * current->next->distance)) {
+		while (current->next && dist_sq > (current->next->distance * current->next->distance)) {
 			current = current->next;
 		}
 	}
@@ -2659,23 +2659,23 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
 
 void BKE_object_empty_draw_type_set(Object *ob, const int value)
 {
-    ob->empty_drawtype = value;
+	ob->empty_drawtype = value;
 
-    if (ob->type == OB_EMPTY && ob->empty_drawtype == OB_EMPTY_IMAGE) {
-        if (!ob->iuser) {
-            ob->iuser = MEM_callocN(sizeof(ImageUser), "image user");
-            ob->iuser->ok = 1;
-            ob->iuser->frames = 100;
-            ob->iuser->sfra = 1;
-            ob->iuser->fie_ima = 2;
-        }
-    }
-    else {
-        if (ob->iuser) {
-            MEM_freeN(ob->iuser);
-            ob->iuser = NULL;
-        }
-    }
+	if (ob->type == OB_EMPTY && ob->empty_drawtype == OB_EMPTY_IMAGE) {
+		if (!ob->iuser) {
+			ob->iuser = MEM_callocN(sizeof(ImageUser), "image user");
+			ob->iuser->ok = 1;
+			ob->iuser->frames = 100;
+			ob->iuser->sfra = 1;
+			ob->iuser->fie_ima = 2;
+		}
+	}
+	else {
+		if (ob->iuser) {
+			MEM_freeN(ob->iuser);
+			ob->iuser = NULL;
+		}
+	}
 }
 
 bool BKE_object_minmax_dupli(Scene *scene, Object *ob, float r_min[3], float r_max[3], const bool use_hidden)
@@ -3224,7 +3224,7 @@ void object_delete_ptcache(Object *ob, int index)
 /* shape key utility function */
 
 /************************* Mesh ************************/
-static KeyBlock *insert_meshkey(Scene *scene, Object *ob, const char *name, int from_mix)
+static KeyBlock *insert_meshkey(Scene *scene, Object *ob, const char *name, const bool from_mix)
 {
 	Mesh *me = ob->data;
 	Key *key = me->key;
@@ -3256,7 +3256,7 @@ static KeyBlock *insert_meshkey(Scene *scene, Object *ob, const char *name, int 
 	return kb;
 }
 /************************* Lattice ************************/
-static KeyBlock *insert_lattkey(Scene *scene, Object *ob, const char *name, int from_mix)
+static KeyBlock *insert_lattkey(Scene *scene, Object *ob, const char *name, const bool from_mix)
 {
 	Lattice *lt = ob->data;
 	Key *key = lt->key;
@@ -3294,7 +3294,7 @@ static KeyBlock *insert_lattkey(Scene *scene, Object *ob, const char *name, int 
 	return kb;
 }
 /************************* Curve ************************/
-static KeyBlock *insert_curvekey(Scene *scene, Object *ob, const char *name, int from_mix)
+static KeyBlock *insert_curvekey(Scene *scene, Object *ob, const char *name, const bool from_mix)
 {
 	Curve *cu = ob->data;
 	Key *key = cu->key;
@@ -3334,7 +3334,7 @@ static KeyBlock *insert_curvekey(Scene *scene, Object *ob, const char *name, int
 	return kb;
 }
 
-KeyBlock *BKE_object_insert_shape_key(Scene *scene, Object *ob, const char *name, int from_mix)
+KeyBlock *BKE_object_insert_shape_key(Scene *scene, Object *ob, const char *name, const bool from_mix)
 {	
 	switch (ob->type) {
 		case OB_MESH:

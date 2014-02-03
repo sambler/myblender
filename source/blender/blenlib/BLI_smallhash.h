@@ -39,17 +39,16 @@ typedef struct {
 	void *val;
 } SmallHashEntry;
 
-/*how much stack space to use before dynamically allocating memory*/
-#define SMSTACKSIZE 64
+/* how much stack space to use before dynamically allocating memory.
+ * set to match one of the values in 'hashsizes' to avoid too many mallocs  */
+#define SMSTACKSIZE 131
 typedef struct SmallHash {
-	SmallHashEntry *buckets;
-	SmallHashEntry *buckets_stack;
-	SmallHashEntry *buckets_copy;
-	SmallHashEntry _buckets_stack[SMSTACKSIZE];
-	SmallHashEntry _buckets_copy[SMSTACKSIZE];
 	unsigned int nbuckets;
 	unsigned int nentries;
 	unsigned int cursize;
+
+	SmallHashEntry *buckets;
+	SmallHashEntry  buckets_stack[SMSTACKSIZE];
 } SmallHash;
 
 typedef struct {
@@ -57,6 +56,8 @@ typedef struct {
 	unsigned int i;
 } SmallHashIter;
 
+void    BLI_smallhash_init_ex(SmallHash *sh,
+                              const unsigned int nentries_reserve) ATTR_NONNULL(1);
 void    BLI_smallhash_init(SmallHash *sh) ATTR_NONNULL(1);
 void    BLI_smallhash_release(SmallHash *sh) ATTR_NONNULL(1);
 void    BLI_smallhash_insert(SmallHash *sh, uintptr_t key, void *item) ATTR_NONNULL(1);

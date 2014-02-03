@@ -680,22 +680,22 @@ eRedrawFlag updateSelectedSnapPoint(TransInfo *t)
 
 	if (t->tsnap.status & MULTI_POINTS) {
 		TransSnapPoint *p, *closest_p = NULL;
-		float closest_dist = TRANSFORM_SNAP_MAX_PX;
+		float dist_min_sq = TRANSFORM_SNAP_MAX_PX;
 		const float mval_fl[2] = {t->mval[0], t->mval[1]};
 		float screen_loc[2];
 
 		for (p = t->tsnap.points.first; p; p = p->next) {
-			float dist;
+			float dist_sq;
 
 			if (ED_view3d_project_float_global(t->ar, p->co, screen_loc, V3D_PROJ_TEST_NOP) != V3D_PROJ_RET_OK) {
 				continue;
 			}
 
-			dist = len_squared_v2v2(mval_fl, screen_loc);
+			dist_sq = len_squared_v2v2(mval_fl, screen_loc);
 
-			if (dist < closest_dist) {
+			if (dist_sq < dist_min_sq) {
 				closest_p = p;
-				closest_dist = dist;
+				dist_min_sq = dist_sq;
 			}
 		}
 
@@ -1542,8 +1542,9 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 
 				/* Only use closer ray_start in case of ortho view! In perspective one, ray_start may already
 				 * been *inside* boundbox, leading to snap failures (see T38409).
+				 * Note also ar might be null (see T38435), in this case we assume ray_start is ok!
 				 */
-				if (!((RegionView3D *)ar->regiondata)->is_persp) {
+				if (ar && !((RegionView3D *)ar->regiondata)->is_persp) {
 					float ray_org_local[3];
 
 					copy_v3_v3(ray_org_local, ray_origin);

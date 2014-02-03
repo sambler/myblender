@@ -238,7 +238,7 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
 		if ((tob->flag & TD_SELECTED) == 0) {
 			TransData *td;
 			int i;
-			float dist, vec[3];
+			float dist_sq, vec[3];
 
 			tob->rdist = -1.0f; // signal for next loop
 
@@ -253,9 +253,9 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
 						sub_v3_v3(vec, vec_p);
 					}
 
-					dist = len_squared_v3(vec);
-					if ((tob->rdist == -1.0f) || (dist < (tob->rdist * tob->rdist))) {
-						tob->rdist = sqrtf(dist);
+					dist_sq = len_squared_v3(vec);
+					if ((tob->rdist == -1.0f) || (dist_sq < (tob->rdist * tob->rdist))) {
+						tob->rdist = sqrtf(dist_sq);
 					}
 				}
 				else {
@@ -5110,7 +5110,7 @@ void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob,
 			}
 		}
 		else if (IS_AUTOKEY_FLAG(scene, INSERTNEEDED)) {
-			short do_loc = FALSE, do_rot = FALSE, do_scale = FALSE;
+			bool do_loc = false, do_rot = false, do_scale = false;
 			
 			/* filter the conditions when this happens (assume that curarea->spacetype==SPACE_VIE3D) */
 			if (tmode == TFM_TRANSLATION) {

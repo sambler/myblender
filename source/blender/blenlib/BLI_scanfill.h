@@ -98,7 +98,10 @@ enum {
 
 	/* note: This flag removes checks for overlapping polygons.
 	 * when this flag is set, we'll never get back more faces then (totvert - 2) */
-	BLI_SCANFILL_CALC_HOLES            = (1 << 2)
+	BLI_SCANFILL_CALC_HOLES            = (1 << 2),
+
+	/* checks valid edge users - can skip for simple loops */
+	BLI_SCANFILL_CALC_LOOSE            = (1 << 3),
 };
 void BLI_scanfill_begin(ScanFillContext *sf_ctx);
 unsigned int BLI_scanfill_calc(ScanFillContext *sf_ctx, const int flag);
@@ -108,9 +111,6 @@ void BLI_scanfill_end(ScanFillContext *sf_ctx);
 
 void BLI_scanfill_begin_arena(ScanFillContext *sf_ctx, struct MemArena *arena);
 void BLI_scanfill_end_arena(ScanFillContext *sf_ctx, struct MemArena *arena);
-
-/* These callbacks are needed to make the lib finction properly */
-void BLI_setErrorCallBack(void (*f)(const char *));
 
 #ifdef __cplusplus
 }

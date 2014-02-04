@@ -49,6 +49,12 @@
 typedef struct MemHead {
 	/* Length of allocated memory block. */
 	size_t len;
+#if defined(__x86_64__)
+	/* pad to get sizeof as multiples of 16 to keep alignment
+	 * as the byte after this struct is the ptr used for data
+	 */
+	char pad[8];
+#endif
 } MemHead;
 
 static unsigned int totblock = 0;

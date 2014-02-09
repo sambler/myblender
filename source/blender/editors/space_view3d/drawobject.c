@@ -180,7 +180,7 @@ static void ob_wire_color_blend_theme_id(const unsigned char ob_wire_col[4], con
 }
 
 /* this condition has been made more complex since editmode can draw textures */
-static bool check_object_draw_texture(Scene *scene, View3D *v3d, const char drawtype)
+bool check_object_draw_texture(Scene *scene, View3D *v3d, const char drawtype)
 {
 	/* texture and material draw modes */
 	if (ELEM(v3d->drawtype, OB_TEXTURE, OB_MATERIAL) && drawtype > OB_SOLID) {
@@ -748,7 +748,7 @@ typedef struct ViewCachedString {
 void view3d_cached_text_draw_begin(void)
 {
 	ListBase *strings = &CachedText[CachedTextLevel];
-	strings->first = strings->last = NULL;
+	BLI_listbase_clear(strings);
 	CachedTextLevel++;
 }
 
@@ -4068,7 +4068,7 @@ static bool drawDispList_nobackface(Scene *scene, View3D *v3d, RegionView3D *rv3
 
 			if (BKE_mball_is_basis(ob)) {
 				lb = &ob->curve_cache->disp;
-				if (lb->first == NULL) {
+				if (BLI_listbase_is_empty(lb)) {
 					return true;
 				}
 
@@ -6584,7 +6584,7 @@ static void draw_object_matcap_check(View3D *v3d, Object *ob)
 
 		v3d->defmaterial = MEM_mallocN(sizeof(Material), "matcap material");
 		*(v3d->defmaterial) = defmaterial;
-		v3d->defmaterial->gpumaterial.first = v3d->defmaterial->gpumaterial.last = NULL;
+		BLI_listbase_clear(&v3d->defmaterial->gpumaterial);
 		v3d->defmaterial->preview = NULL;
 	}
 	/* first time users */
@@ -7336,7 +7336,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 			}
 			else if ((dflag & DRAW_CONSTCOLOR) == 0) {
 				/* we don't draw centers for duplicators and sets */
-				if (U.obcenter_dia > 0) {
+				if (U.obcenter_dia > 0 && !(G.f & G_RENDER_OGL)) {
 					/* check > 0 otherwise grease pencil can draw into the circle select which is annoying. */
 					drawcentercircle(v3d, rv3d, ob->obmat[3], do_draw_center, ob->id.lib || ob->id.us > 1);
 				}

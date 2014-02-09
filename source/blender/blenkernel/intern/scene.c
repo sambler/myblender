@@ -51,6 +51,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_sequence_types.h"
+#include "DNA_space_types.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
@@ -717,23 +718,63 @@ Scene *BKE_scene_set_name(Main *bmain, const char *name)
 	return NULL;
 }
 
+static void scene_unlink_space_node(SpaceNode *snode, Scene *sce)
+{
+	if (snode->id == &sce->id) {
+		/* nasty DNA logic for SpaceNode:
+		 * ideally should be handled by editor code, but would be bad level call
+		 */
+		bNodeTreePath *path, *path_next;
+		for (path = snode->treepath.first; path; path = path_next) {
+			path_next = path->next;
+			MEM_freeN(path);
+		}
+		BLI_listbase_clear(&snode->treepath);
+		
+		snode->id = NULL;
+		snode->from = NULL;
+		snode->nodetree = NULL;
+		snode->edittree = NULL;
+	}
+}
+
 void BKE_scene_unlink(Main *bmain, Scene *sce, Scene *newsce)
 {
 	Scene *sce1;
-	bScreen *sc;
+	bScreen *screen;
 
 	/* check all sets */
 	for (sce1 = bmain->scene.first; sce1; sce1 = sce1->id.next)
 		if (sce1->set == sce)
 			sce1->set = NULL;
 	
-	/* check render layer nodes in other scenes */
-	clear_scene_in_nodes(bmain, sce);
+	for (sce1 = bmain->scene.first; sce1; sce1 = sce1->id.next) {
+		bNode *node;
+		
+		if (sce1 == sce || !sce1->nodetree)
+			continue;
+		
+		for (node = sce1->nodetree->nodes.first; node; node = node->next) {
+			if (node->id == &sce->id)
+				node->id = NULL;
+		}
+	}
 	
-	/* al screens */
-	for (sc = bmain->screen.first; sc; sc = sc->id.next)
-		if (sc->scene == sce)
-			sc->scene = newsce;
+	/* all screens */
+	for (screen = bmain->screen.first; screen; screen = screen->id.next) {
+		ScrArea *area;
+		
+		if (screen->scene == sce)
+			screen->scene = newsce;
+		
+		for (area = screen->areabase.first; area; area = area->next) {
+			SpaceLink *space_link;
+			for (space_link = area->spacedata.first; space_link; space_link = space_link->next) {
+				if (space_link->spacetype == SPACE_NODE)
+					scene_unlink_space_node((SpaceNode *)space_link, sce);
+			}
+		}
+	}
 
 	BKE_libblock_free(bmain, sce);
 }
@@ -1666,6 +1707,7 @@ SceneRenderLayer *BKE_scene_add_render_layer(Scene *sce, const char *name)
 	srl->lay = (1 << 20) - 1;
 	srl->layflag = 0x7FFF;   /* solid ztra halo edge strand */
 	srl->passflag = SCE_PASS_COMBINED | SCE_PASS_Z;
+	srl->pass_alpha_threshold = 0.5f;
 	BKE_freestyle_config_init(&srl->freestyleConfig);
 
 	return srl;

@@ -419,12 +419,12 @@ Sequence *find_nearest_seq(Scene *scene, View2D *v2d, int *hand, const int mval[
 }
 
 
-static int seq_is_parent(Sequence *par, Sequence *seq)
+static bool seq_is_parent(Sequence *par, Sequence *seq)
 {
 	return ((par->seq1 == seq) || (par->seq2 == seq) || (par->seq3 == seq));
 }
 
-static int seq_is_predecessor(Sequence *pred, Sequence *seq)
+static bool seq_is_predecessor(Sequence *pred, Sequence *seq)
 {
 	if (!pred) return 0;
 	if (pred == seq) return 0;
@@ -1980,7 +1980,7 @@ static int sequencer_meta_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 
 		Sequence *seq;
 
-		if (ed->metastack.first == NULL)
+		if (BLI_listbase_is_empty(&ed->metastack))
 			return OPERATOR_CANCELLED;
 
 		ms = ed->metastack.last;
@@ -2114,8 +2114,7 @@ static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
 
 	BLI_movelisttolist(ed->seqbasep, &last_seq->seqbase);
 
-	last_seq->seqbase.first = NULL;
-	last_seq->seqbase.last = NULL;
+	BLI_listbase_clear(&last_seq->seqbase);
 
 	BLI_remlink(ed->seqbasep, last_seq);
 	BKE_sequence_free(scene, last_seq);

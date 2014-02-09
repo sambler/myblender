@@ -252,7 +252,7 @@ void ui_bounds_block(uiBlock *block)
 	uiBut *bt;
 	int xof;
 	
-	if (block->buttons.first == NULL) {
+	if (BLI_listbase_is_empty(&block->buttons)) {
 		if (block->panel) {
 			block->rect.xmin = 0.0; block->rect.xmax = block->panel->sizex;
 			block->rect.ymin = 0.0; block->rect.ymax = block->panel->sizey;
@@ -513,7 +513,7 @@ static bool ui_but_equals_old(const uiBut *but, const uiBut *oldbut)
 	 * to catch all cases, but it is simple to add more checks later */
 	if (but->retval != oldbut->retval) return false;
 	if (but->rnapoin.data != oldbut->rnapoin.data) return false;
-	if (but->rnaprop != oldbut->rnaprop && but->rnaindex != oldbut->rnaindex) return false;
+	if (but->rnaprop != oldbut->rnaprop || but->rnaindex != oldbut->rnaindex) return false;
 	if (but->func != oldbut->func) return false;
 	if (but->funcN != oldbut->funcN) return false;
 	if (oldbut->func_arg1 != oldbut && but->func_arg1 != oldbut->func_arg1) return false;
@@ -523,6 +523,27 @@ static bool ui_but_equals_old(const uiBut *but, const uiBut *oldbut)
 	if (but->optype != oldbut->optype) return false;
 
 	return true;
+}
+
+uiBut *ui_but_find_old(uiBlock *block_old, const uiBut *but_new)
+{
+	uiBut *but_old;
+	for (but_old = block_old->buttons.first; but_old; but_old = but_old->next) {
+		if (ui_but_equals_old(but_new, but_old)) {
+			break;
+		}
+	}
+	return but_old;
+}
+uiBut *ui_but_find_new(uiBlock *block_new, const uiBut *but_old)
+{
+	uiBut *but_new;
+	for (but_new = block_new->buttons.first; but_new; but_new = but_new->next) {
+		if (ui_but_equals_old(but_new, but_old)) {
+			break;
+		}
+	}
+	return but_new;
 }
 
 /* oldbut is being inserted in new block, so we use the lines from new button, and replace button pointers */
@@ -557,96 +578,113 @@ static void ui_but_update_linklines(uiBlock *block, uiBut *oldbut, uiBut *newbut
 	}
 }
 
-static int ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBut **butpp)
+/**
+ * \return true when \a but_p is set (only done for active buttons).
+ */
+static bool ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBut **but_p, uiBut **but_old_p)
 {
 	/* flags from the buttons we want to refresh, may want to add more here... */
-	const int flag_copy = UI_BUT_REDALERT;
+	const int flag_copy = UI_BUT_REDALERT | UI_BUT_DRAG_MULTI;
 	const int drawflag_copy = 0;  /* None currently. */
 
-	uiBlock *oldblock;
-	uiBut *oldbut, *but = *butpp;
-	int found = 0;
+	uiBlock *oldblock = block->oldblock;
+	uiBut *oldbut = NULL, *but = *but_p;
+	bool found_active = false;
 
-	oldblock = block->oldblock;
-	if (!oldblock)
-		return found;
 
-	for (oldbut = oldblock->buttons.first; oldbut; oldbut = oldbut->next) {
-		if (ui_but_equals_old(but, oldbut)) {
-			if (oldbut->active) {
 #if 0
-//				but->flag = oldbut->flag;
+	/* simple/stupid - search every time */
+	oldbut = ui_but_find_old(oldblock, but);
+	(void)but_old_p;
 #else
-				/* exception! redalert flag can't be update from old button. 
-				 * perhaps it should only copy specific flags rather than all. */
-//				but->flag = (oldbut->flag & ~UI_BUT_REDALERT) | (but->flag & UI_BUT_REDALERT);
-#endif
-//				but->active = oldbut->active;
-//				but->pos = oldbut->pos;
-//				but->ofs = oldbut->ofs;
-//				but->editstr = oldbut->editstr;
-//				but->editval = oldbut->editval;
-//				but->editvec = oldbut->editvec;
-//				but->editcoba = oldbut->editcoba;
-//				but->editcumap = oldbut->editcumap;
-//				but->selsta = oldbut->selsta;
-//				but->selend = oldbut->selend;
-//				but->softmin = oldbut->softmin;
-//				but->softmax = oldbut->softmax;
-//				but->linkto[0] = oldbut->linkto[0];
-//				but->linkto[1] = oldbut->linkto[1];
-				found = 1;
-//				oldbut->active = NULL;
-			
-				/* move button over from oldblock to new block */
-				BLI_remlink(&oldblock->buttons, oldbut);
-				BLI_insertlinkafter(&block->buttons, but, oldbut);
-				oldbut->block = block;
-				*butpp = oldbut;
-				
-				/* still stuff needs to be copied */
-				oldbut->rect = but->rect;
-				oldbut->context = but->context; /* set by Layout */
+	BLI_assert(*but_old_p == NULL || BLI_findindex(&oldblock->buttons, *but_old_p) != -1);
 
-				/* drawing */
-				oldbut->icon = but->icon;
-				oldbut->iconadd = but->iconadd;
-				oldbut->alignnr = but->alignnr;
-				
-				/* typically the same pointers, but not on undo/redo */
-				/* XXX some menu buttons store button itself in but->poin. Ugly */
-				if (oldbut->poin != (char *)oldbut) {
-					SWAP(char *, oldbut->poin, but->poin);
-					SWAP(void *, oldbut->func_argN, but->func_argN);
-				}
-
-				oldbut->flag = (oldbut->flag & ~flag_copy) | (but->flag & flag_copy);
-				oldbut->drawflag = (oldbut->drawflag & ~drawflag_copy) | (but->drawflag & drawflag_copy);
-
-				/* copy hardmin for list rows to prevent 'sticking' highlight to mouse position
-				 * when scrolling without moving mouse (see [#28432]) */
-				if (ELEM(oldbut->type, ROW, LISTROW))
-					oldbut->hardmax = but->hardmax;
-				
-				ui_but_update_linklines(block, oldbut, but);
-				
-				BLI_remlink(&block->buttons, but);
-				ui_free_but(C, but);
-				
-				/* note: if layout hasn't been applied yet, it uses old button pointers... */
-			}
-			else {
-				/* ensures one button can get activated, and in case the buttons
-				 * draw are the same this gives O(1) lookup for each button */
-				BLI_remlink(&oldblock->buttons, oldbut);
-				ui_free_but(C, oldbut);
-			}
-			
-			break;
-		}
+	/* fastpath - avoid loop-in-loop, calling 'ui_but_find_old'
+	 * as long as old/new buttons are aligned */
+	if (LIKELY(*but_old_p && ui_but_equals_old(but, *but_old_p))) {
+		oldbut = *but_old_p;
 	}
-	
-	return found;
+	else {
+		/* fallback to block search */
+		oldbut = ui_but_find_old(oldblock, but);
+	}
+	(*but_old_p) = oldbut ? oldbut->next : NULL;
+#endif
+
+
+	if (!oldbut) {
+		return found_active;
+	}
+
+	if (oldbut->active) {
+		found_active = true;
+
+#if 0
+		but->flag = oldbut->flag;
+		but->active = oldbut->active;
+		but->pos = oldbut->pos;
+		but->ofs = oldbut->ofs;
+		but->editstr = oldbut->editstr;
+		but->editval = oldbut->editval;
+		but->editvec = oldbut->editvec;
+		but->editcoba = oldbut->editcoba;
+		but->editcumap = oldbut->editcumap;
+		but->selsta = oldbut->selsta;
+		but->selend = oldbut->selend;
+		but->softmin = oldbut->softmin;
+		but->softmax = oldbut->softmax;
+		but->linkto[0] = oldbut->linkto[0];
+		but->linkto[1] = oldbut->linkto[1];
+		oldbut->active = NULL;
+#endif
+
+		/* move button over from oldblock to new block */
+		BLI_remlink(&oldblock->buttons, oldbut);
+		BLI_insertlinkafter(&block->buttons, but, oldbut);
+		oldbut->block = block;
+		*but_p = oldbut;
+
+		/* still stuff needs to be copied */
+		oldbut->rect = but->rect;
+		oldbut->context = but->context; /* set by Layout */
+
+		/* drawing */
+		oldbut->icon = but->icon;
+		oldbut->iconadd = but->iconadd;
+		oldbut->alignnr = but->alignnr;
+
+		/* typically the same pointers, but not on undo/redo */
+		/* XXX some menu buttons store button itself in but->poin. Ugly */
+		if (oldbut->poin != (char *)oldbut) {
+			SWAP(char *, oldbut->poin, but->poin);
+			SWAP(void *, oldbut->func_argN, but->func_argN);
+		}
+
+		oldbut->flag = (oldbut->flag & ~flag_copy) | (but->flag & flag_copy);
+		oldbut->drawflag = (oldbut->drawflag & ~drawflag_copy) | (but->drawflag & drawflag_copy);
+
+		/* copy hardmin for list rows to prevent 'sticking' highlight to mouse position
+		 * when scrolling without moving mouse (see [#28432]) */
+		if (ELEM(oldbut->type, ROW, LISTROW))
+			oldbut->hardmax = but->hardmax;
+
+		ui_but_update_linklines(block, oldbut, but);
+
+		BLI_remlink(&block->buttons, but);
+		ui_free_but(C, but);
+
+		/* note: if layout hasn't been applied yet, it uses old button pointers... */
+	}
+	else {
+		but->flag = (but->flag & ~flag_copy) | (oldbut->flag & flag_copy);
+
+		/* ensures one button can get activated, and in case the buttons
+		 * draw are the same this gives O(1) lookup for each button */
+		BLI_remlink(&oldblock->buttons, oldbut);
+		ui_free_but(C, oldbut);
+	}
+
+	return found_active;
 }
 
 /* needed for temporarily rename buttons, such as in outliner or file-select,
@@ -663,14 +701,12 @@ bool uiButActiveOnly(const bContext *C, ARegion *ar, uiBlock *block, uiBut *but)
 		activate = true;
 	}
 	else {
-		for (oldbut = oldblock->buttons.first; oldbut; oldbut = oldbut->next) {
-			if (ui_but_equals_old(oldbut, but)) {
-				found = true;
-				
-				if (oldbut->active)
-					isactive = true;
-				
-				break;
+		oldbut = ui_but_find_old(oldblock, but);
+		if (oldbut) {
+			found = true;
+
+			if (oldbut->active) {
+				isactive = true;
 			}
 		}
 	}
@@ -689,7 +725,11 @@ bool uiButActiveOnly(const bContext *C, ARegion *ar, uiBlock *block, uiBut *but)
 /* simulate button click */
 void uiButExecute(const bContext *C, uiBut *but)
 {
-	ui_button_execute_do((bContext *)C, CTX_wm_region(C), but);
+	ARegion *ar = CTX_wm_region(C);
+	void *active_back;
+	ui_button_execute_begin((bContext *)C, ar, but, &active_back);
+	/* Value is applied in begin. No further action required. */
+	ui_button_execute_end((bContext *)C, ar, but, active_back);
 }
 
 /* use to check if we need to disable undo, but don't make any changes
@@ -989,16 +1029,26 @@ static void ui_menu_block_set_keymaps(const bContext *C, uiBlock *block)
 
 void uiEndBlock(const bContext *C, uiBlock *block)
 {
+	const bool has_old = (block->oldblock != NULL);
+	/* avoid searches when old/new lists align */
+	uiBut *but_old = has_old ? block->oldblock->buttons.first : NULL;
+
 	uiBut *but;
 	Scene *scene = CTX_data_scene(C);
+
+
+	if (has_old && BLI_listbase_is_empty(&block->oldblock->butstore) == false) {
+		UI_butstore_update(block);
+	}
 
 	/* inherit flags from 'old' buttons that was drawn here previous, based
 	 * on matching buttons, we need this to make button event handling non
 	 * blocking, while still allowing buttons to be remade each redraw as it
 	 * is expected by blender code */
 	for (but = block->buttons.first; but; but = but->next) {
-		if (ui_but_update_from_old_block(C, block, &but))
+		if (has_old && ui_but_update_from_old_block(C, block, &but, &but_old)) {
 			ui_check_but(but);
+		}
 		
 		/* temp? Proper check for graying out */
 		if (but->optype) {
@@ -1524,6 +1574,32 @@ bool ui_is_but_unit(const uiBut *but)
 		if (unit_type != PROP_UNIT_ROTATION) {
 			return false;
 		}
+	}
+
+	return true;
+}
+
+/**
+ * Check if this button is similar enough to be grouped with another.
+ */
+bool ui_is_but_compatible(const uiBut *but_a, const uiBut *but_b)
+{
+	if (but_a->type != but_b->type)
+		return false;
+	if (but_a->pointype != but_b->pointype)
+		return false;
+
+	if (but_a->rnaprop) {
+		if (but_a->rnapoin.type != but_b->rnapoin.type)
+			return false;
+		if (but_a->rnapoin.data != but_b->rnapoin.data)
+			return false;
+		if (but_a->rnapoin.id.data != but_b->rnapoin.id.data)
+			return false;
+		if (RNA_property_type(but_a->rnaprop) != RNA_property_type(but_b->rnaprop))
+			return false;
+		if (RNA_property_subtype(but_a->rnaprop) != RNA_property_subtype(but_b->rnaprop))
+			return false;
 	}
 
 	return true;
@@ -2199,6 +2275,8 @@ static void ui_free_but(const bContext *C, uiBut *but)
 		IMB_freeImBuf((struct ImBuf *)but->poin);
 	}
 
+	BLI_assert(UI_butstore_is_registered(but->block, but) == false);
+
 	MEM_freeN(but);
 }
 
@@ -2206,6 +2284,8 @@ static void ui_free_but(const bContext *C, uiBut *but)
 void uiFreeBlock(const bContext *C, uiBlock *block)
 {
 	uiBut *but;
+
+	UI_butstore_clear(block);
 
 	while ((but = BLI_pophead(&block->buttons))) {
 		ui_free_but(C, but);
@@ -2299,7 +2379,7 @@ uiBlock *uiBeginBlock(const bContext *C, ARegion *region, const char *name, shor
 		 * would slow down redraw, so only lookup for actual transform when it's indeed
 		 * needed
 		 */
-		block->display_device = scn->display_settings.display_device;
+		BLI_strncpy(block->display_device, scn->display_settings.display_device, sizeof(block->display_device));
 
 		/* copy to avoid crash when scene gets deleted with ui still open */
 		block->unit = MEM_mallocN(sizeof(scn->unit), "UI UnitSettings");
@@ -3506,7 +3586,7 @@ void uiBlockFlipOrder(uiBlock *block)
 	}
 	
 	/* also flip order in block itself, for example for arrowkey */
-	lb.first = lb.last = NULL;
+	BLI_listbase_clear(&lb);
 	but = block->buttons.first;
 	while (but) {
 		next = but->next;

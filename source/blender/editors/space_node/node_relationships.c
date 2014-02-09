@@ -78,7 +78,7 @@ static int sort_nodes_locx(void *a, void *b)
 		return 0;
 }
 
-static int socket_is_available(bNodeTree *UNUSED(ntree), bNodeSocket *sock, const bool allow_used)
+static bool socket_is_available(bNodeTree *UNUSED(ntree), bNodeSocket *sock, const bool allow_used)
 {
 	if (nodeSocketIsHidden(sock))
 		return 0;
@@ -274,7 +274,7 @@ static int node_link_viewer(const bContext *C, bNode *tonode)
 	bNodeSocket *sock;
 
 	/* context check */
-	if (tonode == NULL || tonode->outputs.first == NULL)
+	if (tonode == NULL || BLI_listbase_is_empty(&tonode->outputs))
 		return OPERATOR_CANCELLED;
 	if (ELEM(tonode->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER))
 		return OPERATOR_CANCELLED;
@@ -1209,7 +1209,7 @@ static bool ed_node_link_conditions(ScrArea *sa, bool test, SpaceNode **r_snode,
 		return false;
 
 	/* correct node */
-	if (select->inputs.first == NULL || select->outputs.first == NULL)
+	if (BLI_listbase_is_empty(&select->inputs) || BLI_listbase_is_empty(&select->outputs))
 		return false;
 
 	/* test node for links */

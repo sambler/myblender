@@ -1262,7 +1262,7 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 			Main *bmain = CTX_data_main(C);
 
 			/* special case, 2.4x files */
-			if (wm == NULL && CTX_data_main(C)->wm.first == NULL) {
+			if (wm == NULL && BLI_listbase_is_empty(&bmain->wm)) {
 				extern void wm_add_default(bContext *C);
 
 				/* wm_add_default() needs the screen to be set. */
@@ -1378,7 +1378,7 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 #undef PY_ENABLE_AUTO
 #undef PY_DISABLE_AUTO
 	
-	BLI_argsAdd(ba, 1, "-b", "--background", "<file>\n\tLoad <file> in background (often used for UI-less rendering)", background_mode, NULL);
+	BLI_argsAdd(ba, 1, "-b", "--background", "\n\tRun in background (often used for UI-less rendering)", background_mode, NULL);
 
 	BLI_argsAdd(ba, 1, "-a", NULL, playback_doc, playback_mode, NULL);
 

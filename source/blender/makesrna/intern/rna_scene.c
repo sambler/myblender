@@ -2271,6 +2271,12 @@ void rna_def_render_layer_common(StructRNA *srna, int scene)
 		RNA_def_property_ui_text(prop, "Samples", "Override number of render samples for this render layer, "
 		                                          "0 will use the scene setting");
 		RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
+
+		prop = RNA_def_property(srna, "pass_alpha_threshold", PROP_FLOAT, PROP_FACTOR);
+		RNA_def_property_ui_text(prop, "Alpha Threshold", "Z, Index, normal, UV and vector passes are"
+		                               "only affected by surfaces with alpha transparency equal to"
+									   "or higher than this threshold");
+		RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 	}
 
 	/* layer options */
@@ -4146,6 +4152,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "resolution_x", PROP_INT, PROP_PIXEL);
 	RNA_def_property_int_sdna(prop, NULL, "xsch");
+	RNA_def_property_flag(prop, PROP_PROPORTIONAL);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 4, 65536);
 	RNA_def_property_ui_text(prop, "Resolution X", "Number of horizontal pixels in the rendered image");
@@ -4153,6 +4160,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "resolution_y", PROP_INT, PROP_PIXEL);
 	RNA_def_property_int_sdna(prop, NULL, "ysch");
+	RNA_def_property_flag(prop, PROP_PROPORTIONAL);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 4, 65536);
 	RNA_def_property_ui_text(prop, "Resolution Y", "Number of vertical pixels in the rendered image");
@@ -4182,6 +4190,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "pixel_aspect_x", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "xasp");
+	RNA_def_property_flag(prop, PROP_PROPORTIONAL);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1.0f, 200.0f);
 	RNA_def_property_ui_text(prop, "Pixel Aspect X",
@@ -4190,6 +4199,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "pixel_aspect_y", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "yasp");
+	RNA_def_property_flag(prop, PROP_PROPORTIONAL);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1.0f, 200.0f);
 	RNA_def_property_ui_text(prop, "Pixel Aspect Y",

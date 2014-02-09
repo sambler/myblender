@@ -34,6 +34,8 @@
  *  \since June 2001
  */
 
+#include "BLI_compiler_attrs.h"
+
 struct Lattice;
 struct Main;
 struct Object;
@@ -50,15 +52,11 @@ void BKE_lattice_make_local(struct Lattice *lt);
 void calc_lat_fudu(int flag, int res, float *r_fu, float *r_du);
 
 struct LatticeDeformData;
-struct LatticeDeformData *init_latt_deform(struct Object *oblatt, struct Object *ob)
-#ifdef __GNUC__
-__attribute__((warn_unused_result))
-#endif
-;
+struct LatticeDeformData *init_latt_deform(struct Object *oblatt, struct Object *ob) ATTR_WARN_UNUSED_RESULT;
 void calc_latt_deform(struct LatticeDeformData *lattice_deform_data, float co[3], float weight);
 void end_latt_deform(struct LatticeDeformData *lattice_deform_data);
 
-int object_deform_mball(struct Object *ob, struct ListBase *dispbase);
+bool object_deform_mball(struct Object *ob, struct ListBase *dispbase);
 void outside_lattice(struct Lattice *lt);
 
 void curve_deform_verts(struct Object *cuOb, struct Object *target,
@@ -94,5 +92,4 @@ int  BKE_lattice_index_flip(struct Lattice *lt, const int index,
 void BKE_lattice_bitmap_from_flag(struct Lattice *lt, unsigned int *bitmap, const short flag,
                                   const bool clear, const bool respecthide);
 
-#endif
-
+#endif  /* __BKE_LATTICE_H__ */

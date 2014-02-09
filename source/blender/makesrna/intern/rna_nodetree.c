@@ -3232,6 +3232,7 @@ static void def_sh_mapping(StructRNA *srna)
 	
 	prop = RNA_def_property(srna, "scale", PROP_FLOAT, PROP_XYZ);
 	RNA_def_property_float_sdna(prop, NULL, "size");
+	RNA_def_property_flag(prop, PROP_PROPORTIONAL);
 	RNA_def_property_ui_text(prop, "Scale", "");
 	RNA_def_property_update(prop, 0, "rna_Mapping_Node_update");
 	
@@ -4841,7 +4842,7 @@ static void def_cmp_map_uv(StructRNA *srna)
 static void def_cmp_defocus(StructRNA *srna)
 {
 	PropertyRNA *prop;
-	
+
 	static EnumPropertyItem bokeh_items[] = {
 		{8, "OCTAGON",  0, "Octagonal",  "8 sides"},
 		{7, "HEPTAGON", 0, "Heptagonal", "7 sides"},
@@ -4852,9 +4853,17 @@ static void def_cmp_defocus(StructRNA *srna)
 		{0, "CIRCLE",   0, "Circular",   ""},
 		{0, NULL, 0, NULL, NULL}
 	};
-	
+
+	prop = RNA_def_property(srna, "scene", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "id");
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_Node_scene_set", NULL, NULL);
+	RNA_def_property_struct_type(prop, "Scene");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Scene", "Scene from which to select the active camera (render scene if undefined)");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
 	RNA_def_struct_sdna_from(srna, "NodeDefocus", "storage");
-	
+
 	prop = RNA_def_property(srna, "bokeh", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "bktype");
 	RNA_def_property_enum_items(prop, bokeh_items);
@@ -6312,7 +6321,7 @@ static void rna_def_node_socket(BlenderRNA *brna)
 	/* registration */
 	prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "typeinfo->idname");
-	RNA_def_property_flag(prop, PROP_REGISTER | PROP_NEVER_CLAMP);
+	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_property_ui_text(prop, "ID Name", "");
 
 	/* draw socket */
@@ -6386,7 +6395,7 @@ static void rna_def_node_socket_interface(BlenderRNA *brna)
 	/* registration */
 	prop = RNA_def_property(srna, "bl_socket_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "typeinfo->idname");
-	RNA_def_property_flag(prop, PROP_REGISTER | PROP_NEVER_CLAMP);
+	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_property_ui_text(prop, "ID Name", "");
 
 	func = RNA_def_function(srna, "draw", NULL);
@@ -7088,7 +7097,7 @@ static void rna_def_node(BlenderRNA *brna)
 	/* registration */
 	prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "typeinfo->idname");
-	RNA_def_property_flag(prop, PROP_REGISTER | PROP_NEVER_CLAMP);
+	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_property_ui_text(prop, "ID Name", "");
 
 	prop = RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
@@ -7467,7 +7476,7 @@ static void rna_def_nodetree(BlenderRNA *brna)
 	/* registration */
 	prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "typeinfo->idname");
-	RNA_def_property_flag(prop, PROP_REGISTER | PROP_NEVER_CLAMP);
+	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_property_ui_text(prop, "ID Name", "");
 
 	prop = RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);

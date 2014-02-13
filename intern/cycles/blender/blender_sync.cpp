@@ -135,7 +135,7 @@ bool BlenderSync::sync_recalc()
 	return recalc;
 }
 
-void BlenderSync::sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, const char *layer)
+void BlenderSync::sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, void **python_thread_state, const char *layer)
 {
 	sync_render_layers(b_v3d, layer);
 	sync_integrator();
@@ -143,7 +143,7 @@ void BlenderSync::sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, const 
 	sync_shaders();
 	sync_curve_settings();
 	sync_objects(b_v3d);
-	sync_motion(b_v3d, b_override);
+	sync_motion(b_v3d, b_override, python_thread_state);
 }
 
 /* Integrator */
@@ -182,7 +182,8 @@ void BlenderSync::sync_integrator()
 
 	integrator->layer_flag = render_layer.layer;
 
-	integrator->sample_clamp = get_float(cscene, "sample_clamp");
+	integrator->sample_clamp_direct = get_float(cscene, "sample_clamp_direct");
+	integrator->sample_clamp_indirect = get_float(cscene, "sample_clamp_indirect");
 #ifdef __CAMERA_MOTION__
 	if(!preview) {
 		if(integrator->motion_blur != r.use_motion_blur()) {
@@ -239,6 +240,10 @@ void BlenderSync::sync_film()
 
 	Film *film = scene->film;
 	Film prevfilm = *film;
+	
+	/* Clamping */
+	Integrator *integrator = scene->integrator;
+	film->use_sample_clamp = (integrator->sample_clamp_direct != 0.0f || integrator->sample_clamp_indirect != 0.0f);
 
 	film->exposure = get_float(cscene, "film_exposure");
 	film->filter_type = (FilterType)RNA_enum_get(&cscene, "filter_type");

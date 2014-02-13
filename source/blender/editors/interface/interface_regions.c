@@ -47,6 +47,7 @@
 #include "BKE_context.h"
 #include "BKE_screen.h"
 #include "BKE_idcode.h"
+#include "BKE_report.h"
 #include "BKE_global.h"
 
 #include "WM_api.h"
@@ -72,221 +73,52 @@
 
 #include "interface_intern.h"
 
-#define B_NOP               -1
 #define MENU_TOP            8
 #define MENU_PADDING		(int)(0.2f * UI_UNIT_Y)
 
-/*********************** Menu Data Parsing ********************* */
-
-typedef struct MenuEntry {
-	const char *str;
-	int retval;
-	int icon;
-	int sepr;
-} MenuEntry;
-
-typedef struct MenuData {
-	const char *instr;
-	const char *title;
-	int titleicon;
-	
-	MenuEntry *items;
-	int nitems, itemssize;
-} MenuData;
-
-static MenuData *menudata_new(const char *instr)
+static int rna_property_enum_step(const bContext *C, PointerRNA *ptr, PropertyRNA *prop, int direction)
 {
-	MenuData *md = MEM_mallocN(sizeof(*md), "MenuData");
+	EnumPropertyItem *item_array;
+	int totitem;
+	bool free;
+	int value;
+	int i, i_init;
+	int step = (direction < 0) ? -1 : 1;
+	int step_tot = 0;
 
-	md->instr = instr;
-	md->title = NULL;
-	md->titleicon = 0;
-	md->items = NULL;
-	md->nitems = md->itemssize = 0;
-	
-	return md;
-}
+	RNA_property_enum_items((bContext *)C, ptr, prop, &item_array, &totitem, &free);
+	value = RNA_property_enum_get(ptr, prop);
+	i = RNA_enum_from_value(item_array, value);
+	i_init = i;
 
-static void menudata_set_title(MenuData *md, const char *title, int titleicon)
-{
-	if (!md->title)
-		md->title = title;
-	if (!md->titleicon)
-		md->titleicon = titleicon;
-}
-
-static void menudata_add_item(MenuData *md, const char *str, int retval, int icon, int sepr)
-{
-	if (md->nitems == md->itemssize) {
-		int nsize = md->itemssize ? (md->itemssize << 1) : 1;
-		MenuEntry *oitems = md->items;
-		
-		md->items = MEM_mallocN(nsize * sizeof(*md->items), "md->items");
-		if (oitems) {
-			memcpy(md->items, oitems, md->nitems * sizeof(*md->items));
-			MEM_freeN(oitems);
+	do {
+		i = mod_i(i + step, totitem);
+		if (item_array[i].identifier[0]) {
+			step_tot += step;
 		}
-		
-		md->itemssize = nsize;
+	} while ((i != i_init) && (step_tot != direction));
+
+	if (i != i_init) {
+		value = item_array[i].value;
 	}
-	
-	md->items[md->nitems].str = str;
-	md->items[md->nitems].retval = retval;
-	md->items[md->nitems].icon = icon;
-	md->items[md->nitems].sepr = sepr;
-	md->nitems++;
-}
 
-static void menudata_free(MenuData *md)
-{
-	MEM_freeN((void *)md->instr);
-	if (md->items) {
-		MEM_freeN(md->items);
+	if (free) {
+		MEM_freeN(item_array);
 	}
-	MEM_freeN(md);
-}
 
-/**
- * Parse menu description strings, string is of the
- * form "[sss%t|]{(sss[%xNN]|), (%l|), (sss%l|)}", ssss%t indicates the
- * menu title, sss or sss%xNN indicates an option,
- * if %xNN is given then NN is the return value if
- * that option is selected otherwise the return value
- * is the index of the option (starting with 1). %l
- * indicates a separator, sss%l indicates a label and
- * new column.
- *
- * \param str String to be parsed.
- * \retval new menudata structure, free with menudata_free()
- */
-static MenuData *decompose_menu_string(const char *str)
-{
-	char *instr = BLI_strdup(str);
-	MenuData *md = menudata_new(instr);
-	const char *nitem = NULL;
-	char *s = instr;
-	int nicon = 0, nretval = 1, nitem_is_title = 0, nitem_is_sepr = 0;
-	
-	while (1) {
-		char c = *s;
-
-		if (c == '%') {
-			if (s[1] == 'x') {
-				nretval = atoi(s + 2);
-
-				*s = '\0';
-				s++;
-			}
-			else if (s[1] == 't') {
-				nitem_is_title = (s != instr); /* check for empty title */
-
-				*s = '\0';
-				s++;
-			}
-			else if (s[1] == 'l') {
-				nitem_is_sepr = 1;
-				if (!nitem) nitem = "";
-
-				*s = '\0';
-				s++;
-			}
-			else if (s[1] == 'i') {
-				nicon = atoi(s + 2);
-				
-				*s = '\0';
-				s++;
-			}
-		}
-		else if (c == UI_SEP_CHAR || c == '\n' || c == '\0') {
-			if (nitem) {
-				*s = '\0';
-
-				if (nitem_is_title) {
-					menudata_set_title(md, nitem, nicon);
-					nitem_is_title = 0;
-				}
-				else if (nitem_is_sepr) {
-					/* prevent separator to get a value */
-					menudata_add_item(md, nitem, -1, nicon, 1);
-					nretval = md->nitems + 1;
-					nitem_is_sepr = 0;
-				}
-				else {
-					menudata_add_item(md, nitem, nretval, nicon, 0);
-					nretval = md->nitems + 1;
-				}
-				
-				nitem = NULL;
-				nicon = 0;
-			}
-			
-			if (c == '\0') {
-				break;
-			}
-		}
-		else if (!nitem) {
-			nitem = s;
-		}
-
-		s++;
-	}
-	
-	return md;
-}
-
-void ui_set_name_menu(uiBut *but, int value)
-{
-	MenuData *md;
-	int i;
-	
-	md = decompose_menu_string(but->str);
-	for (i = 0; i < md->nitems; i++) {
-		if (md->items[i].retval == value) {
-			BLI_strncpy(but->drawstr, md->items[i].str, sizeof(but->drawstr));
-			break;
-		}
-	}
-	
-	menudata_free(md);
-}
-
-int ui_step_name_menu(uiBut *but, int step)
-{
-	MenuData *md;
-	int value = ui_get_but_val(but);
-	int i;
-	
-	md = decompose_menu_string(but->str);
-	for (i = 0; i < md->nitems; i++)
-		if (md->items[i].retval == value)
-			break;
-	
-	if (step == 1) {
-		/* skip separators */
-		for (; i < md->nitems - 1; i++) {
-			if (md->items[i + 1].retval != -1) {
-				value = md->items[i + 1].retval;
-				break;
-			}
-		}
-	}
-	else {
-		if (i > 0) {
-			/* skip separators */
-			for (; i > 0; i--) {
-				if (md->items[i - 1].retval != -1) {
-					value = md->items[i - 1].retval;
-					break;
-				}
-			}
-		}
-	}
-	
-	menudata_free(md);
-		
 	return value;
 }
 
+int ui_step_name_menu(uiBut *but, int direction)
+{
+	/* currenly only RNA buttons */
+	if ((but->rnaprop == NULL) || (RNA_property_type(but->rnaprop) != PROP_ENUM)) {
+		printf("%s: cannot cycle button '%s'", __func__, but->str);
+		return 0;
+	}
+
+	return rna_property_enum_step(but->block->evil_C, &but->rnapoin, but->rnaprop, direction);
+}
 
 /******************** Creating Temporary regions ******************/
 
@@ -1547,7 +1379,6 @@ static void ui_block_position(wmWindow *window, ARegion *butregion, uiBut *but, 
 
 		BLI_rctf_translate(&bt->rect, xof, yof);
 
-		bt->aspect = 1.0f;
 		/* ui_check_but recalculates drawstring size in pixels */
 		ui_check_but(bt);
 	}
@@ -1792,119 +1623,6 @@ void ui_popup_block_free(bContext *C, uiPopupBlockHandle *handle)
 }
 
 /***************************** Menu Button ***************************/
-
-static void ui_block_func_MENUSTR(bContext *UNUSED(C), uiLayout *layout, void *arg_str)
-{
-	uiBlock *block = uiLayoutGetBlock(layout);
-	uiPopupBlockHandle *handle = block->handle;
-	uiLayout *split, *column = NULL;
-	MenuData *md;
-	MenuEntry *entry;
-	const char *instr = arg_str;
-	int columns, rows, a, b;
-	int column_start = 0, column_end = 0;
-	int nbr_entries_nosepr = 0;
-
-	uiBlockSetFlag(block, UI_BLOCK_MOVEMOUSE_QUIT);
-
-	/* compute menu data */
-	md = decompose_menu_string(instr);
-
-	/* Run some "tweaking" checks. */
-	entry = md->items;
-	for (a = 0; a < md->nitems; a++, entry++) {
-		if (entry->sepr) {
-			/* inconsistent, but menus with labels do not look good flipped */
-			if (entry->str[0]) {
-				block->flag |= UI_BLOCK_NO_FLIP;
-				nbr_entries_nosepr++;
-			}
-			/* We do not want simple separators in nbr_entries_nosepr count */
-			continue;
-		}
-		nbr_entries_nosepr++;
-	}
-
-	/* Columns and row estimation. Ignore simple separators here. */
-	columns = (nbr_entries_nosepr + 20) / 20;
-	if (columns < 1)
-		columns = 1;
-	if (columns > 8)
-		columns = (nbr_entries_nosepr + 25) / 25;
-
-	rows = md->nitems / columns;
-	if (rows < 1)
-		rows = 1;
-	while (rows * columns < md->nitems)
-		rows++;
-
-	/* create title */
-	if (md->title) {
-		if (md->titleicon) {
-			uiItemL(layout, md->title, md->titleicon);
-		}
-		else {
-			/* Do not use uiItemL here, as our root layout is a menu one, it will add a fake blank icon! */
-			uiDefBut(block, LABEL, 0, md->title, 0, 0, UI_UNIT_X * 5, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
-		}
-
-		uiItemS(layout);
-	}
-
-	/* create items */
-	split = uiLayoutSplit(layout, 0.0f, false);
-
-	for (a = 0; a < md->nitems; a++) {
-		if (a == column_end) {
-			/* start new column, and find out where it ends in advance, so we
-			 * can flip the order of items properly per column */
-			column_start = a;
-			column_end = md->nitems;
-
-			for (b = a + 1; b < md->nitems; b++) {
-				entry = &md->items[b];
-
-				/* new column on N rows or on separation label */
-				if (((b - a) % rows == 0) || (entry->sepr && entry->str[0])) {
-					column_end = b;
-					break;
-				}
-			}
-
-			column = uiLayoutColumn(split, false);
-		}
-
-		if (block->flag & UI_BLOCK_NO_FLIP)
-			entry = &md->items[a];
-		else
-			entry = &md->items[column_start + column_end - 1 - a];
-
-		if (entry->sepr) {
-			if (entry->str[0]) {
-				if (entry->icon) {
-					uiItemL(column, entry->str, entry->icon);
-				}
-				else {
-					/* Do not use uiItemL here, as our root layout is a menu one, it will add a fake blank icon! */
-					uiDefBut(block, LABEL, 0, entry->str, 0, 0, UI_UNIT_X * 5, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
-				}
-			}
-			else {
-				uiItemS(column);
-			}
-		}
-		else if (entry->icon) {
-			uiDefIconTextButF(block, BUTM, B_NOP, entry->icon, entry->str, 0, 0,
-			                  UI_UNIT_X * 5, UI_UNIT_Y, &handle->retvalue, (float) entry->retval, 0.0, 0, -1, "");
-		}
-		else {
-			uiDefButF(block, BUTM, B_NOP, entry->str, 0, 0,
-			          UI_UNIT_X * 5, UI_UNIT_X, &handle->retvalue, (float) entry->retval, 0.0, 0, -1, "");
-		}
-	}
-
-	menudata_free(md);
-}
 
 #if 0
 static void ui_warp_pointer(int x, int y)
@@ -2319,7 +2037,7 @@ uiBlock *ui_block_func_COLOR(bContext *C, uiPopupBlockHandle *handle, void *arg_
 
 /************************ Popup Menu Memory ****************************/
 
-static int ui_popup_string_hash(const char *str)
+static unsigned int ui_popup_string_hash(const char *str)
 {
 	/* sometimes button contains hotkey, sometimes not, strip for proper compare */
 	int hash;
@@ -2332,16 +2050,19 @@ static int ui_popup_string_hash(const char *str)
 	return hash;
 }
 
-static int ui_popup_menu_hash(const char *str)
+static unsigned int ui_popup_menu_hash(const char *str)
 {
 	return BLI_ghashutil_strhash(str);
 }
 
 /* but == NULL read, otherwise set */
-uiBut *ui_popup_menu_memory(uiBlock *block, uiBut *but)
+static uiBut *ui_popup_menu_memory__internal(uiBlock *block, uiBut *but)
 {
-	static int mem[256], first = 1;
-	int hash = block->puphash;
+	static unsigned int mem[256];
+	static bool first = true;
+
+	const unsigned int hash = block->puphash;
+	const unsigned int hash_mod = hash & 255;
 	
 	if (first) {
 		/* init */
@@ -2351,17 +2072,27 @@ uiBut *ui_popup_menu_memory(uiBlock *block, uiBut *but)
 
 	if (but) {
 		/* set */
-		mem[hash & 255] = ui_popup_string_hash(but->str);
+		mem[hash_mod] = ui_popup_string_hash(but->str);
 		return NULL;
 	}
 	else {
 		/* get */
 		for (but = block->buttons.first; but; but = but->next)
-			if (ui_popup_string_hash(but->str) == mem[hash & 255])
+			if (ui_popup_string_hash(but->str) == mem[hash_mod])
 				return but;
 
 		return NULL;
 	}
+}
+
+uiBut *ui_popup_menu_memory_get(uiBlock *block)
+{
+	return ui_popup_menu_memory__internal(block, NULL);
+}
+
+void ui_popup_menu_memory_set(uiBlock *block, uiBut *but)
+{
+	ui_popup_menu_memory__internal(block, but);
 }
 
 /******************** Popup Menu with callback or string **********************/
@@ -2383,7 +2114,9 @@ static uiBlock *ui_block_func_POPUP(bContext *C, uiPopupBlockHandle *handle, voi
 	uiBlock *block;
 	uiBut *bt;
 	uiPopupMenu *pup = arg_pup;
-	int offset[2], direction, minwidth, width, height, flip;
+	int offset[2], minwidth, width, height;
+	char direction;
+	bool flip;
 
 	if (pup->menu_func) {
 		pup->block->handle = handle;
@@ -2395,20 +2128,27 @@ static uiBlock *ui_block_func_POPUP(bContext *C, uiPopupBlockHandle *handle, voi
 		/* minimum width to enforece */
 		minwidth = BLI_rctf_size_x(&pup->but->rect);
 
-		if (pup->but->type == PULLDOWN || pup->but->menu_create_func) {
+		/* settings (typically rna-enum-popups) show above the button,
+		 * menu's like file-menu, show below */
+		if (pup->block->direction != 0) {
+			/* allow overriding the direction from menu_func */
+			direction = pup->block->direction;
+		}
+		else if ((pup->but->type == PULLDOWN) ||
+		         (uiButGetMenuType(pup->but) != NULL))
+		{
 			direction = UI_DOWN;
-			flip = 1;
 		}
 		else {
 			direction = UI_TOP;
-			flip = 0;
 		}
 	}
 	else {
 		minwidth = 50;
 		direction = UI_DOWN;
-		flip = 1;
 	}
+
+	flip = (direction == UI_DOWN);
 
 	block = pup->block;
 	
@@ -2429,7 +2169,7 @@ static uiBlock *ui_block_func_POPUP(bContext *C, uiPopupBlockHandle *handle, voi
 
 		/* offset the mouse position, possibly based on earlier selection */
 		if ((block->flag & UI_BLOCK_POPUP_MEMORY) &&
-		    (bt = ui_popup_menu_memory(block, NULL)))
+		    (bt = ui_popup_menu_memory_get(block)))
 		{
 			/* position mouse on last clicked item, at 0.8*width of the
 			 * button, so it doesn't overlap the text too much, also note
@@ -2478,7 +2218,7 @@ static uiBlock *ui_block_func_POPUP(bContext *C, uiPopupBlockHandle *handle, voi
 }
 
 uiPopupBlockHandle *ui_popup_menu_create(bContext *C, ARegion *butregion, uiBut *but,
-                                         uiMenuCreateFunc menu_func, void *arg, char *str)
+                                         uiMenuCreateFunc menu_func, void *arg)
 {
 	wmWindow *window = CTX_wm_window(C);
 	uiStyle *style = UI_GetStyleDraw();
@@ -2516,16 +2256,9 @@ uiPopupBlockHandle *ui_popup_menu_create(bContext *C, ARegion *butregion, uiBut 
 			uiLayoutContextCopy(pup->layout, but->context);
 	}
 
-	if (str) {
-		/* menu is created from a string */
-		pup->menu_func = ui_block_func_MENUSTR;
-		pup->menu_arg = str;
-	}
-	else {
-		/* menu is created from a callback */
-		pup->menu_func = menu_func;
-		pup->menu_arg = arg;
-	}
+	/* menu is created from a callback */
+	pup->menu_func = menu_func;
+	pup->menu_arg = arg;
 	
 	handle = ui_popup_block_create(C, butregion, but, NULL, ui_block_func_POPUP, pup);
 
@@ -2656,7 +2389,7 @@ void uiPupMenuReports(bContext *C, ReportList *reports)
 	}
 }
 
-void uiPupMenuInvoke(bContext *C, const char *idname)
+bool uiPupMenuInvoke(bContext *C, const char *idname, ReportList *reports)
 {
 	uiPopupMenu *pup;
 	uiLayout *layout;
@@ -2664,12 +2397,12 @@ void uiPupMenuInvoke(bContext *C, const char *idname)
 	MenuType *mt = WM_menutype_find(idname, true);
 
 	if (mt == NULL) {
-		printf("%s: named menu \"%s\" not found\n", __func__, idname);
-		return;
+		BKE_reportf(reports, RPT_ERROR, "menu \"%s\" not found", idname);
+		return false;
 	}
 
 	if (mt->poll && mt->poll(C, mt) == 0)
-		return;
+		return false;
 
 	pup = uiPupMenuBegin(C, IFACE_(mt->label), ICON_NONE);
 	layout = uiPupMenuLayout(pup);
@@ -2684,6 +2417,8 @@ void uiPupMenuInvoke(bContext *C, const char *idname)
 	mt->draw(C, &menu);
 
 	uiPupMenuEnd(C, pup);
+
+	return true;
 }
 
 

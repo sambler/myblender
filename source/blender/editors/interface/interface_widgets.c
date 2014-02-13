@@ -1254,7 +1254,7 @@ static void widget_draw_text(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *b
 			pos = but->pos;
 			if (pos >= but->ofs) {
 				if (drawstr[0] != 0) {
-					t = BLF_width(fstyle->uifont_id, drawstr + but->ofs, pos - but->ofs) / but->aspect;
+					t = BLF_width(fstyle->uifont_id, drawstr + but->ofs, pos - but->ofs);
 				}
 
 				glColor3f(0.20, 0.6, 0.9);
@@ -2734,12 +2734,11 @@ static void widget_numslider(uiBut *but, uiWidgetColors *wcol, rcti *rect, int s
 	wtb.outline = 1;
 	wtb.inner = 0;
 	widgetbase_draw(&wtb, wcol);
-	
-	/* text space */
-	if ((roundboxalign & UI_CNR_TOP_LEFT) && (roundboxalign & UI_CNR_BOTTOM_LEFT))
-		rect->xmin += toffs;
-	if ((roundboxalign & UI_CNR_TOP_RIGHT) && (roundboxalign & UI_CNR_BOTTOM_RIGHT))
-		rect->xmax -= toffs;
+
+	/* add space at either side of the button so text aligns with numbuttons (which have arrow icons) */
+	rect->xmax -= toffs;
+	rect->xmin += toffs;
+
 }
 
 /* I think 3 is sufficient border to indicate keyed status */

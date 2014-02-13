@@ -2821,7 +2821,6 @@ static void ui_blockopen_begin(bContext *C, uiBut *but, uiHandleButtonData *data
 	uiBlockCreateFunc func = NULL;
 	uiBlockHandleCreateFunc handlefunc = NULL;
 	uiMenuCreateFunc menufunc = NULL;
-	char *menustr = NULL;
 	void *arg = NULL;
 
 	switch (but->type) {
@@ -2837,17 +2836,9 @@ static void ui_blockopen_begin(bContext *C, uiBut *but, uiHandleButtonData *data
 			}
 			break;
 		case MENU:
-			if (but->menu_create_func) {
-				menufunc = but->menu_create_func;
-				arg = but->poin;
-			}
-			else {
-				data->origvalue = ui_get_but_val(but);
-				data->value = data->origvalue;
-				but->editval = &data->value;
-
-				menustr = but->str;
-			}
+			BLI_assert(but->menu_create_func);
+			menufunc = but->menu_create_func;
+			arg = but->poin;
 			break;
 		case COLOR:
 			ui_get_but_vectorf(but, data->origvec);
@@ -2868,8 +2859,8 @@ static void ui_blockopen_begin(bContext *C, uiBut *but, uiHandleButtonData *data
 		if (but->block->handle)
 			data->menu->popup = but->block->handle->popup;
 	}
-	else if (menufunc || menustr) {
-		data->menu = ui_popup_menu_create(C, data->region, but, menufunc, arg, menustr);
+	else if (menufunc) {
+		data->menu = ui_popup_menu_create(C, data->region, but, menufunc, arg);
 		if (but->block->handle)
 			data->menu->popup = but->block->handle->popup;
 	}
@@ -3603,7 +3594,7 @@ static bool ui_numedit_but_SLI(uiBut *but, uiHandleButtonData *data,
 	ui_mouse_scale_warp(data, mx, mx, &mx_fl, &my_fl, shift);
 
 	if (but->type == NUMSLI) {
-		offs = (BLI_rctf_size_y(&but->rect) / 2.0f) * but->aspect;
+		offs = (BLI_rctf_size_y(&but->rect) / 2.0f);
 		deler = BLI_rctf_size_x(&but->rect) - offs;
 	}
 	else if (but->type == SCROLL) {
@@ -3612,7 +3603,7 @@ static bool ui_numedit_but_SLI(uiBut *but, uiHandleButtonData *data,
 		offs = 0.0;
 	}
 	else {
-		offs = (BLI_rctf_size_y(&but->rect) / 2.0f) * but->aspect;
+		offs = (BLI_rctf_size_y(&but->rect) / 2.0f);
 		deler = (BLI_rctf_size_x(&but->rect) - offs);
 	}
 
@@ -3625,11 +3616,11 @@ static bool ui_numedit_but_SLI(uiBut *but, uiHandleButtonData *data,
 	if (ui_is_a_warp_but(but)) {
 		/* OK but can go outside bounds */
 		if (is_horizontal) {
-			data->ungrab_mval[0] = (but->rect.xmin + offs / but->aspect) + (f * deler);
+			data->ungrab_mval[0] = (but->rect.xmin + offs) + (f * deler);
 			data->ungrab_mval[1] = BLI_rctf_cent_y(&but->rect);
 		}
 		else {
-			data->ungrab_mval[1] = (but->rect.ymin + offs / but->aspect) + (f * deler);
+			data->ungrab_mval[1] = (but->rect.ymin + offs) + (f * deler);
 			data->ungrab_mval[0] = BLI_rctf_cent_x(&but->rect);
 		}
 		BLI_rctf_clamp_pt_v(&but->rect, data->ungrab_mval);
@@ -4389,6 +4380,7 @@ static void ui_ndofedit_but_HSVCUBE(uiBut *but, uiHandleButtonData *data,
                                     const enum eSnapType snap, const bool shift)
 {
 	float *hsv = ui_block_hsv_get(but->block);
+	const float hsv_v_max = max_ff(hsv[2], but->softmax);
 	float rgb[3];
 	float sensitivity = (shift ? 0.15f : 0.3f) * ndof->dt;
 	bool use_display_colorspace = ui_hsvcube_use_display_colorspace(but);
@@ -4440,6 +4432,9 @@ static void ui_ndofedit_but_HSVCUBE(uiBut *but, uiHandleButtonData *data,
 			ui_color_snap_hue(snap, &hsv[0]);
 		}
 	}
+
+	/* ndof specific: the changes above aren't clamping */
+	hsv_clamp_v(hsv, hsv_v_max);
 
 	hsv_to_rgb_v(hsv, rgb);
 
@@ -4631,7 +4626,7 @@ static void ui_ndofedit_but_HSVCIRCLE(uiBut *but, uiHandleButtonData *data,
 	float *hsv = ui_block_hsv_get(but->block);
 	float rgb[3];
 	float phi, r /*, sqr */ /* UNUSED */, v[2];
-	float sensitivity = (shift ? 0.15f : 0.3f) * ndof->dt;
+	float sensitivity = (shift ? 0.06f : 0.3f) * ndof->dt;
 	
 	ui_get_but_vectorf(but, rgb);
 	rgb_to_hsv_compat_v(rgb, hsv);
@@ -4646,20 +4641,18 @@ static void ui_ndofedit_but_HSVCIRCLE(uiBut *but, uiHandleButtonData *data,
 	v[1] = r * sinf(phi);
 	
 	/* Use ndof device y and x rotation to move the vector in 2d space */
-	v[0] += ndof->ry * sensitivity;
+	v[0] += ndof->rz * sensitivity;
 	v[1] += ndof->rx * sensitivity;
 
 	/* convert back to polar coords on circle */
 	phi = atan2f(v[0], v[1]) / (2.0f * (float)M_PI) + 0.5f;
 	
 	/* use ndof z rotation to additionally rotate hue */
-	phi -= ndof->rz * sensitivity * 0.5f;
-	
+	phi += ndof->ry * sensitivity * 0.5f;
 	r = len_v2(v);
-	CLAMP(r, 0.0f, 1.0f);
-	
+
 	/* convert back to hsv values, in range [0,1] */
-	hsv[0] = fmodf(phi, 1.0f);
+	hsv[0] = phi;
 	hsv[1] = r;
 
 	/* exception, when using color wheel in 'locked' value state:
@@ -4671,6 +4664,8 @@ static void ui_ndofedit_but_HSVCIRCLE(uiBut *but, uiHandleButtonData *data,
 	if (snap != SNAP_OFF) {
 		ui_color_snap_hue(snap, &hsv[0]);
 	}
+
+	hsv_clamp_v(hsv, FLT_MAX);
 
 	hsv_to_rgb_v(hsv, data->vec);
 	
@@ -6769,7 +6764,7 @@ static void button_activate_exit(bContext *C, uiBut *but, uiHandleButtonData *da
 
 		/* popup menu memory */
 		if (block->flag & UI_BLOCK_POPUP_MEMORY)
-			ui_popup_menu_memory(block, but);
+			ui_popup_menu_memory_set(block, but);
 	}
 
 	/* disable tooltips until mousemove + last active flag */
@@ -8074,12 +8069,22 @@ static int ui_handle_menu_event(bContext *C, const wmEvent *event, uiPopupBlockH
 		/* here we check return conditions for menus */
 		if (block->flag & UI_BLOCK_LOOP) {
 			/* if we click outside the block, verify if we clicked on the
-			 * button that opened us, otherwise we need to close */
+			 * button that opened us, otherwise we need to close,
+			 *
+			 * note that there is an exception for root level menus and
+			 * popups which you can click again to close.
+			 */
 			if (inside == 0) {
 				uiSafetyRct *saferct = block->saferct.first;
 
-				if (ELEM3(event->type, LEFTMOUSE, MIDDLEMOUSE, RIGHTMOUSE) && event->val == KM_PRESS) {
-					if (saferct && !BLI_rctf_isect_pt(&saferct->parent, event->x, event->y)) {
+				if (ELEM3(event->type, LEFTMOUSE, MIDDLEMOUSE, RIGHTMOUSE) &&
+				    ELEM(event->val, KM_PRESS, KM_DBL_CLICK))
+				{
+					if ((level == 0) && (U.uiflag & USER_MENUOPENAUTO) == 0) {
+						/* for root menus, allow clicking to close */
+						menu->menuretval = UI_RETURN_OUT;
+					}
+					else if (saferct && !BLI_rctf_isect_pt(&saferct->parent, event->x, event->y)) {
 						if (block->flag & (UI_BLOCK_OUT_1))
 							menu->menuretval = UI_RETURN_OK;
 						else

@@ -349,7 +349,7 @@ void uiPupMenuEnd(struct bContext *C, struct uiPopupMenu *head);
 struct uiLayout *uiPupMenuLayout(uiPopupMenu *head);
 
 void uiPupMenuReports(struct bContext *C, struct ReportList *reports) ATTR_NONNULL();
-void uiPupMenuInvoke(struct bContext *C, const char *idname) ATTR_NONNULL();
+bool uiPupMenuInvoke(struct bContext *C, const char *idname, struct ReportList *reports) ATTR_NONNULL(1, 2);
 
 /* Popup Blocks
  *
@@ -418,7 +418,7 @@ void uiExplicitBoundsBlock(uiBlock *block, int minx, int miny, int maxx, int max
 
 int     uiBlocksGetYMin(struct ListBase *lb);
 
-void    uiBlockSetDirection(uiBlock *block, int direction);
+void    uiBlockSetDirection(uiBlock *block, char direction);
 void    uiBlockFlipOrder(uiBlock *block);
 void    uiBlockSetFlag(uiBlock *block, int flag);
 void    uiBlockClearFlag(uiBlock *block, int flag);
@@ -439,6 +439,8 @@ void    uiButClearFlag(uiBut *but, int flag);
 
 void    uiButSetDrawFlag(uiBut *but, int flag);
 void    uiButClearDrawFlag(uiBut *but, int flag);
+
+void    uiButSetMenuFromPulldown(uiBut *but);
 
 /* special button case, only draw it when used actively, for outliner etc */
 bool    uiButActiveOnly(const struct bContext *C, struct ARegion *ar, uiBlock *block, uiBut *but);

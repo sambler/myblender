@@ -196,7 +196,6 @@ struct uiBut {
 	 */
 	float a2;
 
-	float aspect;
 	unsigned char col[4];
 
 	uiButHandleFunc func;
@@ -294,7 +293,7 @@ struct uiBlock {
 	rctf rect;
 	float aspect;
 
-	int puphash;  /* popup menu hash for memory */
+	unsigned int puphash;  /* popup menu hash for memory */
 
 	uiButHandleFunc func;
 	void *func_arg1;
@@ -467,7 +466,8 @@ uiBlock *ui_block_func_COLOR(struct bContext *C, uiPopupBlockHandle *handle, voi
 struct ARegion *ui_tooltip_create(struct bContext *C, struct ARegion *butregion, uiBut *but);
 void ui_tooltip_free(struct bContext *C, struct ARegion *ar);
 
-uiBut *ui_popup_menu_memory(struct uiBlock *block, struct uiBut *but);
+uiBut *ui_popup_menu_memory_get(struct uiBlock *block);
+void   ui_popup_menu_memory_set(struct uiBlock *block, struct uiBut *but);
 
 float *ui_block_hsv_get(struct uiBlock *block);
 void ui_popup_block_scrolltest(struct uiBlock *block);
@@ -490,11 +490,10 @@ uiPopupBlockHandle *ui_popup_block_create(struct bContext *C, struct ARegion *bu
                                           uiBlockCreateFunc create_func, uiBlockHandleCreateFunc handle_create_func,
                                           void *arg);
 uiPopupBlockHandle *ui_popup_menu_create(struct bContext *C, struct ARegion *butregion, uiBut *but,
-                                         uiMenuCreateFunc create_func, void *arg, char *str);
+                                         uiMenuCreateFunc create_func, void *arg);
 
 void ui_popup_block_free(struct bContext *C, uiPopupBlockHandle *handle);
 
-void ui_set_name_menu(uiBut *but, int value);
 int ui_step_name_menu(uiBut *but, int step);
 
 struct AutoComplete;

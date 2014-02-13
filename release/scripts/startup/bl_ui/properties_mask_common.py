@@ -107,6 +107,10 @@ class MASK_PT_layers:
             layout.prop(active_layer, "blend")
             layout.prop(active_layer, "falloff")
 
+            row = layout.row(align=True)
+            layout.prop(active_layer, "use_fill_overlap")
+            layout.prop(active_layer, "use_fill_holes")
+
 
 class MASK_PT_spline():
     # subclasses must define...

@@ -257,7 +257,7 @@ unsigned int view3d_sample_backbuf(struct ViewContext *vc, int x, int y);
 /* draws and does a 4x4 sample */
 bool ED_view3d_autodist(struct Scene *scene, struct ARegion *ar, struct View3D *v3d,
                         const int mval[2], float mouse_worldloc[3],
-                        bool alphaoverride, const float fallback_depth_pt[3]);
+                        const bool alphaoverride, const float fallback_depth_pt[3]);
 
 /* only draw so ED_view3d_autodist_simple can be called many times after */
 void ED_view3d_autodist_init(struct Scene *scene, struct ARegion *ar, struct View3D *v3d, int mode);
@@ -308,6 +308,8 @@ void ED_view3d_offscreen_sky_color_get(struct Scene *scene, float sky_color[3]);
 struct Base *ED_view3d_give_base_under_cursor(struct bContext *C, const int mval[2]);
 void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar, bool do_clip);
 void ED_view3d_update_viewmat(struct Scene *scene, struct View3D *v3d, struct ARegion *ar, float viewmat[4][4], float winmat[4][4]);
+bool ED_view3d_quat_from_axis_view(const char view, float quat[4]);
+char ED_view3d_lock_view_from_index(int index);
 bool ED_view3d_lock(struct RegionView3D *rv3d);
 
 uint64_t ED_view3d_datamask(struct Scene *scene, struct View3D *v3d);

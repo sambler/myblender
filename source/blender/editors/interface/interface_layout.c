@@ -1654,8 +1654,7 @@ static void ui_item_menu(uiLayout *layout, const char *name, int icon, uiMenuCre
 	if (ELEM(layout->root->type, UI_LAYOUT_PANEL, UI_LAYOUT_TOOLBAR) ||
 	    (force_menu && layout->root->type != UI_LAYOUT_MENU))  /* We never want a dropdown in menu! */
 	{
-		but->type = MENU;
-		but->drawflag |= UI_BUT_TEXT_LEFT;
+		uiButSetMenuFromPulldown(but);
 	}
 }
 
@@ -1794,6 +1793,9 @@ static void menu_item_enum_opname_menu(bContext *UNUSED(C), uiLayout *layout, vo
 
 	uiLayoutSetOperatorContext(layout, lvl->opcontext);
 	uiItemsEnumO(layout, lvl->opname, lvl->propname);
+
+	/* override default, needed since this was assumed pre 2.70 */
+	uiBlockSetDirection(layout->root->block, UI_DOWN);
 }
 
 void uiItemMenuEnumO(uiLayout *layout, bContext *C, const char *opname, const char *propname, const char *name, int icon)

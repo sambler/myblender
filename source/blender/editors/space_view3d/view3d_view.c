@@ -724,7 +724,7 @@ bool ED_view3d_viewplane_get(View3D *v3d, RegionView3D *rv3d, int winx, int winy
 /**
  * Use instead of: ``bglPolygonOffset(rv3d->dist, ...)`` see bug [#37727]
  */
-void ED_view3d_polygon_offset(const RegionView3D *rv3d, float dist)
+void ED_view3d_polygon_offset(const RegionView3D *rv3d, const float dist)
 {
 	float viewdist = rv3d->dist;
 
@@ -803,37 +803,55 @@ static void obmat_to_viewmat(RegionView3D *rv3d, Object *ob)
 	mat3_to_quat(rv3d->viewquat, tmat);
 }
 
-bool ED_view3d_lock(RegionView3D *rv3d)
+bool ED_view3d_quat_from_axis_view(const char view, float quat[4])
 {
-	switch (rv3d->view) {
+	/* quat values are all unit length */
+
+	switch (view) {
 		case RV3D_VIEW_BOTTOM:
-			copy_v4_fl4(rv3d->viewquat, 0.0, -1.0, 0.0, 0.0);
+			copy_v4_fl4(quat, 0.0, -1.0, 0.0, 0.0);
 			break;
 
 		case RV3D_VIEW_BACK:
-			copy_v4_fl4(rv3d->viewquat, 0.0, 0.0, -M_SQRT1_2, -M_SQRT1_2);
+			copy_v4_fl4(quat, 0.0, 0.0, -M_SQRT1_2, -M_SQRT1_2);
 			break;
 
 		case RV3D_VIEW_LEFT:
-			copy_v4_fl4(rv3d->viewquat, 0.5, -0.5, 0.5, 0.5);
+			copy_v4_fl4(quat, 0.5, -0.5, 0.5, 0.5);
 			break;
 
 		case RV3D_VIEW_TOP:
-			copy_v4_fl4(rv3d->viewquat, 1.0, 0.0, 0.0, 0.0);
+			copy_v4_fl4(quat, 1.0, 0.0, 0.0, 0.0);
 			break;
 
 		case RV3D_VIEW_FRONT:
-			copy_v4_fl4(rv3d->viewquat, M_SQRT1_2, -M_SQRT1_2, 0.0, 0.0);
+			copy_v4_fl4(quat, M_SQRT1_2, -M_SQRT1_2, 0.0, 0.0);
 			break;
 
 		case RV3D_VIEW_RIGHT:
-			copy_v4_fl4(rv3d->viewquat, 0.5, -0.5, -0.5, -0.5);
+			copy_v4_fl4(quat, 0.5, -0.5, -0.5, -0.5);
 			break;
 		default:
 			return false;
 	}
 
 	return true;
+}
+
+char ED_view3d_lock_view_from_index(int index)
+{
+	switch (index) {
+		case 0:  return RV3D_VIEW_FRONT;
+		case 1:  return RV3D_VIEW_TOP;
+		case 2:  return RV3D_VIEW_RIGHT;
+		default: return RV3D_VIEW_USER;
+	}
+
+}
+
+bool ED_view3d_lock(RegionView3D *rv3d)
+{
+	return ED_view3d_quat_from_axis_view(rv3d->view, rv3d->viewquat);
 }
 
 /* don't set windows active in here, is used by renderwin too */

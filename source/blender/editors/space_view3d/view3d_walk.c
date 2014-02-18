@@ -348,6 +348,7 @@ static void walk_update_header(bContext *C, WalkInfo *walk)
 	BLI_snprintf(header, HEADER_LENGTH, IFACE_("LMB/Return: confirm, Esc/RMB: cancel, "
                                                "Tab: gravity (%s), "
 	                                           "WASD: move around, "
+	                                           "Shift: fast, Alt: slow, "
 	                                           "QE: up and down, MMB/Space: teleport, V: jump, "
 	                                           "Pad +/Wheel Up: increase speed, Pad -/Wheel Down: decrease speed"),
 	             WM_bool_as_string(gravity));
@@ -1238,28 +1239,22 @@ static int walkApply_ndof(bContext *C, WalkInfo *walk)
 	rv3d->rot_angle = 0.0f; /* disable onscreen rotation doo-dad */
 
 	if (do_translate) {
-		const float forward_sensitivity  = 1.0f;
-		const float vertical_sensitivity = 0.4f;
-		const float lateral_sensitivity  = 0.6f;
-
 		float speed = 10.0f; /* blender units per second */
+		float trans[3], trans_orig_y;
 		/* ^^ this is ok for default cube scene, but should scale with.. something */
-
-		float trans[3] = {lateral_sensitivity  * ndof->tvec[0],
-		                  vertical_sensitivity * ndof->tvec[1],
-		                  forward_sensitivity  * ndof->tvec[2]};
-
 		if (walk->is_slow)
 			speed *= 0.2f;
 
+		WM_event_ndof_pan_get(ndof, trans, false);
 		mul_v3_fl(trans, speed * dt);
+		trans_orig_y = trans[1];
 
 		/* transform motion from view to world coordinates */
 		mul_qt_v3(view_inv, trans);
 
 		if (flag & NDOF_FLY_HELICOPTER) {
 			/* replace world z component with device y (yes it makes sense) */
-			trans[2] = speed * dt * vertical_sensitivity * ndof->tvec[1];
+			trans[2] = trans_orig_y;
 		}
 
 		if (rv3d->persp == RV3D_CAMOB) {
@@ -1285,7 +1280,7 @@ static int walkApply_ndof(bContext *C, WalkInfo *walk)
 
 		float rotation[4];
 		float axis[3];
-		float angle = turn_sensitivity * ndof_to_axis_angle(ndof, axis);
+		float angle = turn_sensitivity * WM_event_ndof_to_axis_angle(ndof, axis);
 
 		if (fabsf(angle) > 0.0001f) {
 			do_rotate = true;

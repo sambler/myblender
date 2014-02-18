@@ -152,6 +152,10 @@ void fly_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_add_item(keymap, SKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_BACKWARD);
 	WM_modalkeymap_add_item(keymap, AKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_LEFT);
 	WM_modalkeymap_add_item(keymap, DKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_RIGHT);
+	WM_modalkeymap_add_item(keymap, EKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_UP);
+	WM_modalkeymap_add_item(keymap, QKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_DOWN);
+
+	/* for legacy reasons, leave R/F working */
 	WM_modalkeymap_add_item(keymap, RKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_UP);
 	WM_modalkeymap_add_item(keymap, FKEY, KM_PRESS, 0, 0, FLY_MODAL_DIR_DOWN);
 
@@ -163,6 +167,10 @@ void fly_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_add_item(keymap, XKEY, KM_PRESS, 0, 0, FLY_MODAL_AXIS_LOCK_X);
 	WM_modalkeymap_add_item(keymap, ZKEY, KM_PRESS, 0, 0, FLY_MODAL_AXIS_LOCK_Z);
 
+	WM_modalkeymap_add_item(keymap, LEFTALTKEY, KM_PRESS, KM_ANY, 0, FLY_MODAL_PRECISION_ENABLE);
+	WM_modalkeymap_add_item(keymap, LEFTALTKEY, KM_RELEASE, KM_ANY, 0, FLY_MODAL_PRECISION_DISABLE);
+
+	/* for legacy reasons, leave shift working */
 	WM_modalkeymap_add_item(keymap, LEFTSHIFTKEY, KM_PRESS, KM_ANY, 0, FLY_MODAL_PRECISION_ENABLE);
 	WM_modalkeymap_add_item(keymap, LEFTSHIFTKEY, KM_RELEASE, KM_ANY, 0, FLY_MODAL_PRECISION_DISABLE);
 
@@ -281,8 +289,8 @@ static void fly_update_header(bContext *C, FlyInfo *fly)
 	BLI_snprintf(header, HEADER_LENGTH, IFACE_("LMB/Return: confirm, "
 	                                           "RMB/Esc: cancel, "
 	                                           "MMB: pan, "
-	                                           "WASDRF: direction, "
-	                                           "Shift: slow, "
+	                                           "WASDQE: direction, "
+	                                           "Alt: slow, "
 	                                           "Ctrl: free look, "
 	                                           "X: Upright x axis (%s), "
 	                                           "Z: Upright z axis (%s), "
@@ -958,28 +966,22 @@ static int flyApply_ndof(bContext *C, FlyInfo *fly)
 	rv3d->rot_angle = 0.0f; /* disable onscreen rotation doo-dad */
 
 	if (do_translate) {
-		const float forward_sensitivity  = 1.0f;
-		const float vertical_sensitivity = 0.4f;
-		const float lateral_sensitivity  = 0.6f;
-
 		float speed = 10.0f; /* blender units per second */
+		float trans[3], trans_orig_y;
 		/* ^^ this is ok for default cube scene, but should scale with.. something */
-
-		float trans[3] = {lateral_sensitivity  * ndof->tvec[0],
-		                  vertical_sensitivity * ndof->tvec[1],
-		                  forward_sensitivity  * ndof->tvec[2]};
-
 		if (fly->use_precision)
 			speed *= 0.2f;
 
+		WM_event_ndof_pan_get(ndof, trans, false);
 		mul_v3_fl(trans, speed * dt);
+		trans_orig_y = trans[1];
 
 		/* transform motion from view to world coordinates */
 		mul_qt_v3(view_inv, trans);
 
 		if (flag & NDOF_FLY_HELICOPTER) {
 			/* replace world z component with device y (yes it makes sense) */
-			trans[2] = speed * dt * vertical_sensitivity * ndof->tvec[1];
+			trans[2] = trans_orig_y;
 		}
 
 		if (rv3d->persp == RV3D_CAMOB) {
@@ -1005,7 +1007,7 @@ static int flyApply_ndof(bContext *C, FlyInfo *fly)
 
 		float rotation[4];
 		float axis[3];
-		float angle = turn_sensitivity * ndof_to_axis_angle(ndof, axis);
+		float angle = turn_sensitivity * WM_event_ndof_to_axis_angle(ndof, axis);
 
 		if (fabsf(angle) > 0.0001f) {
 			do_rotate = true;

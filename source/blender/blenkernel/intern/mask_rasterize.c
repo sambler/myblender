@@ -1435,6 +1435,10 @@ void BKE_maskrasterize_buffer(MaskRasterHandle *mr_handle,
 {
 #ifdef _MSC_VER
 	int y;  /* msvc requires signed for some reason */
+
+	/* ignore sign mismatch */
+#  pragma warning(push)
+#  pragma warning(disable:4018)
 #else
 	unsigned int y;
 #endif
@@ -1451,4 +1455,9 @@ void BKE_maskrasterize_buffer(MaskRasterHandle *mr_handle,
 			buffer[i] = BKE_maskrasterize_handle_sample(mr_handle, xy);
 		}
 	}
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
+
 }

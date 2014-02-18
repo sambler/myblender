@@ -258,6 +258,12 @@ static bool scanfill_preprocess_self_isect(
 
 				LinkData *isect_link;
 
+				if (UNLIKELY(e_ls == NULL)) {
+					/* only happens in very rare cases (entirely overlapping splines).
+					 * in this case se can't do much useful. but at least don't crash */
+					continue;
+				}
+
 				/* maintain coorect terminating edge */
 				if (pi->edge_last == eed) {
 					pi->edge_last = NULL;
@@ -404,7 +410,13 @@ bool BLI_scanfill_calc_self_isect(
 	int totvert_new = 0;
 	bool changed = false;
 
-	PolyInfo *poly_info = MEM_callocN(sizeof(*poly_info) * poly_tot, __func__);
+	PolyInfo *poly_info;
+
+	if (UNLIKELY(sf_ctx->poly_nr == SF_POLY_UNSET)) {
+		return false;
+	}
+
+	poly_info = MEM_callocN(sizeof(*poly_info) * poly_tot, __func__);
 
 	/* get the polygon span */
 	if (sf_ctx->poly_nr == 0) {

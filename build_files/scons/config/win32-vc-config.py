@@ -246,7 +246,7 @@ BF_OPENGL_LIB_STATIC = [ '${BF_OPENGL}/lib/libGL.a', '${BF_OPENGL}/lib/libGLU.a'
 CC = 'cl.exe'
 CXX = 'cl.exe'
 
-CCFLAGS = ['/nologo', '/J', '/W1', '/Gd', '/wd4018', '/wd4244', '/wd4305', '/wd4800', '/wd4065', '/wd4267', '/we4013']
+CCFLAGS = ['/nologo', '/J', '/W3', '/Gd', '/w34062', '/wd4018', '/wd4065', '/wd4127', '/wd4181', '/wd4200', '/wd4244', '/wd4267', '/wd4305', '/wd4800', '/we4013', '/we4431']
 CXXFLAGS = ['/EHsc']
 BGE_CXXFLAGS = ['/O2', '/Ob2', '/EHsc', '/GR', '/fp:fast', '/arch:SSE']
 
@@ -272,7 +272,11 @@ PLATFORM_LINKFLAGS = ['/SUBSYSTEM:CONSOLE','/MACHINE:IX86','/STACK:2097152','/IN
 
 BF_BSC=False
 
-if VC_VERSION == '11.0':
+if VC_VERSION == '12.0':
+    BF_CYCLES_CUDA_ENV="C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+    BF_BUILDDIR = '..\\build\\win32-vc12'
+    BF_INSTALLDIR='..\\install\\win32-vc12'
+elif VC_VERSION == '11.0':
     BF_BUILDDIR = '..\\build\\win32-vc11'
     BF_INSTALLDIR='..\\install\\win32-vc11'
 else:

@@ -2491,6 +2491,25 @@ void ui_check_but(uiBut *but)
 	
 	/* name: */
 	switch (but->type) {
+
+		case MENU:
+			if (BLI_rctf_size_x(&but->rect) > 24.0f) {
+				/* only needed for menus in popup blocks that don't recreate buttons on redraw */
+				if (but->block->flag & UI_BLOCK_LOOP) {
+					if (but->rnaprop && (RNA_property_type(but->rnaprop) == PROP_ENUM)) {
+						int value = RNA_property_enum_get(&but->rnapoin, but->rnaprop);
+						const char *buf;
+						if (RNA_property_enum_name_gettexted(but->block->evil_C,
+						                                     &but->rnapoin, but->rnaprop, value, &buf))
+						{
+							BLI_strncpy(but->str, buf, sizeof(but->strdata));
+						}
+					}
+				}
+				BLI_strncpy(but->drawstr, but->str, sizeof(but->drawstr));
+			}
+			break;
+
 		case NUM:
 		case NUMSLI:
 
@@ -3236,6 +3255,10 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 		but->drawflag |= UI_BUT_ICON_LEFT;
 	}
 	
+	if ((type == MENU) && (but->dt == UI_EMBOSSP)) {
+		but->flag |= UI_ICON_SUBMENU;
+	}
+
 	if (!RNA_property_editable(&but->rnapoin, prop)) {
 		ui_def_but_rna__disable(but);
 	}

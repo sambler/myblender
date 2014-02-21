@@ -1004,9 +1004,11 @@ elseif(WIN32)
 		set(_WARNINGS
 			# warning level:
 			"/W3"
+			"/w34062"  # switch statement contains 'default' but no 'case' labels
 			# disable:
 			"/wd4018"  # signed/unsigned mismatch
 			"/wd4065"  # switch statement contains 'default' but no 'case' labels
+			"/wd4127"  # conditional expression is constant
 			"/wd4181"  # qualifier applied to reference type; ignored
 			"/wd4200"  # zero-sized array in struct/union
 			"/wd4244"  # conversion from 'type1' to 'type2', possible loss of data
@@ -1015,6 +1017,7 @@ elseif(WIN32)
 			"/wd4800"  # forcing value to bool 'true' or 'false'
 			# errors:
 			"/we4013"  # 'function' undefined; assuming extern returning int
+			"/we4431"  # missing type specifier - int assumed
 		)
 
 		string(REPLACE ";" " " _WARNINGS "${_WARNINGS}")
@@ -1853,6 +1856,18 @@ elseif(APPLE)
 		else()
 			message(STATUS "OSL not found")
 		endif()
+	endif()
+	
+	if(WITH_OPENMP AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT ${CMAKE_C_COMPILER_VERSION} VERSION_LESS '3.4')
+		set(OPENMP_FOUND ON)
+		set(OpenMP_C_FLAGS "-fopenmp" CACHE STRING "C compiler flags for OpenMP parallization" FORCE)
+		set(OpenMP_CXX_FLAGS "-fopenmp" CACHE STRING "C++ compiler flags for OpenMP parallization" FORCE)
+		include_directories(${LIBDIR}/openmp/include)
+		LINK_DIRECTORIES(${LIBDIR}/openmp/lib)
+		execute_process(COMMAND cp ${LIBDIR}/openmp/lib/libiomp5.dylib ${CMAKE_BINARY_DIR}/bin/libiomp5.dylib) # for intermediate binaries, lib id is @loader_path
+	else()
+		set(OpenMP_C_FLAGS "" CACHE STRING "C compiler flags for OpenMP parallization" FORCE) # unset
+		set(OpenMP_CXX_FLAGS "" CACHE STRING "C++ compiler flags for OpenMP parallization" FORCE) # unset
 	endif()
 
 	set(EXETYPE MACOSX_BUNDLE)

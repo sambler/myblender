@@ -1796,9 +1796,14 @@ static size_t animdata_filter_ds_materials(bAnimContext *ac, ListBase *anim_data
 			Material *base = give_current_material(ob, a);
 			Material *ma   = give_node_material(base);
 			
-			/* add channels from the nested material if it exists */
-			if (ma)
+			/* add channels from the nested material if it exists
+			 *   - skip if the same material is referenced in its node tree
+			 *     (which is common for BI materials) as that results in
+			 *     confusing duplicates
+			 */
+			if ((ma) && (ma != base)) {
 				items += animdata_filter_ds_material(ac, anim_data, ads, ma, filter_mode);
+			}
 		}
 	}
 	
@@ -1862,7 +1867,7 @@ static size_t animdata_filter_ds_modifiers(bAnimContext *ac, ListBase *anim_data
 	size_t items = 0;
 	
 	/* 1) create a temporary "context" containing all the info we have here to pass to the callback 
-	 *    use to walk thorugh the dependencies of the modifiers
+	 *    use to walk through the dependencies of the modifiers
 	 *
 	 * ! Assumes that all other unspecified values (i.e. accumulation buffers) are zero'd out properly
 	 */

@@ -331,6 +331,10 @@ void BKE_object_free_derived_caches(Object *ob)
 			free_path(ob->curve_cache->path);
 			ob->curve_cache->path = NULL;
 		}
+
+		/* Signal for viewport to run DAG workarounds. */
+		MEM_freeN(ob->curve_cache);
+		ob->curve_cache = NULL;
 	}
 }
 
@@ -1282,6 +1286,7 @@ static ParticleSystem *copy_particlesystem(ParticleSystem *psys)
 	psysn->pdd = NULL;
 	psysn->effectors = NULL;
 	psysn->tree = NULL;
+	psysn->bvhtree = NULL;
 	
 	BLI_listbase_clear(&psysn->pathcachebufs);
 	BLI_listbase_clear(&psysn->childcachebufs);
@@ -1485,11 +1490,6 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, int copy_caches)
 
 	obn->mode = 0;
 	obn->sculpt = NULL;
-
-	/* Proxies are not to be copied. */
-	obn->proxy_from = NULL;
-	obn->proxy_group = NULL;
-	obn->proxy = NULL;
 
 	/* increase user numbers */
 	id_us_plus((ID *)obn->data);

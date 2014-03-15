@@ -64,6 +64,7 @@
 #include "BLI_linklist_stack.h"
 #include "BLI_string.h"
 #include "BLI_rect.h"
+#include "BLI_bitmap.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_action.h"
@@ -2588,10 +2589,10 @@ static void createTransUVs(bContext *C, TransInfo *t)
 	BMLoop *l;
 	BMIter iter, liter;
 	UvElementMap *elementmap = NULL;
-	char *island_enabled = NULL;
+	BLI_bitmap *island_enabled = NULL;
 	int count = 0, countsel = 0, count_rejected = 0;
-	int propmode = t->flag & T_PROP_EDIT;
-	int propconnected = t->flag & T_PROP_CONNECTED;
+	const bool propmode = (t->flag & T_PROP_EDIT) != 0;
+	const bool propconnected = (t->flag & T_PROP_CONNECTED) != 0;
 
 	const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
 
@@ -2606,7 +2607,7 @@ static void createTransUVs(bContext *C, TransInfo *t)
 		else {
 			elementmap = BM_uv_element_map_create(em->bm, true, true);
 		}
-		island_enabled = MEM_callocN(sizeof(*island_enabled) * elementmap->totalIslands, "TransIslandData(UV Editing)");
+		island_enabled = BLI_BITMAP_NEW(elementmap->totalIslands, "TransIslandData(UV Editing)");
 	}
 
 	BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
@@ -2624,7 +2625,7 @@ static void createTransUVs(bContext *C, TransInfo *t)
 
 				if (propconnected) {
 					UvElement *element = BM_uv_element_get(elementmap, efa, l);
-					island_enabled[element->island] = TRUE;
+					BLI_BITMAP_SET(island_enabled, element->island);
 				}
 
 			}
@@ -2665,7 +2666,7 @@ static void createTransUVs(bContext *C, TransInfo *t)
 
 			if (propconnected) {
 				UvElement *element = BM_uv_element_get(elementmap, efa, l);
-				if (!island_enabled[element->island]) {
+				if (!BLI_BITMAP_GET(island_enabled, element->island)) {
 					count_rejected++;
 					continue;
 				}
@@ -3011,7 +3012,10 @@ static int gpf_cmp_frame(void *thunk, void *a, void *b)
 	*((bool *)thunk) = true;
 	/* selected last */
 	if ((frame_a->flag & GP_FRAME_SELECT) &&
-	    ((frame_b->flag & GP_FRAME_SELECT) == 0)) return  1;
+	    ((frame_b->flag & GP_FRAME_SELECT) == 0))
+	{
+		return  1;
+	}
 	return 0;
 }
 
@@ -3025,7 +3029,10 @@ static int masklay_shape_cmp_frame(void *thunk, void *a, void *b)
 	*((bool *)thunk) = true;
 	/* selected last */
 	if ((frame_a->flag & MASK_SHAPE_SELECT) &&
-	    ((frame_b->flag & MASK_SHAPE_SELECT) == 0)) return  1;
+	    ((frame_b->flag & MASK_SHAPE_SELECT) == 0))
+	{
+		return 1;
+	}
 	return 0;
 }
 
@@ -5686,7 +5693,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		if (t->obedit->type == OB_MESH) {
 			BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
 			/* table needs to be created for each edit command, since vertices can move etc */
-			mesh_octree_table(t->obedit, em, NULL, 'e');
+			ED_mesh_mirror_spatial_table(t->obedit, em, NULL, 'e');
 		}
 	}
 	else if ((t->flag & T_POSE) && (t->poseobj)) {
@@ -6592,7 +6599,7 @@ static void MaskPointToTransData(Scene *scene, MaskSplinePoint *point,
 
 			td->flag = 0;
 			td->loc = td2d->loc;
-			copy_v3_v3(td->center, bezt->vec[1]);
+			mul_v2_m3v2(td->center, parent_matrix, bezt->vec[1]);
 			copy_v3_v3(td->iloc, td->loc);
 
 			memset(td->axismtx, 0, sizeof(td->axismtx));
@@ -6640,7 +6647,7 @@ static void MaskPointToTransData(Scene *scene, MaskSplinePoint *point,
 
 		td->flag = 0;
 		td->loc = td2d->loc;
-		copy_v3_v3(td->center, bezt->vec[1]);
+		mul_v2_m3v2(td->center, parent_matrix, bezt->vec[1]);
 		copy_v3_v3(td->iloc, td->loc);
 
 		memset(td->axismtx, 0, sizeof(td->axismtx));

@@ -66,7 +66,9 @@ CCL_NAMESPACE_BEGIN
 #ifdef __KERNEL_CUDA__
 #define __KERNEL_SHADING__
 #define __KERNEL_ADV_SHADING__
+#if __CUDA_ARCH__ != 300
 #define __BRANCHED_PATH__
+#endif
 //#define __VOLUME__
 #endif
 
@@ -834,6 +836,7 @@ typedef struct KernelIntegrator {
 	int ao_samples;
 	int mesh_light_samples;
 	int subsurface_samples;
+	int sample_all_lights_indirect;
 	
 	/* mis */
 	int use_lamp_mis;
@@ -847,7 +850,7 @@ typedef struct KernelIntegrator {
 	int volume_max_steps;
 	float volume_step_size;
 	int volume_samples;
-	int pad1, pad2;
+	int pad1;
 } KernelIntegrator;
 
 typedef struct KernelBVH {

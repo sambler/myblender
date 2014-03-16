@@ -50,7 +50,7 @@
 #include "BLO_readfile.h"
 
 #include "readfile.h"
-#include <stddef.h>
+
 
 void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 {

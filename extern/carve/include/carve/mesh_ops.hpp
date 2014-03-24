@@ -25,8 +25,8 @@
 #include <fstream>
 
 // Support for latest Clang/LLVM on FreeBSD which does have different libcxx.
-​//
-​// copied from lib/triangulator.cpp
+//
+// copied from lib/triangulator.cpp
 //
 // TODO(sergey): Move it some some more generic header with platform-specific
 //               declarations.
@@ -75,7 +75,7 @@ namespace carve {
       }
 
 
-
+      
       template<unsigned ndim, typename proj_t>
       struct TriangulationData {
         typedef Edge<ndim> edge_t;
@@ -168,7 +168,7 @@ namespace carve {
                 if (v_test->next->p == prev->p && v_test->prev->p == next->p) {
                   return false;
                 }
-
+              
                 if (v_test->next->p == prev->p || v_test->prev->p == next->p) {
                   continue;
                 }
@@ -223,7 +223,7 @@ namespace carve {
           geom2d::P2 v_p = P(vert);
           do {
             geom2d::P2 n_p = P(v->next);
-
+            
             if (v_p.y <= point.y) {
               if (n_p.y > point.y && carve::geom2d::orient2d(v_p, n_p, point) > 0.0) {
                 ++wn;
@@ -562,7 +562,7 @@ namespace carve {
 
           return r1 && r2;
         }
-
+        
         template<typename out_iter_t>
         bool doTriangulate(VertexInfo *begin, out_iter_t out);
 
@@ -600,7 +600,7 @@ namespace carve {
           std::vector<VertexInfo *> queue;
 
           void checkheap() {
-#if defined(HAVE_IS_HEAP)
+#ifdef __GNUC__
             CARVE_ASSERT(std::__is_heap(queue.begin(), queue.end(), order_by_score()));
 #endif
           }

@@ -1353,7 +1353,7 @@ struct GPU_PBVH_Buffers {
 	 * smooth-shaded or all faces are flat-shaded */
 	int smooth;
 
-	int show_diffuse_color;
+	bool show_diffuse_color;
 	float diffuse_color[4];
 };
 typedef enum {
@@ -1436,13 +1436,13 @@ static void gpu_color_from_mask_quad_set(const CCGKey *key,
 
 void GPU_update_mesh_pbvh_buffers(GPU_PBVH_Buffers *buffers, MVert *mvert,
                              int *vert_indices, int totvert, const float *vmask,
-                             int (*face_vert_indices)[4], int show_diffuse_color)
+                             int (*face_vert_indices)[4], bool show_diffuse_color)
 {
 	VertexBufferFormat *vert_data;
 	int i, j, k;
 
 	buffers->vmask = vmask;
-	buffers->show_diffuse_color = show_diffuse_color;
+	buffers->show_diffuse_color = (vmask == NULL) || show_diffuse_color;
 
 	if (buffers->vert_buf) {
 		int totelem = (buffers->smooth ? totvert : (buffers->tot_tri * 3));
@@ -1582,7 +1582,7 @@ GPU_PBVH_Buffers *GPU_build_pbvh_mesh_buffers(int (*face_vert_indices)[4],
 	buffers->index_type = GL_UNSIGNED_SHORT;
 	buffers->smooth = mface[face_indices[0]].flag & ME_SMOOTH;
 
-	buffers->show_diffuse_color = FALSE;
+	buffers->show_diffuse_color = false;
 
 	/* Count the number of visible triangles */
 	for (i = 0, tottri = 0; i < totface; ++i) {
@@ -1652,12 +1652,12 @@ GPU_PBVH_Buffers *GPU_build_pbvh_mesh_buffers(int (*face_vert_indices)[4],
 
 void GPU_update_grid_pbvh_buffers(GPU_PBVH_Buffers *buffers, CCGElem **grids,
                              const DMFlagMat *grid_flag_mats, int *grid_indices,
-                             int totgrid, const CCGKey *key, int show_diffuse_color)
+                             int totgrid, const CCGKey *key, bool show_diffuse_color)
 {
 	VertexBufferFormat *vert_data;
 	int i, j, k, x, y;
 
-	buffers->show_diffuse_color = show_diffuse_color;
+	buffers->show_diffuse_color = (key->has_mask == false) || show_diffuse_color;
 
 	/* Build VBO */
 	if (buffers->vert_buf) {
@@ -1703,7 +1703,7 @@ void GPU_update_grid_pbvh_buffers(GPU_PBVH_Buffers *buffers, CCGElem **grids,
 				
 				if (!smooth) {
 					/* for flat shading, recalc normals and set the last vertex of
-					 * each quad in the index buffer to have the flat normal as
+					 * each triangle in the index buffer to have the flat normal as
 					 * that is what opengl will use */
 					for (j = 0; j < key->grid_size - 1; j++) {
 						for (k = 0; k < key->grid_size - 1; k++) {
@@ -1721,7 +1721,7 @@ void GPU_update_grid_pbvh_buffers(GPU_PBVH_Buffers *buffers, CCGElem **grids,
 							               CCG_elem_co(key, elems[2]),
 							               CCG_elem_co(key, elems[3]));
 
-							vd = vert_data + (j + 1) * key->grid_size + (k + 1);
+							vd = vert_data + (j + 1) * key->grid_size + k;
 							normal_float_to_short_v3(vd->no, fno);
 
 							if (has_mask) {
@@ -1793,18 +1793,18 @@ static int gpu_count_grid_quads(BLI_bitmap **grid_hidden,
  * unsigned shorts or unsigned ints. */
 #define FILL_QUAD_BUFFER(type_, tot_quad_, buffer_)                     \
 	{                                                                   \
-		type_ *quad_data;                                               \
+		type_ *tri_data;                                               \
 		int offset = 0;                                                 \
 		int i, j, k;                                                    \
 		                                                                \
 		glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB,                    \
-		                sizeof(type_) * (tot_quad_) * 4, NULL,          \
+						sizeof(type_) * (tot_quad_) * 6, NULL,          \
 		                GL_STATIC_DRAW_ARB);                            \
 		                                                                \
-		/* Fill the quad buffer */                                      \
-		quad_data = glMapBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,         \
+		/* Fill the buffer */                                      \
+		tri_data = glMapBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,         \
 		                           GL_WRITE_ONLY_ARB);                  \
-		if (quad_data) {                                                \
+		if (tri_data) {                                                \
 			for (i = 0; i < totgrid; ++i) {                             \
 				BLI_bitmap *gh = NULL;                                  \
 				if (grid_hidden)                                        \
@@ -1818,10 +1818,13 @@ static int gpu_count_grid_quads(BLI_bitmap **grid_hidden,
 						                              gridsize, k, j))  \
 							continue;                                   \
 																		\
-						*(quad_data++) = offset + j * gridsize + k + 1; \
-						*(quad_data++) = offset + j * gridsize + k;     \
-						*(quad_data++) = offset + (j + 1) * gridsize + k; \
-						*(quad_data++) = offset + (j + 1) * gridsize + k + 1; \
+						*(tri_data++) = offset + j * gridsize + k + 1; \
+						*(tri_data++) = offset + j * gridsize + k;     \
+						*(tri_data++) = offset + (j + 1) * gridsize + k; \
+																		\
+						*(tri_data++) = offset + (j + 1) * gridsize + k + 1; \
+						*(tri_data++) = offset + j * gridsize + k + 1; \
+						*(tri_data++) = offset + (j + 1) * gridsize + k; \
 					}                                                   \
 				}                                                       \
 																		\
@@ -1889,7 +1892,7 @@ static GLuint gpu_get_grid_buffer(int gridsize, GLenum *index_type, unsigned *to
 }
 
 GPU_PBVH_Buffers *GPU_build_grid_pbvh_buffers(int *grid_indices, int totgrid,
-                                    BLI_bitmap **grid_hidden, int gridsize)
+                                              BLI_bitmap **grid_hidden, int gridsize)
 {
 	GPU_PBVH_Buffers *buffers;
 	int totquad;
@@ -1899,7 +1902,7 @@ GPU_PBVH_Buffers *GPU_build_grid_pbvh_buffers(int *grid_indices, int totgrid,
 	buffers->grid_hidden = grid_hidden;
 	buffers->totgrid = totgrid;
 
-	buffers->show_diffuse_color = FALSE;
+	buffers->show_diffuse_color = false;
 
 	/* Count the number of quads */
 	totquad = gpu_count_grid_quads(grid_hidden, grid_indices, totgrid, gridsize);
@@ -2185,7 +2188,7 @@ GPU_PBVH_Buffers *GPU_build_bmesh_pbvh_buffers(int smooth_shading)
 	if (smooth_shading)
 		glGenBuffersARB(1, &buffers->index_buf);
 	glGenBuffersARB(1, &buffers->vert_buf);
-	buffers->use_bmesh = TRUE;
+	buffers->use_bmesh = true;
 	buffers->smooth = smooth_shading;
 
 	return buffers;
@@ -2390,7 +2393,7 @@ static void gpu_draw_buffers_legacy_grids(GPU_PBVH_Buffers *buffers)
 }
 
 void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
-					  int wireframe)
+                           bool wireframe)
 {
 	/* sets material from the first face, to solve properly face would need to
 	 * be sorted in buckets by materials */
@@ -2439,7 +2442,7 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 				glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
 				               offset + offsetof(VertexBufferFormat, color));
 				
-				glDrawElements(GL_QUADS, buffers->tot_quad * 4, buffers->index_type, 0);
+				glDrawElements(GL_TRIANGLES, buffers->tot_quad * 6, buffers->index_type, 0);
 
 				offset += buffers->gridkey.grid_area * sizeof(VertexBufferFormat);
 			}
@@ -2482,15 +2485,15 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 	}
 }
 
-int GPU_pbvh_buffers_diffuse_changed(GPU_PBVH_Buffers *buffers, int show_diffuse_color)
+bool GPU_pbvh_buffers_diffuse_changed(GPU_PBVH_Buffers *buffers, bool show_diffuse_color)
 {
 	float diffuse_color[4];
 
 	if (buffers->show_diffuse_color != show_diffuse_color)
-		return TRUE;
+		return true;
 
-	if (buffers->show_diffuse_color == FALSE)
-		return FALSE;
+	if (buffers->show_diffuse_color == false)
+		return false;
 
 	if (buffers->mface) {
 		MFace *f = buffers->mface + buffers->face_indices[0];

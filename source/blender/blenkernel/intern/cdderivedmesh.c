@@ -270,6 +270,8 @@ static PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 		BKE_pbvh_build_bmesh(cddm->pbvh, ob->sculpt->bm,
 		                     ob->sculpt->bm_smooth_shading,
 		                     ob->sculpt->bm_log);
+
+		pbvh_show_diffuse_color_set(cddm->pbvh, ob->sculpt->show_diffuse_color);
 	}
 		
 
@@ -299,7 +301,7 @@ static PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 			int totvert;
 
 			totvert = deformdm->getNumVerts(deformdm);
-			vertCos = MEM_callocN(3 * totvert * sizeof(float), "cdDM_getPBVH vertCos");
+			vertCos = MEM_mallocN(totvert * sizeof(float[3]), "cdDM_getPBVH vertCos");
 			deformdm->getVertCos(deformdm, vertCos);
 			BKE_pbvh_apply_vertCos(cddm->pbvh, vertCos);
 			MEM_freeN(vertCos);
@@ -612,7 +614,7 @@ static void cdDM_drawFacesSolid(DerivedMesh *dm,
 		if (!GPU_buffer_legacy(dm)) {
 			glShadeModel(GL_SMOOTH);
 			for (a = 0; a < dm->drawObject->totmaterial; a++) {
-				if (setMaterial(dm->drawObject->materials[a].mat_nr + 1, NULL)) {
+				if (!setMaterial || setMaterial(dm->drawObject->materials[a].mat_nr + 1, NULL)) {
 					glDrawArrays(GL_TRIANGLES, dm->drawObject->materials[a].start,
 					             dm->drawObject->materials[a].totpoint);
 				}

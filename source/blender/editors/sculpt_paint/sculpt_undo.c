@@ -296,6 +296,9 @@ static void sculpt_undo_bmesh_restore_generic(bContext *C,
 		for (i = 0; i < totnode; i++) {
 			BKE_pbvh_node_mark_redraw(nodes[i]);
 		}
+
+		if (nodes)
+			MEM_freeN(nodes);
 	}
 	else {
 		/* A bit lame, but for now just recreate the PBVH. The alternative
@@ -709,7 +712,7 @@ static SculptUndoNode *sculpt_undo_bmesh_push(Object *ob,
 	PBVHVertexIter vd;
 
 	if (!lb->first) {
-		unode = MEM_callocN(sizeof(*unode), AT);
+		unode = MEM_callocN(sizeof(*unode), __func__);
 
 		BLI_strncpy(unode->idname, ob->id.name, sizeof(unode->idname));
 		unode->type = type;

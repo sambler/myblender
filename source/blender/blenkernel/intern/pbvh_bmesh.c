@@ -285,7 +285,8 @@ static PBVHNode *pbvh_bmesh_node_lookup(PBVH *bvh, GHash *map, void *key)
 
 static BMVert *pbvh_bmesh_vert_create(PBVH *bvh, int node_index,
                                       const float co[3],
-                                      const BMVert *example)
+                                      const BMVert *example,
+                                      const int cd_vert_mask_offset)
 {
 	BMVert *v = BM_vert_create(bvh->bm, co, example, BM_CREATE_NOP);
 	void *val = SET_INT_IN_POINTER(node_index);
@@ -296,7 +297,7 @@ static BMVert *pbvh_bmesh_vert_create(PBVH *bvh, int node_index,
 	BLI_ghash_insert(bvh->bm_vert_to_node, v, val);
 
 	/* Log the new vertex */
-	BM_log_vert_added(bvh->bm, bvh->bm_log, v);
+	BM_log_vert_added(bvh->bm_log, v, cd_vert_mask_offset);
 
 	return v;
 }
@@ -313,8 +314,9 @@ static BMFace *pbvh_bmesh_face_create(PBVH *bvh, int node_index,
 
 	f = BM_face_create(bvh->bm, v_tri, e_tri, 3, f_example, BM_CREATE_NOP);
 
-	if (!BLI_ghash_haskey(bvh->bm_face_to_node, f)) {
+	BLI_assert(!BLI_ghash_haskey(bvh->bm_face_to_node, f));
 
+	{
 		BLI_ghash_insert(bvh->nodes[node_index].bm_faces, f, NULL);
 		BLI_ghash_insert(bvh->bm_face_to_node, f, val);
 
@@ -695,7 +697,7 @@ static void pbvh_bmesh_split_edge(EdgeQueueContext *eq_ctx, PBVH *bvh,
 
 	node_index = GET_INT_FROM_POINTER(BLI_ghash_lookup(bvh->bm_vert_to_node,
 	                                                   e->v1));
-	v_new = pbvh_bmesh_vert_create(bvh, node_index, mid, e->v1);
+	v_new = pbvh_bmesh_vert_create(bvh, node_index, mid, e->v1, eq_ctx->cd_vert_mask_offset);
 
 	/* update paint mask */
 	if (eq_ctx->cd_vert_mask_offset != -1) {
@@ -851,7 +853,7 @@ static void pbvh_bmesh_collapse_edge(PBVH *bvh, BMEdge *e, BMVert *v1,
 	}
 
 	/* Kill the edge */
-	BLI_assert(BM_edge_face_count(e) == 0);
+	BLI_assert(BM_edge_is_wire(e));
 	BM_edge_kill(bvh->bm, e);
 
 	/* For all remaining faces of v_del, create a new face that is the
@@ -935,14 +937,14 @@ static void pbvh_bmesh_collapse_edge(PBVH *bvh, BMEdge *e, BMVert *v1,
 		/* Check if any of the face's edges are now unused by any
 		 * face, if so delete them */
 		for (j = 0; j < 3; j++) {
-			if (BM_edge_face_count(e_tri[j]) == 0)
+			if (BM_edge_is_wire(e_tri[j]))
 				BM_edge_kill(bvh->bm, e_tri[j]);
 		}
 
 		/* Delete unused vertices */
 		for (j = 0; j < 3; j++) {
 			if (v_tri[j]) {
-				BM_log_vert_removed(bvh->bm, bvh->bm_log, v_tri[j]);
+				BM_log_vert_removed(bvh->bm_log, v_tri[j], cd_vert_mask_offset);
 				BM_vert_kill(bvh->bm, v_tri[j]);
 			}
 		}
@@ -951,14 +953,14 @@ static void pbvh_bmesh_collapse_edge(PBVH *bvh, BMEdge *e, BMVert *v1,
 	/* Move v_conn to the midpoint of v_conn and v_del (if v_conn still exists, it
 	 * may have been deleted above) */
 	if (!BLI_ghash_haskey(deleted_verts, v_conn)) {
-		BM_log_vert_before_modified(bvh->bm, bvh->bm_log, v_conn);
+		BM_log_vert_before_modified(bvh->bm_log, v_conn, cd_vert_mask_offset);
 		mid_v3_v3v3(v_conn->co, v_conn->co, v_del->co);
 	}
 
 	/* Delete v_del */
 	BLI_assert(BM_vert_face_count(v_del) == 0);
 	BLI_ghash_insert(deleted_verts, v_del, NULL);
-	BM_log_vert_removed(bvh->bm, bvh->bm_log, v_del);
+	BM_log_vert_removed(bvh->bm_log, v_del, cd_vert_mask_offset);
 	BM_vert_kill(bvh->bm, v_del);
 }
 

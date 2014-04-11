@@ -454,7 +454,7 @@ static const char *sensor_name(int type)
 	case SENS_JOYSTICK:
 		return N_("Joystick");
 	}
-	return N_("unknown");
+	return N_("Unknown");
 }
 
 static const char *controller_name(int type)
@@ -477,7 +477,7 @@ static const char *controller_name(int type)
 	case CONT_PYTHON:
 		return N_("Python");
 	}
-	return N_("unknown");
+	return N_("Unknown");
 }
 
 static const char *actuator_name(int type)
@@ -528,7 +528,7 @@ static const char *actuator_name(int type)
 	case ACT_STEERING:
 		return N_("Steering");
 	}
-	return N_("unknown");
+	return N_("Unknown");
 }
 
 static void set_sca_ob(Object *ob)
@@ -922,7 +922,7 @@ static uiBlock *controller_state_mask_menu(bContext *C, ARegion *ar, void *arg_c
 	return block;
 }
 
-static int is_sensor_linked(uiBlock *block, bSensor *sens)
+static bool is_sensor_linked(uiBlock *block, bSensor *sens)
 {
 	bController *cont;
 	int i;

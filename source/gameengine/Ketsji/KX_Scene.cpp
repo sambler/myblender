@@ -1648,8 +1648,9 @@ static void update_anim_thread_func(TaskPool *pool, void *taskdata, int UNUSED(t
 		for (int j=0; j<children->GetCount(); ++j) {
 			child = (KX_GameObject*)children->GetValue(j);
 
-			if (child->GetDeformer())
+			if (child->GetDeformer()) {
 				child->GetDeformer()->Update();
+			}
 		}
 
 		children->Release();

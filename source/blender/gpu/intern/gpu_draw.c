@@ -261,7 +261,7 @@ void GPU_set_gpu_mipmapping(int gpu_mipmap)
 
 static void gpu_generate_mipmap(GLenum target)
 {
-	int is_ati = GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_ANY, GPU_DRIVER_ANY);
+	const bool is_ati = GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_ANY, GPU_DRIVER_ANY);
 	int target_enabled = 0;
 
 	/* work around bug in ATI driver, need to have GL_TEXTURE_2D enabled
@@ -1040,7 +1040,7 @@ void GPU_paint_update_image(Image *ima, int x, int y, int w, int h)
 		/* if color correction is needed, we must update the part that needs updating. */
 		if (ibuf->rect_float) {
 			float *buffer = MEM_mallocN(w*h*sizeof(float)*4, "temp_texpaint_float_buf");
-			int is_data = (ima->tpageflag & IMA_GLBIND_IS_DATA);
+			bool is_data = (ima->tpageflag & IMA_GLBIND_IS_DATA) != 0;
 			IMB_partial_rect_from_float(ibuf, buffer, x, y, w, h, is_data);
 
 			if (GPU_check_scaled_image(ibuf, ima, buffer, x, y, w, h)) {
@@ -1403,8 +1403,12 @@ void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, O
 	const bool new_shading_nodes = BKE_scene_use_new_shading_nodes(scene);
 	const bool use_matcap = (v3d->flag2 & V3D_SHOW_SOLID_MATCAP) != 0;  /* assumes v3d->defmaterial->preview is set */
 
-	ob = BKE_object_lod_matob_get(ob, scene);
-	
+#ifdef WITH_GAMEENGINE
+	if (rv3d->rflag & RV3D_IS_GAME_ENGINE) {
+		ob = BKE_object_lod_matob_get(ob, scene);
+	}
+#endif
+
 	/* initialize state */
 	memset(&GMS, 0, sizeof(GMS));
 	GMS.lastmatnr = -1;
@@ -1597,6 +1601,9 @@ int GPU_enable_material(int nr, void *attribs)
 				else
 					glDisable(GL_CULL_FACE);
 			}
+
+			if (GMS.use_matcaps)
+				glColor3f(1.0, 1.0, 1.0f);
 		}
 		else {
 			/* or do fixed function opengl material */

@@ -143,7 +143,7 @@ static unsigned int power_of_2_max_u(unsigned int x)
 	x = x | (x >> 2);
 	x = x | (x >> 4);
 	x = x | (x >> 8);
-	x = x | (x >>16);
+	x = x | (x >> 16);
 	return x + 1;
 }
 #endif
@@ -311,10 +311,12 @@ BLI_mempool *BLI_mempool_create(unsigned int esize, unsigned int totelem,
 #endif
 	pool->totused = 0;
 
-	/* allocate the actual chunks */
-	for (i = 0; i < maxchunks; i++) {
-		BLI_mempool_chunk *mpchunk = mempool_chunk_alloc(pool);
-		lasttail = mempool_chunk_add(pool, mpchunk, lasttail);
+	if (totelem) {
+		/* allocate the actual chunks */
+		for (i = 0; i < maxchunks; i++) {
+			BLI_mempool_chunk *mpchunk = mempool_chunk_alloc(pool);
+			lasttail = mempool_chunk_add(pool, mpchunk, lasttail);
+		}
 	}
 
 #ifdef WITH_MEM_VALGRIND

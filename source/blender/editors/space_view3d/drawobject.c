@@ -1091,8 +1091,8 @@ static void draw_transp_spot_volume(Lamp *la, float x, float z)
 	glCullFace(GL_BACK);
 }
 
-static void drawlamp(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
-                     const char dt, const short dflag, const unsigned char ob_wire_col[4])
+static void drawlamp(View3D *v3d, RegionView3D *rv3d, Base *base,
+                     const char dt, const short dflag, const unsigned char ob_wire_col[4], const bool is_obact)
 {
 	Object *ob = base->object;
 	const float pixsize = ED_view3d_pixel_size(rv3d, ob->obmat[3]);
@@ -1147,8 +1147,12 @@ static void drawlamp(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 
 		if ((dflag & DRAW_CONSTCOLOR) == 0) {
 			if (ob->id.us > 1) {
-				if (ob == OBACT || (ob->flag & SELECT)) glColor4ub(0x88, 0xFF, 0xFF, 155);
-				else glColor4ub(0x77, 0xCC, 0xCC, 155);
+				if (is_obact || (ob->flag & SELECT)) {
+					glColor4ub(0x88, 0xFF, 0xFF, 155);
+				}
+				else {
+					glColor4ub(0x77, 0xCC, 0xCC, 155);
+				}
 			}
 		}
 		
@@ -2399,6 +2403,48 @@ static int draw_dm_test_freestyle_face_mark(BMesh *bm, BMFace *efa)
 
 #endif
 
+/* Draw loop normals. */
+static void draw_dm_loop_normals(BMEditMesh *em, Scene *scene, Object *ob, DerivedMesh *dm)
+{
+	/* XXX Would it be worth adding a dm->foreachMappedLoop func just for this? I doubt it... */
+
+	/* We can't use dm->getLoopDataLayout(dm) here, we want to always access dm->loopData, EditDerivedBMesh would
+	 * return loop data from bmesh itself. */
+	float (*lnors)[3] = DM_get_loop_data_layer(dm, CD_NORMAL);
+
+	if (lnors) {
+		drawDMNormal_userData data;
+		const MLoop *mloops = dm->getLoopArray(dm);
+		const MVert *mverts = dm->getVertArray(dm);
+		int i, totloops = dm->getNumLoops(dm);
+
+		data.bm = em->bm;
+		data.normalsize = scene->toolsettings->normalsize;
+
+		calcDrawDMNormalScale(ob, &data);
+
+		glBegin(GL_LINES);
+		for (i = 0; i < totloops; i++, mloops++, lnors++) {
+			float no[3];
+			const float *co = mverts[mloops->v].co;
+
+			if (!data.uniform_scale) {
+				mul_v3_m3v3(no, data.tmat, (float *)lnors);
+				normalize_v3(no);
+				mul_m3_v3(data.imat, no);
+			}
+			else {
+				copy_v3_v3(no, (float *)lnors);
+			}
+			mul_v3_fl(no, data.normalsize);
+			add_v3_v3(no, co);
+			glVertex3fv(co);
+			glVertex3fv(no);
+		}
+		glEnd();
+	}
+}
+
 /* Draw faces with color set based on selection
  * return 2 for the active face so it renders with stipple enabled */
 static DMDrawOption draw_dm_faces_sel__setDrawOptions(void *userData, int index)
@@ -3346,6 +3392,10 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 		if (me->drawflag & ME_DRAW_VNORMALS) {
 			UI_ThemeColor(TH_VNORMAL);
 			draw_dm_vert_normals(em, scene, ob, cageDM);
+		}
+		if (me->drawflag & ME_DRAW_LNORMALS) {
+			UI_ThemeColor(TH_VNORMAL);
+			draw_dm_loop_normals(em, scene, ob, cageDM);
 		}
 
 		if ((me->drawflag & (ME_DRAWEXTRA_EDGELEN |
@@ -6482,7 +6532,7 @@ static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
 	glDepthMask(1);
 }
 
-static void draw_wire_extra(Scene *scene, RegionView3D *rv3d, Object *ob, unsigned char ob_wire_col[4])
+static void draw_wire_extra(Scene *scene, RegionView3D *rv3d, Object *ob, const unsigned char ob_wire_col[4])
 {
 	if (ELEM4(ob->type, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL)) {
 
@@ -6553,7 +6603,8 @@ static void draw_hooks(Object *ob)
 	}
 }
 
-static void draw_rigid_body_pivot(bRigidBodyJointConstraint *data, const short dflag, unsigned char ob_wire_col[4])
+static void draw_rigid_body_pivot(bRigidBodyJointConstraint *data,
+                                  const short dflag, const unsigned char ob_wire_col[4])
 {
 	const char *axis_str[3] = {"px", "py", "pz"};
 	int axis;
@@ -6731,8 +6782,8 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	RegionView3D *rv3d = ar->regiondata;
 	float vec1[3], vec2[3];
 	unsigned int col = 0;
-	unsigned char _ob_wire_col[4];      /* dont initialize this */
-	unsigned char *ob_wire_col = NULL;  /* dont initialize this, use NULL crashes as a way to find invalid use */
+	unsigned char _ob_wire_col[4];            /* dont initialize this */
+	const unsigned char *ob_wire_col = NULL;  /* dont initialize this, use NULL crashes as a way to find invalid use */
 	int i, selstart, selend, empty_object = 0;
 	short dtx;
 	char  dt;
@@ -7073,7 +7124,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				break;
 			case OB_LAMP:
 				if (!render_override) {
-					drawlamp(scene, v3d, rv3d, base, dt, dflag, ob_wire_col);
+					drawlamp(v3d, rv3d, base, dt, dflag, ob_wire_col, is_obact);
 				}
 				break;
 			case OB_CAMERA:

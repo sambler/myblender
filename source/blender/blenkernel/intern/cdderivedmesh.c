@@ -269,7 +269,8 @@ static PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 
 		BKE_pbvh_build_bmesh(cddm->pbvh, ob->sculpt->bm,
 		                     ob->sculpt->bm_smooth_shading,
-		                     ob->sculpt->bm_log);
+		                     ob->sculpt->bm_log, ob->sculpt->cd_vert_node_offset,
+		                     ob->sculpt->cd_face_node_offset);
 
 		pbvh_show_diffuse_color_set(cddm->pbvh, ob->sculpt->show_diffuse_color);
 	}
@@ -421,7 +422,7 @@ static void cdDM_drawUVEdges(DerivedMesh *dm)
 	}
 }
 
-static void cdDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int drawAllEdges)
+static void cdDM_drawEdges(DerivedMesh *dm, bool drawLooseEdges, bool drawAllEdges)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh *) dm;
 	MVert *mvert = cddm->mvert;
@@ -531,7 +532,7 @@ static void cdDM_drawLooseEdges(DerivedMesh *dm)
 
 static void cdDM_drawFacesSolid(DerivedMesh *dm,
                                 float (*partial_redraw_planes)[4],
-                                int UNUSED(fast), DMSetMaterial setMaterial)
+                                bool UNUSED(fast), DMSetMaterial setMaterial)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh *) dm;
 	MVert *mvert = cddm->mvert;
@@ -1511,7 +1512,7 @@ static void cdDM_drawFacesGLSL(DerivedMesh *dm, DMSetMaterial setMaterial)
 }
 
 static void cdDM_drawMappedFacesMat(DerivedMesh *dm,
-                                    void (*setMaterial)(void *userData, int, void *attribs),
+                                    void (*setMaterial)(void *userData, int matnr, void *attribs),
                                     bool (*setFace)(void *userData, int index), void *userData)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh *) dm;
@@ -2162,6 +2163,8 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, const bool use_mdisps,
 			mloop->e = BM_elem_index_get(l_iter->e);
 			CustomData_from_bmesh_block(&bm->ldata, &dm->loopData, l_iter->head.data, j);
 
+			BM_elem_index_set(l_iter, j); /* set_inline */
+
 			j++;
 			mloop++;
 		} while ((l_iter = l_iter->next) != l_first);
@@ -2170,7 +2173,7 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, const bool use_mdisps,
 
 		if (add_orig) *index++ = i;
 	}
-	bm->elem_index_dirty &= ~BM_FACE;
+	bm->elem_index_dirty &= ~(BM_FACE | BM_LOOP);
 
 	dm->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 

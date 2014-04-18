@@ -4793,6 +4793,36 @@ void sculpt_pbvh_clear(Object *ob)
 	BKE_object_free_derived_caches(ob);
 }
 
+void sculpt_dyntopo_node_layers_add(SculptSession *ss)
+{
+	int cd_node_layer_index;
+
+	char layer_id[] = "_dyntopo_node_id";
+
+	cd_node_layer_index = CustomData_get_named_layer_index(&ss->bm->vdata, CD_PROP_INT, layer_id);
+	if (cd_node_layer_index == -1) {
+		BM_data_layer_add_named(ss->bm, &ss->bm->vdata, CD_PROP_INT, layer_id);
+		cd_node_layer_index = CustomData_get_named_layer_index(&ss->bm->vdata, CD_PROP_INT, layer_id);
+	}
+
+	ss->cd_vert_node_offset = CustomData_get_n_offset(&ss->bm->vdata, CD_PROP_INT,
+	                                                  cd_node_layer_index - CustomData_get_layer_index(&ss->bm->vdata, CD_PROP_INT));
+
+	ss->bm->vdata.layers[cd_node_layer_index].flag |= CD_FLAG_TEMPORARY;
+
+	cd_node_layer_index = CustomData_get_named_layer_index(&ss->bm->pdata, CD_PROP_INT, layer_id);
+	if (cd_node_layer_index == -1) {
+		BM_data_layer_add_named(ss->bm, &ss->bm->pdata, CD_PROP_INT, layer_id);
+		cd_node_layer_index = CustomData_get_named_layer_index(&ss->bm->pdata, CD_PROP_INT, layer_id);
+	}
+
+	ss->cd_face_node_offset = CustomData_get_n_offset(&ss->bm->pdata, CD_PROP_INT,
+	                                                  cd_node_layer_index - CustomData_get_layer_index(&ss->bm->pdata, CD_PROP_INT));
+
+	ss->bm->pdata.layers[cd_node_layer_index].flag |= CD_FLAG_TEMPORARY;
+}
+
+
 void sculpt_update_after_dynamic_topology_toggle(bContext *C)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -4825,6 +4855,8 @@ void sculpt_dynamic_topology_enable(bContext *C)
 	BM_mesh_bm_from_me(ss->bm, me, true, true, ob->shapenr);
 	sculpt_dynamic_topology_triangulate(ss->bm);
 	BM_data_layer_add(ss->bm, &ss->bm->vdata, CD_PAINT_MASK);
+	sculpt_dyntopo_node_layers_add(ss);
+	/* make sure the data for existing faces are initialized */
 	BM_mesh_normals_update(ss->bm);
 
 	/* Enable dynamic topology */

@@ -594,7 +594,7 @@ static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
 	int *mat_orig_to_new;
 	int *cur_index_per_mat;
 	int i;
-	int success;
+	bool success;
 	GLboolean uploaded;
 
 	pool = gpu_get_global_buffer_pool();
@@ -1283,13 +1283,13 @@ void GPU_color_switch(int mode)
 
 /* return 1 if drawing should be done using old immediate-mode
  * code, 0 otherwise */
-int GPU_buffer_legacy(DerivedMesh *dm)
+bool GPU_buffer_legacy(DerivedMesh *dm)
 {
 	int test = (U.gameflags & USER_DISABLE_VBO);
 	if (test)
 		return 1;
 
-	if (dm->drawObject == 0)
+	if (dm->drawObject == NULL)
 		dm->drawObject = GPU_drawobject_new(dm);
 	return dm->drawObject->legacy;
 }
@@ -2576,14 +2576,15 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 bool GPU_pbvh_buffers_diffuse_changed(GPU_PBVH_Buffers *buffers, GSet *bm_faces, bool show_diffuse_color)
 {
 	float diffuse_color[4];
+	bool use_matcaps = GPU_material_use_matcaps_get();
 
 	if (buffers->show_diffuse_color != show_diffuse_color)
 		return true;
 
-	if (buffers->use_matcaps != GPU_material_use_matcaps_get())
+	if (buffers->use_matcaps != use_matcaps)
 		return true;
 
-	if (buffers->show_diffuse_color == false)
+	if ((buffers->show_diffuse_color == false) || use_matcaps)
 		return false;
 
 	if (buffers->mface) {

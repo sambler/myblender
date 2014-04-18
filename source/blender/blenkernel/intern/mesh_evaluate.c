@@ -872,7 +872,7 @@ void BKE_mesh_calc_poly_center(MPoly *mpoly, MLoop *loopstart,
 
 /* note, passing polynormal is only a speedup so we can skip calculating it */
 float BKE_mesh_calc_poly_area(MPoly *mpoly, MLoop *loopstart,
-                              MVert *mvarray, const float polynormal[3])
+                              MVert *mvarray)
 {
 	if (mpoly->totloop == 3) {
 		return area_tri_v3(mvarray[loopstart[0].v].co,
@@ -890,22 +890,16 @@ float BKE_mesh_calc_poly_area(MPoly *mpoly, MLoop *loopstart,
 	else {
 		int i;
 		MLoop *l_iter = loopstart;
-		float area, polynorm_local[3];
+		float area;
 		float (*vertexcos)[3] = BLI_array_alloca(vertexcos, (size_t)mpoly->totloop);
-		const float *no = polynormal ? polynormal : polynorm_local;
 
 		/* pack vertex cos into an array for area_poly_v3 */
 		for (i = 0; i < mpoly->totloop; i++, l_iter++) {
 			copy_v3_v3(vertexcos[i], mvarray[l_iter->v].co);
 		}
 
-		/* need normal for area_poly_v3 as well */
-		if (polynormal == NULL) {
-			BKE_mesh_calc_poly_normal(mpoly, loopstart, mvarray, polynorm_local);
-		}
-
 		/* finally calculate the area */
-		area = area_poly_v3((const float (*)[3])vertexcos, (unsigned int)mpoly->totloop, no);
+		area = area_poly_v3((const float (*)[3])vertexcos, (unsigned int)mpoly->totloop);
 
 		return area;
 	}
@@ -1242,7 +1236,7 @@ void BKE_mesh_loops_to_tessdata(CustomData *fdata, CustomData *ldata, CustomData
 		float (*lnors)[3] = CustomData_get_layer(ldata, CD_NORMAL);
 
 		for (findex = 0, lidx = loopindices; findex < num_faces; lidx++, findex++, fnors++) {
-			for (j = (*lidx)[3] ? 4 : 3; j--;) {
+			for (j = (mface ? mface[findex].v4 : (*lidx)[3]) ? 4 : 3; j--;) {
 				normal_float_to_short_v3((*fnors)[j], lnors[(*lidx)[j]]);
 			}
 		}

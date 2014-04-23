@@ -283,7 +283,7 @@ bool id_make_local(ID *id, bool test)
 		case ID_GD:
 			return false; /* not implemented */
 		case ID_LS:
-			return 0; /* not implemented */
+			return false; /* not implemented */
 	}
 
 	return false;
@@ -384,7 +384,7 @@ bool id_copy(ID *id, ID **newid, bool test)
 			return true;
 		case ID_LS:
 			if (!test) *newid = (ID *)BKE_copy_linestyle((FreestyleLineStyle *)id);
-			return 1;
+			return true;
 	}
 	
 	return false;
@@ -1348,6 +1348,11 @@ void id_clear_lib_data(Main *bmain, ID *id)
 	bNodeTree *ntree = NULL;
 
 	BKE_id_lib_local_paths(bmain, id->lib, id);
+
+	if (id->flag & LIB_FAKEUSER) {
+		id->us--;
+		id->flag &= ~LIB_FAKEUSER;
+	}
 
 	id->lib = NULL;
 	id->flag = LIB_LOCAL;

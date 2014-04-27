@@ -2095,6 +2095,12 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 	/* init binarytree-list for getting keyframes */
 	BLI_dlrbTree_init(&keys);
 	
+	/* seed up dummy dopesheet context with flags to perform necessary filtering */
+	if ((scene->flag & SCE_KEYS_NO_SELONLY) == 0) {
+		/* only selected channels are included */
+		ads.filterflag |= ADS_FILTER_ONLYSEL;
+	}
+	
 	/* populate tree with keyframe nodes */
 	scene_to_keylist(&ads, scene, &keys, NULL);
 
@@ -2869,9 +2875,11 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 	ARegion *ar = CTX_wm_region(C);
 	
 	/* some rules... */
-	if (ar->regiontype != RGN_TYPE_WINDOW)
+	if (ar->regiontype != RGN_TYPE_WINDOW) {
 		BKE_report(op->reports, RPT_ERROR, "Only window region can be 4-splitted");
+	}
 	else if (ar->alignment == RGN_ALIGN_QSPLIT) {
+		/* Exit quad-view */
 		ScrArea *sa = CTX_wm_area(C);
 		ARegion *arn;
 		
@@ -2879,10 +2887,19 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 		ar->alignment = 0;
 		
 		if (sa->spacetype == SPACE_VIEW3D) {
+			ARegion *ar_iter;
 			RegionView3D *rv3d = ar->regiondata;
-			rv3d->viewlock_quad = rv3d->viewlock | RV3D_VIEWLOCK_INIT;
+			rv3d->viewlock_quad = RV3D_VIEWLOCK_INIT;
 			rv3d->viewlock = 0;
 			rv3d->rflag &= ~RV3D_CLIPPING;
+
+			/* accumulate locks, incase they're mixed */
+			for (ar_iter = sa->regionbase.first; ar_iter; ar_iter = ar_iter->next) {
+				if (ar_iter->regiontype == RGN_TYPE_WINDOW) {
+					RegionView3D *rv3d_iter = ar_iter->regiondata;
+					rv3d->viewlock_quad |= rv3d_iter->viewlock;
+				}
+			}
 		}
 		
 		for (ar = sa->regionbase.first; ar; ar = arn) {
@@ -2897,9 +2914,11 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 		ED_area_tag_redraw(sa);
 		WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);
 	}
-	else if (ar->next)
+	else if (ar->next) {
 		BKE_report(op->reports, RPT_ERROR, "Only last region can be 4-splitted");
+	}
 	else {
+		/* Enter quad-view */
 		ScrArea *sa = CTX_wm_area(C);
 		ARegion *newar;
 		int count;

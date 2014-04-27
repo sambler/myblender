@@ -2059,9 +2059,13 @@ static struct TransIslandData *editmesh_islands_info_calc(BMEditMesh *em, int *r
 			/* pass */
 		}
 		else {
-			normalize_v3(no);
-			axis_dominant_v3_to_m3(trans_islands[i].axismtx, no);
-			invert_m3(trans_islands[i].axismtx);
+			if (normalize_v3(no) != 0.0f) {
+				axis_dominant_v3_to_m3(trans_islands[i].axismtx, no);
+				invert_m3(trans_islands[i].axismtx);
+			}
+			else {
+				unit_m3(trans_islands[i].axismtx);
+			}
 		}
 	}
 
@@ -3573,7 +3577,7 @@ static void bezt_to_transdata(TransData *td, TransData2D *td2d, AnimData *adt, B
                               float mtx[3][3], float smtx[3][3])
 {
 	float *loc = bezt->vec[bi];
-	float *cent = bezt->vec[1];
+	const float *cent = bezt->vec[1];
 
 	/* New location from td gets dumped onto the old-location of td2d, which then
 	 * gets copied to the actual data at td2d->loc2d (bezt->vec[n])
@@ -4107,14 +4111,16 @@ void flushTransGraphData(TransInfo *t)
 		/* handle snapping for time values
 		 *	- we should still be in NLA-mapping timespace
 		 *	- only apply to keyframes (but never to handles)
+		 *  - don't do this when cancelling, or else these changes won't go away
 		 */
-		if ((td->flag & TD_NOTIMESNAP) == 0) {
+		if ((t->state != TRANS_CANCEL) && (td->flag & TD_NOTIMESNAP) == 0) {
 			switch (sipo->autosnap) {
-				case SACTSNAP_FRAME: /* snap to nearest frame (or second if drawing seconds) */
-					if (sipo->flag & SIPO_DRAWTIME)
-						td2d->loc[0] = floor(((double)td2d->loc[0] / secf) + 0.5) * secf;
-					else
-						td2d->loc[0] = floor((double)td2d->loc[0] + 0.5);
+				case SACTSNAP_FRAME: /* snap to nearest frame */
+					td2d->loc[0] = floor((double)td2d->loc[0] + 0.5);
+					break;
+				
+				case SACTSNAP_SECOND: /* snap to nearest second */
+					td2d->loc[0] = floor(((double)td2d->loc[0] / secf) + 0.5) * secf;
 					break;
 				
 				case SACTSNAP_MARKER: /* snap to nearest marker */
@@ -4128,6 +4134,31 @@ void flushTransGraphData(TransInfo *t)
 			td2d->loc2d[0] = BKE_nla_tweakedit_remap(adt, td2d->loc[0], NLATIME_CONVERT_UNMAP);
 		else
 			td2d->loc2d[0] = td2d->loc[0];
+			
+		/* Time-stepping auto-snapping modes don't get applied for Graph Editor transforms,
+		 * as these use the generic transform modes which don't account for this sort of thing.
+		 * These ones aren't affected by NLA mapping, so we do this after the conversion...
+		 *
+		 * NOTE: We also have to apply to td->loc, as that's what the handle-adjustment step below looks
+		 *       to, otherwise we get "swimming handles"
+		 * NOTE: We don't do this when cancelling transforms, or else these changes don't go away
+		 */
+		if ((t->state != TRANS_CANCEL) && (td->flag & TD_NOTIMESNAP) == 0 && 
+		    ELEM(sipo->autosnap, SACTSNAP_STEP, SACTSNAP_TSTEP)) 
+		{
+			switch (sipo->autosnap) {
+				case SACTSNAP_STEP: /* frame step */
+					td2d->loc2d[0] = floor((double)td2d->loc[0] + 0.5);
+					td->loc[0]     = floor((double)td->loc[0] + 0.5);
+					break;
+				
+				case SACTSNAP_TSTEP: /* second step */
+					/* XXX: the handle behaviour in this case is still not quite right... */
+					td2d->loc[0] = floor(((double)td2d->loc[0] / secf) + 0.5) * secf;
+					td->loc[0]   = floor(((double)td->loc[0] / secf) + 0.5) * secf;
+					break;
+			}
+		}
 		
 		/* if int-values only, truncate to integers */
 		if (td->flag & TD_INTVALUES)
@@ -6026,7 +6057,7 @@ typedef struct TransDataTracking {
 
 	/* tracks transformation from main window */
 	int area;
-	float *relative, *loc;
+	const float *relative, *loc;
 	float soffset[2], srelative[2];
 	float offset[2];
 

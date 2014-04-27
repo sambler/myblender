@@ -916,7 +916,7 @@ int ANIM_apply_keyingset(bContext *C, ListBase *dsources, bAction *act, KeyingSe
 	ReportList *reports = CTX_wm_reports(C);
 	KS_Path *ksp;
 	int kflag = 0, success = 0;
-	char *groupname = NULL;
+	const char *groupname = NULL;
 	
 	/* sanity checks */
 	if (ks == NULL)
@@ -1009,7 +1009,7 @@ int ANIM_apply_keyingset(bContext *C, ListBase *dsources, bAction *act, KeyingSe
 		}
 		
 		/* send notifiers for updates (this doesn't require context to work!) */
-		WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+		WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_ADDED, NULL);
 	}
 	
 	/* return the number of channels successfully affected */

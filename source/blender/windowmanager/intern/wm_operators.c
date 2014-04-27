@@ -497,7 +497,7 @@ bool WM_operatortype_remove(const char *idname)
 /* SOME_OT_op -> some.op */
 void WM_operator_py_idname(char *to, const char *from)
 {
-	char *sep = strstr(from, "_OT_");
+	const char *sep = strstr(from, "_OT_");
 	if (sep) {
 		int ofs = (sep - from);
 		
@@ -519,7 +519,7 @@ void WM_operator_py_idname(char *to, const char *from)
 void WM_operator_bl_idname(char *to, const char *from)
 {
 	if (from) {
-		char *sep = strchr(from, '.');
+		const char *sep = strchr(from, '.');
 
 		if (sep) {
 			int ofs = (sep - from);
@@ -2423,6 +2423,7 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 	Scene *scene = CTX_data_scene(C);
 	Main *mainl = NULL;
 	BlendHandle *bh;
+	Library *lib;
 	PropertyRNA *prop;
 	char name[FILE_MAX], dir[FILE_MAX], libname[FILE_MAX], group[BLO_GROUP_MAX];
 	int idcode, totfiles = 0;
@@ -2497,6 +2498,9 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 
 	/* here appending/linking starts */
 	mainl = BLO_library_append_begin(bmain, &bh, libname);
+	lib = mainl->curlib;
+	BLI_assert(lib);
+
 	if (totfiles == 0) {
 		BLO_library_append_named_part_ex(C, mainl, &bh, name, idcode, flag);
 	}
@@ -2516,9 +2520,8 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 
 	/* append, rather than linking */
 	if ((flag & FILE_LINK) == 0) {
-		Library *lib = BLI_findstring(&bmain->library, libname, offsetof(Library, filepath));
-		if (lib) BKE_library_make_local(bmain, lib, true);
-		else BLI_assert(!"cant find name of just added library!");
+		BLI_assert(BLI_findindex(&bmain->library, lib) != -1);
+		BKE_library_make_local(bmain, lib, true);
 	}
 
 	/* important we unset, otherwise these object wont
@@ -3333,7 +3336,7 @@ static void gesture_lasso_apply(bContext *C, wmOperator *op)
 	PointerRNA itemptr;
 	float loc[2];
 	int i;
-	short *lasso = gesture->customdata;
+	const short *lasso = gesture->customdata;
 	
 	/* operator storage as path. */
 

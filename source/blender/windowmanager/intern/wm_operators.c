@@ -91,7 +91,6 @@
 
 #include "ED_screen.h"
 #include "ED_util.h"
-#include "ED_object.h"
 #include "ED_view3d.h"
 
 #include "RNA_access.h"
@@ -1587,6 +1586,14 @@ static int wm_operator_props_popup_ex(bContext *C, wmOperator *op,
 		BKE_reportf(op->reports, RPT_ERROR,
 		            "Operator '%s' does not have register enabled, incorrect invoke function", op->type->idname);
 		return OPERATOR_CANCELLED;
+	}
+
+	if (do_redo) {
+		if ((op->type->flag & OPTYPE_UNDO) == 0) {
+			BKE_reportf(op->reports, RPT_ERROR,
+			            "Operator '%s' does not have undo enabled, incorrect invoke function", op->type->idname);
+			return OPERATOR_CANCELLED;
+		}
 	}
 
 	/* if we don't have global undo, we can't do undo push for automatic redo,

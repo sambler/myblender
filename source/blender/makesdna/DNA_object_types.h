@@ -327,6 +327,9 @@ typedef struct DupliObject {
 
 	/* particle this dupli was generated from */
 	struct ParticleSystem *particle_system;
+
+	char no_render;
+	char pad1[7];
 } DupliObject;
 
 /* **************** OBJECT ********************* */
@@ -397,6 +400,7 @@ enum {
 	OB_DUPLIROT         = 1 << 5,
 	OB_DUPLINOSPEED     = 1 << 6,
 /*	OB_POWERTRACK       = 1 << 7,*/ /*UNUSED*/
+	OB_DUPLIARRAY       = 1 << 7, /* re-use to prevent using sign bit with 1 << 15 */
 	OB_DUPLIGROUP       = 1 << 8,
 	OB_DUPLIFACES       = 1 << 9,
 	OB_DUPLIFACES_SCALE = 1 << 10,
@@ -405,7 +409,7 @@ enum {
 	OB_NO_CONSTRAINTS   = 1 << 13,  /* runtime constraints disable */
 	OB_NO_PSYS_UPDATE   = 1 << 14,  /* hack to work around particle issue */
 
-	OB_DUPLI            = OB_DUPLIFRAMES | OB_DUPLIVERTS | OB_DUPLIGROUP | OB_DUPLIFACES | OB_DUPLIPARTS,
+	OB_DUPLI            = OB_DUPLIFRAMES | OB_DUPLIVERTS | OB_DUPLIGROUP | OB_DUPLIFACES | OB_DUPLIPARTS | OB_DUPLIARRAY,
 };
 
 /* (short) ipoflag */

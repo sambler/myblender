@@ -35,6 +35,8 @@
 
 /* Array modifier: duplicates the object multiple times along an axis */
 
+///#include <time.h>
+///#include <math.h>
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
@@ -42,6 +44,7 @@
 #include "BLI_ghash.h"
 
 #include "DNA_curve_types.h"
+#include "DNA_group_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -49,8 +52,13 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
 #include "BKE_curve.h"
+#include "BKE_group.h"
 #include "BKE_modifier.h"
+///#include "BKE_anim.h"
 
+///#include "BLI_rand.h"
+
+#include "BKE_ama.h"
 #include "MOD_util.h"
 
 #include "bmesh.h"
@@ -74,7 +82,7 @@ static void initData(ModifierData *md)
 	/* default to 2 duplicates distributed along the x-axis by an
 	 * offset of 1 object-width
 	 */
-	amd->start_cap = amd->end_cap = amd->curve_ob = amd->offset_ob = NULL;
+	amd->start_cap = amd->mid_cap = amd->end_cap = amd->curve_cap = amd->curve_ob = amd->offset_ob = NULL;
 	amd->count = 2;
 	zero_v3(amd->offset);
 	amd->scale[0] = 1;
@@ -84,6 +92,29 @@ static void initData(ModifierData *md)
 	amd->fit_type = MOD_ARR_FIXEDCOUNT;
 	amd->offset_type = MOD_ARR_OFF_RELATIVE;
 	amd->flags = 0;
+	amd->seed[0] = amd->seed[1] = amd->seed[2] = 0;
+	amd->type = MOD_ARR_MOD_NRM;
+	amd->mode = !MOD_ARR_MOD_ADV;
+	amd->displays = !MOD_ARR_DIS_ADV;
+	amd->loc_offset[0] = amd->loc_offset[1] = amd->loc_offset[2] = 0;
+	amd->rot_offset[0] = amd->rot_offset[1] = amd->rot_offset[2] = 0;
+	amd->scale_offset[0] = amd->scale_offset[1] = amd->scale_offset[2] = 1;
+	amd->sign = MOD_ARR_SIGN_P + MOD_ARR_SIGN_L;
+	amd->lock = MOD_ARR_LOCK;
+	amd->flag_offset = MOD_ARR_PROP + MOD_ARR_LOCAL;
+	amd->rays = 1;
+	amd->rand_mat = MOD_ARR_MAT;
+	amd->mat_ob = MOD_ARR_AR_MAT_RND;
+	amd->cont_mat = 1;
+	amd->count_mc = 1;
+	amd->dist_mc = MOD_ARR_DIST_SEQ;
+	amd->rays_dir = MOD_ARR_RAYS_X;
+	amd->arr_group = NULL;
+	amd->rand_group = !MOD_ARR_RAND_GROUP;
+	amd->dist_cu = MOD_ARR_DIST_EVENLY;
+	amd->outer_cp = !MOD_ARR_CP_FIRST;
+	amd->Mem_Mat_Ob.start_cap = 0;
+	amd->Mem_Mat_Ob.end_cap = 0;
 }
 
 static void copyData(ModifierData *md, ModifierData *target)
@@ -103,8 +134,10 @@ static void foreachObjectLink(
 	ArrayModifierData *amd = (ArrayModifierData *) md;
 
 	walk(userData, ob, &amd->start_cap);
+	walk(userData, ob, &amd->mid_cap);
 	walk(userData, ob, &amd->end_cap);
 	walk(userData, ob, &amd->curve_ob);
+	walk(userData, ob, &amd->curve_cap);
 	walk(userData, ob, &amd->offset_ob);
 }
 
@@ -119,6 +152,12 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 		dag_add_relation(forest, curNode, obNode,
 		                 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Array Modifier");
 	}
+	if (amd->mid_cap) {
+		DagNode *curNode = dag_get_node(forest, amd->mid_cap);
+
+		dag_add_relation(forest, curNode, obNode,
+				 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Array Modifier");
+	}
 	if (amd->end_cap) {
 		DagNode *curNode = dag_get_node(forest, amd->end_cap);
 
@@ -131,6 +170,12 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 
 		dag_add_relation(forest, curNode, obNode,
 		                 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Array Modifier");
+	}
+	if (amd->curve_cap) {
+		DagNode *curNode = dag_get_node(forest, amd->curve_cap);
+
+		dag_add_relation(forest, curNode, obNode,
+						 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Array Modifier");
 	}
 	if (amd->offset_ob) {
 		DagNode *curNode = dag_get_node(forest, amd->offset_ob);
@@ -336,18 +381,29 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	/* offset matrix */
 	float offset[4][4];
 	float final_offset[4][4];
+	float mid_offset[4][4], half_offset[4][4];
+	float tmp_mat[4][4], prec_mid[4][4];
+	float alpha = 0, d_alp = 0, circle;
+	float f_o;
+	int start, start_mc;
 	float length = amd->length;
 	int count = amd->count, maxVerts;
 	int *indexMap = NULL;
-	DerivedMesh *start_cap = NULL, *end_cap = NULL;
+	DerivedMesh *start_cap = NULL, *mid_cap = NULL, *end_cap = NULL;
 	MVert *src_mvert;
 	BMOpSlot *slot_targetmap = NULL;  /* for weld_op */
+	Nurb *nu = NULL;
 
 	/* need to avoid infinite recursion here */
 	if (amd->start_cap && amd->start_cap != ob && amd->start_cap->type == OB_MESH)
 		start_cap = get_dm_for_modifier(amd->start_cap, flag);
+	if(amd->mid_cap && amd->mid_cap != ob && amd->mid_cap->type == OB_MESH)
+		mid_cap = get_dm_for_modifier(amd->mid_cap, flag);
 	if (amd->end_cap && amd->end_cap != ob && amd->end_cap->type == OB_MESH)
 		end_cap = get_dm_for_modifier(amd->end_cap, flag);
+
+	if (amd->count_mc < 1)
+		amd->count_mc = 1;
 
 	unit_m4(offset);
 
@@ -376,6 +432,10 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 		copy_m4_m4(offset, result_mat);
 	}
 
+/* ***************
+	if ((amd->type & MOD_ARR_MOD_CURVE) && (amd->curve_ob))
+		length = length_fitcurve(amd, scene);
+
 	if (amd->fit_type == MOD_ARR_FITCURVE && amd->curve_ob) {
 		Curve *cu = amd->curve_ob->data;
 		if (cu) {
@@ -391,32 +451,153 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			}
 		}
 	}
+ * ***************
+*/
 
-	/* calculate the maximum number of copies which will fit within the
-	 * prescribed length */
-	if (amd->fit_type == MOD_ARR_FITLENGTH || amd->fit_type == MOD_ARR_FITCURVE) {
-		float dist = len_v3(offset[3]);
-
-		if (dist > 1e-6f)
-			/* this gives length = first copy start to last copy end
-			 * add a tiny offset for floating point rounding errors */
-			count = (length + 1e-6f) / dist;
-		else
-			/* if the offset has no translation, just make one copy */
-			count = 1;
+	if (amd->fit_type & MOD_ARR_FITBETWEEN) {
+		count = count + 2;
+		if (amd->type & MOD_ARR_MOD_NRM) {
+			if ((amd->offset_type & MOD_ARR_OFF_OBJ) && (amd->offset_ob)) {
+				//float dist = sqrt(dot_v3v3(amd->offset_ob->obmat[3], amd->offset_ob->obmat[3]));
+				offset[3][0] = amd->offset_ob->obmat[3][0] / (count - 1);
+				offset[3][1] = amd->offset_ob->obmat[3][1] / (count - 1);
+				offset[3][2] = amd->offset_ob->obmat[3][2] / (count - 1);
+			}
+			else {
+				offset[3][0] = offset[3][0] / (count - 1);
+				offset[3][1] = offset[3][1] / (count - 1);
+				offset[3][2] = offset[3][2] / (count - 1);
+			}
+		}
+		else { /* amd->type & MOD_ARR_MOD_CURVE*/
+			Curve *cu = amd->curve_ob->data;
+			nu = cu->nurb.first;
+			if (nu->bezt)
+				copy_v3_v3(offset[3], nu->bezt[nu->pntsu - 1].vec[1]);
+			else
+				copy_v3_v3(offset[3], nu->bp[nu->pntsu * nu->pntsv - 1].vec);
+			offset[3][0] = offset[3][0] / (count - 1);
+			offset[3][1] = offset[3][1] / (count - 1);
+			offset[3][2] = offset[3][2] / (count - 1);
+		}
 	}
 
 	if (count < 1)
 		count = 1;
 
+	/**/
+	if ((amd->dist_mc & MOD_ARR_DIST_CURVE) && (amd->curve_cap)){
+		int dec = 0;
+		Curve *cu = amd->curve_cap->data;
+		nu = cu->nurb.first;
+		unit_m4(mid_offset);
+		if (amd->outer_cp & MOD_ARR_CP_FIRST && amd->start_cap)
+			dec = dec + 1;
+		if (amd->outer_cp & MOD_ARR_CP_LAST && amd->end_cap)
+			dec = dec + 1;
+		if (nu->bezt) {
+			if (amd->outer_cp & MOD_ARR_CP_FIRST && amd->start_cap)
+				copy_v3_v3(mid_offset[3], nu->bezt[1].vec[1]);
+			else
+				copy_v3_v3(mid_offset[3], nu->bezt[0].vec[1]);
+			if (amd->count_mc > (nu->pntsu - dec))
+				amd->count_mc = nu->pntsu - dec;
+		}
+		else {
+			if (amd->outer_cp & MOD_ARR_CP_FIRST && amd->start_cap)
+				copy_v3_v3(mid_offset[3], nu->bp[1].vec);
+			else
+				copy_v3_v3(mid_offset[3], nu->bp[0].vec);
+			if (amd->count_mc > (nu->pntsu * nu->pntsv - dec))
+				amd->count_mc = nu->pntsu * nu->pntsv - dec;
+		}
+	}
+	else
+		if (amd->count_mc >= count)
+			amd->count_mc = count - 1;
+
+	if ((amd->mode & MOD_ARR_MOD_ADV) || (amd->mode & MOD_ARR_MOD_ADV_MAT)) {
+		start = 0;
+		start_mc = 0;
+		if (!amd->Mem_Ob)
+			amd->Mem_Ob = MEM_callocN(sizeof(*amd->Mem_Ob) * count, "Mem_Ob");
+		else {
+			int dim = 0;
+			dim = MEM_allocN_len(amd->Mem_Ob) / sizeof(*amd->Mem_Ob);
+			if (dim != count) {
+				amd->Mem_Ob = MEM_reallocN(amd->Mem_Ob, sizeof(*amd->Mem_Ob) * count);
+				if (dim < count)
+					start = dim;
+				else if (dim > count)
+					start = amd->count;
+			}
+		}
+
+		if (!amd->Mem_Mat_Ob.mid_cap)
+			amd->Mem_Mat_Ob.mid_cap = MEM_callocN(sizeof(int) * (amd->count_mc), "Mem_Mat_Ob");
+		else {
+			int dim = 0;
+			dim = MEM_allocN_len(amd->Mem_Mat_Ob.mid_cap) / sizeof(*amd->Mem_Mat_Ob.mid_cap);
+			if (dim != amd->count_mc) {
+				amd->Mem_Mat_Ob.mid_cap = MEM_reallocN(amd->Mem_Mat_Ob.mid_cap, sizeof(*amd->Mem_Mat_Ob.mid_cap) * amd->count_mc);
+				if (dim < amd->count_mc)
+					start_mc = dim;
+				else if (dim > amd->count_mc)
+					start_mc = amd->count_mc;
+			}
+		}
+		//Inizializzare i nuovi cloni creati
+		if (amd->Mem_Mat_Ob.mid_cap) {
+			if ((start_mc != 0) && (start_mc != amd->count_mc))
+				init_mat_oc(start_mc, amd->count_mc, amd->Mem_Mat_Ob.mid_cap);
+		}
+		if ((start != 0) && (start != count))
+			init_offset(start, count, amd);
+		create_offset(count, ob->totcol, amd, ob);
+	}
+
+	f_o = count-1;
+
+	if (amd->rays>1) {
+		alpha = (float)6.2831 / amd->rays;
+		circle = (float)(count - 1) / amd->rays;
+		f_o = ceil(circle);
+	}
+
 	/* calculate the offset matrix of the final copy (for merging) */
 	unit_m4(final_offset);
 
-	for (j = 0; j < count - 1; j++) {
+	for (j = 0; j < f_o; j++) {
 		float tmp_mat[4][4];
 		mul_m4_m4m4(tmp_mat, offset, final_offset);
 		copy_m4_m4(final_offset, tmp_mat);
 	}
+
+	if (amd->dist_mc & MOD_ARR_DIST_SEQ){
+		copy_m4_m4(mid_offset, offset);
+		mid_offset[3][0] = mid_offset[3][0] / 2;
+		mid_offset[3][1] = mid_offset[3][1] / 2;
+		mid_offset[3][2] = mid_offset[3][2] / 2;
+		if (amd->mode & MOD_ARR_MOD_ADV) {
+			if (amd->Mem_Ob[0].transform) {
+				float app[4][4];
+				unit_m4(app);
+				loc_eul_size_to_mat4(app, amd->Mem_Ob[0].loc, amd->Mem_Ob[0].rot, amd->Mem_Ob[0].scale);
+				copy_m4_m4(prec_mid, mid_offset);
+				copy_m4_m4(tmp_mat, mid_offset);
+				mul_m4_m4m4(mid_offset, tmp_mat, app);
+			}
+		}
+	}
+	else if (amd->dist_mc & MOD_ARR_DIST_HALF){
+		copy_m4_m4(half_offset, final_offset);
+		half_offset[3][0] = half_offset[3][0] / (amd->count_mc + 1);
+		half_offset[3][1] = half_offset[3][1] / (amd->count_mc + 1);
+		half_offset[3][2] = half_offset[3][2] / (amd->count_mc + 1);
+		copy_m4_m4(mid_offset, half_offset);
+	}
+
+	copy_m4_m4(amd->delta, offset);
 
 	/* BMESH_TODO: bumping up the stack level avoids computing the normals
 	 * after every top-level operator execution (and this modifier has the
@@ -523,7 +704,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	}
 
 	/* start capping */
-	if (start_cap || end_cap) {
+	if (start_cap || mid_cap || end_cap) {
 		BM_mesh_elem_hflag_enable_all(bm, BM_VERT, BM_ELEM_TAG, false);
 
 		if (start_cap) {
@@ -531,6 +712,15 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			invert_m4_m4(startoffset, offset);
 			bm_merge_dm_transform(bm, start_cap, startoffset, amd,
 			                      &first_dupe_op, first_dupe_op.slots_in, "geom", &weld_op);
+		}
+
+		if(mid_cap) {
+			/* TODO not certain this is right */
+			float endoffset[4][4];
+			mul_m4_m4m4(endoffset, offset, final_offset);
+			bm_merge_dm_transform(bm, end_cap, endoffset, amd,
+								  &dupe_op, (count == 1) ? dupe_op.slots_in : dupe_op.slots_out,
+								  (count == 1) ? "geom" : "geom.out", &weld_op);
 		}
 
 		if (end_cap) {
@@ -559,6 +749,54 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 	result = CDDM_from_bmesh(bm, false);
 
+	if ((amd->mode & MOD_ARR_MOD_ADV) || (amd->mode & MOD_ARR_MOD_ADV_MAT)) {
+		start = 0;
+		start_mc = 0;
+		if (!amd->Mem_Ob)
+			amd->Mem_Ob = MEM_callocN(sizeof(*amd->Mem_Ob) * count, "Mem_Ob");
+		else {
+			int dim = 0;
+			dim = MEM_allocN_len(amd->Mem_Ob) / sizeof(*amd->Mem_Ob);
+			if (dim != count) {
+				amd->Mem_Ob = MEM_reallocN(amd->Mem_Ob, sizeof(*amd->Mem_Ob) * count);
+				if (dim < count)
+					start = dim;
+				else if (dim > count)
+					start = amd->count;
+			}
+		}
+
+		if (!amd->Mem_Mat_Ob.mid_cap)
+			amd->Mem_Mat_Ob.mid_cap = MEM_callocN(sizeof(int) * (amd->count_mc), "Mem_Mat_Ob");
+		else {
+			int dim = 0;
+			dim = MEM_allocN_len(amd->Mem_Mat_Ob.mid_cap) / sizeof(*amd->Mem_Mat_Ob.mid_cap);
+			if (dim != amd->count_mc) {
+				amd->Mem_Mat_Ob.mid_cap = MEM_reallocN(amd->Mem_Mat_Ob.mid_cap, sizeof(*amd->Mem_Mat_Ob.mid_cap) * amd->count_mc);
+				if (dim < amd->count_mc)
+					start_mc = dim;
+				else if (dim > amd->count_mc)
+					start_mc = amd->count_mc;
+			}
+		}
+		//Inizializzare i nuovi cloni creati
+		if (amd->Mem_Mat_Ob.mid_cap) {
+			if ((start_mc != 0) && (start_mc != amd->count_mc))
+				init_mat_oc(start_mc, amd->count_mc, amd->Mem_Mat_Ob.mid_cap);
+		}
+		if ((start != 0) && (start != count))
+			init_offset(start, count, amd);
+		create_offset(count, ob->totcol, amd, ob);
+	}
+
+	f_o = count-1;
+
+	if (amd->rays>1) {
+		alpha = (float)6.2831 / amd->rays;
+		circle = (float)(count - 1) / amd->rays;
+		f_o = ceil(circle);
+	}
+
 	if ((dm->dirty & DM_DIRTY_NORMALS) ||
 	    ((amd->offset_type & MOD_ARR_OFF_OBJ) && (amd->offset_ob)))
 	{
@@ -576,6 +814,137 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	return result;
 }
 
+static void group_arrayduplilist(ListBase *lb, Scene *scene, Object *ob, int level, int animated)
+{
+	DupliObject *dob;
+	Group *group;
+	GroupObject *go;
+	float mat[4][4], tmat[4][4], offset[4][4], rot[4][4];
+	ModifierData *md;
+	int i, cont_rnd;
+	float d_alp, alpha=0;
+
+	if(ob->dup_group==NULL) return;
+	group= ob->dup_group;
+
+	/* simple preventing of too deep nested groups */
+	if(level>MAX_DUPLI_RECUR) return;
+
+	/* handles animated groups, and */
+	/* we need to check update for objects that are not in scene... */
+	BKE_group_handle_recalc_and_update(NULL, scene, ob, group); /* AMA TODO get ctx instead on NULL */
+	animated= animated || BKE_group_is_animated(ob, group);
+
+	for(md=ob->modifiers.first; md; md=md->next) {
+		if(md->type == eModifierType_Array) {
+			if (md->mode&eModifierMode_Realtime || md->mode&eModifierMode_Render){
+				ArrayModifierData *amd = (ArrayModifierData*) md;
+
+				d_alp=0;
+				if (amd->rays > 1)
+					alpha = (float)6.2831 / amd->rays;
+				copy_m4_m4(offset, amd->delta);
+
+				for (i = 0; i < amd->count-1; i++) {
+					cont_rnd = 0;
+					for(go= group->gobject.first; go; go= go->next) {
+						cont_rnd++;
+						/* note, if you check on layer here, render goes wrong... it still deforms verts and uses parent imat */
+						if(go->ob!=ob) {
+							if (amd->rand_group & MOD_ARR_RAND_GROUP) {
+								if ((amd->Mem_Ob[i].rand_group_obj != 0) && (amd->Mem_Ob[i].rand_group_obj != cont_rnd))
+									continue;
+							} else if (amd->rand_group & MOD_ARR_RAND_MAT_GROUP) {
+								//assign_material(go->ob, *ob->mat, go->ob->totcol+1);
+								//go->ob->actcol = BLI_rand() % ob->totcol;
+
+								//printf("Totcol=%d\n", go->ob->totcol);
+								//printf("actcol=%d\n", go->ob->actcol);
+							}
+							/* Group Dupli Offset, should apply after everything else */
+							if (group->dupli_ofs[0] || group->dupli_ofs[1] || group->dupli_ofs[2]) {
+								copy_m4_m4(tmat, go->ob->obmat);
+								sub_v3_v3v3(tmat[3], tmat[3], group->dupli_ofs);
+								mul_m4_m4m4(mat, ob->obmat, tmat);
+							} else {
+								mul_m4_m4m4(mat, ob->obmat, go->ob->obmat);
+							}
+
+							copy_m4_m4(tmat, mat);
+							if (amd->rays>1) {
+								unit_m4(rot);
+								if (amd->rays_dir == MOD_ARR_RAYS_X)
+									rotate_m4(rot,'X',d_alp);
+								else if (amd->rays_dir == MOD_ARR_RAYS_Y)
+									rotate_m4(rot,'Y',d_alp);
+								else
+									rotate_m4(rot,'Z',d_alp);
+								if (d_alp == 0){
+									mul_m4_m4m4(mat, tmat, offset);
+
+									copy_m4_m4(tmat, mat);
+									mul_m4_m4m4(mat, tmat, rot);
+								}
+								else{
+									mul_m4_m4m4(mat, tmat, offset);
+
+									copy_m4_m4(tmat, mat);
+									mul_m4_m4m4(mat, tmat, rot);
+								}
+							}
+							else {
+								mul_m4_m4m4(mat, tmat, offset);
+							}
+							/* Noise */
+							if (amd->mode & MOD_ARR_MOD_ADV) {
+								if (amd->Mem_Ob[i].transform == 1) {
+									float app[4][4];
+									unit_m4(app);
+									loc_eul_size_to_mat4(app, amd->Mem_Ob[i].loc, amd->Mem_Ob[i].rot, amd->Mem_Ob[i].scale);
+
+									copy_m4_m4(tmat, mat);
+									mul_m4_m4m4(mat, tmat, app);
+								}
+							}
+
+							// dob = new_dupli_object(lb, go->ob, mat, ob->lay, 0, OB_DUPLIARRAY, animated); /// AMA TODO
+
+							if (!(md->mode&eModifierMode_Render))
+								dob->no_render = 1;
+							else
+								dob->no_render = 0;
+							/* check the group instance and object layers match, also that the object visible flags are ok. */
+							//(G.rendering==0 && dob->ob->restrictflag & OB_RESTRICT_VIEW) || /* AMA TODO from below */
+							//(G.rendering && dob->ob->restrictflag & OB_RESTRICT_RENDER)) ||
+							if((dob->origlay & group->layer)==0 ||
+								!(md->mode&eModifierMode_Realtime) || (!(md->mode&eModifierMode_Editmode) && (ob->mode == OB_MODE_EDIT))) {
+								dob->no_draw= 1;
+							}
+							else {
+								dob->no_draw= 0;
+							}
+							if(go->ob->transflag & OB_DUPLI) {
+								copy_m4_m4(dob->ob->obmat, dob->mat);
+								/// AMA TODO object_duplilist_recursive(&group->id, scene, go->ob, lb, ob->obmat, level+1, animated);
+								///copy_m4_m4(dob->ob->obmat, dob->omat);
+							}
+						}
+					}
+					/* Increment for rays */
+					if (amd->rays>1) {
+						d_alp = d_alp + alpha;
+						if (d_alp>6.2831)
+							d_alp=0;
+					}
+					/* Offset for clone group */
+					if (d_alp == 0)
+						mul_m4_m4m4(offset, amd->delta, offset);
+				}
+			}
+		}
+	}
+}
+
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
                                   DerivedMesh *dm,
                                   ModifierApplyFlag flag)
@@ -588,6 +957,16 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	return result;
 }
 
+static void freeData(ModifierData *md)
+{
+	ArrayModifierData *amd = (ArrayModifierData*) md;
+
+	if (amd)
+	{
+		if (amd->Mem_Ob)
+			MEM_freeN(amd->Mem_Ob);
+	}
+}
 
 ModifierTypeInfo modifierType_Array = {
 	/* name */              "Array",
@@ -609,7 +988,7 @@ ModifierTypeInfo modifierType_Array = {
 	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  NULL,
-	/* freeData */          NULL,
+	/* freeData */          freeData,
 	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     NULL,

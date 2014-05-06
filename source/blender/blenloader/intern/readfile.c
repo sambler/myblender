@@ -4466,7 +4466,16 @@ static void lib_link_object(FileData *fd, Main *main)
 					smd->domain->flags |= MOD_SMOKE_FILE_LOAD; /* flag for refreshing the simulation after loading */
 				}
 			}
-			
+
+			{
+				ArrayModifierData *amd = (ArrayModifierData *)modifiers_findByType(ob, eModifierType_Array);
+
+				if(amd)
+				{
+					amd->arr_group = newlibadr(fd, ob->id.lib, amd->arr_group);
+				}
+			}
+
 			/* texture field */
 			if (ob->pd)
 				lib_link_partdeflect(fd, &ob->id, ob->pd);
@@ -4789,6 +4798,12 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			wmd->cmap_curve = newdataadr(fd, wmd->cmap_curve);
 			if (wmd->cmap_curve)
 				direct_link_curvemapping(fd, wmd->cmap_curve);
+		}
+		else if (md->type==eModifierType_Array) {
+			ArrayModifierData *amd = (ArrayModifierData*) md;
+
+			amd->Mem_Ob = newdataadr(fd, amd->Mem_Ob);
+			amd->Mem_Mat_Ob.mid_cap = newdataadr(fd, amd->Mem_Mat_Ob.mid_cap);
 		}
 		else if (md->type == eModifierType_LaplacianDeform) {
 			LaplacianDeformModifierData *lmd = (LaplacianDeformModifierData *)md;

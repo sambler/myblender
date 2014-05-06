@@ -4799,7 +4799,8 @@ static int allow_render_object(Render *re, Object *ob, int nolamps, int onlysele
 	if (ob->transflag & OB_DUPLIPARTS) {
 		/* pass */  /* let particle system(s) handle showing vs. not showing */
 	}
-	else if ((ob->transflag & OB_DUPLI) && !(ob->transflag & OB_DUPLIFRAMES)) {
+	else if ((ob->transflag & OB_DUPLI) && !(ob->transflag & OB_DUPLIFRAMES) &&
+			 !(ob->transflag & OB_DUPLIARRAY)) {
 		return 0;
 	}
 	
@@ -4907,6 +4908,9 @@ static void add_group_render_dupli_obs(Render *re, Group *group, int nolamps, in
 	/* simple preventing of too deep nested groups */
 	if (level>MAX_DUPLI_RECUR) return;
 
+	//if((ob->transflag == OB_DUPLIARRAY) && dob->no_render)
+	//	return;
+
 	/* recursively go into dupligroups to find objects with OB_RENDER_DUPLI
 	 * that were not created yet */
 	for (go= group->gobject.first; go; go= go->next) {
@@ -5000,9 +5004,9 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 					Object *obd= dob->ob;
 
 					/* group duplis need to set ob matrices correct, for deform. so no_draw is part handled */
-					if (!(obd->transflag & OB_RENDER_DUPLI) && dob->no_draw)
-						continue;
-
+					if (obd->transflag & OB_DUPLIARRAY)
+						if(!(obd->transflag & OB_RENDER_DUPLI) && dob->no_draw)
+							continue;
 					if (is_object_hidden(re, obd))
 						continue;
 

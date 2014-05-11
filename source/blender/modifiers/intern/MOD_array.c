@@ -41,6 +41,7 @@
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
+#include "BLI_edgehash.h" /// AMA TODO for BLI_edgehash_haskey - still use??
 #include "BLI_ghash.h"
 
 #include "DNA_curve_types.h"
@@ -381,29 +382,18 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	/* offset matrix */
 	float offset[4][4];
 	float final_offset[4][4];
-	float mid_offset[4][4], half_offset[4][4];
-	float tmp_mat[4][4], prec_mid[4][4];
-	float alpha = 0, d_alp = 0, circle;
-	float f_o;
-	int start, start_mc;
 	float length = amd->length;
 	int count = amd->count, maxVerts;
 	int *indexMap = NULL;
-	DerivedMesh *start_cap = NULL, *mid_cap = NULL, *end_cap = NULL;
+	DerivedMesh *start_cap = NULL, *end_cap = NULL;
 	MVert *src_mvert;
 	BMOpSlot *slot_targetmap = NULL;  /* for weld_op */
-	Nurb *nu = NULL;
 
 	/* need to avoid infinite recursion here */
 	if (amd->start_cap && amd->start_cap != ob && amd->start_cap->type == OB_MESH)
 		start_cap = get_dm_for_modifier(amd->start_cap, flag);
-	if(amd->mid_cap && amd->mid_cap != ob && amd->mid_cap->type == OB_MESH)
-		mid_cap = get_dm_for_modifier(amd->mid_cap, flag);
 	if (amd->end_cap && amd->end_cap != ob && amd->end_cap->type == OB_MESH)
 		end_cap = get_dm_for_modifier(amd->end_cap, flag);
-
-	if (amd->count_mc < 1)
-		amd->count_mc = 1;
 
 	unit_m4(offset);
 
@@ -427,23 +417,19 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			unit_m4(obinv);
 
 		mul_serie_m4(result_mat, offset,
-		             obinv, amd->offset_ob->obmat,
-		             NULL, NULL, NULL, NULL, NULL);
+					 obinv, amd->offset_ob->obmat,
+					 NULL, NULL, NULL, NULL, NULL);
 		copy_m4_m4(offset, result_mat);
 	}
-
-/* ***************
-	if ((amd->type & MOD_ARR_MOD_CURVE) && (amd->curve_ob))
-		length = length_fitcurve(amd, scene);
 
 	if (amd->fit_type == MOD_ARR_FITCURVE && amd->curve_ob) {
 		Curve *cu = amd->curve_ob->data;
 		if (cu) {
-#ifdef CYCLIC_DEPENDENCY_WORKAROUND
+	#ifdef CYCLIC_DEPENDENCY_WORKAROUND
 			if (amd->curve_ob->curve_cache == NULL) {
 				BKE_displist_make_curveTypes(scene, amd->curve_ob, false);
 			}
-#endif
+	#endif
 
 			if (amd->curve_ob->curve_cache && amd->curve_ob->curve_cache->path) {
 				float scale = mat4_to_scale(amd->curve_ob->obmat);
@@ -451,153 +437,32 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			}
 		}
 	}
- * ***************
-*/
 
-	if (amd->fit_type & MOD_ARR_FITBETWEEN) {
-		count = count + 2;
-		if (amd->type & MOD_ARR_MOD_NRM) {
-			if ((amd->offset_type & MOD_ARR_OFF_OBJ) && (amd->offset_ob)) {
-				//float dist = sqrt(dot_v3v3(amd->offset_ob->obmat[3], amd->offset_ob->obmat[3]));
-				offset[3][0] = amd->offset_ob->obmat[3][0] / (count - 1);
-				offset[3][1] = amd->offset_ob->obmat[3][1] / (count - 1);
-				offset[3][2] = amd->offset_ob->obmat[3][2] / (count - 1);
-			}
-			else {
-				offset[3][0] = offset[3][0] / (count - 1);
-				offset[3][1] = offset[3][1] / (count - 1);
-				offset[3][2] = offset[3][2] / (count - 1);
-			}
-		}
-		else { /* amd->type & MOD_ARR_MOD_CURVE*/
-			Curve *cu = amd->curve_ob->data;
-			nu = cu->nurb.first;
-			if (nu->bezt)
-				copy_v3_v3(offset[3], nu->bezt[nu->pntsu - 1].vec[1]);
-			else
-				copy_v3_v3(offset[3], nu->bp[nu->pntsu * nu->pntsv - 1].vec);
-			offset[3][0] = offset[3][0] / (count - 1);
-			offset[3][1] = offset[3][1] / (count - 1);
-			offset[3][2] = offset[3][2] / (count - 1);
-		}
+	/* calculate the maximum number of copies which will fit within the
+	 * prescribed length */
+	if (amd->fit_type == MOD_ARR_FITLENGTH || amd->fit_type == MOD_ARR_FITCURVE) {
+		float dist = len_v3(offset[3]);
+
+		if (dist > 1e-6f)
+			/* this gives length = first copy start to last copy end
+			 * add a tiny offset for floating point rounding errors */
+			count = (length + 1e-6f) / dist;
+		else
+			/* if the offset has no translation, just make one copy */
+			count = 1;
 	}
 
 	if (count < 1)
 		count = 1;
 
-	/**/
-	if ((amd->dist_mc & MOD_ARR_DIST_CURVE) && (amd->curve_cap)){
-		int dec = 0;
-		Curve *cu = amd->curve_cap->data;
-		nu = cu->nurb.first;
-		unit_m4(mid_offset);
-		if (amd->outer_cp & MOD_ARR_CP_FIRST && amd->start_cap)
-			dec = dec + 1;
-		if (amd->outer_cp & MOD_ARR_CP_LAST && amd->end_cap)
-			dec = dec + 1;
-		if (nu->bezt) {
-			if (amd->outer_cp & MOD_ARR_CP_FIRST && amd->start_cap)
-				copy_v3_v3(mid_offset[3], nu->bezt[1].vec[1]);
-			else
-				copy_v3_v3(mid_offset[3], nu->bezt[0].vec[1]);
-			if (amd->count_mc > (nu->pntsu - dec))
-				amd->count_mc = nu->pntsu - dec;
-		}
-		else {
-			if (amd->outer_cp & MOD_ARR_CP_FIRST && amd->start_cap)
-				copy_v3_v3(mid_offset[3], nu->bp[1].vec);
-			else
-				copy_v3_v3(mid_offset[3], nu->bp[0].vec);
-			if (amd->count_mc > (nu->pntsu * nu->pntsv - dec))
-				amd->count_mc = nu->pntsu * nu->pntsv - dec;
-		}
-	}
-	else
-		if (amd->count_mc >= count)
-			amd->count_mc = count - 1;
-
-	if ((amd->mode & MOD_ARR_MOD_ADV) || (amd->mode & MOD_ARR_MOD_ADV_MAT)) {
-		start = 0;
-		start_mc = 0;
-		if (!amd->Mem_Ob)
-			amd->Mem_Ob = MEM_callocN(sizeof(*amd->Mem_Ob) * count, "Mem_Ob");
-		else {
-			int dim = 0;
-			dim = MEM_allocN_len(amd->Mem_Ob) / sizeof(*amd->Mem_Ob);
-			if (dim != count) {
-				amd->Mem_Ob = MEM_reallocN(amd->Mem_Ob, sizeof(*amd->Mem_Ob) * count);
-				if (dim < count)
-					start = dim;
-				else if (dim > count)
-					start = amd->count;
-			}
-		}
-
-		if (!amd->Mem_Mat_Ob.mid_cap)
-			amd->Mem_Mat_Ob.mid_cap = MEM_callocN(sizeof(int) * (amd->count_mc), "Mem_Mat_Ob");
-		else {
-			int dim = 0;
-			dim = MEM_allocN_len(amd->Mem_Mat_Ob.mid_cap) / sizeof(*amd->Mem_Mat_Ob.mid_cap);
-			if (dim != amd->count_mc) {
-				amd->Mem_Mat_Ob.mid_cap = MEM_reallocN(amd->Mem_Mat_Ob.mid_cap, sizeof(*amd->Mem_Mat_Ob.mid_cap) * amd->count_mc);
-				if (dim < amd->count_mc)
-					start_mc = dim;
-				else if (dim > amd->count_mc)
-					start_mc = amd->count_mc;
-			}
-		}
-		//Inizializzare i nuovi cloni creati
-		if (amd->Mem_Mat_Ob.mid_cap) {
-			if ((start_mc != 0) && (start_mc != amd->count_mc))
-				init_mat_oc(start_mc, amd->count_mc, amd->Mem_Mat_Ob.mid_cap);
-		}
-		if ((start != 0) && (start != count))
-			init_offset(start, count, amd);
-		create_offset(count, ob->totcol, amd, ob);
-	}
-
-	f_o = count-1;
-
-	if (amd->rays>1) {
-		alpha = (float)6.2831 / amd->rays;
-		circle = (float)(count - 1) / amd->rays;
-		f_o = ceil(circle);
-	}
-
 	/* calculate the offset matrix of the final copy (for merging) */
 	unit_m4(final_offset);
 
-	for (j = 0; j < f_o; j++) {
+	for (j = 0; j < count - 1; j++) {
 		float tmp_mat[4][4];
 		mul_m4_m4m4(tmp_mat, offset, final_offset);
 		copy_m4_m4(final_offset, tmp_mat);
 	}
-
-	if (amd->dist_mc & MOD_ARR_DIST_SEQ){
-		copy_m4_m4(mid_offset, offset);
-		mid_offset[3][0] = mid_offset[3][0] / 2;
-		mid_offset[3][1] = mid_offset[3][1] / 2;
-		mid_offset[3][2] = mid_offset[3][2] / 2;
-		if (amd->mode & MOD_ARR_MOD_ADV) {
-			if (amd->Mem_Ob[0].transform) {
-				float app[4][4];
-				unit_m4(app);
-				loc_eul_size_to_mat4(app, amd->Mem_Ob[0].loc, amd->Mem_Ob[0].rot, amd->Mem_Ob[0].scale);
-				copy_m4_m4(prec_mid, mid_offset);
-				copy_m4_m4(tmp_mat, mid_offset);
-				mul_m4_m4m4(mid_offset, tmp_mat, app);
-			}
-		}
-	}
-	else if (amd->dist_mc & MOD_ARR_DIST_HALF){
-		copy_m4_m4(half_offset, final_offset);
-		half_offset[3][0] = half_offset[3][0] / (amd->count_mc + 1);
-		half_offset[3][1] = half_offset[3][1] / (amd->count_mc + 1);
-		half_offset[3][2] = half_offset[3][2] / (amd->count_mc + 1);
-		copy_m4_m4(mid_offset, half_offset);
-	}
-
-	copy_m4_m4(amd->delta, offset);
 
 	/* BMESH_TODO: bumping up the stack level avoids computing the normals
 	 * after every top-level operator execution (and this modifier has the
@@ -611,13 +476,13 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 	if (amd->flags & MOD_ARR_MERGE) {
 		BMO_op_init(bm, &weld_op, (BMO_FLAG_DEFAULTS & ~BMO_FLAG_RESPECT_HIDE),
-		            "weld_verts");
+					"weld_verts");
 
 		slot_targetmap = BMO_slot_get(weld_op.slots_in, "targetmap");
 	}
 
 	BMO_op_initf(bm, &dupe_op, (BMO_FLAG_DEFAULTS & ~BMO_FLAG_RESPECT_HIDE),
-	             "duplicate geom=%avef");
+				 "duplicate geom=%avef");
 	first_dupe_op = dupe_op;
 
 	for (j = 0; j < count - 1; j++) {
@@ -628,8 +493,8 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 		if (j != 0) {
 			BMO_op_initf(bm, &dupe_op,
-			             (BMO_FLAG_DEFAULTS & ~BMO_FLAG_RESPECT_HIDE),
-			             "duplicate geom=%S", &old_dupe_op, "geom.out");
+						 (BMO_FLAG_DEFAULTS & ~BMO_FLAG_RESPECT_HIDE),
+						 "duplicate geom=%S", &old_dupe_op, "geom.out");
 		}
 		BMO_op_exec(bm, &dupe_op);
 
@@ -638,7 +503,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 		if ((amd->flags & MOD_ARR_MERGEFINAL) && j == 0) {
 			int first_geom_bytes = sizeof(BMVert *) * geom_slot->len;
-				
+
 			/* make a copy of the initial geometry ordering so the
 			 * last duplicate can be merged into it */
 			first_geom = MEM_mallocN(first_geom_bytes, "first_geom");
@@ -654,10 +519,10 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			/*calculate merge mapping*/
 			if (j == 0) {
 				indexMap = find_doubles_index_map(bm, &dupe_op,
-				                                  amd, &index_len);
+												  amd, &index_len);
 			}
 
-#define _E(s, i) ((BMVert **)(s)->data.buf)[i]
+	#define _E(s, i) ((BMVert **)(s)->data.buf)[i]
 
 			/* ensure this is set */
 			BLI_assert(index_len != -1);
@@ -678,22 +543,22 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				BMO_slot_map_elem_insert(&weld_op, slot_targetmap, v, v2);
 			}
 
-#undef _E
+	#undef _E
 		}
 
 		/* already copied earlier, but after executation more slot
 		 * memory may be allocated */
 		if (j == 0)
 			first_dupe_op = dupe_op;
-		
+
 		if (j >= 2)
 			BMO_op_finish(bm, &old_dupe_op);
 		old_dupe_op = dupe_op;
 	}
 
 	if ((amd->flags & MOD_ARR_MERGE) &&
-	    (amd->flags & MOD_ARR_MERGEFINAL) &&
-	    (count > 1))
+		(amd->flags & MOD_ARR_MERGEFINAL) &&
+		(count > 1))
 	{
 		/* Merge first and last copies. Note that we can't use the
 		 * indexMap for this because (unless the array is forming a
@@ -704,31 +569,22 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	}
 
 	/* start capping */
-	if (start_cap || mid_cap || end_cap) {
+	if (start_cap || end_cap) {
 		BM_mesh_elem_hflag_enable_all(bm, BM_VERT, BM_ELEM_TAG, false);
 
 		if (start_cap) {
 			float startoffset[4][4];
 			invert_m4_m4(startoffset, offset);
 			bm_merge_dm_transform(bm, start_cap, startoffset, amd,
-			                      &first_dupe_op, first_dupe_op.slots_in, "geom", &weld_op);
-		}
-
-		if(mid_cap) {
-			/* TODO not certain this is right */
-			float endoffset[4][4];
-			mul_m4_m4m4(endoffset, offset, final_offset);
-			bm_merge_dm_transform(bm, end_cap, endoffset, amd,
-								  &dupe_op, (count == 1) ? dupe_op.slots_in : dupe_op.slots_out,
-								  (count == 1) ? "geom" : "geom.out", &weld_op);
+								  &first_dupe_op, first_dupe_op.slots_in, "geom", &weld_op);
 		}
 
 		if (end_cap) {
 			float endoffset[4][4];
 			mul_m4_m4m4(endoffset, offset, final_offset);
 			bm_merge_dm_transform(bm, end_cap, endoffset, amd,
-			                      &dupe_op, (count == 1) ? dupe_op.slots_in : dupe_op.slots_out,
-			                      (count == 1) ? "geom" : "geom.out", &weld_op);
+								  &dupe_op, (count == 1) ? dupe_op.slots_in : dupe_op.slots_out,
+								  (count == 1) ? "geom" : "geom.out", &weld_op);
 		}
 	}
 	/* done capping */
@@ -749,56 +605,8 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 	result = CDDM_from_bmesh(bm, false);
 
-	if ((amd->mode & MOD_ARR_MOD_ADV) || (amd->mode & MOD_ARR_MOD_ADV_MAT)) {
-		start = 0;
-		start_mc = 0;
-		if (!amd->Mem_Ob)
-			amd->Mem_Ob = MEM_callocN(sizeof(*amd->Mem_Ob) * count, "Mem_Ob");
-		else {
-			int dim = 0;
-			dim = MEM_allocN_len(amd->Mem_Ob) / sizeof(*amd->Mem_Ob);
-			if (dim != count) {
-				amd->Mem_Ob = MEM_reallocN(amd->Mem_Ob, sizeof(*amd->Mem_Ob) * count);
-				if (dim < count)
-					start = dim;
-				else if (dim > count)
-					start = amd->count;
-			}
-		}
-
-		if (!amd->Mem_Mat_Ob.mid_cap)
-			amd->Mem_Mat_Ob.mid_cap = MEM_callocN(sizeof(int) * (amd->count_mc), "Mem_Mat_Ob");
-		else {
-			int dim = 0;
-			dim = MEM_allocN_len(amd->Mem_Mat_Ob.mid_cap) / sizeof(*amd->Mem_Mat_Ob.mid_cap);
-			if (dim != amd->count_mc) {
-				amd->Mem_Mat_Ob.mid_cap = MEM_reallocN(amd->Mem_Mat_Ob.mid_cap, sizeof(*amd->Mem_Mat_Ob.mid_cap) * amd->count_mc);
-				if (dim < amd->count_mc)
-					start_mc = dim;
-				else if (dim > amd->count_mc)
-					start_mc = amd->count_mc;
-			}
-		}
-		//Inizializzare i nuovi cloni creati
-		if (amd->Mem_Mat_Ob.mid_cap) {
-			if ((start_mc != 0) && (start_mc != amd->count_mc))
-				init_mat_oc(start_mc, amd->count_mc, amd->Mem_Mat_Ob.mid_cap);
-		}
-		if ((start != 0) && (start != count))
-			init_offset(start, count, amd);
-		create_offset(count, ob->totcol, amd, ob);
-	}
-
-	f_o = count-1;
-
-	if (amd->rays>1) {
-		alpha = (float)6.2831 / amd->rays;
-		circle = (float)(count - 1) / amd->rays;
-		f_o = ceil(circle);
-	}
-
 	if ((dm->dirty & DM_DIRTY_NORMALS) ||
-	    ((amd->offset_type & MOD_ARR_OFF_OBJ) && (amd->offset_ob)))
+		((amd->offset_type & MOD_ARR_OFF_OBJ) && (amd->offset_ob)))
 	{
 		/* Update normals in case offset object has rotation. */
 		result->dirty |= DM_DIRTY_NORMALS;
@@ -812,7 +620,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 		MEM_freeN(first_geom);
 
 	return result;
-}
+	}
 
 static void group_arrayduplilist(ListBase *lb, Scene *scene, Object *ob, int level, int animated)
 {
@@ -953,7 +761,22 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	ArrayModifierData *amd = (ArrayModifierData *) md;
 
 	result = arrayModifier_doArray(amd, md->scene, ob, dm, flag);
-
+	if(result != dm) {
+		if(amd->arr_group!=NULL) {
+			if (amd->mode & MOD_ARR_MOD_ADV_CLONE) {
+				ob->transflag = OB_DUPLIARRAY;
+				ob->dup_group = amd->arr_group;
+			}
+			else {
+				ob->transflag = 0;
+				ob->dup_group = NULL;
+			}
+		}
+		else {
+			ob->transflag = 0;
+			ob->dup_group = NULL;
+		}
+	}
 	return result;
 }
 

@@ -328,7 +328,8 @@ typedef struct ArrayModifierData {
 enum {
 	MOD_ARR_FIXEDCOUNT  = 0,
 	MOD_ARR_FITLENGTH   = 1,
-	MOD_ARR_FITBETWEEN  = 2,
+	MOD_ARR_FITCURVE    = 2,
+	MOD_ARR_FITBETWEEN  = 3
 };
 
 /* ArrayModifierData->offset_type */

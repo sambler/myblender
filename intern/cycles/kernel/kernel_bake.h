@@ -114,8 +114,8 @@ ccl_device void compute_light_pass(KernelGlobals *kg, ShaderData *sd, PathRadian
 				kernel_branched_path_integrate_lighting(kg, &rng,
 					sd, throughput, 1.0f, &state, &L_sample);
 			}
-#endif
 		}
+#endif
 
 		/* accumulate into master L */
 		path_radiance_accum_sample(L, &L_sample, samples);
@@ -180,8 +180,7 @@ ccl_device void kernel_bake_evaluate(KernelGlobals *kg, ccl_global uint4 *input,
 	PathRadiance L;
 
 	shader_setup_from_sample(kg, &sd, P, Ng, I, shader, object, prim, u, v, t, time, bounce, transparent_bounce);
-
-	sd.I = camera_direction_from_point(kg, sd.P);
+	sd.I = sd.N;
 
 	/* update differentials */
 	sd.dP.dx = sd.dPdu * dudx + sd.dPdv * dvdx;

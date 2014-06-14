@@ -1796,18 +1796,7 @@ void ui_set_but_val(uiBut *but, double value)
 			value = (char)floor(value + 0.5);
 		}
 		else if (but->pointype == UI_BUT_POIN_SHORT) {
-			/* gcc 3.2.1 seems to have problems
-			 * casting a double like 32772.0 to
-			 * a short so we cast to an int, then
-			 * to a short.
-			 *
-			 * Update: even in gcc.4.6 using intermediate int cast gives -32764,
-			 * where as a direct cast from double to short gives -32768,
-			 * if this difference isn't important we could remove this hack,
-			 * since we dont support gcc3 anymore - Campbell */
-			int gcckludge;
-			gcckludge = (int) floor(value + 0.5);
-			value = (short)gcckludge;
+			value = (short)floor(value + 0.5);
 		}
 		else if (but->pointype == UI_BUT_POIN_INT)
 			value = (int)floor(value + 0.5);
@@ -1893,8 +1882,7 @@ void ui_convert_to_unit_alt_name(uiBut *but, char *str, size_t maxlen)
 		int unit_type = uiButGetUnitType(but);
 		char *orig_str;
 		
-		orig_str = MEM_callocN(sizeof(char) * maxlen + 1, "textedit sub str");
-		memcpy(orig_str, str, maxlen);
+		orig_str = BLI_strdup(str);
 		
 		bUnit_ToUnitAltName(str, maxlen, orig_str, unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));
 		
@@ -3170,12 +3158,12 @@ static void ui_def_but_rna__menu(bContext *UNUSED(C), uiLayout *layout, void *bu
 		}
 		else {
 			if (item->icon) {
-				uiDefIconTextButF(block, BUTM, B_NOP, item->icon, item->name, 0, 0,
-				                  UI_UNIT_X * 5, UI_UNIT_Y, &handle->retvalue, (float) item->value, 0.0, 0, -1, item->description);
+				uiDefIconTextButI(block, BUTM, B_NOP, item->icon, item->name, 0, 0,
+				                  UI_UNIT_X * 5, UI_UNIT_Y, &handle->retvalue, item->value, 0.0, 0, -1, item->description);
 			}
 			else {
-				uiDefButF(block, BUTM, B_NOP, item->name, 0, 0,
-				          UI_UNIT_X * 5, UI_UNIT_X, &handle->retvalue, (float) item->value, 0.0, 0, -1, item->description);
+				uiDefButI(block, BUTM, B_NOP, item->name, 0, 0,
+				          UI_UNIT_X * 5, UI_UNIT_X, &handle->retvalue, item->value, 0.0, 0, -1, item->description);
 			}
 		}
 	}

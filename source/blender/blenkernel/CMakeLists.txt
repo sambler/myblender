@@ -406,11 +406,6 @@ if(WITH_LZMA)
 	add_definitions(-DWITH_LZMA)
 endif()
 
-if(WITH_FFTW3)
-	list(APPEND INC ${FFTW3_INCLUDE_DIRS})	
-	add_definitions(-DFFTW3=1)
-endif()
-
 if(WITH_GAMEENGINE)
 	list(APPEND INC_SYS
 		../../../extern/recastnavigation

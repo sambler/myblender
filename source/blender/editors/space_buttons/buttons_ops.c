@@ -34,7 +34,6 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_userdef_types.h"
-#include "DNA_scene_types.h"
 
 #include "BLI_utildefines.h"
 #include "BLI_fileops.h"

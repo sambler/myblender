@@ -1367,7 +1367,7 @@ static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Obje
 	/* colors for posemode */
 	if (armflag & ARM_POSEMODE) {
 		set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
-    }
+	}
 	
 	if (id != -1) {
 		glLoadName((GLuint) id | BONESEL_BONE);

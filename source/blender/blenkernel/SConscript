@@ -148,10 +148,6 @@ if env['WITH_BF_LZMA']:
     incs += ' #/extern/lzma'
     defs.append('WITH_LZMA')
 
-if env['WITH_BF_FFTW3']:
-    defs.append('FFTW3=1')
-    incs += ' ' + env['BF_FFTW3_INC'] 
-
 if env['WITH_BF_GAMEENGINE']:
     incs += ' #/extern/recastnavigation'
     defs.append('WITH_GAMEENGINE')

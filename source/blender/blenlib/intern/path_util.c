@@ -1363,7 +1363,7 @@ const char *BLI_get_folder(int folder_id, const char *subfolder)
 		case BLENDER_USER_AUTOSAVE:
 			if (get_path_user(path, "autosave", subfolder, "BLENDER_USER_DATAFILES", ver)) break;
 			return NULL;
-			
+
 		case BLENDER_USER_CONFIG:
 			if (get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver)) break;
 			return NULL;

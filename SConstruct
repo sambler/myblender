@@ -40,11 +40,13 @@ import string
 import shutil
 import re
 
-# store path to tools
+# store path to tools and modules
 toolpath=os.path.join(".", "build_files", "scons", "tools")
+modulespath=os.path.join(".", "build_files", "scons", "Modules")
 
-# needed for importing tools
+# needed for importing tools and modules
 sys.path.append(toolpath)
+sys.path.append(modulespath)
 
 import Blender
 import btools
@@ -176,6 +178,16 @@ if crossbuild and platform not in ('win32-vc', 'win64-vc'):
 
 env['OURPLATFORM'] = platform
 
+# Put all auto configuration run-time tests here
+
+from FindSharedPtr import FindSharedPtr
+from FindUnorderedMap import FindUnorderedMap
+
+conf = Configure(env)
+FindSharedPtr(conf)
+FindUnorderedMap(conf)
+env = conf.Finish()
+
 configfile = os.path.join("build_files", "scons", "config", platform + "-config.py")
 
 if os.path.exists(configfile):
@@ -285,7 +297,7 @@ if env['OURPLATFORM']=='darwin':
     import subprocess
 
     command = ["%s"%env['CC'], "--version"]
-    line = subprocess.check_output(command)
+    line = btools.get_command_output(command)
     ver = re.search(r'[0-9]+(\.[0-9]+[svn]+)+', line) or re.search(r'[0-9]+(\.[0-9]+)+', line) # read the "based on LLVM x.xsvn" version here, not the Apple version
     if ver:
         env['CCVERSION'] = ver.group(0).strip('svn')

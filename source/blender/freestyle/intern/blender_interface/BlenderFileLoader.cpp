@@ -395,6 +395,8 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 			vlr = obr->vlaknodes[a>>8].vlak;
 		else
 			vlr++;
+		if (vlr->mat->mode & MA_ONLYCAST)
+			continue;
 		if (vlr->mat->material_type == MA_TYPE_WIRE) {
 			wire_material = 1;
 			continue;
@@ -492,7 +494,7 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 			vlr = obr->vlaknodes[p>>8].vlak;
 		else
 			vlr++;
-		if (vlr->mat->material_type == MA_TYPE_WIRE)
+		if ((vlr->mat->mode & MA_ONLYCAST) || vlr->mat->material_type == MA_TYPE_WIRE)
 			continue;
 		copy_v3_v3(v1, vlr->v1->co);
 		copy_v3_v3(v2, vlr->v2->co);
@@ -576,12 +578,14 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 
 		Material *mat = vlr->mat;
 		if (mat) {
+			tmpMat.setLine(mat->line_col[0], mat->line_col[1], mat->line_col[2], mat->line_col[3]);
 			tmpMat.setDiffuse(mat->r, mat->g, mat->b, mat->alpha);
 			tmpMat.setSpecular(mat->specr, mat->specg, mat->specb, mat->spectra);
 			float s = 1.0 * (mat->har + 1) / 4 ; // in Blender: [1;511] => in OpenGL: [0;128]
 			if (s > 128.f)
 				s = 128.f;
 			tmpMat.setShininess(s);
+			tmpMat.setPriority(mat->line_priority);
 		}
 
 		if (meshFrsMaterials.empty()) {

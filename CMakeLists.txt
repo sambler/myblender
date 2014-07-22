@@ -735,7 +735,7 @@ if(UNIX AND NOT APPLE)
 			set(__boost_packages filesystem regex system thread date_time)
 			if(WITH_INTERNATIONAL)
 				list(APPEND __boost_packages locale)
-                                set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -liconv") # boost_locale needs it !
+				set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -liconv") # boost_locale needs it !
 			endif()
 			if(WITH_CYCLES_NETWORK)
 				list(APPEND __boost_packages serialization)

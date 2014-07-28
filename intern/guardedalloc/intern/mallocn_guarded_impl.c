@@ -238,7 +238,7 @@ __attribute__ ((format(printf, 1, 2)))
 #endif
 static void print_error(const char *str, ...)
 {
-	char buf[512];
+	char buf[1024];
 	va_list ap;
 
 	va_start(ap, str);
@@ -246,7 +246,10 @@ static void print_error(const char *str, ...)
 	va_end(ap);
 	buf[sizeof(buf) - 1] = '\0';
 
-	if (error_callback) error_callback(buf);
+	if (error_callback)
+		error_callback(buf);
+	else
+		fputs(buf, stderr);
 }
 
 static void mem_lock_thread(void)
@@ -801,11 +804,10 @@ static void MEM_guarded_printmemlist_internal(int pydict)
 	}
 	while (membl) {
 		if (pydict) {
-			fprintf(stderr,
-			        "    {'len':" SIZET_FORMAT ", "
-			        "'name':'''%s''', "
-			        "'pointer':'%p'},\n",
-			        SIZET_ARG(membl->len), membl->name, (void *)(membl + 1));
+			print_error("    {'len':" SIZET_FORMAT ", "
+			            "'name':'''%s''', "
+			            "'pointer':'%p'},\n",
+			            SIZET_ARG(membl->len), membl->name, (void *)(membl + 1));
 		}
 		else {
 #ifdef DEBUG_MEMCOUNTER
@@ -825,8 +827,8 @@ static void MEM_guarded_printmemlist_internal(int pydict)
 		else break;
 	}
 	if (pydict) {
-		fprintf(stderr, "]\n\n");
-		fprintf(stderr, mem_printmemlist_pydict_script);
+		print_error("]\n\n");
+		print_error(mem_printmemlist_pydict_script);
 	}
 	
 	mem_unlock_thread();

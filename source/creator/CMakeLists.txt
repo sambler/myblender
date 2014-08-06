@@ -274,7 +274,7 @@ elseif(APPLE)
 	if(WITH_PYTHON_MODULE)
 		set(TARGETDIR_VER ${TARGETDIR}/${BLENDER_VERSION})
 	else()
-		set(TARGETDIR_VER ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION})
+		set(TARGETDIR_VER ${TARGETDIR}/blender.app/Contents/Resources/${BLENDER_VERSION})
 	endif()
 
 endif()
@@ -737,12 +737,10 @@ elseif(WIN32)
 	endif()
 
 	if(WITH_SDL)
-		if(NOT CMAKE_CL_64)
-			install(
-				FILES ${LIBDIR}/sdl/lib/SDL.dll
-				DESTINATION ${TARGETDIR}
-			)
-		endif()
+		install(
+			FILES ${LIBDIR}/sdl/lib/SDL.dll
+			DESTINATION ${TARGETDIR}
+		)
 	endif()
 
 	if(NOT CMAKE_CL_64)
@@ -824,6 +822,13 @@ elseif(APPLE)
 	if(WITH_OPENMP AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT ${CMAKE_C_COMPILER_VERSION} VERSION_LESS '3.4')
 		install(
 			FILES ${LIBDIR}/openmp/lib/libiomp5.dylib
+			DESTINATION ${TARGETDIR}/blender.app/Contents/MacOS
+		)
+	endif()
+
+	if(WITH_LLVM AND NOT LLVM_STATIC)
+		install(
+			FILES ${LIBDIR}/llvm/lib/libLLVM-3.4.dylib
 			DESTINATION ${TARGETDIR}/blender.app/Contents/MacOS
 		)
 	endif()

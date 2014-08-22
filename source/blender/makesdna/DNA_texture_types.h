@@ -502,7 +502,6 @@ typedef struct ColorMapping {
 #define MTEX_BLEND_SAT		11
 #define MTEX_BLEND_VAL		12
 #define MTEX_BLEND_COLOR	13
-/* free for use */
 #define MTEX_SOFT_LIGHT     15 
 #define MTEX_LIN_LIGHT      16
 

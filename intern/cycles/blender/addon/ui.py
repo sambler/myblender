@@ -154,7 +154,7 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
             sub.prop(cscene, "subsurface_samples", text="Subsurface")
             sub.prop(cscene, "volume_samples", text="Volume")
 
-        if cscene.feature_set == 'EXPERIMENTAL' and use_cpu(context):
+        if use_cpu(context) or cscene.feature_set == 'EXPERIMENTAL':
             layout.row().prop(cscene, "sampling_pattern", text="Pattern")
 
         for rl in scene.render.layers:
@@ -468,6 +468,7 @@ class CyclesCamera_PT_dof(CyclesButtonsPanel, Panel):
         sub = col.column(align=True)
         sub.prop(ccam, "aperture_blades", text="Blades")
         sub.prop(ccam, "aperture_rotation", text="Rotation")
+        sub.prop(ccam, "aperture_ratio", text="Ratio")
 
 
 class Cycles_PT_context_material(CyclesButtonsPanel, Panel):
@@ -929,7 +930,9 @@ class CyclesWorld_PT_settings(CyclesButtonsPanel, Panel):
 
         col = split.column()
         col.label(text="Volume:")
-        col.prop(cworld, "volume_sampling", text="")
+        sub = col.column()
+        sub.active = use_cpu(context)
+        sub.prop(cworld, "volume_sampling", text="")
         col.prop(cworld, "homogeneous_volume", text="Homogeneous")
 
 
@@ -1031,7 +1034,9 @@ class CyclesMaterial_PT_settings(CyclesButtonsPanel, Panel):
 
         col = split.column()
         col.label(text="Volume:")
-        col.prop(cmat, "volume_sampling", text="")
+        sub = col.column()
+        sub.active = use_cpu(context)
+        sub.prop(cmat, "volume_sampling", text="")
         col.prop(cmat, "homogeneous_volume", text="Homogeneous")
 
 

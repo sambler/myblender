@@ -75,11 +75,15 @@ CCL_NAMESPACE_BEGIN
 #define __KERNEL_SHADING__
 #define __KERNEL_ADV_SHADING__
 #define __BRANCHED_PATH__
+#define __VOLUME__
+#define __VOLUME_SCATTER__
 
 /* Experimental on GPU */
-//#define __VOLUME__
-//#define __VOLUME_SCATTER__
-//#define __SUBSURFACE__
+#ifdef __KERNEL_CUDA_EXPERIMENTAL__
+#define __SUBSURFACE__
+#define __CMJ__
+#endif
+
 #endif
 
 #ifdef __KERNEL_OPENCL__
@@ -757,9 +761,12 @@ typedef struct KernelCamera {
 	/* render size */
 	float width, height;
 	int resolution;
+
+	/* anamorphic lens bokeh */
+	float inv_aperture_ratio;
+
 	int pad1;
 	int pad2;
-	int pad3;
 
 	/* more matrices */
 	Transform screentoworld;

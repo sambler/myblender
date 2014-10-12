@@ -553,7 +553,7 @@ typedef enum AttributeStandard {
 typedef struct ShaderClosure {
 	ClosureType type;
 	float3 weight;
-#ifndef __APPLE__
+#if !defined(__APPLE__) && ! defined(__FreeBSD__)
 	float sample_weight;
 #endif
 	float data0;
@@ -562,7 +562,7 @@ typedef struct ShaderClosure {
 
 	float3 N;
 	float3 T;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 	float sample_weight;
 #endif
 #ifdef __OSL__

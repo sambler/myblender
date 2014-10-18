@@ -38,7 +38,7 @@ CCL_NAMESPACE_BEGIN
 #define BSSRDF_MIN_RADIUS			1e-8f
 #define BSSRDF_MAX_HITS				4
 
-#define BB_DRAPPER				800.0f
+#define BB_DRAPER				800.0f
 #define BB_MAX_TABLE_RANGE		12000.0f
 #define BB_TABLE_XPOWER			1.5f
 #define BB_TABLE_YPOWER			5.0f
@@ -864,7 +864,7 @@ typedef struct KernelFilm {
 
 #ifdef __KERNEL_DEBUG__
 	int pass_bvh_traversal_steps;
-	int pad[3];
+	int pass_pad3, pass_pad4, pass_pad5;
 #endif
 } KernelFilm;
 

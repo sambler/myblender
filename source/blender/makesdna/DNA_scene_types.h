@@ -600,6 +600,11 @@ typedef struct RenderData {
 	int line_thickness_mode;
 	float unit_line_thickness; /* in pixels */
 
+	/* Freestyle SVG Export */
+	char svg_path[1024]; /* 1024 = FILE_MAX */
+	int svg_mode;
+	int svg_flag;
+
 	/* render engine */
 	char engine[32];
 
@@ -609,6 +614,15 @@ typedef struct RenderData {
 	int preview_start_resolution;
 	int pad;
 } RenderData;
+
+/* RenderData::svg_flag */
+#define FREESTYLE_SVG_EXPORT                (1 << 0)
+#define FREESTYLE_SVG_SPLIT_AT_INVISIBLE    (1 << 1)
+#define FREESTYLE_SVG_OBJECT_FILL           (1 << 2)
+
+/* RenderData::svg_mode */
+#define FREESTYLE_CONTROL_SVG_FRAME      1
+#define FREESTYLE_CONTROL_SVG_ANIMATION  2
 
 /* *************************************************************** */
 /* Render Conversion/Simplfication Settings */
@@ -836,7 +850,7 @@ typedef struct Paint {
 typedef struct ImagePaintSettings {
 	Paint paint;
 
-	short flag, pad;
+	short flag, missing_data;
 	
 	/* for projection painting only */
 	short seam_bleed, normal_angle;
@@ -1733,6 +1747,11 @@ typedef enum ImagePaintMode {
 #define IMAGEPAINT_PROJECT_LAYER_CLONE	128
 #define IMAGEPAINT_PROJECT_LAYER_STENCIL	256
 #define IMAGEPAINT_PROJECT_LAYER_STENCIL_INV	512
+
+#define IMAGEPAINT_MISSING_UVS       (1 << 0)
+#define IMAGEPAINT_MISSING_MATERIAL  (1 << 1)
+#define IMAGEPAINT_MISSING_TEX       (1 << 2)
+#define IMAGEPAINT_MISSING_STENCIL   (1 << 3)
 
 /* toolsettings->uvcalc_flag */
 #define UVCALC_FILLHOLES			1

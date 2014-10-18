@@ -93,9 +93,6 @@
 
 #include "bmesh.h"
 
-//XXX #include "BIF_previewrender.h"
-//XXX #include "BIF_editseq.h"
-
 #ifdef WIN32
 #else
 #  include <sys/time.h>
@@ -469,6 +466,9 @@ Scene *BKE_scene_add(Main *bmain, const char *name)
 	sce->r.postgamma = 1.0;
 	sce->r.posthue = 0.0;
 	sce->r.postsat = 1.0;
+
+	/* Freestyle SVG Export */
+	sce->r.svg_mode = FREESTYLE_CONTROL_SVG_FRAME;
 
 	sce->r.bake_mode = 1;    /* prevent to include render stuff here */
 	sce->r.bake_filter = 16;

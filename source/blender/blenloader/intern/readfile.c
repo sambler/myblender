@@ -3305,7 +3305,7 @@ static void direct_link_image(FileData *fd, Image *ima)
 {
 	/* for undo system, pointers could be restored */
 	if (fd->imamap)
-		ima->cache = newmclipadr(fd, ima->cache);
+		ima->cache = newimaadr(fd, ima->cache);
 	else
 		ima->cache = NULL;
 
@@ -6238,7 +6238,6 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 
 				rv3d->depths = NULL;
 				rv3d->gpuoffscreen = NULL;
-				rv3d->ri = NULL;
 				rv3d->render_engine = NULL;
 				rv3d->sms = NULL;
 				rv3d->smooth_timer = NULL;

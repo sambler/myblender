@@ -5027,7 +5027,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 	Object *ob = CTX_data_active_object(C);
 	Scene *scene = CTX_data_scene(C);
 	Material *ma;
-	bool is_bi = BKE_scene_uses_blender_internal(scene);
+	bool is_bi = BKE_scene_uses_blender_internal(scene) || BKE_scene_uses_blender_game(scene);
 	Image *ima = NULL;
 
 	if (!ob)
@@ -5086,9 +5086,8 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 					ima = mtex->tex->ima = proj_paint_image_create(op, bmain);
 				}
 
-				WM_event_add_notifier(C, NC_TEXTURE, CTX_data_scene(C));
+				WM_event_add_notifier(C, NC_TEXTURE | NA_ADDED, mtex->tex);
 			}
-			WM_event_add_notifier(C, NC_TEXTURE | NA_ADDED, mtex->tex);				
 		}
 		
 		if (ima) {
@@ -5160,7 +5159,7 @@ void PAINT_OT_add_texture_paint_slot(wmOperatorType *ot)
 	ot->poll = ED_operator_region_view3d_active;
 
 	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 
 	/* properties */
 	prop = RNA_def_enum(ot->srna, "type", layer_type_items, 0, "Type", "Merge method to use");
@@ -5184,7 +5183,7 @@ static int texture_paint_delete_texture_paint_slot_exec(bContext *C, wmOperator 
 	Object *ob = CTX_data_active_object(C);
 	Scene *scene = CTX_data_scene(C);
 	Material *ma;
-	bool is_bi = BKE_scene_uses_blender_internal(scene);
+	bool is_bi = BKE_scene_uses_blender_internal(scene) || BKE_scene_uses_blender_game(scene);
 	TexPaintSlot *slot;
 	
 	/* not supported for node-based engines */

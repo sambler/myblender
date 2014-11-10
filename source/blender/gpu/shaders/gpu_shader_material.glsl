@@ -722,7 +722,7 @@ void invert(float fac, vec4 col, out vec4 outcol)
 	outcol.w = col.w;
 }
 
-void clamp_val(vec3 vec, vec3 min, vec3 max, out vec3 out_vec)
+void clamp_vec3(vec3 vec, vec3 min, vec3 max, out vec3 out_vec)
 {
 	out_vec = clamp(vec, min, max);
 }
@@ -1933,6 +1933,17 @@ void shade_spec_t(float shadfac, float spec, float visifac, float specfac, out f
 void shade_add_spec(float t, vec3 lampcol, vec3 speccol, out vec3 outcol)
 {
 	outcol = t*lampcol*speccol;
+}
+
+void alpha_spec_correction(vec3 spec, float spectra, float alpha, out float outalpha)
+{
+	if (spectra > 0.0) {
+		float t = clamp(max(max(spec.r, spec.g), spec.b) * spectra, 0.0, 1.0);
+		outalpha = (1.0 - t) * alpha + t;
+	}
+	else {
+		outalpha = alpha;
+	}
 }
 
 void shade_add(vec4 col1, vec4 col2, out vec4 outcol)

@@ -227,7 +227,7 @@ static int add_reroute_exec(bContext *C, wmOperator *op)
 		float insert_point[2];
 		
 		/* always first */
-		ED_preview_kill_jobs(C);
+		ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 		
 		node_deselect_all(snode);
 		
@@ -347,7 +347,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 			return OPERATOR_CANCELLED;
 	}
 	
-	ED_preview_kill_jobs(C);
+	ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 	
 	node = node_add_node(C, NULL, type, snode->cursor[0], snode->cursor[1]);
 	
@@ -426,7 +426,7 @@ static int node_add_mask_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	ED_preview_kill_jobs(C);
+	ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
 	node = node_add_node(C, NULL, CMP_NODE_MASK, snode->cursor[0], snode->cursor[1]);
 
@@ -498,7 +498,7 @@ static int new_node_tree_exec(bContext *C, wmOperator *op)
 	ntree = ntreeAddTree(bmain, treename, idname);
 	
 	/* hook into UI */
-	uiIDContextProperty(C, &ptr, &prop);
+	UI_context_active_but_prop_get_templateID(C, &ptr, &prop);
 
 	if (prop) {
 		/* RNA_property_pointer_set increases the user count,

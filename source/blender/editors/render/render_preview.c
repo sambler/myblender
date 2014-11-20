@@ -525,7 +525,7 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 }
 
 /* new UI convention: draw is in pixel space already. */
-/* uses ROUNDBOX button in block to get the rect */
+/* uses UI_BTYPE_ROUNDBOX button in block to get the rect */
 static bool ed_preview_draw_rect(ScrArea *sa, int split, int first, rcti *rect, rcti *newrect)
 {
 	Render *re;
@@ -1180,12 +1180,11 @@ void ED_preview_shader_job(const bContext *C, void *owner, ID *id, ID *parent, M
 	WM_jobs_start(CTX_wm_manager(C), wm_job);
 }
 
-void ED_preview_kill_jobs(const struct bContext *C)
+void ED_preview_kill_jobs(wmWindowManager *wm, Main *bmain)
 {
-	wmWindowManager *wm = CTX_wm_manager(C);
 	if (wm)
 		WM_jobs_kill(wm, NULL, common_preview_startjob);
-	
-	ED_viewport_render_kill_jobs(C, false);
+
+	ED_viewport_render_kill_jobs(wm, bmain, false);
 }
 

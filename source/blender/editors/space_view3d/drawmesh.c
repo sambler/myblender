@@ -668,48 +668,48 @@ static void update_tface_color_layer(DerivedMesh *dm)
 	}
 }
 
-static DMDrawOption draw_tface_mapped__set_draw(void *userData, int index)
+static DMDrawOption draw_tface_mapped__set_draw(void *userData, int origindex, int UNUSED(mat_nr))
 {
 	Mesh *me = ((drawTFace_userData *)userData)->me;
 
 	/* array checked for NULL before calling */
-	MPoly *mpoly = &me->mpoly[index];
+	MPoly *mpoly = &me->mpoly[origindex];
 
-	BLI_assert(index >= 0 && index < me->totpoly);
+	BLI_assert(origindex >= 0 && origindex < me->totpoly);
 
 	if (mpoly->flag & ME_HIDE) {
 		return DM_DRAW_OPTION_SKIP;
 	}
 	else {
-		MTexPoly *tpoly = (me->mtpoly) ? &me->mtpoly[index] : NULL;
+		MTexPoly *tpoly = (me->mtpoly) ? &me->mtpoly[origindex] : NULL;
 		MTFace mtf = {{{0}}};
 		int matnr = mpoly->mat_nr;
 
 		if (tpoly) {
 			ME_MTEXFACE_CPY(&mtf, tpoly);
 		}
-
+		
 		return draw_tface__set_draw(&mtf, (me->mloopcol != NULL), matnr);
 	}
 }
 
-static DMDrawOption draw_em_tf_mapped__set_draw(void *userData, int index)
+static DMDrawOption draw_em_tf_mapped__set_draw(void *userData, int origindex, int mat_nr)
 {
 	drawEMTFMapped_userData *data = userData;
 	BMEditMesh *em = data->em;
 	BMFace *efa;
 
-	if (UNLIKELY(index >= em->bm->totface))
+	if (UNLIKELY(origindex >= em->bm->totface))
 		return DM_DRAW_OPTION_NORMAL;
 
-	efa = BM_face_at_index(em->bm, index);
+	efa = BM_face_at_index(em->bm, origindex);
 
 	if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
 		return DM_DRAW_OPTION_SKIP;
 	}
 	else {
 		MTFace mtf = {{{0}}};
-		int matnr = efa->mat_nr;
+		int matnr = (mat_nr != -1) ? mat_nr : efa->mat_nr;
 
 		if (data->has_mtface) {
 			MTexPoly *tpoly = CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_MTEXPOLY);
@@ -1189,7 +1189,7 @@ void draw_mesh_paint_weight_faces(DerivedMesh *dm, const bool use_light,
 	}
 
 	dm->drawMappedFaces(dm, (DMSetDrawOptions)facemask_cb, GPU_enable_material, NULL, user_data,
-	                    DM_DRAW_USE_COLORS | DM_DRAW_ALWAYS_SMOOTH);
+	                    DM_DRAW_USE_COLORS);
 
 	if (use_light) {
 		draw_mesh_paint_light_end();
@@ -1206,12 +1206,11 @@ void draw_mesh_paint_vcolor_faces(DerivedMesh *dm, const bool use_light,
 
 	if (me->mloopcol) {
 		dm->drawMappedFaces(dm, facemask_cb, GPU_enable_material, NULL, user_data,
-		                    DM_DRAW_USE_COLORS | DM_DRAW_ALWAYS_SMOOTH);
+		                    DM_DRAW_USE_COLORS);
 	}
 	else {
 		glColor3f(1.0f, 1.0f, 1.0f);
-		dm->drawMappedFaces(dm, facemask_cb, GPU_enable_material, NULL, user_data,
-		                    DM_DRAW_ALWAYS_SMOOTH);
+		dm->drawMappedFaces(dm, facemask_cb, GPU_enable_material, NULL, user_data, 0);
 	}
 
 	if (use_light) {

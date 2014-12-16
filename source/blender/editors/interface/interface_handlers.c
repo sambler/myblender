@@ -2436,6 +2436,8 @@ static void ui_textedit_ime_begin(wmWindow *win, uiBut *UNUSED(but))
 	/* XXX Is this really needed? */
 	int x, y;
 
+	BLI_assert(win->ime_data == NULL);
+
 	/* enable IME and position to cursor, it's a trick */
 	x = win->eventstate->x;
 	/* flip y and move down a bit, prevent the IME panel cover the edit button */
@@ -2573,7 +2575,9 @@ static void ui_textedit_end(bContext *C, uiBut *but, uiHandleButtonData *data)
 	WM_cursor_modal_restore(win);
 
 #ifdef WITH_INPUT_IME
-	ui_textedit_ime_end(win, but);
+	if (win->ime_data) {
+		ui_textedit_ime_end(win, but);
+	}
 #endif
 }
 
@@ -6353,6 +6357,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 		case UI_BTYPE_TOGGLE_N:
 		case UI_BTYPE_CHECKBOX:
 		case UI_BTYPE_CHECKBOX_N:
+		case UI_BTYPE_ROW:
 			retval = ui_do_but_TOG(C, but, data, event);
 			break;
 		case UI_BTYPE_SCROLL:
@@ -6375,7 +6380,6 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 			break;
 		case UI_BTYPE_ROUNDBOX:
 		case UI_BTYPE_LABEL:
-		case UI_BTYPE_ROW:
 		case UI_BTYPE_IMAGE:
 		case UI_BTYPE_PROGRESS_BAR:
 		case UI_BTYPE_NODE_SOCKET:

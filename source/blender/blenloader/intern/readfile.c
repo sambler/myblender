@@ -4888,6 +4888,15 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			}
 			lmd->cache_system = NULL;
 		}
+		else if (md->type == eModifierType_Displace) {
+			DisplaceModifierData *dmd = (DisplaceModifierData *)md;
+			/* Temp values, always reset! */
+			dmd->cached_lpmap_totvert = -1;
+			dmd->cached_lpmap_totedge = -1;
+			dmd->loosepart_count = -1;
+			dmd->loosepart_vertex_map = NULL;
+			dmd->loosepart_vertex_mem = NULL;
+		}
 	}
 }
 

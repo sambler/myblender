@@ -154,20 +154,18 @@ static void displaceModifier_doVertices(DisplaceModifierData *dmd, DerivedMesh *
 				vertexCos[i][j] += delta;
 			}
 		}
-		else {
-			if (direction == MOD_DISP_DIR_VAL_XYZ) {
-				while (j--) {
-					float delta = val[3] * loc_f[j];
-					CLAMP(delta, -10000, 10000);
-					vertexCos[i][j] += delta;
-				}
+		else if (direction == MOD_DISP_DIR_VAL_XYZ) {
+			while (j--) {
+				float delta = val[3] * loc_f[j];
+				CLAMP(delta, -10000, 10000);
+				vertexCos[i][j] += delta;
 			}
-			else {  /* if (direction == MOD_DISP_DIR_NOR) */
-				while (j--) {
-					float delta = val[3] * (mvert[i].no[j] / 32767.0f) * nor_fac;
-					CLAMP(delta, -10000, 10000);
-					vertexCos[i][j] += delta;
-				}
+		}
+		else {  /* if (direction == MOD_DISP_DIR_NOR) */
+			while (j--) {
+				float delta = val[3] * (mvert[i].no[j] / 32767.0f) * nor_fac;
+				CLAMP(delta, -10000, 10000);
+				vertexCos[i][j] += delta;
 			}
 		}
 	}

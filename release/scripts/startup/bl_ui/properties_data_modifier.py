@@ -324,14 +324,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             sub.active = (md.noise_mode == 'GAUSSIAN')
             sub.prop(md, "noise_std_deviation" )
 
-       # layout.separator()
-        split = layout.split()
-
-        col = split.column(align=True)
-        col.prop(md, "mid_level")
-        col.label(text="Vertex Group:")
-        col.prop_search(md, "vertex_group", ob, "vertex_groups", text="")
-
+        layout.separator()
         split = layout.split()
 
         col = split.column(align=True)

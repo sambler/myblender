@@ -263,7 +263,7 @@ static bool paint_brush_update(bContext *C,
 		}
 
 		if (brush->mtex.brush_map_mode == MTEX_MAP_MODE_RANDOM)
-			BKE_brush_randomize_texture_coordinates(ups, false);
+			BKE_brush_randomize_texture_coords(ups, false);
 		else {
 			copy_v2_v2(ups->tex_mouse, mouse);
 		}
@@ -271,7 +271,7 @@ static bool paint_brush_update(bContext *C,
 		/* take care of mask texture, if any */
 		if (brush->mask_mtex.tex) {
 			if (brush->mask_mtex.brush_map_mode == MTEX_MAP_MODE_RANDOM)
-				BKE_brush_randomize_texture_coordinates(ups, true);
+				BKE_brush_randomize_texture_coords(ups, true);
 			else {
 				copy_v2_v2(ups->mask_tex_mouse, mouse);
 			}
@@ -662,6 +662,10 @@ PaintStroke *paint_stroke_new(bContext *C,
 	/* initialize here */
 	ups->overlap_factor = 1.0;
 	ups->stroke_active = true;
+	
+	zero_v3(ups->average_stroke_accum);
+	ups->average_stroke_counter = 0;
+	
 
 	/* initialize here to avoid initialization conflict with threaded strokes */
 	curvemapping_initialize(br->curve);

@@ -949,7 +949,7 @@ void BKE_brush_jitter_pos(const Scene *scene, Brush *brush, const float pos[2], 
 	jitterpos[1] = pos[1] + 2 * rand_pos[1] * diameter * spread;
 }
 
-void BKE_brush_randomize_texture_coordinates(UnifiedPaintSettings *ups, bool mask)
+void BKE_brush_randomize_texture_coords(UnifiedPaintSettings *ups, bool mask)
 {
 	/* we multiply with brush radius as an optimization for the brush
 	 * texture sampling functions */
@@ -964,7 +964,7 @@ void BKE_brush_randomize_texture_coordinates(UnifiedPaintSettings *ups, bool mas
 }
 
 /* Uses the brush curve control to find a strength value between 0 and 1 */
-float BKE_brush_curve_strength_clamp(Brush *br, float p, const float len)
+float BKE_brush_curve_strength(Brush *br, float p, const float len)
 {
 	float strength;
 
@@ -976,17 +976,6 @@ float BKE_brush_curve_strength_clamp(Brush *br, float p, const float len)
 	CLAMP(strength, 0.0f, 1.0f);
 
 	return strength;
-}
-/* same as above but can return negative values if the curve enables
- * used for sculpt only */
-float BKE_brush_curve_strength(Brush *br, float p, const float len)
-{
-	if (p >= len)
-		p = 1.0f;
-	else
-		p = p / len;
-
-	return curvemapping_evaluateF(br->curve, 0, p);
 }
 
 /* TODO: should probably be unified with BrushPainter stuff? */
@@ -1045,7 +1034,7 @@ struct ImBuf *BKE_brush_gen_radial_control_imbuf(Brush *br, bool secondary)
 	for (i = 0; i < side; ++i) {
 		for (j = 0; j < side; ++j) {
 			float magn = sqrtf(pow2f(i - half) + pow2f(j - half));
-			im->rect_float[i * side + j] = BKE_brush_curve_strength_clamp(br, magn, half);
+			im->rect_float[i * side + j] = BKE_brush_curve_strength(br, magn, half);
 		}
 	}
 

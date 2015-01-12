@@ -323,15 +323,14 @@ void static noise_displace_mesh_part(DisplaceModifierData *dmd, float (*vertexCo
 		}
 
 		/* Now prepare transform mat4 for this loose part. */
-		/* Since we are going to change the pivot point, we do not want any translation for now! */
-		loc_eul_size_to_mat4(mat, zero_v, rot, scale);
+		loc_eul_size_to_mat4(mat, trans, rot, scale);
 		transform_pivot_set_m4(mat, pivot);
 	}
 	else {
 		/* Loose part is affected but only with translation, much simpler. */
 		unit_m4(mat);
+		copy_v3_v3(mat[3], trans);
 	}
-	copy_v3_v3(mat[3], trans);
 
 	for (i = 0; i < vcount; i++) {
 		const int iv = vmap ? vmap->indices[i] : i;

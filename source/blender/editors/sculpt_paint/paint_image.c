@@ -662,22 +662,24 @@ void paint_brush_color_get(struct Scene *scene, struct Brush *br, bool color_cor
 		copy_v3_v3(color, BKE_brush_secondary_color_get(scene, br));
 	else {
 		if (br->flag & BRUSH_USE_GRADIENT) {
+			float color_gr[4];
 			switch (br->gradient_stroke_mode) {
 				case BRUSH_GRADIENT_PRESSURE:
-					do_colorband(br->gradient, pressure, color);
+					do_colorband(br->gradient, pressure, color_gr);
 					break;
 				case BRUSH_GRADIENT_SPACING_REPEAT:
 				{
 					float coord = fmod(distance / br->gradient_spacing, 1.0);
-					do_colorband(br->gradient, coord, color);
+					do_colorband(br->gradient, coord, color_gr);
 					break;
 				}
 				case BRUSH_GRADIENT_SPACING_CLAMP:
 				{
-					do_colorband(br->gradient, distance / br->gradient_spacing, color);
+					do_colorband(br->gradient, distance / br->gradient_spacing, color_gr);
 					break;
 				}
 			}
+			copy_v3_v3(color, color_gr);
 		}
 		else
 			copy_v3_v3(color, BKE_brush_color_get(scene, br));
@@ -1056,7 +1058,7 @@ void ED_space_image_paint_update(wmWindowManager *wm, ToolSettings *settings)
 					enabled = true;
 
 	if (enabled) {
-		BKE_paint_init(&imapaint->paint, PAINT_CURSOR_TEXTURE_PAINT);
+		BKE_paint_init(&settings->unified_paint_settings, &imapaint->paint, PAINT_CURSOR_TEXTURE_PAINT);
 
 		paint_cursor_start_explicit(&imapaint->paint, wm, image_paint_poll);
 	}
@@ -1413,7 +1415,7 @@ static int texture_paint_toggle_exec(bContext *C, wmOperator *op)
 		
 		ob->mode |= mode_flag;
 
-		BKE_paint_init(&scene->toolsettings->imapaint.paint, PAINT_CURSOR_TEXTURE_PAINT);
+		BKE_paint_init(&scene->toolsettings->unified_paint_settings, &imapaint->paint, PAINT_CURSOR_TEXTURE_PAINT);
 
 		if (U.glreslimit != 0)
 			GPU_free_images();

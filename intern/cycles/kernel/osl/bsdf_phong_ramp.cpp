@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <OpenImageIO/fmath.h>
+#include <OpenImageIO14/fmath.h>
 
 #include <OSL/genclosure.h>
 

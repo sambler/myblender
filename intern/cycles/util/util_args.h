@@ -20,7 +20,7 @@
 /* Argument Parsing for command line, we use the OpenImageIO
  * library because it has nice functions to do this. */
 
-#include <OpenImageIO/argparse.h>
+#include <OpenImageIO14/argparse.h>
 
 CCL_NAMESPACE_BEGIN
 

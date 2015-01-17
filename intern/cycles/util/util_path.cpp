@@ -19,8 +19,8 @@
 #include "util_path.h"
 #include "util_string.h"
 
-#include <OpenImageIO/strutil.h>
-#include <OpenImageIO/sysutil.h>
+#include <OpenImageIO14/strutil.h>
+#include <OpenImageIO14/sysutil.h>
 OIIO_NAMESPACE_USING
 
 #include <stdio.h>

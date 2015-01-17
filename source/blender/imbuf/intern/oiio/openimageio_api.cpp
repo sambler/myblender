@@ -32,7 +32,7 @@
 #include <set>
 
 #include <openimageio_api.h>
-#include <OpenImageIO/imageio.h>
+#include <OpenImageIO14/imageio.h>
 
 OIIO_NAMESPACE_USING
 

@@ -133,7 +133,7 @@ def register():
                    ],
             name="Support",
             description="Display support level",
-            default={'OFFICIAL', 'COMMUNITY'},
+            default={'OFFICIAL', 'COMMUNITY', 'TESTING'},
             options={'ENUM_FLAG'},
             )
     # done...

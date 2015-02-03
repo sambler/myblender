@@ -777,7 +777,7 @@ static void decode_blender_header(FileData *fd)
 	readsize = fd->read(fd, header, sizeof(header));
 	
 	if (readsize == sizeof(header)) {
-		if (strncmp(header, "BLENDER", 7) == 0) {
+		if (STREQLEN(header, "BLENDER", 7)) {
 			int remove_this_endian_test = 1;
 			
 			fd->flags |= FD_FLAGS_FILE_OK;
@@ -1182,7 +1182,7 @@ bool BLO_is_a_library(const char *path, char *dir, char *group)
 		
 		/* now we know that we are in a blend file and it is safe to 
 		 * assume that gp actually points to a group */
-		if (strcmp("Screen", gp) != 0)
+		if (!STREQ("Screen", gp))
 			BLI_strncpy(group, gp, BLO_GROUP_MAX);
 	}
 	return 1;
@@ -4549,7 +4549,7 @@ static void lib_link_object(FileData *fd, Main *main)
 					steeringa->target = newlibadr(fd, ob->id.lib, steeringa->target);
 					steeringa->navmesh = newlibadr(fd, ob->id.lib, steeringa->navmesh);
 				}
-				else if(act->type == ACT_MOUSE) {
+				else if (act->type == ACT_MOUSE) {
 					/* bMouseActuator *moa= act->data; */
 				}
 			}
@@ -6011,7 +6011,7 @@ typedef enum ePointerUserMode {
 
 static bool restore_pointer(ID *id, ID *newid, ePointerUserMode user)
 {
-	if (strcmp(newid->name + 2, id->name + 2) == 0) {
+	if (STREQ(newid->name + 2, id->name + 2)) {
 		if (newid->lib == id->lib) {
 			if (user == USER_ONE) {
 				if (newid->us == 0) {
@@ -6872,9 +6872,10 @@ static void direct_link_sound(FileData *fd, bSound *sound)
 		sound->waveform = NULL;
 	}
 		
-	if (sound->mutex)
-		sound->mutex = BLI_mutex_alloc();
-	
+	if (sound->spinlock) {
+		sound->spinlock = MEM_mallocN(sizeof(SpinLock), "sound_spinlock");
+		BLI_spin_init(sound->spinlock);
+	}
 	/* clear waveform loading flag */
 	sound->flags &= ~SOUND_FLAGS_WAVEFORM_LOADING;
 
@@ -9099,7 +9100,7 @@ static ID *append_named_part(Main *mainl, FileData *fd, const char *idname, cons
 		if (bhead->code == idcode) {
 			const char *idname_test= bhead_id_name(fd, bhead);
 			
-			if (strcmp(idname_test + 2, idname) == 0) {
+			if (STREQ(idname_test + 2, idname)) {
 				found = 1;
 				id = is_yet_read(fd, mainl, bhead);
 				if (id == NULL) {
@@ -9220,7 +9221,7 @@ static void append_id_part(FileData *fd, Main *mainvar, ID *id, ID **r_id)
 	for (bhead = blo_firstbhead(fd); bhead; bhead = blo_nextbhead(fd, bhead)) {
 		if (bhead->code == GS(id->name)) {
 			
-			if (strcmp(id->name, bhead_id_name(fd, bhead))==0) {
+			if (STREQ(id->name, bhead_id_name(fd, bhead))) {
 				id->flag &= ~LIB_READ;
 				id->flag |= LIB_NEED_EXPAND;
 //				printf("read lib block %s\n", id->name);

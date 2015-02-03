@@ -102,6 +102,8 @@
 #include "ED_util.h"
 #include "ED_view3d.h"
 
+#include "GPU_material.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
@@ -1187,7 +1189,7 @@ bool WM_operator_filesel_ensure_ext_imtype(wmOperator *op, const struct ImageFor
 	/* dont NULL check prop, this can only run on ops with a 'filepath' */
 	prop = RNA_struct_find_property(op->ptr, "filepath");
 	RNA_property_string_get(op->ptr, prop, filepath);
-	if (BKE_add_image_extension(filepath, im_format)) {
+	if (BKE_image_path_ensure_ext_from_imformat(filepath, im_format)) {
 		RNA_property_string_set(op->ptr, prop, filepath);
 		/* note, we could check for and update 'filename' here,
 		 * but so far nothing needs this. */
@@ -2026,6 +2028,14 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	uiItemO(col, NULL, ICON_RECOVER_LAST, "WM_OT_recover_last_session");
 	uiItemL(col, "", ICON_NONE);
 	
+	mt = WM_menutype_find("USERPREF_MT_splash_footer", false);
+	if (mt) {
+		Menu menu = {NULL};
+		menu.layout = uiLayoutColumn(layout, false);
+		menu.type = mt;
+		mt->draw(C, &menu);
+	}
+
 	UI_block_bounds_set_centered(block, 0);
 	
 	return block;
@@ -2682,7 +2692,9 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 
 	/* recreate dependency graph to include new objects */
 	DAG_scene_relations_rebuild(bmain, scene);
-
+	
+	/* free gpu materials, some materials depend on existing objects, such as lamps so freeing correctly refreshes */
+	GPU_materials_free();
 	BLO_blendhandle_close(bh);
 
 	/* XXX TODO: align G.lib with other directory storage (like last opened image etc...) */
@@ -4419,7 +4431,7 @@ static int radial_control_modal(bContext *C, wmOperator *op, const wmEvent *even
 							if (snap) new_value = ((int)ceil(new_value * 10.f) * 10.0f) / 100.f;
 							break;
 						case PROP_ANGLE:
-							new_value = atan2f(delta[1], delta[0]) + M_PI + angle_precision;
+							new_value = atan2f(delta[1], delta[0]) + (float)M_PI + angle_precision;
 							new_value = fmod(new_value, 2.0f * (float)M_PI);
 							if (new_value < 0.0f)
 								new_value += 2.0f * (float)M_PI;

@@ -385,7 +385,7 @@ static int rna_Scene_object_bases_lookup_string(PointerRNA *ptr, const char *key
 	Base *base;
 
 	for (base = scene->base.first; base; base = base->next) {
-		if (strncmp(base->object->id.name + 2, key, sizeof(base->object->id.name) - 2) == 0) {
+		if (STREQLEN(base->object->id.name + 2, key, sizeof(base->object->id.name) - 2)) {
 			*r_ptr = rna_pointer_inherit_refine(ptr, &RNA_ObjectBase, base);
 			return true;
 		}
@@ -942,7 +942,7 @@ static int rna_SceneRender_file_ext_length(PointerRNA *ptr)
 	RenderData *rd = (RenderData *)ptr->data;
 	char ext[8];
 	ext[0] = '\0';
-	BKE_add_image_extension(ext, &rd->im_format);
+	BKE_image_path_ensure_ext_from_imformat(ext, &rd->im_format);
 	return strlen(ext);
 }
 
@@ -950,7 +950,7 @@ static void rna_SceneRender_file_ext_get(PointerRNA *ptr, char *str)
 {
 	RenderData *rd = (RenderData *)ptr->data;
 	str[0] = '\0';
-	BKE_add_image_extension(str, &rd->im_format);
+	BKE_image_path_ensure_ext_from_imformat(str, &rd->im_format);
 }
 
 #ifdef WITH_QUICKTIME
@@ -1158,7 +1158,7 @@ static int rna_RenderSettings_engine_get(PointerRNA *ptr)
 	int a = 0;
 
 	for (type = R_engines.first; type; type = type->next, a++)
-		if (strcmp(type->idname, rd->engine) == 0)
+		if (STREQ(type->idname, rd->engine))
 			return a;
 	
 	return 0;
@@ -1243,7 +1243,7 @@ static int rna_RenderSettings_use_game_engine_get(PointerRNA *ptr)
 	RenderEngineType *type;
 
 	for (type = R_engines.first; type; type = type->next)
-		if (strcmp(type->idname, rd->engine) == 0)
+		if (STREQ(type->idname, rd->engine))
 			return (type->flag & RE_GAME);
 	
 	return 0;
@@ -3207,7 +3207,7 @@ static void rna_def_scene_game_recast_data(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "slope_max", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_sdna(prop, NULL, "agentmaxslope");
-	RNA_def_property_range(prop, 0, M_PI / 2);
+	RNA_def_property_range(prop, 0, M_PI_2);
 	RNA_def_property_ui_text(prop, "Max Slope", "Maximum walkable slope angle");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 

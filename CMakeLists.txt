@@ -1344,11 +1344,11 @@ elseif(WIN32)
 			set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/include/OpenEXR)
 			set(OPENEXR_LIBPATH ${OPENEXR}/lib)
 			set(OPENEXR_LIBRARIES
-				${OPENEXR_LIBPATH}/Iex-2_1.lib
+				${OPENEXR_LIBPATH}/Iex-2_2.lib
 				${OPENEXR_LIBPATH}/Half.lib
-				${OPENEXR_LIBPATH}/IlmImf-2_1.lib
-				${OPENEXR_LIBPATH}/Imath-2_1.lib
-				${OPENEXR_LIBPATH}/IlmThread-2_1.lib
+				${OPENEXR_LIBPATH}/IlmImf-2_2.lib
+				${OPENEXR_LIBPATH}/Imath-2_2.lib
+				${OPENEXR_LIBPATH}/IlmThread-2_2.lib
 			)
 			endif(NOT OPENEXR_FOUND)
 		endif()
@@ -1516,7 +1516,7 @@ elseif(WIN32)
 			if (GCC_VERSION VERSION_GREATER 4.9 OR GCC_VERSION VERSION_EQUAL 4.9)
 				set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/mingw64_gcc49)
 			else()
-				set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/mingw)
+				set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/mingw64)
 			endif()
 		else()
 			message(STATUS "Compiling for 32 bit with MinGW-w32.")

@@ -263,6 +263,9 @@ bool OSLShaderManager::osl_compile(const string& inputfile, const string& output
 	options.push_back("-o");
 	options.push_back(outputfile);
 
+	/* I want to up the optimize level */
+	options.push_back("-O2");
+
 	/* specify standard include path */
 	options.push_back(shader_path);
 

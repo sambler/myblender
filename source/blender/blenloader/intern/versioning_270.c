@@ -519,6 +519,20 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 		}
 	}
 
+	if (!DNA_struct_elem_find(fd->filesdna, "HookModifierData", "char", "flag")) {
+		Object *ob;
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			ModifierData *md;
+			for (md = ob->modifiers.first; md; md = md->next) {
+				if (md->type == eModifierType_Hook) {
+					HookModifierData *hmd = (HookModifierData *)md;
+					hmd->falloff_type = eHook_Falloff_InvSquare;
+				}
+			}
+		}
+	}
+
 	if (!MAIN_VERSION_ATLEAST(main, 273, 3)) {
 		ParticleSettings *part;
 		for (part = main->particle.first; part; part = part->id.next) {
@@ -529,6 +543,24 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 		}
 	}
 
+	if (!DNA_struct_elem_find(fd->filesdna, "NodePlaneTrackDeformData", "char", "flag")) {
+		FOREACH_NODETREE(main, ntree, id) {
+			if (ntree->type == NTREE_COMPOSIT) {
+				bNode *node;
+				for (node = ntree->nodes.first; node; node = node->next) {
+					if (ELEM(node->type, CMP_NODE_PLANETRACKDEFORM)) {
+						NodePlaneTrackDeformData *data = node->storage;
+						data->flag = 0;
+						data->motion_blur_samples = 16;
+						data->motion_blur_shutter = 0.5f;
+					}
+				}
+			}
+		}
+		FOREACH_NODETREE_END
+	}
+
+/* adjustments for custom displace modifier - D320*/
 	if (!MAIN_VERSION_ATLEAST(main, 273, 9)) {
 		Object *ob;
 
@@ -561,4 +593,5 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 			}
 		}
 	}
+/* end of D320 adjustments */
 }

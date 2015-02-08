@@ -251,23 +251,21 @@ void OSLShaderManager::shading_system_free()
 
 bool OSLShaderManager::osl_compile(const string& inputfile, const string& outputfile)
 {
-#if OSL_LIBRARY_VERSION_CODE < 10500
-	vector<string> options;
-#else
+#if OSL_LIBRARY_VERSION_CODE < 10602
 	vector<string_view> options;
+#else
+	vector<string> options;
 #endif
 	string stdosl_path;
-	string shader_path = path_get("shader").insert(0,"-I");
+	string shader_path = path_get("shader");
 
 	/* specify output file name */
 	options.push_back("-o");
 	options.push_back(outputfile);
 
-	/* I want to up the optimize level */
-	options.push_back("-O2");
-
 	/* specify standard include path */
-	options.push_back(shader_path);
+	string include_path_arg = string("-I") + shader_path;
+	options.push_back(include_path_arg);
 
 	stdosl_path = path_get("shader/stdosl.h");
 

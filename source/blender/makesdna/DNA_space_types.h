@@ -292,6 +292,7 @@ typedef enum eSpaceOutliner_Mode {
 	SO_DATABLOCKS = 11,
 	SO_USERDEF = 12,
 	/* SO_KEYMAP = 13, */        /* deprecated! */
+	SO_ID_ORPHANS = 14,
 } eSpaceOutliner_Mode;
 
 /* SpaceOops->storeflag */
@@ -370,8 +371,6 @@ typedef enum eGraphEdit_Flag {
 	/* normalize curves on display */
 	SIPO_NORMALIZE            = (1 << 14),
 	SIPO_NORMALIZE_FREEZE     = (1 << 15),
-	/* automatically set view on selection */
-	SIPO_AUTO_VIEW_SELECTED   = (1 << 16),
 } eGraphEdit_Flag;
 
 /* SpaceIpo->mode (Graph Editor Mode) */
@@ -638,9 +637,18 @@ typedef struct SpaceFile {
 	struct FileLayout *layout;
 	
 	short recentnr, bookmarknr;
-	short systemnr, pad2;
+	short systemnr, system_bookmarknr;
 } SpaceFile;
 
+/* FSMenuEntry's without paths indicate seperators */
+typedef struct FSMenuEntry {
+	struct FSMenuEntry *next;
+
+	char *path;
+	char name[256];  /* FILE_MAXFILE */
+	short save;
+	short pad[3];
+} FSMenuEntry;
 
 /* FileSelectParams.display */
 enum FileDisplayTypeE {

@@ -1482,7 +1482,7 @@ static int outliner_orphans_purge_invoke(bContext *C, wmOperator *op, const wmEv
 	                                   "Click here to proceed...");
 }
 
-static int outliner_orphans_purge_exec(bContext *C, wmOperator *op)
+static int outliner_orphans_purge_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	/* Firstly, ensure that the file has been saved,
 	 * so that the latest changes since the last save
@@ -1500,7 +1500,7 @@ void OUTLINER_OT_orphans_purge(wmOperatorType *ot)
 	/* identifiers */
 	ot->idname = "OUTLINER_OT_orphans_purge";
 	ot->name = "Purge All";
-	ot->description = "Clears all orphaned datablocks without any users from the file (cannot be undone)";
+	ot->description = "Clear all orphaned datablocks without any users from the file (cannot be undone)";
 	
 	/* callbacks */
 	ot->invoke = outliner_orphans_purge_invoke;

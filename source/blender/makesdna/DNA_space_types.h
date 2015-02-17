@@ -494,7 +494,7 @@ typedef struct SpaceSeq {
 	
 	float xof DNA_DEPRECATED, yof DNA_DEPRECATED;   /* deprecated: offset for drawing the image preview */
 	short mainb;    /* weird name for the sequencer subtype (seq, image, luma... etc) */
-	short render_size;
+	short render_size;  /* eSpaceSeq_Proxy_RenderSize */
 	short chanshown;
 	short zebra;
 	int flag;
@@ -647,7 +647,8 @@ typedef struct FSMenuEntry {
 	char *path;
 	char name[256];  /* FILE_MAXFILE */
 	short save;
-	short pad[3];
+	short valid;
+	short pad[2];
 } FSMenuEntry;
 
 /* FileSelectParams.display */

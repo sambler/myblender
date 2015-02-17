@@ -179,16 +179,18 @@ static FileSelect file_select_do(bContext *C, int selected_idx, bool do_diropen)
 		params->active_file = selected_idx;
 
 		if (S_ISDIR(file->type)) {
+			const bool is_parent_dir = FILENAME_IS_PARENT(file->relname);
+
 			if (do_diropen == false) {
 				params->file[0] = '\0';
 				retval = FILE_SELECT_DIR;
 			}
 			/* the path is too long and we are not going up! */
-			else if (!FILENAME_IS_PARENT(file->relname) && strlen(params->dir) + strlen(file->relname) >= FILE_MAX) {
+			else if (!is_parent_dir && strlen(params->dir) + strlen(file->relname) >= FILE_MAX) {
 				// XXX error("Path too long, cannot enter this directory");
 			}
 			else {
-				if (FILENAME_IS_PARENT(file->relname)) {
+				if (is_parent_dir) {
 					/* avoids /../../ */
 					BLI_parent_dir(params->dir);
 				}
@@ -235,7 +237,7 @@ static FileSelect file_select(bContext *C, const rcti *rect, FileSelType select,
 	}
 
 	/* update operator for name change event */
-	file_draw_check_cb(C, NULL, NULL);
+	file_draw_check(C);
 	
 	return retval;
 }
@@ -434,6 +436,7 @@ static int file_select_all_exec(bContext *C, wmOperator *UNUSED(op))
 		const FileCheckType check_type = (sfile->params->flag & FILE_DIRSEL_ONLY) ? CHECK_DIRS : CHECK_FILES;
 		filelist_select(sfile->files, &sel, FILE_SEL_ADD, FILE_SEL_SELECTED, check_type);
 	}
+	file_draw_check(C);
 	ED_area_tag_redraw(sa);
 	return OPERATOR_FINISHED;
 }
@@ -598,6 +601,7 @@ static int bookmark_cleanup_exec(bContext *C, wmOperator *UNUSED(op))
 
 		BLI_make_file_string("/", name, BKE_appdir_folder_id_create(BLENDER_USER_CONFIG, NULL), BLENDER_BOOKMARK_FILE);
 		fsmenu_write_file(fsmenu, name);
+		fsmenu_refresh_bookmarks_status(fsmenu);
 		ED_area_tag_refresh(sa);
 		ED_area_tag_redraw(sa);
 	}
@@ -919,7 +923,7 @@ void file_operator_to_sfile(SpaceFile *sfile, wmOperator *op)
 	/* XXX, files and dirs updates missing, not really so important though */
 }
 
-void file_draw_check_cb(bContext *C, void *UNUSED(arg1), void *UNUSED(arg2))
+void file_draw_check(bContext *C)
 {
 	SpaceFile *sfile = CTX_wm_space_file(C);
 	wmOperator *op = sfile->op;
@@ -937,6 +941,12 @@ void file_draw_check_cb(bContext *C, void *UNUSED(arg1), void *UNUSED(arg2))
 			}
 		}
 	}
+}
+
+/* for use with; UI_block_func_set */
+void file_draw_check_cb(bContext *C, void *UNUSED(arg1), void *UNUSED(arg2))
+{
+	file_draw_check(C);
 }
 
 bool file_draw_check_exists(SpaceFile *sfile)
@@ -1516,6 +1526,9 @@ void file_filename_enter_handle(bContext *C, void *UNUSED(arg_unused), void *arg
 				}
 			}
 		}
+		else if (matches > 1) {
+			file_draw_check(C);
+		}
 	}
 }
 
@@ -1618,7 +1631,7 @@ static int file_filenum_exec(bContext *C, wmOperator *op)
 	if (sfile->params && (inc != 0)) {
 		BLI_newname(sfile->params->file, inc);
 		ED_area_tag_redraw(sa);
-		file_draw_check_cb(C, NULL, NULL);
+		file_draw_check(C);
 		// WM_event_add_notifier(C, NC_WINDOW, NULL);
 	}
 	

@@ -89,6 +89,7 @@ struct GPUFX {
 
 	/* texture bound to the depth attachment of the gbuffer */
 	GPUTexture *depth_buffer;
+	GPUTexture *depth_buffer_xray;
 
 	/* texture used for jittering for various effects */
 	GPUTexture *jitter_buffer;
@@ -112,6 +113,7 @@ struct GPUFX {
 	bool restore_stencil;
 };
 
+#if 0
 /* concentric mapping, see "A Low Distortion Map Between Disk and Square" and
  * http://psgraphics.blogspot.nl/2011/01/improved-code-for-concentric-map.html */
 static GPUTexture * create_concentric_sample_texture(int side)
@@ -141,6 +143,28 @@ static GPUTexture * create_concentric_sample_texture(int side)
 	}
 
 	tex = GPU_texture_create_1D_procedural(side * side, texels, NULL);
+	MEM_freeN(texels);
+	return tex;
+}
+#endif
+
+static GPUTexture *create_spiral_sample_texture(int numsaples)
+{
+	GPUTexture *tex;
+	float (*texels)[2] = MEM_mallocN(sizeof(float[2]) * numsaples, "concentric_tex");
+	const float numsaples_inv = 1.0f / numsaples;
+	int i;
+	/* arbitrary number to ensure we don't get conciding samples every circle */
+	const float spirals = 7.357;
+
+	for (i = 0; i < numsaples; i++) {
+		float r = (i + 0.5f) * numsaples_inv;
+		float phi = r * spirals * (float)(2.0 * M_PI);
+		texels[i][0] = r * cosf(phi);
+		texels[i][1] = r * sinf(phi);
+	}
+
+	tex = GPU_texture_create_1D_procedural(numsaples, (float *)texels, NULL);
 	MEM_freeN(texels);
 	return tex;
 }
@@ -213,6 +237,12 @@ static void cleanup_fx_gl_data(GPUFX *fx, bool do_fbo)
 		fx->depth_buffer = NULL;
 	}
 
+	if (fx->depth_buffer_xray) {
+		GPU_framebuffer_texture_detach(fx->depth_buffer_xray);
+		GPU_texture_free(fx->depth_buffer_xray);
+		fx->depth_buffer_xray = NULL;
+	}
+
 	cleanup_fx_dof_buffers(fx);
 
 	if (fx->ssao_concentric_samples_tex) {
@@ -244,8 +274,8 @@ static GPUTexture * create_jitter_texture(void)
 	int i;
 
 	for (i = 0; i < 64 * 64; i++) {
-		jitter[i][0] = 2.0f * BLI_frand() - 1.0;
-		jitter[i][1] = 2.0f * BLI_frand() - 1.0;
+		jitter[i][0] = 2.0f * BLI_frand() - 1.0f;
+		jitter[i][1] = 2.0f * BLI_frand() - 1.0f;
 		normalize_v2(jitter[i]);
 	}
 
@@ -260,7 +290,7 @@ bool GPU_fx_compositor_initialize_passes(
 	int w = BLI_rcti_size_x(rect), h = BLI_rcti_size_y(rect);
 	char err_out[256];
 	int num_passes = 0;
-	char fx_flag = fx_settings->fx_flag;
+	char fx_flag;
 
 	fx->effects = 0;
 
@@ -268,6 +298,8 @@ bool GPU_fx_compositor_initialize_passes(
 		cleanup_fx_gl_data(fx, true);
 		return false;
 	}
+
+	fx_flag = fx_settings->fx_flag;
 
 	/* disable effects if no options passed for them */
 	if (!fx_settings->dof) {
@@ -284,7 +316,7 @@ bool GPU_fx_compositor_initialize_passes(
 
 	/* scissor is missing when drawing offscreen, in that case, dimensions match exactly. In opposite case
 	 * add one to match viewport dimensions */
-	if (!scissor_rect) {
+	if (scissor_rect) {
 		w++, h++;
 	}
 
@@ -334,7 +366,7 @@ bool GPU_fx_compositor_initialize_passes(
 				GPU_texture_free(fx->ssao_concentric_samples_tex);
 			}
 
-			fx->ssao_concentric_samples_tex = create_concentric_sample_texture(fx_settings->ssao->samples);
+			fx->ssao_concentric_samples_tex = create_spiral_sample_texture(fx_settings->ssao->samples);
 		}
 	}
 	else {
@@ -452,6 +484,88 @@ static void gpu_fx_bind_render_target(int *passes_left, GPUFX *fx, struct GPUOff
 	}
 }
 
+void GPU_fx_compositor_setup_XRay_pass(GPUFX *fx, bool do_xray)
+{
+	char err_out[256];
+
+	if (do_xray) {
+		if (!fx->depth_buffer_xray && !(fx->depth_buffer_xray = GPU_texture_create_depth(fx->gbuffer_dim[0], fx->gbuffer_dim[1], err_out))) {
+			printf("%.256s\n", err_out);
+			cleanup_fx_gl_data(fx, true);
+			return;
+		}
+	}
+	else {
+		if (fx->depth_buffer_xray) {
+			GPU_framebuffer_texture_detach(fx->depth_buffer_xray);
+			GPU_texture_free(fx->depth_buffer_xray);
+			fx->depth_buffer_xray = NULL;
+		}
+		return;
+	}
+
+	GPU_framebuffer_texture_detach(fx->depth_buffer);
+
+	/* first depth buffer, because system assumes read/write buffers */
+	if(!GPU_framebuffer_texture_attach(fx->gbuffer, fx->depth_buffer_xray, 0, err_out))
+		printf("%.256s\n", err_out);
+}
+
+
+void GPU_fx_compositor_XRay_resolve(GPUFX *fx)
+{
+	GPUShader *depth_resolve_shader;
+	GPU_framebuffer_texture_detach(fx->depth_buffer_xray);
+
+	/* attach regular framebuffer */
+	GPU_framebuffer_texture_attach(fx->gbuffer, fx->depth_buffer, 0, NULL);
+
+	/* full screen quad where we will always write to depth buffer */
+	glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_SCISSOR_BIT);
+	glDepthFunc(GL_ALWAYS);
+	/* disable scissor from sculpt if any */
+	glDisable(GL_SCISSOR_TEST);
+	/* disable writing to color buffer, it's depth only pass */
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+	/* set up quad buffer */
+	glVertexPointer(2, GL_FLOAT, 0, fullscreencos);
+	glTexCoordPointer(2, GL_FLOAT, 0, fullscreenuvs);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	depth_resolve_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_DEPTH_RESOLVE, false);
+
+	if (depth_resolve_shader) {
+		int depth_uniform;
+
+		depth_uniform = GPU_shader_get_uniform(depth_resolve_shader, "depthbuffer");
+
+		GPU_shader_bind(depth_resolve_shader);
+
+		GPU_texture_bind(fx->depth_buffer_xray, 0);
+		GPU_depth_texture_mode(fx->depth_buffer_xray, false, true);
+		GPU_shader_uniform_texture(depth_resolve_shader, depth_uniform, fx->depth_buffer_xray);
+
+		/* draw */
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+		/* disable bindings */
+		GPU_depth_texture_mode(fx->depth_buffer_xray, true, false);
+		GPU_texture_unbind(fx->depth_buffer_xray);
+
+		GPU_shader_unbind();
+	}
+
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	glPopAttrib();
+}
+
+
 bool GPU_fx_do_composite_pass(GPUFX *fx, float projmat[4][4], bool is_persp, struct Scene *scene, struct GPUOffScreen *ofs)
 {
 	GPUTexture *src, *target;
@@ -529,7 +643,7 @@ bool GPU_fx_do_composite_pass(GPUFX *fx, float projmat[4][4], bool is_persp, str
 			float ssao_params[4] = {fx_ssao->distance_max, fx_ssao->factor, fx_ssao->attenuation, 0.0f};
 			float sample_params[4];
 
-			sample_params[0] = fx->ssao_sample_count * fx->ssao_sample_count;
+			sample_params[0] = fx->ssao_sample_count;
 			/* multiplier so we tile the random texture on screen */
 			sample_params[2] = fx->gbuffer_dim[0] / 64.0;
 			sample_params[3] = fx->gbuffer_dim[1] / 64.0;
@@ -598,17 +712,21 @@ bool GPU_fx_do_composite_pass(GPUFX *fx, float projmat[4][4], bool is_persp, str
 		GPUShader *dof_shader_pass1, *dof_shader_pass2, *dof_shader_pass3, *dof_shader_pass4, *dof_shader_pass5;
 		float dof_params[4];
 		float scale = scene->unit.system ? scene->unit.scale_length : 1.0f;
+		/* this is factor that converts to the scene scale. focal length and sensor are expressed in mm
+		 * unit.scale_length is how many meters per blender unit we have. We want to convert to blender units though
+		 * because the shader reads coordinates in world space, which is in blender units. */
 		float scale_camera = 0.001f / scale;
-		float aperture = 2.0f * scale_camera * fx_dof->focal_length / fx_dof->fstop;
+		/* we want radius here for the aperture number  */
+		float aperture = 0.5f * scale_camera * fx_dof->focal_length / fx_dof->fstop;
 
-		dof_params[0] = aperture * fabs(scale_camera * fx_dof->focal_length / (fx_dof->focus_distance - scale_camera * fx_dof->focal_length));
-		dof_params[1] = fx_dof->focus_distance;
+		dof_params[0] = aperture * fabsf(scale_camera * fx_dof->focal_length / ((fx_dof->focus_distance / scale) - scale_camera * fx_dof->focal_length));
+		dof_params[1] = fx_dof->focus_distance / scale;
 		dof_params[2] = fx->gbuffer_dim[0] / (scale_camera * fx_dof->sensor);
 		dof_params[3] = 0.0f;
 
 		/* DOF effect has many passes but most of them are performed on a texture whose dimensions are 4 times less than the original
-			 * (16 times lower than original screen resolution). Technique used is not very exact but should be fast enough and is based
-			 * on "Practical Post-Process Depth of Field" see http://http.developer.nvidia.com/GPUGems3/gpugems3_ch28.html */
+		 * (16 times lower than original screen resolution). Technique used is not very exact but should be fast enough and is based
+		 * on "Practical Post-Process Depth of Field" see http://http.developer.nvidia.com/GPUGems3/gpugems3_ch28.html */
 		dof_shader_pass1 = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_DEPTH_OF_FIELD_PASS_ONE, is_persp);
 		dof_shader_pass2 = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_DEPTH_OF_FIELD_PASS_TWO, is_persp);
 		dof_shader_pass3 = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_DEPTH_OF_FIELD_PASS_THREE, is_persp);
@@ -865,5 +983,5 @@ void GPU_fx_compositor_init_ssao_settings(GPUSSAOSettings *fx_ssao)
 	fx_ssao->factor = 1.0f;
 	fx_ssao->distance_max = 0.2f;
 	fx_ssao->attenuation = 1.0f;
-	fx_ssao->samples = 4;
+	fx_ssao->samples = 20;
 }

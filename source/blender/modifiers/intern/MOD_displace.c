@@ -608,6 +608,7 @@ static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *UNUSED(bmain),
                            struct Scene *UNUSED(scene),
                            Object *UNUSED(ob),
                            DagNode *obNode)

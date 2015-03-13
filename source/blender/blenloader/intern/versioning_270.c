@@ -616,10 +616,47 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 				}
 			}
 		}
+
+		if (!DNA_struct_elem_find(fd->filesdna, "bSteeringActuator", "float", "acceleration")) {
+			for (ob = main->object.first; ob; ob = ob->id.next) {
+				bActuator *act;
+				for (act = ob->actuators.first; act; act = act->next) {
+					if (act->type == ACT_STEERING) {
+						bSteeringActuator *sact = act->data;
+						sact->acceleration = 1000.f;
+					}
+				}
+			}
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 273, 9)) {
+		bScreen *scr;
+		ScrArea *sa;
+		SpaceLink *sl;
+		ARegion *ar;
+
+		/* Make sure sequencer preview area limits zoom */
+		for (scr = main->screen.first; scr; scr = scr->id.next) {
+			for (sa = scr->areabase.first; sa; sa = sa->next) {
+				for (sl = sa->spacedata.first; sl; sl = sl->next) {
+					if (sl->spacetype == SPACE_SEQ) {
+						for (ar = sl->regionbase.first; ar; ar = ar->next) {
+							if (ar->regiontype == RGN_TYPE_PREVIEW) {
+								ar->v2d.keepzoom |= V2D_LIMITZOOM;
+								ar->v2d.minzoom = 0.001f;
+								ar->v2d.maxzoom = 1000.0f;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 /* adjustments for custom displace modifier - D320*/
-	if (!MAIN_VERSION_ATLEAST(main, 273, 98)) {
+	if (!MAIN_VERSION_ATLEAST(main, 274, 98)) {
 		Object *ob;
 
 		for (ob = main->object.first; ob; ob = ob->id.next) {

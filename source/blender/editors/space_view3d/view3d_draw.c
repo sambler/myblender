@@ -42,6 +42,7 @@
 #include "DNA_lamp_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
+#include "DNA_brush_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -2655,8 +2656,6 @@ void ED_view3d_update_viewmat(Scene *scene, View3D *v3d, ARegion *ar, float view
 	}
 }
 
-
-
 /**
  * Shared by #ED_view3d_draw_offscreen and #view3d_main_area_draw_objects
  *
@@ -2667,13 +2666,16 @@ static void view3d_draw_objects(
         const bContext *C,
         Scene *scene, View3D *v3d, ARegion *ar,
         const char **grid_unit,
-        const bool do_bgpic, const bool draw_offscreen)
+        const bool do_bgpic, const bool draw_offscreen, GPUFX *fx)
 {
 	RegionView3D *rv3d = ar->regiondata;
 	Base *base;
 	const bool do_camera_frame = !draw_offscreen;
-	const bool draw_floor = (rv3d->view == RV3D_VIEW_USER) || (rv3d->persp != RV3D_ORTHO);
 	const bool draw_grids = !draw_offscreen && (v3d->flag2 & V3D_RENDER_OVERRIDE) == 0;
+	const bool draw_floor = (rv3d->view == RV3D_VIEW_USER) || (rv3d->persp != RV3D_ORTHO);
+	/* only draw grids after in solid modes, else it hovers over mesh wires */
+	const bool draw_grids_after = draw_grids && draw_floor && (v3d->drawtype > OB_WIRE);
+	bool do_composite_xray = false;
 	bool xrayclear = true;
 
 	if (!draw_offscreen) {
@@ -2720,6 +2722,9 @@ static void view3d_draw_objects(
 			glLoadMatrixf(rv3d->winmat);
 			glMatrixMode(GL_MODELVIEW);
 			glLoadMatrixf(rv3d->viewmat);
+		}
+		else {
+			drawfloor(scene, v3d, grid_unit);
 		}
 	}
 
@@ -2795,6 +2800,11 @@ static void view3d_draw_objects(
 		}
 	}
 
+	/* perspective floor goes last to use scene depth and avoid writing to depth buffer */
+	if (draw_grids_after) {
+		drawfloor(scene, v3d, grid_unit);
+	}
+
 	/* must be before xray draw which clears the depth buffer */
 	if (v3d->flag2 & V3D_SHOW_GPENCIL) {
 		/* must be before xray draw which clears the depth buffer */
@@ -2803,15 +2813,21 @@ static void view3d_draw_objects(
 		if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
 	}
 
-	/* perspective floor goes last to use scene depth and avoid writing to depth buffer */
-	if (draw_grids && draw_floor) {
-		drawfloor(scene, v3d, grid_unit);
-	}
-
 	/* transp and X-ray afterdraw stuff */
 	if (v3d->afterdraw_transp.first)     view3d_draw_transp(scene, ar, v3d);
+
+	/* always do that here to cleanup depth buffers if none needed */
+	if (fx) {
+		do_composite_xray = v3d->zbuf && (v3d->afterdraw_xray.first || v3d->afterdraw_xraytransp.first);
+		GPU_fx_compositor_setup_XRay_pass(fx, do_composite_xray);
+	}
+
 	if (v3d->afterdraw_xray.first)       view3d_draw_xray(scene, ar, v3d, &xrayclear);
 	if (v3d->afterdraw_xraytransp.first) view3d_draw_xraytransp(scene, ar, v3d, xrayclear);
+
+	if (fx && do_composite_xray) {
+		GPU_fx_compositor_XRay_resolve(fx);
+	}
 
 	if (!draw_offscreen) {
 		ED_region_draw_cb_draw(C, ar, REGION_DRAW_POST_VIEW);
@@ -2863,11 +2879,9 @@ void ED_view3d_draw_offscreen_init(Scene *scene, View3D *v3d)
 /*
  * Function to clear the view
  */
-static void view3d_main_area_clear(Scene *scene, View3D *v3d, ARegion *ar, bool force)
+static void view3d_main_area_clear(Scene *scene, View3D *v3d, ARegion *ar)
 {
-	/* clear background */
-	if (scene->world && ((v3d->flag3 & V3D_SHOW_WORLD) || force)) {
-		float alpha = (force) ? 1.0f : 0.0f;
+	if (scene->world && (v3d->flag3 & V3D_SHOW_WORLD)) {
 		bool glsl = GPU_glsl_support() && BKE_scene_use_new_shading_nodes(scene) && scene->world->nodetree && scene->world->use_nodes;
 		
 		if (glsl) {
@@ -2980,7 +2994,7 @@ static void view3d_main_area_clear(Scene *scene, View3D *v3d, ARegion *ar, bool 
 					interp_v3_v3v3(col_fl, col_hor, col_zen, col_fac);
 
 					rgb_float_to_uchar(col_ub, col_fl);
-					col_ub[3] = alpha * 255;
+					col_ub[3] = 255;
 				}
 			}
 
@@ -3015,7 +3029,7 @@ static void view3d_main_area_clear(Scene *scene, View3D *v3d, ARegion *ar, bool 
 			IMB_colormanagement_pixel_to_display_space_v3(col_hor, &scene->world->horr, &scene->view_settings,
 			                                              &scene->display_settings);
 
-			glClearColor(col_hor[0], col_hor[1], col_hor[2], alpha);
+			glClearColor(col_hor[0], col_hor[1], col_hor[2], 1.0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 	}
@@ -3051,7 +3065,7 @@ static void view3d_main_area_clear(Scene *scene, View3D *v3d, ARegion *ar, bool 
 			glPopMatrix();
 		}
 		else {
-			UI_ThemeClearColor(TH_HIGH_GRAD);
+			UI_ThemeClearColorAlpha(TH_HIGH_GRAD, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 	}
@@ -3109,15 +3123,15 @@ void ED_view3d_draw_offscreen(
 
 	/* clear opengl buffers */
 	if (do_sky) {
-		view3d_main_area_clear(scene, v3d, ar, true);
+		view3d_main_area_clear(scene, v3d, ar);
 	}
 	else {
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);		
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
 	/* main drawing call */
-	view3d_draw_objects(NULL, scene, v3d, ar, NULL, do_bgpic, true);
+	view3d_draw_objects(NULL, scene, v3d, ar, NULL, do_bgpic, true, do_compositing ? fx : NULL);
 
 	/* post process */
 	if (do_compositing) {
@@ -3159,7 +3173,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Scene *scene, View3D *v3d, ARegion *ar, in
 	RegionView3D *rv3d = ar->regiondata;
 	ImBuf *ibuf;
 	GPUOffScreen *ofs;
-	bool draw_sky = (alpha_mode == R_ADDSKY);
+	bool draw_sky = (alpha_mode == R_ADDSKY) && v3d && (v3d->flag3 & V3D_SHOW_WORLD);
 
 	/* state changes make normal drawing go weird otherwise */
 	glPushAttrib(GL_LIGHTING_BIT);
@@ -3178,7 +3192,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Scene *scene, View3D *v3d, ARegion *ar, in
 	/* render 3d view */
 	if (rv3d->persp == RV3D_CAMOB && v3d->camera) {
 		CameraParams params;
-		GPUFXSettings fx_settings = {0};
+		GPUFXSettings fx_settings = {NULL};
 		Object *camera = v3d->camera;
 
 		BKE_camera_params_init(&params);
@@ -3539,7 +3553,7 @@ static void view3d_main_area_draw_objects(const bContext *C, Scene *scene, View3
 	}
 	
 	/* clear the background */
-	view3d_main_area_clear(scene, v3d, ar, false);
+	view3d_main_area_clear(scene, v3d, ar);
 
 	/* enables anti-aliasing for 3D view drawing */
 	if (U.ogl_multisamples != USER_MULTISAMPLE_NONE) {
@@ -3547,7 +3561,7 @@ static void view3d_main_area_draw_objects(const bContext *C, Scene *scene, View3
 	}
 
 	/* main drawing call */
-	view3d_draw_objects(C, scene, v3d, ar, grid_unit, true, false);
+	view3d_draw_objects(C, scene, v3d, ar, grid_unit, true, false, do_compositing ? rv3d->compositor : NULL);
 
 	/* post process */
 	if (do_compositing) {
@@ -3574,6 +3588,36 @@ static void view3d_main_area_draw_objects(const bContext *C, Scene *scene, View3
 		/* TODO: draw something else (but not this) during fly mode */
 		draw_rotation_guide(rv3d);
 
+}
+
+static bool is_cursor_visible(Scene *scene)
+{
+	Object *ob = OBACT;
+
+	/* don't draw cursor in paint modes, but with a few exceptions */
+	if (ob && ob->mode & OB_MODE_ALL_PAINT) {
+		/* exception: object is in weight paint and has deforming armature in pose mode */
+		if (ob->mode & OB_MODE_WEIGHT_PAINT) {
+			if (BKE_object_pose_armature_get(ob) != NULL) {
+				return true;
+			}
+		}
+		/* exception: object in texture paint mode, clone brush, use_clone_layer disabled */
+		else if (ob->mode & OB_MODE_TEXTURE_PAINT) {
+			const Paint *p = BKE_paint_get_active(scene);
+
+			if (p && p->brush->imagepaint_tool == PAINT_TOOL_CLONE) {
+				if ((scene->toolsettings->imapaint.flag & IMAGEPAINT_PROJECT_LAYER_CLONE) == 0) {
+					return true;
+				}
+			}
+		}
+
+		/* no exception met? then don't draw cursor! */
+		return false;
+	}
+
+	return true;
 }
 
 static void view3d_main_area_draw_info(const bContext *C, Scene *scene,
@@ -3609,7 +3653,10 @@ static void view3d_main_area_draw_info(const bContext *C, Scene *scene,
 	if ((v3d->flag2 & V3D_RENDER_OVERRIDE) == 0) {
 		Object *ob;
 
-		drawcursor(scene, ar, v3d);
+		/* 3d cursor */
+		if (is_cursor_visible(scene)) {
+			drawcursor(scene, ar, v3d);
+		}
 
 		if (U.uiflag & USER_SHOW_ROTVIEWICON)
 			draw_view_axis(rv3d, &rect);

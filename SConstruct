@@ -765,6 +765,7 @@ if B.targets != ['cudakernels']:
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_frag.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_vert.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_lib.glsl")
+    data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_depth_resolve.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_vert.glsl")
     data_to_c_simple("intern/opencolorio/gpu_shader_display_transform.glsl")
 
@@ -1166,8 +1167,36 @@ if env['OURPLATFORM']=='linuxcross':
 textlist = []
 texttargetlist = []
 for tp, tn, tf in os.walk('release/text'):
+    tf.remove("readme.html")
     for f in tf:
         textlist.append(tp+os.sep+f)
+
+def readme_version_patch():
+    readme_src = "release/text/readme.html"
+    readme_dst = os.path.abspath(os.path.normpath(os.path.join(env['BF_BUILDDIR'], "readme.html")))
+
+    if not os.path.exists(readme_dst) or (os.path.getmtime(readme_dst) < os.path.getmtime(readme_src)):
+        f = open(readme_src, "r")
+        data = f.read()
+        f.close()
+
+        data = data.replace("BLENDER_VERSION", VERSION)
+        f = open(readme_dst, "w")
+        f.write(data)
+        f.close()
+
+    textlist.append(readme_dst)
+
+readme_version_patch()
+del readme_version_patch
+
+
+'''Command(
+    "release/text/readme.html"
+
+    )
+Command("file.out", "file.in", Copy(env['BF_INSTALLDIR'], "release/text/readme.html"))
+'''
 
 # Font licenses
 textlist.append('release/datafiles/LICENSE-bfont.ttf.txt')

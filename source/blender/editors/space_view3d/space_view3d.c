@@ -420,10 +420,10 @@ static void view3d_free(SpaceLink *sl)
 		MEM_freeN(vd->defmaterial);
 	}
 
-		if (vd->fx_settings.ssao)
-			MEM_freeN(vd->fx_settings.ssao);
-		if (vd->fx_settings.dof)
-			MEM_freeN(vd->fx_settings.dof);
+	if (vd->fx_settings.ssao)
+		MEM_freeN(vd->fx_settings.ssao);
+	if (vd->fx_settings.dof)
+		MEM_freeN(vd->fx_settings.dof);
 }
 
 
@@ -904,8 +904,16 @@ static void view3d_main_area_listener(bScreen *sc, ScrArea *sa, ARegion *ar, wmN
 			ED_region_tag_redraw(ar);
 			break;
 		case NC_BRUSH:
-			if (wmn->action == NA_EDITED)
-				ED_region_tag_redraw_overlay(ar);
+			switch (wmn->action) {
+				case NA_EDITED:
+					ED_region_tag_redraw_overlay(ar);
+					break;
+				case NA_SELECTED:
+					/* used on brush changes - needed because 3d cursor
+					 * has to be drawn if clone brush is selected */
+					ED_region_tag_redraw(ar);
+					break;
+			}
 			break;
 		case NC_MATERIAL:
 			switch (wmn->data) {
@@ -1144,7 +1152,8 @@ static void view3d_buttons_area_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa
 			ED_region_tag_redraw(ar);
 			break;
 		case NC_BRUSH:
-			if (wmn->action == NA_EDITED)
+			/* NA_SELECTED is used on brush changes */
+			if (ELEM(wmn->action, NA_EDITED, NA_SELECTED))
 				ED_region_tag_redraw(ar);
 			break;
 		case NC_SPACE:

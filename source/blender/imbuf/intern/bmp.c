@@ -136,14 +136,14 @@ struct ImBuf *imb_bmp_decode(unsigned char *mem, size_t size, int flags, char co
 
 	colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
-	bmp = mem + LITTLE_LONG(*(int*)(mem + 10));
+	bmp = mem + LITTLE_LONG(*(int *)(mem + 10));
 
 	if (CHECK_HEADER_FIELD_BMP(mem)) {
 		/* skip fileheader */
 		mem += BMP_FILEHEADER_SIZE;
 	}
 	else {
-		return 0;
+		return NULL;
 	}
 
 	/* for systems where an int needs to be 4 bytes aligned */

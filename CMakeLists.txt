@@ -261,6 +261,10 @@ endif()
 # (unix defaults to System OpenJPEG On)
 option(WITH_SYSTEM_OPENJPEG "Use the operating systems OpenJPEG library" OFF)
 
+if(UNIX AND NOT APPLE)
+	option(WITH_SYSTEM_EIGEN3 "Use the systems Eigen3 library" OFF)
+endif()
+
 
 # Modifiers
 option(WITH_MOD_FLUID           "Enable Elbeem Modifier (Fluid Simulation)" ON)
@@ -309,6 +313,9 @@ endif()
 # Compression
 option(WITH_LZO           "Enable fast LZO compression (used for pointcache)" ON)
 option(WITH_LZMA          "Enable best LZMA compression, (used for pointcache)" ON)
+if(UNIX AND NOT APPLE)
+	option(WITH_SYSTEM_LZO    "Use the system LZO library" OFF)
+endif()
 
 # Camera/motion tracking
 option(WITH_LIBMV         "Enable libmv structure from motion library" ON)
@@ -436,6 +443,10 @@ if(MSVC)
 	getDefaultWindowsPrefixBase(CMAKE_GENERIC_PROGRAM_FILES)
 	set(CPACK_INSTALL_PREFIX ${CMAKE_GENERIC_PROGRAM_FILES}/${})
 endif()
+
+# Experimental support of C++11
+option(WITH_CPP11 "Build with C++11 standard enabled, for development use only!" OFF)
+mark_as_advanced(WITH_CPP11)
 
 # avoid using again
 option_defaults_clear()
@@ -663,6 +674,7 @@ if(WITH_GHOST_SDL OR WITH_HEADLESS)
 	set(WITH_X11_XINPUT    OFF)
 	set(WITH_X11_XF86VMODE OFF)
 	set(WITH_GHOST_XDND    OFF)
+	set(WITH_INPUT_IME     OFF)
 endif()
 
 if(WITH_CPU_SSE)
@@ -796,6 +808,21 @@ if(UNIX AND NOT APPLE)
 	find_package_wrapper(PNG REQUIRED)
 	find_package_wrapper(ZLIB REQUIRED)
 	find_package_wrapper(Freetype REQUIRED)
+
+	if(WITH_LZO AND WITH_SYSTEM_LZO)
+		find_package_wrapper(LZO)
+		if(NOT LZO_FOUND)
+			message(FATAL_ERROR "Failed finding system LZO version!")
+		endif()
+	endif()
+
+	if(WITH_SYSTEM_EIGEN3)
+		find_package_wrapper(Eigen3)
+		if(NOT EIGEN3_FOUND)
+			message(FATAL_ERROR "Failed finding system Eigen3 version!")
+		endif()
+	endif()
+	# else values are set below for all platforms
 
 	if(WITH_PYTHON)
 		# No way to set py34. remove for now.
@@ -2233,6 +2260,9 @@ if(WITH_IMAGE_REDCODE)
 	set(REDCODE_INC ${REDCODE})
 endif()
 
+if(NOT WITH_SYSTEM_EIGEN3)
+	set(EIGEN3_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/extern/Eigen3)
+endif()
 
 #-----------------------------------------------------------------------------
 # Configure OpenGL.
@@ -2651,6 +2681,16 @@ if(WITH_PYTHON)
 		# pass, we have this in lib/python/site-packages
 	elseif(WITH_PYTHON_INSTALL_REQUESTS)
 		find_python_package(requests)
+	endif()
+endif()
+
+if(WITH_CPP11)
+	if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+	elseif(MSVC12)
+		# Nothing special is needed, C++11 features are available by default.
+	else()
+		message(FATAL_ERROR "Compiler ${CMAKE_C_COMPILER_ID} is not supported for C++11 build yet")
 	endif()
 endif()
 

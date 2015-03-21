@@ -480,6 +480,13 @@ if env['WITH_BF_OPENMP'] == 1:
             else:
                 env.Append(CCFLAGS=['-fopenmp'])
 
+if env['WITH_BF_CPP11']:
+    if env['OURPLATFORM'] in ('win32-vc', 'win64-vc'):
+        # Nothing special is needed, C++11 features are available by default.
+        pass
+    else:
+        env['CXXFLAGS'].append('-std=c++11')
+
 #check for additional debug libnames
 
 if env.has_key('BF_DEBUG_LIBS'):
@@ -764,6 +771,9 @@ if B.targets != ['cudakernels']:
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_ssao_frag.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_frag.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_vert.glsl")
+    data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_hq_frag.glsl")
+    data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_hq_vert.glsl")
+    data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_dof_hq_geo.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_lib.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_depth_resolve.glsl")
     data_to_c_simple("source/blender/gpu/shaders/gpu_shader_fx_vert.glsl")

@@ -655,6 +655,18 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 		}
 	}
 
+	if (!MAIN_VERSION_ATLEAST(main, 274, 1)) {
+		/* particle systems need to be forced to redistribute for jitter mode fix */
+		{
+			Object *ob;
+			ParticleSystem *psys;
+			for (ob = main->object.first; ob; ob = ob->id.next) {
+				for (psys = ob->particlesystem.first; psys; psys = psys->next) {
+					psys->recalc |= PSYS_RECALC_RESET;
+				}
+			}
+		}
+	}
 /* adjustments for custom displace modifier - D320*/
 	if (!MAIN_VERSION_ATLEAST(main, 274, 98)) {
 		Object *ob;

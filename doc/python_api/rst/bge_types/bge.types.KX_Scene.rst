@@ -83,6 +83,12 @@ base class --- :class:`PyObjectPlus`
          
          This can be set directly from python to avoid using the :class:`KX_SceneActuator`.
 
+   .. attribute:: world
+
+      The current active world, (read-only).
+
+      :type: :class:`KX_WorldInfo`
+
    .. attribute:: suspended
 
       True if the scene is suspended, (read-only).
@@ -125,14 +131,14 @@ base class --- :class:`PyObjectPlus`
 
       :type: Vector((gx, gy, gz))
 
-   .. method:: addObject(object, other, time=0)
+   .. method:: addObject(object, reference, time=0)
 
       Adds an object to the scene like the Add Object Actuator would.
 
-      :arg object: The object to add
+      :arg object: The (name of the) object to add.
       :type object: :class:`KX_GameObject` or string
-      :arg other: The object's center to use when adding the object
-      :type other: :class:`KX_GameObject` or string
+      :arg reference: The (name of the) object which position, orientation, and scale to copy.
+      :type reference: :class:`KX_GameObject` or string
       :arg time: The lifetime of the added object, in frames. A time of 0 means the object will last forever.
       :type time: integer
       :return: The newly added object.

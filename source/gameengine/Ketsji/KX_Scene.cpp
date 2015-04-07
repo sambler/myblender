@@ -156,7 +156,9 @@ KX_Scene::KX_Scene(class SCA_IInputDevice* keyboarddevice,
 	m_networkDeviceInterface(ndi),
 	m_active_camera(NULL),
 	m_ueberExecutionPriority(0),
-	m_blenderScene(scene)
+	m_blenderScene(scene),
+	m_isActivedHysteresis(false),
+	m_lodHysteresisValue(0)
 {
 	m_suspendedtime = 0.0;
 	m_suspendeddelta = 0.0;
@@ -848,6 +850,12 @@ void KX_Scene::DupliGroupRecurse(CValue* obj, int level)
 	// now look if object in the hierarchy have dupli group and recurse
 	for (git = m_logicHierarchicalGameObjects.begin();!(git==m_logicHierarchicalGameObjects.end());++git)
 	{
+		/* Replicate all constraints. */
+		if ((*git)->GetPhysicsController()) {
+			(*git)->GetPhysicsController()->ReplicateConstraints((*git), m_logicHierarchicalGameObjects);
+			(*git)->ClearConstraints();
+		}
+
 		if ((*git) != groupobj && (*git)->IsDupliGroup())
 			// can't instantiate group immediately as it destroys m_logicHierarchicalGameObjects
 			duplilist.push_back((*git));
@@ -861,7 +869,7 @@ void KX_Scene::DupliGroupRecurse(CValue* obj, int level)
 
 
 SCA_IObject* KX_Scene::AddReplicaObject(class CValue* originalobject,
-										class CValue* parentobject,
+										class CValue* referenceobject,
 										int lifespan)
 {
 
@@ -870,7 +878,7 @@ SCA_IObject* KX_Scene::AddReplicaObject(class CValue* originalobject,
 	m_groupGameObjects.clear();
 
 	KX_GameObject* originalobj = (KX_GameObject*) originalobject;
-	KX_GameObject* parentobj = (KX_GameObject*) parentobject;
+	KX_GameObject* referenceobj = (KX_GameObject*) referenceobject;
 
 	m_ueberExecutionPriority++;
 
@@ -908,14 +916,14 @@ SCA_IObject* KX_Scene::AddReplicaObject(class CValue* originalobject,
 
 	// At this stage all the objects in the hierarchy have been duplicated,
 	// we can update the scenegraph, we need it for the duplication of logic
-	MT_Point3 newpos = ((KX_GameObject*) parentobject)->NodeGetWorldPosition();
+	MT_Point3 newpos = referenceobj->NodeGetWorldPosition();
 	replica->NodeSetLocalPosition(newpos);
 
-	MT_Matrix3x3 newori = ((KX_GameObject*) parentobject)->NodeGetWorldOrientation();
+	MT_Matrix3x3 newori = referenceobj->NodeGetWorldOrientation();
 	replica->NodeSetLocalOrientation(newori);
 	
 	// get the rootnode's scale
-	MT_Vector3 newscale = parentobj->GetSGNode()->GetRootSGParent()->GetLocalScale();
+	MT_Vector3 newscale = referenceobj->GetSGNode()->GetRootSGParent()->GetLocalScale();
 	// set the replica's relative scale with the rootnode's scale
 	replica->NodeSetRelativeScale(newscale);
 
@@ -937,13 +945,13 @@ SCA_IObject* KX_Scene::AddReplicaObject(class CValue* originalobject,
 	{
 		// this will also relink the actuators in the hierarchy
 		(*git)->Relink(&m_map_gameobject_to_replica);
-		// add the object in the layer of the parent
-		(*git)->SetLayer(parentobj->GetLayer());
+		// add the object in the layer of the reference object
+		(*git)->SetLayer(referenceobj->GetLayer());
 		// If the object was a light, we need to update it's RAS_LightObject as well
 		if ((*git)->GetGameObjectType()==SCA_IObject::OBJ_LIGHT)
 		{
 			KX_LightObject* lightobj = static_cast<KX_LightObject*>(*git);
-			lightobj->SetLayer(parentobj->GetLayer());
+			lightobj->SetLayer(referenceobj->GetLayer());
 		}
 	}
 
@@ -1757,6 +1765,26 @@ void KX_Scene::UpdateObjectLods(void)
 	}
 }
 
+void KX_Scene::SetLodHysteresis(bool active)
+{
+	m_isActivedHysteresis = active;
+}
+
+bool KX_Scene::IsActivedLodHysteresis(void)
+{
+	return m_isActivedHysteresis;
+}
+
+void KX_Scene::SetLodHysteresisValue(int hysteresisvalue)
+{
+	m_lodHysteresisValue = hysteresisvalue;
+}
+
+int KX_Scene::GetLodHysteresisValue(void)
+{
+	return m_lodHysteresisValue;
+}
+
 void KX_Scene::UpdateObjectActivity(void) 
 {
 	if (m_activity_culling) {
@@ -2313,6 +2341,19 @@ PyObject *KX_Scene::pyattr_get_lights(void *self_v, const KX_PYATTRIBUTE_DEF *at
 	return self->GetLightList()->GetProxy();
 }
 
+PyObject *KX_Scene::pyattr_get_world(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Scene* self = static_cast<KX_Scene*>(self_v);
+	KX_WorldInfo *world = self->GetWorldInfo();
+
+	if (world->GetName() != "") {
+		return world->GetProxy();
+	}
+	else {
+		Py_RETURN_NONE;
+	}
+}
+
 PyObject *KX_Scene::pyattr_get_cameras(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
 {
 	/* With refcounts in this case...
@@ -2436,6 +2477,7 @@ PyAttributeDef KX_Scene::Attributes[] = {
 	KX_PYATTRIBUTE_RO_FUNCTION("objectsInactive",	KX_Scene, pyattr_get_objects_inactive),
 	KX_PYATTRIBUTE_RO_FUNCTION("lights",			KX_Scene, pyattr_get_lights),
 	KX_PYATTRIBUTE_RO_FUNCTION("cameras",			KX_Scene, pyattr_get_cameras),
+	KX_PYATTRIBUTE_RO_FUNCTION("world",				KX_Scene, pyattr_get_world),
 	KX_PYATTRIBUTE_RW_FUNCTION("active_camera",		KX_Scene, pyattr_get_active_camera, pyattr_set_active_camera),
 	KX_PYATTRIBUTE_RW_FUNCTION("pre_draw",			KX_Scene, pyattr_get_drawing_callback_pre, pyattr_set_drawing_callback_pre),
 	KX_PYATTRIBUTE_RW_FUNCTION("post_draw",			KX_Scene, pyattr_get_drawing_callback_post, pyattr_set_drawing_callback_post),
@@ -2451,23 +2493,23 @@ KX_PYMETHODDEF_DOC(KX_Scene, addObject,
 "addObject(object, other, time=0)\n"
 "Returns the added object.\n")
 {
-	PyObject *pyob, *pyother;
-	KX_GameObject *ob, *other;
+	PyObject *pyob, *pyreference;
+	KX_GameObject *ob, *reference;
 
 	int time = 0;
 
-	if (!PyArg_ParseTuple(args, "OO|i:addObject", &pyob, &pyother, &time))
+	if (!PyArg_ParseTuple(args, "OO|i:addObject", &pyob, &pyreference, &time))
 		return NULL;
 
-	if (	!ConvertPythonToGameObject(pyob, &ob, false, "scene.addObject(object, other, time): KX_Scene (first argument)") ||
-			!ConvertPythonToGameObject(pyother, &other, false, "scene.addObject(object, other, time): KX_Scene (second argument)") )
+	if (	!ConvertPythonToGameObject(pyob, &ob, false, "scene.addObject(object, reference, time): KX_Scene (first argument)") ||
+			!ConvertPythonToGameObject(pyreference, &reference, false, "scene.addObject(object, reference, time): KX_Scene (second argument)") )
 		return NULL;
 
 	if (!m_inactivelist->SearchValue(ob)) {
-		PyErr_Format(PyExc_ValueError, "scene.addObject(object, other, time): KX_Scene (first argument): object must be in an inactive layer");
+		PyErr_Format(PyExc_ValueError, "scene.addObject(object, reference, time): KX_Scene (first argument): object must be in an inactive layer");
 		return NULL;
 	}
-	SCA_IObject* replica = AddReplicaObject((SCA_IObject*)ob, other, time);
+	SCA_IObject* replica = AddReplicaObject((SCA_IObject*)ob, reference, time);
 	
 	// release here because AddReplicaObject AddRef's
 	// the object is added to the scene so we don't want python to own a reference

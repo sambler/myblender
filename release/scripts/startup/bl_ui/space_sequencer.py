@@ -473,7 +473,7 @@ class SEQUENCER_PT_edit(SequencerButtonsPanel, Panel):
         split.label(text="Type:")
         split.prop(strip, "type", text="")
 
-        if strip.type not in {'SOUND'}:
+        if strip.type != 'SOUND':
             split = layout.split(percentage=0.3)
             split.label(text="Blend:")
             split.prop(strip, "blend_type", text="")
@@ -948,23 +948,13 @@ class SEQUENCER_PT_proxy(SequencerButtonsPanel, Panel):
                 if proxy.use_proxy_custom_file:
                     flow.prop(proxy, "filepath")
 
-            layout.label("Enabled Proxies:")
-            enabled = ""
             row = layout.row()
-            if (proxy.build_25):
-                enabled += "25% "
-            if (proxy.build_50):
-                enabled += "50% "
-            if (proxy.build_75):
-                enabled += "75% "
-            if (proxy.build_100):
-                enabled += "100% "
+            row.prop(strip.proxy, "build_25")
+            row.prop(strip.proxy, "build_50")
+            row.prop(strip.proxy, "build_75")
+            row.prop(strip.proxy, "build_100")
 
-            row.label(enabled)
-            if (proxy.use_overwrite):
-                layout.label("Overwrite On")
-            else:
-                layout.label("Overwrite Off")
+            layout.prop(proxy, "use_overwrite")
 
             col = layout.column()
             col.label(text="Build JPEG quality")

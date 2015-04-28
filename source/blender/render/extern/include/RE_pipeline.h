@@ -49,6 +49,7 @@ struct Scene;
 struct SceneRenderLayer;
 struct EnvMap;
 struct RenderResult;
+struct StampData;
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 /* this include is what is exposed of render to outside world */
@@ -171,6 +172,8 @@ typedef struct RenderResult {
 	/* render info text */
 	char *text;
 	char *error;
+
+	struct StampData *stamp_data;
 } RenderResult;
 
 
@@ -261,10 +264,10 @@ void RE_init_threadcount(Render *re);
 /* the main processor, assumes all was set OK! */
 void RE_TileProcessor(struct Render *re);
 
-bool RE_WriteRenderViewsImage(struct ReportList *reports, struct RenderResult *rr, struct Scene *scene, struct Object *camera, const bool stamp, char *name);
+bool RE_WriteRenderViewsImage(struct ReportList *reports, struct RenderResult *rr, struct Scene *scene, const bool stamp, char *name);
 bool RE_WriteRenderViewsMovie(struct ReportList *reports, struct RenderResult *rr, struct Scene *scene, struct RenderData *rd,
                               struct bMovieHandle *mh, const size_t width, const size_t height, void **movie_ctx_arr,
-                              const size_t totvideos);
+                              const size_t totvideos, bool preview);
 
 /* only RE_NewRender() needed, main Blender render calls */
 void RE_BlenderFrame(struct Render *re, struct Main *bmain, struct Scene *scene,
@@ -314,6 +317,8 @@ void RE_zbuf_accumulate_vecblur(struct NodeBlurData *nbd, int xsize, int ysize, 
 int RE_seq_render_active(struct Scene *scene, struct RenderData *rd);
 
 bool RE_layers_have_name(struct RenderResult *result);
+
+struct RenderPass *RE_pass_find_by_type(struct RenderLayer *rl, int passtype, const char *viewname);
 
 /* shaded view or baking options */
 #define RE_BAKE_LIGHT				0	/* not listed in rna_scene.c -> can't be enabled! */

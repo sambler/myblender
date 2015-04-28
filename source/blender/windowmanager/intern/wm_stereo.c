@@ -79,6 +79,8 @@ static void wm_method_draw_stereo3d_pageflip(wmWindow *win)
 
 		wm_triple_draw_textures(win, drawdata->triple, 1.0f);
 	}
+
+	glDrawBuffer(GL_BACK);
 }
 
 static GLuint left_interlace_mask[32];
@@ -350,23 +352,33 @@ void wm_method_draw_stereo3d(const bContext *UNUSED(C), wmWindow *win)
 	}
 }
 
+static bool wm_stereo3d_quadbuffer_supported(void)
+{
+	int gl_stereo = 0;
+	glGetBooleanv(GL_STEREO, (GLboolean *)&gl_stereo);
+	return gl_stereo != 0;
+}
+
 static bool wm_stereo3d_is_fullscreen_required(eStereoDisplayMode stereo_display)
 {
 	return ELEM(stereo_display,
 	            S3D_DISPLAY_SIDEBYSIDE,
-	            S3D_DISPLAY_TOPBOTTOM,
-	            S3D_DISPLAY_PAGEFLIP);
+	            S3D_DISPLAY_TOPBOTTOM);
 }
 
 bool WM_stereo3d_enabled(wmWindow *win, bool skip_stereo3d_check)
 {
 	bScreen *screen = win->screen;
 
-	if ((skip_stereo3d_check == false) && (ED_screen_stereo3d_required(screen) == false))
+	if ((skip_stereo3d_check == false) && (ED_screen_stereo3d_required(screen) == false)) {
 		return false;
+	}
 
-	if (wm_stereo3d_is_fullscreen_required(win->stereo3d_format->display_mode))
-		return WM_window_is_fullscreen(win);
+	if (wm_stereo3d_is_fullscreen_required(win->stereo3d_format->display_mode)) {
+		if (GHOST_GetWindowState(win->ghostwin) != GHOST_kWindowStateFullScreen) {
+			return false;
+		}
+	}
 
 	return true;
 }
@@ -376,10 +388,10 @@ typedef struct Stereo3dData {
 	Stereo3dFormat stereo3d_format;
 } Stereo3dData;
 
-static bool wm_stereo3d_set_properties(bContext *C, wmOperator *op)
+static bool wm_stereo3d_set_properties(bContext *UNUSED(C), wmOperator *op)
 {
-	wmWindow *win = CTX_wm_window(C);
-	Stereo3dFormat *s3d = win->stereo3d_format;
+	Stereo3dData *s3dd = op->customdata;
+	Stereo3dFormat *s3d = &s3dd->stereo3d_format;
 	PropertyRNA *prop;
 	bool is_set = false;
 
@@ -438,32 +450,61 @@ int wm_stereo3d_set_exec(bContext *C, wmOperator *op)
 	wmWindowManager *wm = CTX_wm_manager(C);
 	wmWindow *win = CTX_wm_window(C);
 	const bool is_fullscreen = WM_window_is_fullscreen(win);
+	char prev_display_mode = win->stereo3d_format->display_mode;
+	Stereo3dData *s3dd;
 
 	if (G.background)
 		return OPERATOR_CANCELLED;
 
-	/* pagelfip requires a new window to be created with the proper OS flags */
-	if (win->stereo3d_format->display_mode == S3D_DISPLAY_PAGEFLIP) {
+	if (op->customdata == NULL) {
+		/* no invoke means we need to set the operator properties here */
+		wm_stereo3d_set_init(C, op);
+		wm_stereo3d_set_properties(C, op);
+	}
+
+	s3dd = op->customdata;
+	*win->stereo3d_format = s3dd->stereo3d_format;
+
+	if (prev_display_mode == S3D_DISPLAY_PAGEFLIP &&
+	    prev_display_mode != win->stereo3d_format->display_mode)
+	{
+		/* in case the hardward supports pageflip but not the display */
 		if (wm_window_duplicate_exec(C, op) == OPERATOR_FINISHED) {
 			wm_window_close(C, wm, win);
-			win = wm->windows.last;
 		}
 		else {
-			BKE_reportf(op->reports, RPT_ERROR,
-			            "Fail to create a window compatible with time sequential (page-flip) display method");
-			return OPERATOR_CANCELLED;
+			BKE_report(op->reports, RPT_ERROR,
+			           "Failed to create a window without quad-buffer support, you may experience flickering");
+		}
+	}
+	else if (win->stereo3d_format->display_mode == S3D_DISPLAY_PAGEFLIP) {
+		/* pageflip requires a new window to be created with the proper OS flags */
+		if (wm_window_duplicate_exec(C, op) == OPERATOR_FINISHED) {
+			if (wm_stereo3d_quadbuffer_supported()) {
+				wm_window_close(C, wm, win);
+				BKE_report(op->reports, RPT_INFO, "Quad-buffer window successfully created");
+			}
+			else {
+				wmWindow *win_new = wm->windows.last;
+				wm_window_close(C, wm, win_new);
+				win->stereo3d_format->display_mode = prev_display_mode;
+				BKE_report(op->reports, RPT_ERROR, "Quad-buffer not supported by the system");
+			}
+		}
+		else {
+			BKE_report(op->reports, RPT_ERROR,
+			           "Failed to create a window compatible with the time sequential display method");
+			win->stereo3d_format->display_mode = prev_display_mode;
 		}
 	}
 
-	if (wm_stereo3d_is_fullscreen_required(win->stereo3d_format->display_mode)) {
+	if (wm_stereo3d_is_fullscreen_required(s3dd->stereo3d_format.display_mode)) {
 		if (!is_fullscreen) {
-			wm_window_fullscreen_toggle_exec(C, op);
+			BKE_report(op->reports, RPT_INFO, "Stereo 3D Mode requires the window to be fullscreen");
 		}
 	}
 
-	if (op->customdata) {
-		MEM_freeN(op->customdata);
-	}
+	MEM_freeN(op->customdata);
 
 	WM_event_add_notifier(C, NC_WINDOW, NULL);
 	return OPERATOR_FINISHED;
@@ -479,21 +520,19 @@ int wm_stereo3d_set_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(ev
 		return WM_operator_props_dialog_popup(C, op, 250, 100);
 }
 
-void wm_stereo3d_set_draw(bContext *C, wmOperator *op)
+void wm_stereo3d_set_draw(bContext *UNUSED(C), wmOperator *op)
 {
-	wmWindow *win = CTX_wm_window(C);
-	Stereo3dFormat *stereo3d_format;
+	Stereo3dData *s3dd = op->customdata;
 	PointerRNA stereo3d_format_ptr;
 	uiLayout *layout = op->layout;
 	uiLayout *col;
 
-	stereo3d_format = win->stereo3d_format;
-	RNA_pointer_create(NULL, &RNA_Stereo3dDisplay, stereo3d_format, &stereo3d_format_ptr);
+	RNA_pointer_create(NULL, &RNA_Stereo3dDisplay, &s3dd->stereo3d_format, &stereo3d_format_ptr);
 
 	col = uiLayoutColumn(layout, false);
 	uiItemR(col, &stereo3d_format_ptr, "display_mode", 0, NULL, ICON_NONE);
 
-	switch (stereo3d_format->display_mode) {
+	switch (s3dd->stereo3d_format.display_mode) {
 		case S3D_DISPLAY_ANAGLYPH:
 		{
 			uiItemR(col, &stereo3d_format_ptr, "anaglyph_type", 0, NULL, ICON_NONE);
@@ -519,16 +558,16 @@ void wm_stereo3d_set_draw(bContext *C, wmOperator *op)
 	}
 }
 
-void wm_stereo3d_set_cancel(bContext *C, wmOperator *op)
+bool wm_stereo3d_set_check(bContext *UNUSED(C), wmOperator *UNUSED(op))
 {
-	Stereo3dData *s3dd = op->customdata;
-	wmWindow *win = CTX_wm_window(C);
+	/* the check function guarantees that the menu is updated to show the
+	 * sub-options when an enum change (e.g., it shows the anaglyph options
+	 * when anaglyph is on, and the interlace options when this is on */
+	return true;
+}
 
-	/* roll back to the original */
-	if (win) {
-		*win->stereo3d_format = s3dd->stereo3d_format;
-	}
-
+void wm_stereo3d_set_cancel(bContext *UNUSED(C), wmOperator *op)
+{
 	MEM_freeN(op->customdata);
 	op->customdata = NULL;
 }

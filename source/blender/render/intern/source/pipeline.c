@@ -202,7 +202,7 @@ float *RE_RenderLayerGetPass(volatile RenderLayer *rl, int passtype, const char 
 
 			if (viewname == NULL)
 				break;
-			else if (strcmp(rpass->view, viewname) == 0)
+			else if (STREQ(rpass->view, viewname))
 				break;
 		}
 	}
@@ -363,6 +363,7 @@ void RE_AcquireResultImageViews(Render *re, RenderResult *rr)
 			rr->layers = re->result->layers;
 			rr->xof = re->disprect.xmin;
 			rr->yof = re->disprect.ymin;
+			rr->stamp_data = re->result->stamp_data;
 		}
 	}
 }
@@ -776,7 +777,7 @@ static void render_result_rescale(Render *re)
 	if (src_rectf == NULL) {
 		RenderLayer *rl = render_get_active_layer(re, re->result);
 		if (rl != NULL) {
-			src_rectf = RE_RenderLayerGetPass(rl, SCE_PASS_COMBINED, "");
+			src_rectf = RE_RenderLayerGetPass(rl, SCE_PASS_COMBINED, NULL);
 		}
 	}
 
@@ -795,7 +796,7 @@ static void render_result_rescale(Render *re)
 				RenderLayer *rl;
 				rl = render_get_active_layer(re, re->result);
 				if (rl != NULL) {
-					dst_rectf = RE_RenderLayerGetPass(rl, SCE_PASS_COMBINED, "");
+					dst_rectf = RE_RenderLayerGetPass(rl, SCE_PASS_COMBINED, NULL);
 				}
 			}
 
@@ -812,9 +813,8 @@ static void render_result_rescale(Render *re)
 				}
 			}
 		}
+		render_result_free(result);
 	}
-
-	render_result_free(result);
 }
 
 void RE_ChangeResolution(Render *re, int winx, int winy, rcti *disprect)
@@ -2233,7 +2233,7 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 			}
 		}
 
-		for (nr = 0, rv = re->result->views.first; rv; rv = rv->next, nr++) {
+		for (nr = 0, rv = rectfs->first; rv; rv = rv->next, nr++) {
 			rectf = rv->rectf;
 
 			/* ensure we get either composited result or the active layer */
@@ -2249,9 +2249,9 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 				
 				for (x = 0; x < re->rectx; x++, rf += 4, col += 4) {
 					/* clamping to 1.0 is needed for correct AA */
-					if (col[0] < 0.0f) col[0] = 0.0f; else if (col[0] > 1.0f) col[0] = 1.0f;
-					if (col[1] < 0.0f) col[1] = 0.0f; else if (col[1] > 1.0f) col[1] = 1.0f;
-					if (col[2] < 0.0f) col[2] = 0.0f; else if (col[2] > 1.0f) col[2] = 1.0f;
+					CLAMP(col[0], 0.0f, 1.0f);
+					CLAMP(col[1], 0.0f, 1.0f);
+					CLAMP(col[2], 0.0f, 1.0f);
 					
 					add_filt_fmask_coord(filt, col, rf, re->rectx, re->recty, x, y);
 				}
@@ -2484,7 +2484,7 @@ static void renderresult_stampinfo(Render *re)
 	for (rv = re->result->views.first;rv;rv = rv->next, nr++) {
 		RE_SetActiveRenderView(re, rv->name);
 		RE_AcquireResultImage(re, &rres, nr);
-		BKE_image_stamp_buf(re->scene, RE_GetCamera(re), (unsigned char *)rv->rect32, rv->rectf, rres.rectx, rres.recty, 4);
+		BKE_image_stamp_buf(re->scene, RE_GetCamera(re), (unsigned char *)rres.rect32, rres.rectf, rres.rectx, rres.recty, 4);
 		RE_ReleaseResultImage(re);
 	}
 }
@@ -2615,6 +2615,8 @@ static void do_render_seq(Render *re)
 /* main loop: doing sequence + fields + blur + 3d render + compositing */
 static void do_render_all_options(Render *re)
 {
+	Object *camera;
+
 	re->current_scene_update(re->suh, re->scene);
 
 	BKE_scene_camera_switch_update(re->scene);
@@ -2648,6 +2650,10 @@ static void do_render_all_options(Render *re)
 	
 	re->stats_draw(re->sdh, &re->i);
 	
+	/* save render result stamp if needed */
+	camera = RE_GetCamera(re);
+	BKE_render_result_stamp_info(re->scene, camera, re->result);
+
 	/* stamp image info here */
 	if ((re->r.stamp & R_STAMP_ALL) && (re->r.stamp & R_STAMP_DRAW)) {
 		renderresult_stampinfo(re);
@@ -3083,7 +3089,7 @@ void RE_RenderFreestyleExternal(Render *re)
 }
 #endif
 
-bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scene, struct Object *camera, const bool stamp, char *name)
+bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scene, const bool stamp, char *name)
 {
 	bool is_mono;
 	bool ok = true;
@@ -3126,8 +3132,7 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 
 				if (stamp) {
 					/* writes the name of the individual cameras */
-					Object *view_camera = BKE_camera_multiview_render(scene, camera, rv->name);
-					ok = BKE_imbuf_write_stamp(scene, view_camera, ibuf, name, &rd->im_format);
+					ok = BKE_imbuf_write_stamp(scene, rr, ibuf, name, &rd->im_format);
 				}
 				else {
 					ok = BKE_imbuf_write(ibuf, name, &rd->im_format);
@@ -3153,8 +3158,7 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 
 					if (stamp) {
 						/* writes the name of the individual cameras */
-						Object *view_camera = BKE_camera_multiview_render(scene, camera, rv->name);
-						ok = BKE_imbuf_write_stamp(scene, view_camera, ibuf, name, &rd->im_format);
+						ok = BKE_imbuf_write_stamp(scene, rr, ibuf, name, &rd->im_format);
 					}
 					else {
 						ok = BKE_imbuf_write(ibuf, name, &rd->im_format);
@@ -3189,7 +3193,7 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 			ibuf_arr[2] = IMB_stereo3d_ImBuf(&scene->r.im_format, ibuf_arr[0], ibuf_arr[1]);
 
 			if (stamp)
-				ok = BKE_imbuf_write_stamp(scene, camera, ibuf_arr[2], name, &rd->im_format);
+				ok = BKE_imbuf_write_stamp(scene, rr, ibuf_arr[2], name, &rd->im_format);
 			else
 				ok = BKE_imbuf_write(ibuf_arr[2], name, &rd->im_format);
 
@@ -3215,7 +3219,7 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 				                                    &scene->display_settings, &imf);
 
 				if (stamp)
-					ok = BKE_imbuf_write_stamp(scene, camera, ibuf_arr[2], name, &rd->im_format);
+					ok = BKE_imbuf_write_stamp(scene, rr, ibuf_arr[2], name, &rd->im_format);
 				else
 					ok = BKE_imbuf_write(ibuf_arr[2], name, &imf);
 
@@ -3233,7 +3237,7 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 }
 
 bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scene, RenderData *rd, bMovieHandle *mh,
-                              const size_t width, const size_t height, void **movie_ctx_arr, const size_t totvideos)
+                              const size_t width, const size_t height, void **movie_ctx_arr, const size_t totvideos, bool preview)
 {
 	bool is_mono;
 	bool ok = true;
@@ -3261,7 +3265,7 @@ bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scen
 			IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings,
 			                                    &scene->display_settings, &scene->r.im_format);
 
-			ok &= mh->append_movie(movie_ctx_arr[view_id], rd, scene->r.sfra, scene->r.cfra,
+			ok &= mh->append_movie(movie_ctx_arr[view_id], rd, preview ? scene->r.psfra : scene->r.sfra, scene->r.cfra,
 			                       (int *) ibuf->rect, ibuf->x, ibuf->y, suffix, reports);
 
 			if (do_free) {
@@ -3301,7 +3305,7 @@ bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scen
 
 		ibuf_arr[2] = IMB_stereo3d_ImBuf(&scene->r.im_format, ibuf_arr[0], ibuf_arr[1]);
 
-		ok = mh->append_movie(movie_ctx_arr[0], rd, scene->r.sfra, scene->r.cfra, (int *) ibuf_arr[2]->rect,
+		ok = mh->append_movie(movie_ctx_arr[0], rd, preview ? scene->r.psfra : scene->r.sfra, scene->r.cfra, (int *) ibuf_arr[2]->rect,
 		                      ibuf_arr[2]->x, ibuf_arr[2]->y, "", reports);
 
 		for (i = 0; i < 2; i++) {
@@ -3325,13 +3329,12 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 	RenderResult rres;
 	double render_time;
 	bool ok = true;
-	Object *camera = RE_GetCamera(re);
 
 	RE_AcquireResultImageViews(re, &rres);
 
 	/* write movie or image */
 	if (BKE_imtype_is_movie(scene->r.im_format.imtype)) {
-		RE_WriteRenderViewsMovie(re->reports, &rres, scene, &re->r, mh, re->rectx, re->recty, re->movie_ctx_arr, totvideos);
+		RE_WriteRenderViewsMovie(re->reports, &rres, scene, &re->r, mh, re->rectx, re->recty, re->movie_ctx_arr, totvideos, false);
 	}
 	else {
 		if (name_override)
@@ -3342,7 +3345,7 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 			        &scene->r.im_format, (scene->r.scemode & R_EXTENSION) != 0, true, NULL);
 
 		/* write images as individual images or stereo */
-		ok = RE_WriteRenderViewsImage(re->reports, &rres, scene, camera, true, name);
+		ok = RE_WriteRenderViewsImage(re->reports, &rres, scene, true, name);
 	}
 	
 	RE_ReleaseResultImageViews(re, &rres);
@@ -3857,4 +3860,14 @@ bool RE_layers_have_name(struct RenderResult *rr)
 	return false;
 }
 
-
+RenderPass *RE_pass_find_by_type(RenderLayer *rl, int passtype, const char *viewname)
+{
+	RenderPass *rp;
+	for (rp = rl->passes.first; rp; rp = rp->next) {
+		if (rp->passtype == passtype) {
+			if (STREQ(rp->view, viewname))
+				return rp;
+		}
+	}
+	return NULL;
+}

@@ -511,18 +511,22 @@ void BlenderSession::render()
 	sync = NULL;
 }
 
-static void populate_bake_data(BakeData *data, BL::BakePixel pixel_array, const int num_pixels)
+static void populate_bake_data(BakeData *data, const int object_id, BL::BakePixel pixel_array, const int num_pixels)
 {
 	BL::BakePixel bp = pixel_array;
 
 	int i;
 	for(i=0; i < num_pixels; i++) {
-		data->set(i, bp.primitive_id(), bp.uv(), bp.du_dx(), bp.du_dy(), bp.dv_dx(), bp.dv_dy());
+		if(bp.object_id() == object_id) {
+			data->set(i, bp.primitive_id(), bp.uv(), bp.du_dx(), bp.du_dy(), bp.dv_dx(), bp.dv_dy());
+		} else {
+			data->set_null(i);
+		}
 		bp = bp.next();
 	}
 }
 
-void BlenderSession::bake(BL::Object b_object, const string& pass_type, BL::BakePixel pixel_array, const size_t num_pixels, const int /*depth*/, float result[])
+void BlenderSession::bake(BL::Object b_object, const string& pass_type, const int object_id, BL::BakePixel pixel_array, const size_t num_pixels, const int /*depth*/, float result[])
 {
 	ShaderEvalType shader_type = get_shader_type(pass_type);
 	size_t object_index = OBJECT_NONE;
@@ -578,7 +582,7 @@ void BlenderSession::bake(BL::Object b_object, const string& pass_type, BL::Bake
 
 	BakeData *bake_data = scene->bake_manager->init(object, tri_offset, num_pixels);
 
-	populate_bake_data(bake_data, pixel_array, num_pixels);
+	populate_bake_data(bake_data, object_id, pixel_array, num_pixels);
 
 	/* set number of samples */
 	session->tile_manager.set_samples(session_params.samples);
@@ -632,7 +636,7 @@ void BlenderSession::do_write_update_render_result(BL::RenderResult b_rr, BL::Re
 	}
 	else {
 		/* copy combined pass */
-		 BL::RenderPass b_combined_pass(b_rlay.passes.find_by_type(BL::RenderPass::type_COMBINED, b_rview_name.c_str()));
+		BL::RenderPass b_combined_pass(b_rlay.passes.find_by_type(BL::RenderPass::type_COMBINED, b_rview_name.c_str()));
 		if(buffers->get_pass_rect(PASS_COMBINED, exposure, rtile.sample, 4, &pixels[0]))
 			b_combined_pass.rect(&pixels[0]);
 	}

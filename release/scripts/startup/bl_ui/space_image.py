@@ -84,6 +84,7 @@ class IMAGE_MT_view(Menu):
             layout.prop(toolsettings, "show_uv_local_view")
 
         layout.prop(uv, "show_other_objects")
+        layout.prop(uv, "show_metadata")
         if paint.brush and (context.image_paint_object or sima.mode == 'PAINT'):
             layout.prop(uv, "show_texpaint")
             layout.prop(toolsettings, "show_uv_local_view", text="Show same material")
@@ -1057,10 +1058,10 @@ class ImageScopesPanel:
         if not (sima and sima.image):
             return False
         # scopes are not updated in paint modes, hide
-        if sima.mode in {'PAINT'}:
+        if sima.mode == 'PAINT':
             return False
         ob = context.active_object
-        if ob and ob.mode in {'TEXTURE_PAINT'}:
+        if ob and ob.mode in {'TEXTURE_PAINT', 'EDIT'}:
             return False
         return True
 

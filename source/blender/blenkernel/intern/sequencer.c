@@ -868,9 +868,9 @@ void BKE_sequence_reload_new_file(Scene *scene, Sequence *seq, const bool lock_r
 						seq_multiview_name(scene, i, prefix, ext, str, FILE_MAX);
 						anim = openanim(str, IB_rect | ((seq->flag & SEQ_FILTERY) ? IB_animdeinterlace : 0),
 						                seq->streamindex, seq->strip->colorspace_settings.name);
-						seq_anim_add_suffix(scene, anim, i);
 
 						if (anim) {
+							seq_anim_add_suffix(scene, anim, i);
 							sanim = MEM_mallocN(sizeof(StripAnim), "Strip Anim");
 							BLI_addtail(&seq->anims, sanim);
 							sanim->anim = anim;
@@ -1161,30 +1161,25 @@ static void make_black_ibuf(ImBuf *ibuf)
 	}
 }
 
-static void multibuf(ImBuf *ibuf, float fmul)
+static void multibuf(ImBuf *ibuf, const float fmul)
 {
 	char *rt;
 	float *rt_float;
 
-	int a, mul, icol;
+	int a;
 
-	mul = (int)(256.0f * fmul);
 	rt = (char *)ibuf->rect;
 	rt_float = ibuf->rect_float;
 
 	if (rt) {
+		const int imul = (int)(256.0f * fmul);
 		a = ibuf->x * ibuf->y;
 		while (a--) {
+			rt[0] = min_ii((imul * rt[0]) >> 8, 255);
+			rt[1] = min_ii((imul * rt[1]) >> 8, 255);
+			rt[2] = min_ii((imul * rt[2]) >> 8, 255);
+			rt[3] = min_ii((imul * rt[3]) >> 8, 255);
 
-			icol = (mul * rt[0]) >> 8;
-			if (icol > 254) rt[0] = 255; else rt[0] = icol;
-			icol = (mul * rt[1]) >> 8;
-			if (icol > 254) rt[1] = 255; else rt[1] = icol;
-			icol = (mul * rt[2]) >> 8;
-			if (icol > 254) rt[2] = 255; else rt[2] = icol;
-			icol = (mul * rt[3]) >> 8;
-			if (icol > 254) rt[3] = 255; else rt[3] = icol;
-			
 			rt += 4;
 		}
 	}
@@ -1510,9 +1505,15 @@ static void seq_open_anim_file(Scene *scene, Sequence *seq, bool openfile)
 					        seq->streamindex, seq->strip->colorspace_settings.name);
 				}
 
-				seq_anim_add_suffix(scene, sanim->anim, i);
-
-				if (sanim->anim == NULL) {
+				if (sanim->anim) {
+#if 0
+					seq_anim_add_suffix(scene, sanim->anim, i);
+#else
+					/* we already have the suffix */
+					IMB_suffix_anim(sanim->anim, suffix);
+#endif
+				}
+				else {
 					if (openfile) {
 						sanim->anim = openanim(
 						        name, IB_rect | ((seq->flag & SEQ_FILTERY) ? IB_animdeinterlace : 0),
@@ -1581,13 +1582,19 @@ static bool seq_proxy_get_fname(Editing *ed, Sequence *seq, int cfra, int render
 
 	sanim = BLI_findlink(&seq->anims, view_id);
 
-	if (sanim && sanim->anim && ed->proxy_storage == SEQ_EDIT_PROXY_DIR_STORAGE) {
+	if (ed->proxy_storage == SEQ_EDIT_PROXY_DIR_STORAGE) {
 		char fname[FILE_MAXFILE];
 		if (ed->proxy_dir[0] == 0)
 			BLI_strncpy(dir, "//BL_proxy", sizeof(dir));
 		else
 			BLI_strncpy(dir, ed->proxy_dir, sizeof(dir));
-		IMB_anim_get_fname(sanim->anim, fname, FILE_MAXFILE);
+
+		if (sanim && sanim->anim) {
+			IMB_anim_get_fname(sanim->anim, fname, FILE_MAXFILE);
+		}
+		else if (seq->type == SEQ_TYPE_IMAGE) {
+			fname[0] = 0;
+		}
 		BLI_path_append(dir, sizeof(dir), fname);
 		BLI_path_abs(name, G.main->name);
 	}
@@ -1774,6 +1781,9 @@ static bool seq_proxy_multiview_context_invalid(Sequence *seq, Scene *scene, con
 			                 seq->strip->stripdata->name);
 			BLI_path_abs(path, G.main->name);
 			BKE_scene_multiview_view_prefix_get(scene, path, prefix, &ext);
+		}
+		else {
+			prefix[0] = '\0';
 		}
 
 		if (prefix[0] == '\0')
@@ -2731,6 +2741,9 @@ static ImBuf *seq_render_image_strip(const SeqRenderData *context, Sequence *seq
 			if (prefix[0] == '\0') {
 				goto monoview_image;
 			}
+		}
+		else {
+			prefix[0] = '\0';
 		}
 
 		totviews = BKE_scene_multiview_num_views_get(&context->scene->r);
@@ -4627,7 +4640,7 @@ static size_t sequencer_rna_path_prefix(char str[SEQ_RNAPATH_MAXSTR], const char
 	char name_esc[SEQ_NAME_MAXSTR * 2];
 
 	BLI_strescape(name_esc, name, sizeof(name_esc));
-	return BLI_snprintf(str, SEQ_RNAPATH_MAXSTR, "sequence_editor.sequences_all[\"%s\"]", name_esc);
+	return BLI_snprintf_rlen(str, SEQ_RNAPATH_MAXSTR, "sequence_editor.sequences_all[\"%s\"]", name_esc);
 }
 
 /* XXX - hackish function needed for transforming strips! TODO - have some better solution */
@@ -5058,9 +5071,9 @@ Sequence *BKE_sequencer_add_movie_strip(bContext *C, ListBase *seqbasep, SeqLoad
 
 				seq_multiview_name(scene, i, prefix, ext, str, FILE_MAX);
 				anim_arr[j] = openanim(str, IB_rect, 0, colorspace);
-				seq_anim_add_suffix(scene, anim_arr[j], i);
 
 				if (anim_arr[j]) {
+					seq_anim_add_suffix(scene, anim_arr[j], i);
 					j++;
 				}
 			}
@@ -5214,10 +5227,6 @@ static Sequence *seq_dupli(Scene *scene, Scene *scene_to, Sequence *seq, int dup
 		        MEM_dupallocN(seq->strip->stripdata);
 	}
 	else if (seq->type >= SEQ_TYPE_EFFECT) {
-		if (seq->seq1 && seq->seq1->tmp) seqn->seq1 = seq->seq1->tmp;
-		if (seq->seq2 && seq->seq2->tmp) seqn->seq2 = seq->seq2->tmp;
-		if (seq->seq3 && seq->seq3->tmp) seqn->seq3 = seq->seq3->tmp;
-
 		if (seq->type & SEQ_TYPE_EFFECT) {
 			struct SeqEffectHandle sh;
 			sh = BKE_sequence_get_effect(seq);
@@ -5242,6 +5251,28 @@ static Sequence *seq_dupli(Scene *scene, Scene *scene_to, Sequence *seq, int dup
 	return seqn;
 }
 
+static void seq_new_fix_links_recursive(Sequence *seq)
+{
+	SequenceModifierData *smd;
+
+	if (seq->type >= SEQ_TYPE_EFFECT) {
+		if (seq->seq1 && seq->seq1->tmp) seq->seq1 = seq->seq1->tmp;
+		if (seq->seq2 && seq->seq2->tmp) seq->seq2 = seq->seq2->tmp;
+		if (seq->seq3 && seq->seq3->tmp) seq->seq3 = seq->seq3->tmp;
+	}
+	else if (seq->type == SEQ_TYPE_META) {
+		Sequence *seqn;
+		for (seqn = seq->seqbase.first; seqn; seqn = seqn->next) {
+			seq_new_fix_links_recursive(seqn);
+		}
+	}
+
+	for (smd = seq->modifiers.first; smd; smd = smd->next) {
+		if (smd->mask_sequence && smd->mask_sequence->tmp)
+			smd->mask_sequence = smd->mask_sequence->tmp;
+	}
+}
+
 Sequence *BKE_sequence_dupli_recursive(Scene *scene, Scene *scene_to, Sequence *seq, int dupe_flag)
 {
 	Sequence *seqn = seq_dupli(scene, scene_to, seq, dupe_flag);
@@ -5254,6 +5285,9 @@ Sequence *BKE_sequence_dupli_recursive(Scene *scene, Scene *scene_to, Sequence *
 			}
 		}
 	}
+
+	seq_new_fix_links_recursive(seqn);
+
 	return seqn;
 }
 
@@ -5291,6 +5325,11 @@ void BKE_sequence_base_dupli_recursive(
 				}
 			}
 		}
+	}
+
+	/* fix modifier linking */
+	for (seq = nseqbase->first; seq; seq = seq->next) {
+		seq_new_fix_links_recursive(seq);
 	}
 }
 

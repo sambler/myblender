@@ -472,7 +472,7 @@ float ED_view3d_grid_scale(Scene *scene, View3D *v3d, const char **grid_unit)
 	return v3d->grid * ED_scene_grid_scale(scene, grid_unit);
 }
 
-static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit)
+static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool write_depth)
 {
 	float grid, grid_scale;
 	unsigned char col_grid[3];
@@ -484,7 +484,8 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit)
 	grid_scale = ED_view3d_grid_scale(scene, v3d, grid_unit);
 	grid = gridlines * grid_scale;
 
-	glDepthMask(GL_FALSE);
+	if (!write_depth)
+		glDepthMask(GL_FALSE);
 
 	UI_GetThemeColor3ubv(TH_GRID, col_grid);
 
@@ -657,7 +658,7 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 	glEnable(GL_POINT_SMOOTH);
 	glDepthMask(0);  /* don't overwrite zbuf */
 
-	if (rv3d->rot_angle != 0.f) {
+	if (rv3d->rot_angle != 0.0f) {
 		/* -- draw rotation axis -- */
 		float scaled_axis[3];
 		const float scale = rv3d->dist;
@@ -665,19 +666,21 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 
 
 		glBegin(GL_LINE_STRIP);
-		color[3] = 0.f;  /* more transparent toward the ends */
+		color[3] = 0.0f;  /* more transparent toward the ends */
 		glColor4fv(color);
 		add_v3_v3v3(end, o, scaled_axis);
 		glVertex3fv(end);
 
-		// color[3] = 0.2f + fabsf(rv3d->rot_angle);  /* modulate opacity with angle */
-		// ^^ neat idea, but angle is frame-rate dependent, so it's usually close to 0.2
+#if 0
+		color[3] = 0.2f + fabsf(rv3d->rot_angle);  /* modulate opacity with angle */
+		/* ^^ neat idea, but angle is frame-rate dependent, so it's usually close to 0.2 */
+#endif
 
 		color[3] = 0.5f;  /* more opaque toward the center */
 		glColor4fv(color);
 		glVertex3fv(o);
 
-		color[3] = 0.f;
+		color[3] = 0.0f;
 		glColor4fv(color);
 		sub_v3_v3v3(end, o, scaled_axis);
 		glVertex3fv(end);
@@ -688,14 +691,14 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 #define     ROT_AXIS_DETAIL 13
 
 			const float s = 0.05f * scale;
-			const float step = 2.f * (float)(M_PI / ROT_AXIS_DETAIL);
+			const float step = 2.0f * (float)(M_PI / ROT_AXIS_DETAIL);
 			float angle;
 			int i;
 
 			float q[4];  /* rotate ring so it's perpendicular to axis */
 			const int upright = fabsf(rv3d->rot_axis[2]) >= 0.95f;
 			if (!upright) {
-				const float up[3] = {0.f, 0.f, 1.f};
+				const float up[3] = {0.0f, 0.0f, 1.0f};
 				float vis_angle, vis_axis[3];
 
 				cross_v3_v3v3(vis_axis, up, rv3d->rot_axis);
@@ -706,7 +709,7 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 			color[3] = 0.25f;  /* somewhat faint */
 			glColor4fv(color);
 			glBegin(GL_LINE_LOOP);
-			for (i = 0, angle = 0.f; i < ROT_AXIS_DETAIL; ++i, angle += step) {
+			for (i = 0, angle = 0.0f; i < ROT_AXIS_DETAIL; ++i, angle += step) {
 				float p[3] = {s * cosf(angle), s * sinf(angle), 0.0f};
 
 				if (!upright) {
@@ -732,12 +735,12 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 	glVertex3fv(o);
 	glEnd();
 
-	/* find screen coordinates for rotation center, then draw pretty icon */
 #if 0
+	/* find screen coordinates for rotation center, then draw pretty icon */
 	mul_m4_v3(rv3d->persinv, rot_center);
 	UI_icon_draw(rot_center[0], rot_center[1], ICON_NDOF_TURN);
-#endif
 	/* ^^ just playing around, does not work */
+#endif
 
 	glDisable(GL_BLEND);
 	glDisable(GL_POINT_SMOOTH);
@@ -1325,12 +1328,12 @@ static void backdrawview3d(Scene *scene, ARegion *ar, View3D *v3d)
 		/* do nothing */
 	}
 	else if ((base && (base->object->mode & OB_MODE_PARTICLE_EDIT)) &&
-	         v3d->drawtype > OB_WIRE && (v3d->flag & V3D_ZBUF_SELECT))
+	         V3D_IS_ZBUF(v3d))
 	{
 		/* do nothing */
 	}
-	else if (scene->obedit && v3d->drawtype > OB_WIRE &&
-	         (v3d->flag & V3D_ZBUF_SELECT))
+	else if (scene->obedit &&
+	         V3D_IS_ZBUF(v3d))
 	{
 		/* do nothing */
 	}
@@ -1452,14 +1455,23 @@ static void view3d_opengl_read_Z_pixels(ARegion *ar, int x, int y, int w, int h,
 	glReadPixels(ar->winrct.xmin + x, ar->winrct.ymin + y, w, h, format, type, data);
 }
 
-void view3d_validate_backbuf(ViewContext *vc)
+void ED_view3d_backbuf_validate(ViewContext *vc)
 {
 	if (vc->v3d->flag & V3D_INVALID_BACKBUF)
 		backdrawview3d(vc->scene, vc->ar, vc->v3d);
 }
 
+/**
+ * allow for small values [0.5 - 2.5],
+ * and large values, FLT_MAX by clamping by the area size
+ */
+int ED_view3d_backbuf_sample_size_clamp(ARegion *ar, const float dist)
+{
+	return (int)min_ff(ceilf(dist), (float)max_ii(ar->winx, ar->winx));
+}
+
 /* samples a single pixel (copied from vpaint) */
-unsigned int view3d_sample_backbuf(ViewContext *vc, int x, int y)
+unsigned int ED_view3d_backbuf_sample(ViewContext *vc, int x, int y)
 {
 	unsigned int col;
 	
@@ -1467,7 +1479,7 @@ unsigned int view3d_sample_backbuf(ViewContext *vc, int x, int y)
 		return 0;
 	}
 
-	view3d_validate_backbuf(vc);
+	ED_view3d_backbuf_validate(vc);
 
 	view3d_opengl_read_pixels(vc->ar, x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &col);
 	glReadBuffer(GL_BACK);
@@ -1480,7 +1492,7 @@ unsigned int view3d_sample_backbuf(ViewContext *vc, int x, int y)
 }
 
 /* reads full rect, converts indices */
-ImBuf *view3d_read_backbuf(ViewContext *vc, short xmin, short ymin, short xmax, short ymax)
+ImBuf *ED_view3d_backbuf_read(ViewContext *vc, short xmin, short ymin, short xmax, short ymax)
 {
 	unsigned int *dr, *rd;
 	struct ImBuf *ibuf, *ibuf1;
@@ -1499,7 +1511,7 @@ ImBuf *view3d_read_backbuf(ViewContext *vc, short xmin, short ymin, short xmax, 
 
 	ibuf = IMB_allocImBuf((xmaxc - xminc + 1), (ymaxc - yminc + 1), 32, IB_rect);
 
-	view3d_validate_backbuf(vc);
+	ED_view3d_backbuf_validate(vc);
 
 	view3d_opengl_read_pixels(vc->ar,
 	             xminc, yminc,
@@ -1539,23 +1551,21 @@ ImBuf *view3d_read_backbuf(ViewContext *vc, short xmin, short ymin, short xmax, 
 }
 
 /* smart function to sample a rect spiralling outside, nice for backbuf selection */
-unsigned int view3d_sample_backbuf_rect(ViewContext *vc, const int mval[2], int size,
-                                        unsigned int min, unsigned int max, float *r_dist, short strict,
-                                        void *handle, bool (*indextest)(void *handle, unsigned int index))
+unsigned int ED_view3d_backbuf_sample_rect(
+        ViewContext *vc, const int mval[2], int size,
+        unsigned int min, unsigned int max, float *r_dist)
 {
 	struct ImBuf *buf;
-	unsigned int *bufmin, *bufmax, *tbuf;
+	const unsigned int *bufmin, *bufmax, *tbuf;
 	int minx, miny;
 	int a, b, rc, nr, amount, dirvec[4][2];
-	int distance = 0;
 	unsigned int index = 0;
-	bool indexok = false;
 
 	amount = (size - 1) / 2;
 
 	minx = mval[0] - (amount + 1);
 	miny = mval[1] - (amount + 1);
-	buf = view3d_read_backbuf(vc, minx, miny, minx + size - 1, miny + size - 1);
+	buf = ED_view3d_backbuf_read(vc, minx, miny, minx + size - 1, miny + size - 1);
 	if (!buf) return 0;
 
 	rc = 0;
@@ -1573,21 +1583,19 @@ unsigned int view3d_sample_backbuf_rect(ViewContext *vc, const int mval[2], int 
 	for (nr = 1; nr <= size; nr++) {
 		
 		for (a = 0; a < 2; a++) {
-			for (b = 0; b < nr; b++, distance++) {
-				if (*tbuf && *tbuf >= min && *tbuf < max) {  /* we got a hit */
-					if (strict) {
-						indexok =  indextest(handle, *tbuf - min + 1);
-						if (indexok) {
-							*r_dist = sqrtf((float)distance);
-							index = *tbuf - min + 1;
-							goto exit; 
-						}
-					}
-					else {
-						*r_dist = sqrtf((float)distance);  /* XXX, this distance is wrong - */
-						index = *tbuf - min + 1;  /* messy yah, but indices start at 1 */
-						goto exit;
-					}
+			for (b = 0; b < nr; b++) {
+				if (*tbuf && *tbuf >= min && *tbuf < max) {
+					/* we got a hit */
+
+					/* get x,y pixel coords from the offset
+					 * (manhatten distance in keeping with other screen-based selection) */
+					*r_dist = (float)(
+					        abs(((int)(tbuf - buf->rect) % size) - (size / 2)) +
+					        abs(((int)(tbuf - buf->rect) / size) - (size / 2)));
+
+					/* indices start at 1 here */
+					index = (*tbuf - min) + 1;
+					goto exit;
 				}
 				
 				tbuf += (dirvec[rc][0] + dirvec[rc][1]);
@@ -1614,17 +1622,19 @@ static void view3d_stereo_bgpic_setup(Scene *scene, View3D *v3d, Image *ima, Ima
 	if ((ima->flag & IMA_IS_STEREO)) {
 		iuser->flag |= IMA_SHOW_STEREO;
 
-		if ((scene->r.scemode & R_MULTIVIEW) == 0)
+		if ((scene->r.scemode & R_MULTIVIEW) == 0) {
 			iuser->multiview_eye = STEREO_LEFT_ID;
-
-		/* show only left or right camera */
-		else if (v3d->stereo3d_camera != STEREO_3D_ID)
+		}
+		else if (v3d->stereo3d_camera != STEREO_3D_ID) {
+			/* show only left or right camera */
 			iuser->multiview_eye = v3d->stereo3d_camera;
+		}
 
 		BKE_image_multiview_index(ima, iuser);
 	}
-	else
+	else {
 		iuser->flag &= ~IMA_SHOW_STEREO;
+	}
 }
 
 static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
@@ -2717,7 +2727,7 @@ static void view3d_draw_objects(
 	const bool draw_grids = !draw_offscreen && (v3d->flag2 & V3D_RENDER_OVERRIDE) == 0;
 	const bool draw_floor = (rv3d->view == RV3D_VIEW_USER) || (rv3d->persp != RV3D_ORTHO);
 	/* only draw grids after in solid modes, else it hovers over mesh wires */
-	const bool draw_grids_after = draw_grids && draw_floor && (v3d->drawtype > OB_WIRE);
+	const bool draw_grids_after = draw_grids && draw_floor && (v3d->drawtype > OB_WIRE) && fx;
 	bool do_composite_xray = false;
 	bool xrayclear = true;
 
@@ -2766,8 +2776,8 @@ static void view3d_draw_objects(
 			glMatrixMode(GL_MODELVIEW);
 			glLoadMatrixf(rv3d->viewmat);
 		}
-		else {
-			drawfloor(scene, v3d, grid_unit);
+		else if (!draw_grids_after){
+			drawfloor(scene, v3d, grid_unit, true);
 		}
 	}
 
@@ -2845,7 +2855,7 @@ static void view3d_draw_objects(
 
 	/* perspective floor goes last to use scene depth and avoid writing to depth buffer */
 	if (draw_grids_after) {
-		drawfloor(scene, v3d, grid_unit);
+		drawfloor(scene, v3d, grid_unit, false);
 	}
 
 	/* must be before xray draw which clears the depth buffer */
@@ -3561,7 +3571,7 @@ static bool view3d_stereo3d_active(const bContext *C, Scene *scene, View3D *v3d,
 	if (WM_stereo3d_enabled(win, true) == false)
 		return false;
 
-	if ((v3d->camera == NULL) || rv3d->persp != RV3D_CAMOB)
+	if ((v3d->camera == NULL) || (v3d->camera->type != OB_CAMERA) || rv3d->persp != RV3D_CAMOB)
 		return false;
 
 	if (scene->r.views_format & SCE_VIEWS_FORMAT_MULTIVIEW) {

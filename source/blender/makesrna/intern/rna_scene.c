@@ -134,6 +134,7 @@ EnumPropertyItem proportional_falloff_curve_only_items[] = {
 	{PROP_SMOOTH, "SMOOTH", ICON_SMOOTHCURVE, "Smooth", "Smooth falloff"},
 	{PROP_SPHERE, "SPHERE", ICON_SPHERECURVE, "Sphere", "Spherical falloff"},
 	{PROP_ROOT, "ROOT", ICON_ROOTCURVE, "Root", "Root falloff"},
+	{PROP_INVSQUARE, "INVERSE_SQUARE", ICON_ROOTCURVE, "Inverse Square", "Inverse Square falloff"},
 	{PROP_SHARP, "SHARP", ICON_SHARPCURVE, "Sharp", "Sharp falloff"},
 	{PROP_LIN, "LINEAR", ICON_LINCURVE, "Linear", "Linear falloff"},
 	{0, NULL, 0, NULL, NULL}
@@ -373,10 +374,8 @@ EnumPropertyItem stereo3d_display_items[] = {
      "(anaglyph glasses are required)"},
 	{S3D_DISPLAY_INTERLACE, "INTERLACE", 0, "Interlace",
      "Render views for left and right eyes interlaced in a single image (3D-ready monitor is required)"},
-#ifdef DEBUG /* MULTIVIEW_TODO: quadbuffer mode not fully working */
 	{S3D_DISPLAY_PAGEFLIP, "TIMESEQUENTIAL", 0, "Time Sequential",
      "Render alternate eyes (also known as page flip, quad buffer support in the graphic card is required)"},
-#endif
 	{S3D_DISPLAY_SIDEBYSIDE, "SIDEBYSIDE", 0, "Side-by-Side", "Render views for left and right eyes side-by-side"},
 	{S3D_DISPLAY_TOPBOTTOM, "TOPBOTTOM", 0, "Top-Bottom", "Render views for left and right eyes one above another"},
 	{0, NULL, 0, NULL, NULL}
@@ -1907,7 +1906,7 @@ static void rna_FreestyleSettings_module_remove(
 		if (module->script)
 			BKE_reportf(reports, RPT_ERROR, "Style module '%s' could not be removed", module->script->id.name + 2);
 		else
-			BKE_reportf(reports, RPT_ERROR, "Style module could not be removed");
+			BKE_report(reports, RPT_ERROR, "Style module could not be removed");
 		return;
 	}
 
@@ -2167,6 +2166,22 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_ui_text(prop, "Proportional Editing Objects", "Proportional editing mask mode");
 	RNA_def_property_ui_icon(prop, ICON_PROP_OFF, 1);
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+
+	prop = RNA_def_property(srna, "use_proportional_action", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "proportional_action", 0);
+	RNA_def_property_ui_text(prop, "Proportional Editing Actions", "Proportional editing in action editor");
+	RNA_def_property_ui_icon(prop, ICON_PROP_OFF, 1);
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+
+	prop = RNA_def_property(srna, "use_proportional_fcurve", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "proportional_fcurve", 0);
+	RNA_def_property_ui_text(prop, "Proportional Editing FCurves", "Proportional editing in FCurve editor");
+	RNA_def_property_ui_icon(prop, ICON_PROP_OFF, 1);
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+
+	prop = RNA_def_property(srna, "lock_markers", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "lock_markers", 0);
+	RNA_def_property_ui_text(prop, "Lock Markers", "Prevent marker editing");
 
 	prop = RNA_def_property(srna, "proportional_edit_falloff", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "prop_mode");

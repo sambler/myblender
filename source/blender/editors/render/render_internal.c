@@ -188,7 +188,7 @@ static void image_buffer_rect_update(RenderJob *rj, RenderResult *rr, ImBuf *ibu
 	 *                                              - sergey -
 	 */
 	/* TODO(sergey): Need to check has_combined here? */
-	if (iuser->pass == 0) {
+	if (iuser->passtype == SCE_PASS_COMBINED) {
 		size_t view_id = BKE_scene_multiview_view_id_get(&scene->r, viewname);
 		/* find current float rect for display, first case is after composite... still weak */
 		rectf = RE_RenderViewGetRectf(rr, view_id);
@@ -519,7 +519,6 @@ static void render_image_update_pass_and_layer(RenderJob *rj, RenderResult *rr, 
 			}
 		}
 
-		iuser->pass = sima->iuser.pass;
 		iuser->layer = sima->iuser.layer;
 
 		RE_ReleaseResult(rj->re);
@@ -893,6 +892,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
 	rj->write_still = is_write_still && !is_animation;
 	rj->iuser.scene = scene;
 	rj->iuser.ok = 1;
+	rj->iuser.passtype = SCE_PASS_COMBINED;
 	rj->reports = op->reports;
 	rj->orig_layer = 0;
 	rj->last_layer = 0;
@@ -1229,10 +1229,10 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 	if ((update_flag & (PR_UPDATE_RENDERSIZE | PR_UPDATE_DATABASE)) || rstats->convertdone == 0) {
 		RenderData rdata;
 
-		/* no osa, blur, seq, layers, etc for preview render */
+		/* no osa, blur, seq, layers, savebuffer etc for preview render */
 		rdata = rp->scene->r;
 		rdata.mode &= ~(R_OSA | R_MBLUR | R_BORDER | R_PANORAMA);
-		rdata.scemode &= ~(R_DOSEQ | R_DOCOMP | R_FREE_IMAGE);
+		rdata.scemode &= ~(R_DOSEQ | R_DOCOMP | R_FREE_IMAGE | R_EXR_TILE_FILE | R_FULL_SAMPLE);
 		rdata.scemode |= R_VIEWPORT_PREVIEW;
 
 		/* we do use layers, but only active */

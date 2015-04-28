@@ -511,10 +511,6 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 	bool done = false;
 	bool use_proj;
 
-	if (ELEM(event->click_type, KM_CLICK, KM_HOLD)) {
-		return OPERATOR_CANCELLED;
-	}
-
 	em_setup_viewcontext(C, &vc);
 
 	ED_view3d_init_mats_rv3d(vc.obedit, vc.rv3d);
@@ -578,8 +574,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 			mul_mat3_m4_v3(vc.obedit->imat, nor); /* local space */
 
 			/* correct the normal to be aligned on the view plane */
-			copy_v3_v3(view_vec, vc.rv3d->viewinv[2]);
-			mul_mat3_m4_v3(vc.obedit->imat, view_vec);
+			mul_v3_mat3_m4v3(view_vec, vc.obedit->imat, vc.rv3d->viewinv[2]);
 			cross_v3_v3v3(cross, nor, view_vec);
 			cross_v3_v3v3(nor, view_vec, cross);
 			normalize_v3(nor);

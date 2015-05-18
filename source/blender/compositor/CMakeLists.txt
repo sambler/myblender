@@ -90,8 +90,6 @@ set(SRC
 	intern/COM_OpenCLDevice.h
 	intern/COM_CompositorContext.cpp
 	intern/COM_CompositorContext.h
-	intern/COM_ChannelInfo.cpp
-	intern/COM_ChannelInfo.h
 	intern/COM_SingleThreadedOperation.cpp
 	intern/COM_SingleThreadedOperation.h
 	intern/COM_Debug.cpp
@@ -121,6 +119,8 @@ set(SRC
 	nodes/COM_TimeNode.h
 	nodes/COM_SwitchNode.cpp
 	nodes/COM_SwitchNode.h
+	nodes/COM_SwitchViewNode.cpp
+	nodes/COM_SwitchViewNode.h
 	nodes/COM_MovieClipNode.cpp
 	nodes/COM_MovieClipNode.h
 	nodes/COM_OutputFileNode.cpp
@@ -372,6 +372,8 @@ set(SRC
 	operations/COM_CompositorOperation.cpp
 	operations/COM_OutputFileOperation.h
 	operations/COM_OutputFileOperation.cpp
+	operations/COM_OutputFileMultiViewOperation.h
+	operations/COM_OutputFileMultiViewOperation.cpp
 	operations/COM_ViewerOperation.h
 	operations/COM_ViewerOperation.cpp
 	operations/COM_PreviewOperation.h

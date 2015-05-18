@@ -48,6 +48,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_report.h"
+#include "BKE_screen.h"
 #include "BKE_tracking.h"
 
 #include "DNA_object_types.h"
@@ -999,7 +1000,7 @@ static void gp_session_validatebuffer(tGPsdata *p)
 }
 
 /* (re)init new painting data */
-static int gp_session_initdata(bContext *C, tGPsdata *p)
+static bool gp_session_initdata(bContext *C, tGPsdata *p)
 {
 	bGPdata **gpd_ptr = NULL;
 	ScrArea *curarea = CTX_wm_area(C);
@@ -1030,6 +1031,7 @@ static int gp_session_initdata(bContext *C, tGPsdata *p)
 			/* set current area
 			 *	- must verify that region data is 3D-view (and not something else)
 			 */
+			/* CAUTION: If this is the "toolbar", then this will change on the first stroke */
 			p->sa = curarea;
 			p->ar = ar;
 			
@@ -1082,7 +1084,13 @@ static int gp_session_initdata(bContext *C, tGPsdata *p)
 		case SPACE_CLIP:
 		{
 			SpaceClip *sc = curarea->spacedata.first;
+			MovieClip *clip = ED_space_clip_get_clip(sc);
 			
+			if (clip == NULL) {
+				p->status = GP_STATUS_ERROR;
+				return false;
+			}
+
 			/* set the current area */
 			p->sa = curarea;
 			p->ar = ar;
@@ -1097,13 +1105,18 @@ static int gp_session_initdata(bContext *C, tGPsdata *p)
 			p->custom_color[3] = 0.9f;
 			
 			if (sc->gpencil_src == SC_GPENCIL_SRC_TRACK) {
-				MovieClip *clip = ED_space_clip_get_clip(sc);
 				int framenr = ED_space_clip_get_clip_frame_number(sc);
 				MovieTrackingTrack *track = BKE_tracking_track_get_active(&clip->tracking);
-				MovieTrackingMarker *marker = BKE_tracking_marker_get(track, framenr);
-				
-				p->imat[3][0] -= marker->pos[0];
-				p->imat[3][1] -= marker->pos[1];
+				MovieTrackingMarker *marker = track ? BKE_tracking_marker_get(track, framenr) : NULL;
+
+				if (marker) {
+					p->imat[3][0] -= marker->pos[0];
+					p->imat[3][1] -= marker->pos[1];
+				}
+				else {
+					p->status = GP_STATUS_ERROR;
+					return false;
+				}
 			}
 			
 			invert_m4_m4(p->mat, p->imat);
@@ -1225,12 +1238,23 @@ static void gp_paint_initstroke(tGPsdata *p, short paintmode)
 			}
 		}
 	}
+	else {
+		/* disable eraser flags - so that we can switch modes during a session */
+		p->gpd->sbuffer_sflag &= ~GP_STROKE_ERASER;
+		
+		if (p->sa->spacetype == SPACE_VIEW3D) {
+			if (p->gpl->flag & GP_LAYER_NO_XRAY) {
+				p->flags &= ~GP_PAINTFLAG_V3D_ERASER_DEPTH;
+			}
+		}
+	}
 	
 	/* set 'initial run' flag, which is only used to denote when a new stroke is starting */
 	p->flags |= GP_PAINTFLAG_FIRSTRUN;
 	
 	
 	/* when drawing in the camera view, in 2D space, set the subrect */
+	p->subrect = NULL;
 	if (!(p->gpd->flag & GP_DATA_VIEWALIGN)) {
 		if (p->sa->spacetype == SPACE_VIEW3D) {
 			View3D *v3d = p->sa->spacedata.first;
@@ -1389,7 +1413,7 @@ static void gpencil_draw_toggle_eraser_cursor(bContext *C, tGPsdata *p, short en
 		WM_paint_cursor_end(CTX_wm_manager(C), p->erasercursor);
 		p->erasercursor = NULL;
 	}
-	else if (enable) {
+	else if (enable && !p->erasercursor) {
 		/* enable cursor */
 		p->erasercursor = WM_paint_cursor_activate(CTX_wm_manager(C),
 		                                           NULL, /* XXX */
@@ -1471,6 +1495,15 @@ static int gpencil_draw_init(bContext *C, wmOperator *op)
 
 
 /* ------------------------------- */
+
+/* ensure that the correct cursor icon is set */
+static void gpencil_draw_cursor_set(tGPsdata *p)
+{
+	if (p->paintmode == GP_PAINTMODE_ERASER)
+		WM_cursor_modal_set(p->win, BC_CROSSCURSOR);  /* XXX need a better cursor */
+	else
+		WM_cursor_modal_set(p->win, BC_PAINTBRUSHCURSOR);
+}
 
 /* update UI indicators of status, including cursor and header prints */
 static void gpencil_draw_status_indicators(tGPsdata *p)
@@ -1587,7 +1620,7 @@ static void gpencil_draw_apply_event(wmOperator *op, const wmEvent *event)
 	
 	/* handle pressure sensitivity (which is supplied by tablets) */
 	if (event->tablet_data) {
-		wmTabletData *wmtab = event->tablet_data;
+		const wmTabletData *wmtab = event->tablet_data;
 		
 		tablet = (wmtab->Active != EVT_TABLET_NONE);
 		p->pressure = wmtab->Pressure;
@@ -1621,7 +1654,7 @@ static void gpencil_draw_apply_event(wmOperator *op, const wmEvent *event)
 	mousef[1] = p->mval[1];
 	RNA_float_set_array(&itemptr, "mouse", mousef);
 	RNA_float_set(&itemptr, "pressure", p->pressure);
-	RNA_boolean_set(&itemptr, "is_start", (p->flags & GP_PAINTFLAG_FIRSTRUN));
+	RNA_boolean_set(&itemptr, "is_start", (p->flags & GP_PAINTFLAG_FIRSTRUN) != 0);
 	
 	RNA_float_set(&itemptr, "time", p->curtime - p->inittime);
 	
@@ -1712,7 +1745,6 @@ static int gpencil_draw_exec(bContext *C, wmOperator *op)
 static int gpencil_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	tGPsdata *p = NULL;
-	wmWindow *win = CTX_wm_window(C);
 	
 	if (G.debug & G_DEBUG)
 		printf("GPencil - Starting Drawing\n");
@@ -1738,11 +1770,11 @@ static int gpencil_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event
 		gpencil_draw_toggle_eraser_cursor(C, p, true);
 	}
 	
-	/* set cursor */
-	if (p->paintmode == GP_PAINTMODE_ERASER)
-		WM_cursor_modal_set(win, BC_CROSSCURSOR);  /* XXX need a better cursor */
-	else
-		WM_cursor_modal_set(win, BC_PAINTBRUSHCURSOR);
+	/* set cursor 
+	 * NOTE: This may change later (i.e. intentionally via brush toggle,
+	 *       or unintentionally if the user scrolls outside the area)...
+	 */
+	gpencil_draw_cursor_set(p);
 	
 	/* only start drawing immediately if we're allowed to do so... */
 	if (RNA_boolean_get(op->ptr, "wait_for_input") == false) {
@@ -1756,6 +1788,7 @@ static int gpencil_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event
 	else {
 		/* toolbar invoked - don't start drawing yet... */
 		/* printf("\tGP - hotkey invoked... waiting for click-drag\n"); */
+		op->flag |= OP_IS_MODAL_CURSOR_REGION;
 	}
 	
 	WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
@@ -1793,8 +1826,10 @@ static tGPsdata *gpencil_stroke_begin(bContext *C, wmOperator *op)
 	if (gp_session_initdata(C, p))
 		gp_paint_initstroke(p, p->paintmode);
 	
-	if (p->status != GP_STATUS_ERROR)
+	if (p->status != GP_STATUS_ERROR) {
 		p->status = GP_STATUS_PAINTING;
+		op->flag &= ~OP_IS_MODAL_CURSOR_REGION;
+	}
 	
 	return op->customdata;
 }
@@ -1810,6 +1845,7 @@ static void gpencil_stroke_end(wmOperator *op)
 	gp_session_cleanup(p);
 	
 	p->status = GP_STATUS_IDLING;
+	op->flag |= OP_IS_MODAL_CURSOR_REGION;
 	
 	p->gpd = NULL;
 	p->gpl = NULL;
@@ -1835,6 +1871,11 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	 * in 3D space.
 	 */
 	
+	if (p->status == GP_STATUS_IDLING) {
+		ARegion *ar = CTX_wm_region(C);
+		p->ar = ar;
+	}
+
 	/* we don't pass on key events, GP is used with key-modifiers - prevents Dkey to insert drivers */
 	if (ISKEYBOARD(event->type)) {
 		if (ELEM(event->type, LEFTARROWKEY, DOWNARROWKEY, RIGHTARROWKEY, UPARROWKEY, ZKEY)) {
@@ -1864,8 +1905,9 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	 *  - LEFTMOUSE  = standard drawing (all) / straight line drawing (all) / polyline (toolbox only)
 	 *  - RIGHTMOUSE = polyline (hotkey) / eraser (all)
 	 *    (Disabling RIGHTMOUSE case here results in bugs like [#32647])
+	 * also making sure we have a valid event value, to not exit too early
 	 */
-	if (ELEM(event->type, LEFTMOUSE, RIGHTMOUSE)) {
+	if (ELEM(event->type, LEFTMOUSE, RIGHTMOUSE) && (event->val != KM_NOTHING)) {
 		/* if painting, end stroke */
 		if (p->status == GP_STATUS_PAINTING) {
 			int sketch = 0;
@@ -1882,6 +1924,27 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 				/* printf("\t\tGP - end stroke only\n"); */
 				gpencil_stroke_end(op);
 				
+				/* If eraser mode is on, turn it off after the stroke finishes
+				 * NOTE: This just makes it nicer to work with drawing sessions
+				 */
+				if (p->paintmode == GP_PAINTMODE_ERASER) {
+					p->paintmode = RNA_enum_get(op->ptr, "mode");
+					
+					/* if the original mode was *still* eraser,
+					 * we'll let it say for now, since this gives
+					 * users an opportunity to have visual feedback
+					 * when adjusting eraser size
+					 */
+					if (p->paintmode != GP_PAINTMODE_ERASER) {	
+						/* turn off cursor...
+						 * NOTE: this should be enough for now
+						 *       Just hiding this makes it seem like
+						 *       you can paint again...
+						 */
+						gpencil_draw_toggle_eraser_cursor(C, p, false);
+					}
+				}
+				
 				/* we've just entered idling state, so this event was processed (but no others yet) */
 				estate = OPERATOR_RUNNING_MODAL;
 				
@@ -1895,15 +1958,88 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 			}
 		}
 		else if (event->val == KM_PRESS) {
-			/* not painting, so start stroke (this should be mouse-button down) */
-			p = gpencil_stroke_begin(C, op);
+			bool in_bounds = false;
 			
-			if (p->status == GP_STATUS_ERROR) {
+			/* Check if we're outside the bounds of the active region
+			 * NOTE: An exception here is that if launched from the toolbar,
+			 *       whatever region we're now in should become the new region
+			 */
+			if ((p->ar) && (p->ar->regiontype == RGN_TYPE_TOOLS)) {
+				/* Change to whatever region is now under the mouse */
+				ARegion *current_region = BKE_area_find_region_xy(p->sa, RGN_TYPE_ANY, event->x, event->y);
+				
+				if (G.debug & G_DEBUG) {
+					printf("found alternative region %p (old was %p) - at %d %d (sa: %d %d -> %d %d)\n",
+						current_region, p->ar, event->x, event->y,
+						p->sa->totrct.xmin, p->sa->totrct.ymin, p->sa->totrct.xmax, p->sa->totrct.ymax);
+				}
+				
+				if (current_region) {
+					/* Assume that since we found the cursor in here, it is in bounds
+					 * and that this should be the region that we begin drawing in
+					 */
+					p->ar = current_region;
+					in_bounds = true;
+				}
+				else {
+					/* Out of bounds, or invalid in some other way */
+					p->status = GP_STATUS_ERROR;
+					estate = OPERATOR_CANCELLED;
+					
+					if (G.debug & G_DEBUG)
+						printf("%s: Region under cursor is out of bounds, so cannot be drawn on\n", __func__);
+				}
+			}
+			else if (p->ar) {
+				rcti region_rect;
+				
+				/* Perform bounds check using  */
+				ED_region_visible_rect(p->ar, &region_rect);
+				in_bounds = BLI_rcti_isect_pt_v(&region_rect, event->mval);
+			}
+			else {
+				/* No region */
+				p->status = GP_STATUS_ERROR;
 				estate = OPERATOR_CANCELLED;
+				
+				if (G.debug & G_DEBUG)
+					printf("%s: No active region found in GP Paint session data\n", __func__);
+			}
+			
+			if (in_bounds) {
+				/* Switch paintmode (temporarily if need be) based on which button was used
+				 * NOTE: This is to make it more convenient to erase strokes when using drawing sessions
+				 */
+				if (event->type == LEFTMOUSE) {
+					/* restore drawmode to default */
+					p->paintmode = RNA_enum_get(op->ptr, "mode");
+				}
+				else if (event->type == RIGHTMOUSE) {
+					/* turn on eraser */
+					p->paintmode = GP_PAINTMODE_ERASER;
+				}
+				
+				gpencil_draw_toggle_eraser_cursor(C, p, p->paintmode == GP_PAINTMODE_ERASER);
+				
+				/* not painting, so start stroke (this should be mouse-button down) */
+				p = gpencil_stroke_begin(C, op);
+				
+				if (p->status == GP_STATUS_ERROR) {
+					estate = OPERATOR_CANCELLED;
+				}
+			}
+			else if (p->status != GP_STATUS_ERROR) {
+				/* User clicked outside bounds of window while idling, so exit paintmode 
+				 * NOTE: Don't eter this case if an error occurred while finding the
+				 *       region (as above)
+				 */
+				p->status = GP_STATUS_DONE;
+				estate = OPERATOR_FINISHED;
 			}
 		}
 		else {
 			p->status = GP_STATUS_IDLING;
+			op->flag |= OP_IS_MODAL_CURSOR_REGION;
 		}
 	}
 	
@@ -1967,9 +2103,11 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	/* gpencil modal operator stores area, which can be removed while using it (like fullscreen) */
 	if (0 == gpencil_area_exists(C, p->sa))
 		estate = OPERATOR_CANCELLED;
-	else
+	else {
 		/* update status indicators - cursor, header, etc. */
 		gpencil_draw_status_indicators(p);
+		gpencil_draw_cursor_set(p); /* cursor may have changed outside our control - T44084 */
+	}
 	
 	/* process last operations before exiting */
 	switch (estate) {

@@ -29,8 +29,6 @@
  *  \ingroup edobj
  */
 
-#include "MEM_guardedalloc.h"
-
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
@@ -41,7 +39,8 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
-#include "BKE_object_data_transfer.h"
+#include "BKE_data_transfer.h"
+#include "BKE_depsgraph.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_remap.h"
@@ -58,7 +57,6 @@
 #include "ED_object.h"
 
 #include "UI_interface.h"
-#include "UI_resources.h"
 
 #include "object_intern.h"
 
@@ -82,6 +80,7 @@ static EnumPropertyItem DT_layer_items[] = {
 	{DT_TYPE_BWEIGHT_EDGE, "BEVEL_WEIGHT_EDGE", 0, "Bevel Weight", "Transfer bevel weights"},
 	{DT_TYPE_FREESTYLE_EDGE, "FREESTYLE_EDGE", 0, "Freestyle Mark", "Transfer Freestyle edge mark"},
 	{0, "", 0, "Face Corner Data", ""},
+	{DT_TYPE_LNOR, "CUSTOM_NORMAL", 0, "Custom Normals", "Transfer custom normals"},
 	{DT_TYPE_VCOL, "VCOL", 0, "VCol", "Vertex (face corners) colors"},
 	{DT_TYPE_UV, "UV", 0, "UVs", "Transfer UV layers"},
 	{0, "", 0, "Face Data", ""},
@@ -226,7 +225,7 @@ static EnumPropertyItem *dt_mix_mode_itemf(bContext *C, PointerRNA *ptr, Propert
 
 	BKE_object_data_transfer_get_dttypes_capacity(dtdata_type, &support_advanced_mixing, &support_threshold);
 
-	if (support_advanced_mixing) {
+	if (support_threshold) {
 		RNA_enum_items_add_value(&item, &totitem, DT_mix_mode_items, CDT_MIX_REPLACE_ABOVE_THRESHOLD);
 		RNA_enum_items_add_value(&item, &totitem, DT_mix_mode_items, CDT_MIX_REPLACE_BELOW_THRESHOLD);
 	}
@@ -297,7 +296,7 @@ static bool data_transfer_exec_is_object_valid(
         wmOperator *op, Object *ob_src, Object *ob_dst, const bool reverse_transfer)
 {
 	Mesh *me;
-	if ((ob_dst == ob_src) || !ELEM(OB_MESH, ob_src->type, ob_dst->type)) {
+	if ((ob_dst == ob_src) || (ob_src->type != OB_MESH) || (ob_dst->type != OB_MESH)) {
 		return false;
 	}
 
@@ -323,7 +322,7 @@ static bool data_transfer_exec_is_object_valid(
 static int data_transfer_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
-	Object *ob_src = CTX_data_active_object(C);
+	Object *ob_src = ED_object_active_context(C);
 
 	ListBase ctx_objects;
 	CollectionPointerLink *ctx_ob_dst;
@@ -393,12 +392,16 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 			}
 		}
 
+		DAG_id_tag_update(&ob_dst->id, OB_RECALC_DATA);
+
 		if (reverse_transfer) {
 			SWAP(Object *, ob_src, ob_dst);
 		}
 	}
 
 	BLI_freelistN(&ctx_objects);
+
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, NULL);
 
 #if 0  /* TODO */
 	/* Note: issue with that is that if canceled, operator cannot be redone... Nasty in our case. */
@@ -413,7 +416,7 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 /* Note this context poll is only really partial, it cannot check for all possible invalid cases. */
 static int data_transfer_poll(bContext *C)
 {
-	Object *ob = ED_object_context(C);
+	Object *ob = ED_object_active_context(C);
 	ID *data = (ob) ? ob->data : NULL;
 	return (ob && ob->type == OB_MESH && data);
 }
@@ -592,6 +595,8 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 
 		BKE_object_data_transfer_layout(scene, ob_src, ob_dst, dtmd->data_types, use_delete,
 		                                dtmd->layers_select_src, dtmd->layers_select_dst);
+
+		DAG_id_tag_update(&ob_dst->id, OB_RECALC_DATA);
 	}
 	else {
 		Object *ob_src = ob_act;
@@ -621,10 +626,14 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 				BKE_object_data_transfer_layout(scene, ob_src, ob_dst, data_type, use_delete,
 				                                layers_select_src, layers_select_dst);
 			}
+
+			DAG_id_tag_update(&ob_dst->id, OB_RECALC_DATA);
 		}
 
 		BLI_freelistN(&ctx_objects);
 	}
+
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -643,7 +652,7 @@ void OBJECT_OT_datalayout_transfer(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 
-	ot->name = "Transfer Mesh Datalayout";
+	ot->name = "Transfer Mesh Data Layout";
 	ot->description = "Transfer layout of data layer(s) from active to selected meshes";
 	ot->idname = "OBJECT_OT_datalayout_transfer";
 

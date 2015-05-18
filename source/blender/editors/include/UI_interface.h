@@ -40,14 +40,11 @@
 /* Struct Declarations */
 
 struct ID;
-struct Main;
 struct ListBase;
 struct ARegion;
-struct ARegionType;
 struct ScrArea;
 struct wmEvent;
 struct wmWindow;
-struct wmWindowManager;
 struct wmOperator;
 struct AutoComplete;
 struct bContext;
@@ -58,18 +55,14 @@ struct PointerRNA;
 struct PropertyRNA;
 struct ReportList;
 struct rcti;
-struct rctf;
 struct uiList;
 struct uiStyle;
 struct uiFontStyle;
 struct uiWidgetColors;
-struct ColorBand;
-struct CurveMapping;
 struct Image;
 struct ImageUser;
 struct wmOperatorType;
 struct uiWidgetColors;
-struct Tex;
 struct MTex;
 struct ImBuf;
 struct bNodeTree;
@@ -181,10 +174,11 @@ enum {
 	UI_BUT_COLOR_CUBIC     = (1 << 23),  /* cubic saturation for the color wheel */
 	UI_BUT_LIST_ITEM       = (1 << 24),  /* This but is "inside" a list item (currently used to change theme colors). */
 	UI_BUT_DRAG_MULTI      = (1 << 25),  /* edit this button as well as the active button (not just dragging) */
-	UI_BUT_SCA_LINK_GREY   = (1 << 26),  /* used to flag if sca links shoud be grey out */
+	UI_BUT_SCA_LINK_GREY   = (1 << 26),  /* used to flag if sca links shoud be gray out */
 	UI_BUT_HAS_SEP_CHAR    = (1 << 27),  /* but->str contains UI_SEP_CHAR, used for key shortcuts */
 	UI_BUT_TIP_FORCE       = (1 << 28),  /* force show tooltips when holding option/alt if U's USER_TOOLTIPS is off */
 	UI_BUT_TEXTEDIT_UPDATE = (1 << 29),  /* when widget is in textedit mode, update value on each char stroke */
+	UI_BUT_SEARCH_UNLINK   = (1 << 30),  /* show unlink for search button */
 };
 
 #define UI_PANEL_WIDTH          340
@@ -279,7 +273,6 @@ typedef enum {
 	UI_BTYPE_WAVEFORM               = (49 << 9),
 	UI_BTYPE_VECTORSCOPE            = (50 << 9),
 	UI_BTYPE_PROGRESS_BAR           = (51 << 9),
-	UI_BTYPE_SEARCH_MENU_UNLINK     = (52 << 9),
 	UI_BTYPE_NODE_SOCKET            = (53 << 9),
 	UI_BTYPE_SEPR                   = (54 << 9),
 	UI_BTYPE_SEPR_LINE              = (55 << 9),
@@ -316,11 +309,20 @@ void UI_draw_roundbox_shade_x(int mode, float minx, float miny, float maxx, floa
 void UI_draw_roundbox_shade_y(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadeLeft, float shadeRight);
 void UI_draw_text_underline(int pos_x, int pos_y, int len, int height);
 
+void UI_draw_safe_areas(
+        float x1, float x2, float y1, float y2,
+        const float title_aspect[2], const float action_aspect[2]);
+
 /* state for scrolldrawing */
 #define UI_SCROLL_PRESSED       (1 << 0)
 #define UI_SCROLL_ARROWS        (1 << 1)
 #define UI_SCROLL_NO_OUTLINE    (1 << 2)
 void UI_draw_widget_scroll(struct uiWidgetColors *wcol, const struct rcti *rect, const struct rcti *slider, int state);
+
+/* Shortening string helper. */
+float UI_text_clip_middle_ex(
+        struct uiFontStyle *fstyle, char *str, float okwidth, const float minwidth,
+        const size_t max_len, const char *rpart_sep);
 
 /* Callbacks
  *
@@ -344,6 +346,9 @@ typedef void (*uiButHandleRenameFunc)(struct bContext *C, void *arg, char *origs
 typedef void (*uiButHandleNFunc)(struct bContext *C, void *argN, void *arg2);
 typedef int (*uiButCompleteFunc)(struct bContext *C, char *str, void *arg);
 typedef void (*uiButSearchFunc)(const struct bContext *C, void *arg, const char *str, uiSearchItems *items);
+/* Must return allocated string. */
+typedef char *(*uiButToolTipFunc)(struct bContext *C, void *argN, const char *tip);
+
 typedef void (*uiBlockHandleFunc)(struct bContext *C, void *arg, int event);
 
 /* Menu Callbacks */
@@ -483,6 +488,14 @@ bool    UI_but_active_only(const struct bContext *C, struct ARegion *ar, uiBlock
 
 void    UI_but_execute(const struct bContext *C, uiBut *but);
 
+bool UI_but_online_manual_id(
+        const uiBut *but,
+        char *r_str, size_t maxlength)
+        ATTR_WARN_UNUSED_RESULT;
+bool UI_but_online_manual_id_from_active(
+        const struct bContext *C,
+        char *r_str, size_t maxlength)
+        ATTR_WARN_UNUSED_RESULT;
 
 /* Buttons
  *
@@ -673,6 +686,9 @@ void    UI_but_func_drawextra_set(
         uiBlock *block,
         void (*func)(const struct bContext *C, void *, void *, void *, struct rcti *rect),
         void *arg1, void *arg2);
+
+void    UI_but_func_tooltip_set(uiBut *but, uiButToolTipFunc func, void *argN);
+void    UI_but_tooltip_timer_remove(struct bContext *C, uiBut *but);
 
 bool UI_textbutton_activate_rna(const struct bContext *C, struct ARegion *ar,
                                 const void *rna_poin_data, const char *rna_prop_id);
@@ -887,7 +903,11 @@ void uiTemplateGameStates(uiLayout *layout, struct PointerRNA *ptr, const char *
                       PointerRNA *used_ptr, const char *used_propname, int active_state);
 void uiTemplateImage(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, struct PointerRNA *userptr, int compact);
 void uiTemplateImageSettings(uiLayout *layout, struct PointerRNA *imfptr, int color_management);
+void uiTemplateImageStereo3d(uiLayout *layout, struct PointerRNA *stereo3d_format_ptr);
+void uiTemplateImageViews(uiLayout *layout, struct PointerRNA *imaptr);
+void uiTemplateImageFormatViews(uiLayout *layout, PointerRNA *imfptr, PointerRNA *ptr);
 void uiTemplateImageLayers(uiLayout *layout, struct bContext *C, struct Image *ima, struct ImageUser *iuser);
+void uiTemplateImageInfo(uiLayout *layout, struct bContext *C, Image *ima, ImageUser *iuser);
 void uiTemplateRunningJobs(uiLayout *layout, struct bContext *C);
 void UI_but_func_operator_search(uiBut *but);
 void uiTemplateOperatorSearch(uiLayout *layout);
@@ -902,7 +922,8 @@ void uiTemplateNodeSocket(uiLayout *layout, struct bContext *C, float *color);
 #define UI_UL_DEFAULT_CLASS_NAME "UI_UL_list"
 void uiTemplateList(uiLayout *layout, struct bContext *C, const char *listtype_name, const char *list_id,
                     struct PointerRNA *dataptr, const char *propname, struct PointerRNA *active_dataptr,
-                    const char *active_propname, int rows, int maxrows, int layout_type, int columns);
+                    const char *active_propname, const char *item_dyntip_propname,
+                    int rows, int maxrows, int layout_type, int columns);
 void uiTemplateNodeLink(uiLayout *layout, struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *input);
 void uiTemplateNodeView(uiLayout *layout, struct bContext *C, struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *input);
 void uiTemplateTextureUser(uiLayout *layout, struct bContext *C);
@@ -960,6 +981,10 @@ void ED_button_operatortypes(void);
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
 int UI_drop_color_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
 
+bool UI_context_copy_to_selected_list(
+        struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop,
+        struct ListBase *r_lb, bool *r_use_path_from_id, char **r_path);
+
 /* Helpers for Operators */
 uiBut *UI_context_active_but_get(const struct bContext *C);
 void UI_context_active_but_prop_get(const struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA **prop, int *index);
@@ -970,15 +995,20 @@ void UI_context_active_but_prop_get_filebrowser(const struct bContext *C, struct
 void UI_context_active_but_prop_get_templateID(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA **prop);
 
 /* Styled text draw */
-void UI_fontstyle_set(struct uiFontStyle *fs);
+void UI_fontstyle_set(const struct uiFontStyle *fs);
 void UI_fontstyle_draw_ex(
-        struct uiFontStyle *fs, const struct rcti *rect, const char *str,
+        const struct uiFontStyle *fs, const struct rcti *rect, const char *str,
         size_t len, float *r_xofs, float *r_yofs);
-void UI_fontstyle_draw(struct uiFontStyle *fs, const struct rcti *rect, const char *str);
-void UI_fontstyle_draw_rotated(struct uiFontStyle *fs, const struct rcti *rect, const char *str);
+void UI_fontstyle_draw(const struct uiFontStyle *fs, const struct rcti *rect, const char *str);
+void UI_fontstyle_draw_rotated(const struct uiFontStyle *fs, const struct rcti *rect, const char *str);
+void UI_fontstyle_draw_simple(const struct uiFontStyle *fs, float x, float y, const char *str);
+void UI_fontstyle_draw_simple_backdrop(
+        const uiFontStyle *fs, float x, float y, const char *str,
+        const unsigned char fg[4], const unsigned char bg[4]);
 
-int UI_fontstyle_string_width(const char *str); // XXX temp
-void UI_draw_string(float x, float y, const char *str); // XXX temp
+int UI_fontstyle_string_width(const struct uiFontStyle *fs, const char *str);
+int UI_fontstyle_height_max(const struct uiFontStyle *fs);
+
 void UI_draw_icon_tri(float x, float y, char dir);
 
 uiStyle *UI_style_get(void);		/* use for fonts etc */
@@ -1008,6 +1038,9 @@ void UI_butstore_unregister(uiButStore *bs_handle, uiBut **but_p);
 
 /* Float precision helpers */
 #define UI_PRECISION_FLOAT_MAX 7
+
+/* Typical UI text */
+#define UI_FSTYLE_WIDGET (const uiFontStyle *)&(UI_style_get()->widget)
 
 int UI_calc_float_precision(int prec, double value);
 

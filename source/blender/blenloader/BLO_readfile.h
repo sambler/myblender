@@ -37,13 +37,11 @@ extern "C" {
 #endif
 
 struct bScreen;
-struct direntry;
 struct LinkNode;
 struct Main;
 struct MemFile;
 struct ReportList;
 struct Scene;
-struct SpaceFile;
 struct UserDef;
 struct bContext;
 struct BHead;
@@ -61,9 +59,7 @@ typedef struct BlendFileData {
 	struct Main *main;
 	struct UserDef *user;
 
-	int winpos;
 	int fileflags;
-	int displaymode;
 	int globalf;
 	char filename[1024];    /* 1024 = FILE_MAX */
 	

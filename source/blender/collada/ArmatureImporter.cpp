@@ -54,7 +54,7 @@ static EditBone *get_edit_bone(bArmature * armature, char *name) {
 	EditBone  *eBone;
 
 	for (eBone = (EditBone *)armature->edbo->first; eBone; eBone = eBone->next) {
-		if (!strcmp(name, eBone->name))
+		if (STREQ(name, eBone->name))
 			return eBone;
 	}
 
@@ -588,9 +588,11 @@ void ArmatureImporter::create_armature_bones(SkinInfo& skin)
 	/* and step back to edit mode to fix the leaf nodes */
 	ED_armature_to_edit(armature);
 
-	connect_bone_chains(armature, (Bone *)armature->bonebase.first, UNLIMITED_CHAIN_MAX);
-	fix_leaf_bones(armature, (Bone *)armature->bonebase.first);
-
+	if (armature->bonebase.first) {
+		/* Do this only if Armature has bones */
+		connect_bone_chains(armature, (Bone *)armature->bonebase.first, UNLIMITED_CHAIN_MAX);
+		fix_leaf_bones(armature, (Bone *)armature->bonebase.first);
+	}
 	// exit armature edit mode
 	ED_armature_from_edit(armature);
 	ED_armature_edit_free(armature);

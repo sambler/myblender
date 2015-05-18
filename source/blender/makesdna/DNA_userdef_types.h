@@ -288,9 +288,10 @@ typedef struct ThemeSpace {
 
 	char handle_vertex[4];
 	char handle_vertex_select[4];
-	char pad2[4];
 	
 	char handle_vertex_size;
+
+	char clipping_border_3d[4];
 	
 	char marker_outline[4], marker[4], act_marker[4], sel_marker[4], dis_marker[4], lock_marker[4];
 	char bundle_solid[4];
@@ -337,6 +338,9 @@ typedef struct ThemeSpace {
 
 	char paint_curve_pivot[4];
 	char paint_curve_handle[4];
+
+	char metadatabg[4];
+	char metadatatext[4];
 } ThemeSpace;
 
 
@@ -461,7 +465,7 @@ typedef struct UserDef {
 
 	int scrollback; /* console scrollback limit */
 	int dpi;		/* range 48-128? */
-	short encoding;
+	char pad2[2];
 	short transopts;
 	short menuthreshold1, menuthreshold2;
 	
@@ -499,7 +503,10 @@ typedef struct UserDef {
 	char  ipo_new;			/* interpolation mode for newly added F-Curves */
 	char  keyhandles_new;	/* handle types for newly added keyframes */
 	char  gpu_select_method;
-	char  pad1;
+	char  view_frame_type;
+
+	int view_frame_keyframes; /* number of keyframes to zoom around current frame */
+	float view_frame_seconds; /* seconds to zoom around current frame */
 
 	short scrcastfps;		/* frame rate for screencast to be played back */
 	short scrcastwait;		/* milliseconds between screencast snapshots */
@@ -666,9 +673,10 @@ typedef enum eUserpref_UI_Flag {
 
 /* uiflag2 */
 typedef enum eUserpref_UI_Flag2 {
-	USER_KEEP_SESSION		= (1 << 0),
-	USER_REGION_OVERLAP		= (1 << 1),
-	USER_TRACKPAD_NATURAL	= (1 << 2)
+	USER_KEEP_SESSION			= (1 << 0),
+	USER_REGION_OVERLAP			= (1 << 1),
+	USER_TRACKPAD_NATURAL		= (1 << 2),
+	USER_OPENGL_NO_WARN_SUPPORT	= (1 << 3)
 } eUserpref_UI_Flag2;
 	
 /* Auto-Keying mode */
@@ -680,6 +688,13 @@ typedef enum eAutokey_Mode {
 	AUTOKEY_MODE_NORMAL    = 3,
 	AUTOKEY_MODE_EDITKEYS  = 5
 } eAutokey_Mode;
+
+/* Zoom to frame mode */
+typedef enum eZoomFrame_Mode {
+	ZOOM_FRAME_MODE_KEEP_RANGE = 0,
+	ZOOM_FRAME_MODE_SECONDS = 1,
+	ZOOM_FRAME_MODE_KEYFRAMES = 2
+} eZoomFrame_Mode;
 
 /* Auto-Keying flag
  * U.autokey_flag (not strictly used when autokeying only - is also used when keyframing these days)

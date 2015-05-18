@@ -24,7 +24,7 @@ import pickle
 import re
 
 
-class SpellChecker():
+class SpellChecker:
     """
     A basic spell checker.
     """
@@ -125,6 +125,7 @@ class SpellChecker():
         "multisampling",
         "multitexture",
         "multiuser",
+        "multiview",
         "namespace",
         "keyconfig",
         "online",
@@ -217,6 +218,7 @@ class SpellChecker():
         "passepartout",
         "perspectively",
         "pixelate",
+        "pointiness",
         "polycount",
         "polygonization", "polygonalization",  # yuck!
         "selectability",
@@ -454,6 +456,7 @@ class SpellChecker():
         "vcol", "vcols",
         "vgroup", "vgroups",
         "vinterlace",
+        "vse",
         "wasd", "wasdqe",  # keys...
         "wetmap", "wetmaps",
         "wpaint",
@@ -509,6 +512,7 @@ class SpellChecker():
         "fov",
         "fft",
         "futura",
+        "fx",
         "gfx",
         "gl",
         "glsl",
@@ -539,6 +543,7 @@ class SpellChecker():
         "sdl",
         "sl",
         "smpte",
+        "ssao",
         "svn",
         "ui",
         "unix",
@@ -572,6 +577,8 @@ class SpellChecker():
         "btx",
         "cineon",
         "dpx",
+        "dwaa",
+        "dwab",
         "dxf",
         "eps",
         "exr",

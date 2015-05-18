@@ -288,6 +288,11 @@ struct anim *IMB_open_anim(const char *name, int ib_flags, int streamindex, char
 	return(anim);
 }
 
+void IMB_suffix_anim(struct anim *anim, const char *suffix)
+{
+	BLI_strncpy(anim->suffix, suffix, sizeof(anim->suffix));
+}
+
 #ifdef WITH_AVI
 static int startavi(struct anim *anim)
 {
@@ -1314,25 +1319,27 @@ struct ImBuf *IMB_anim_absolute(struct anim *anim, int position,
 
 	filter_y = (anim->ib_flags & IB_animdeinterlace);
 
-	if (anim->curtype == 0) {
-		ibuf = anim_getnew(anim);
-		if (ibuf == NULL) {
-			return(NULL);
+	if (preview_size == IMB_PROXY_NONE) {
+		if (anim->curtype == 0) {
+			ibuf = anim_getnew(anim);
+			if (ibuf == NULL) {
+				return(NULL);
+			}
+
+			IMB_freeImBuf(ibuf); /* ???? */
+			ibuf = NULL;
 		}
 
-		IMB_freeImBuf(ibuf); /* ???? */
-		ibuf = NULL;
+		if (position < 0) return(NULL);
+		if (position >= anim->duration) return(NULL);
 	}
-
-	if (position < 0) return(NULL);
-	if (position >= anim->duration) return(NULL);
-
-	if (preview_size != IMB_PROXY_NONE) {
+	else {
 		struct anim *proxy = IMB_anim_open_proxy(anim, preview_size);
 
 		if (proxy) {
 			position = IMB_anim_index_get_frame_index(
 			    anim, tc, position);
+
 			return IMB_anim_absolute(
 			           proxy, position,
 			           IMB_TC_NONE, IMB_PROXY_NONE);

@@ -110,7 +110,7 @@ int ui_but_menu_step(uiBut *but, int direction)
 {
 	/* currenly only RNA buttons */
 	if ((but->rnaprop == NULL) || (RNA_property_type(but->rnaprop) != PROP_ENUM)) {
-		printf("%s: cannot cycle button '%s'", __func__, but->str);
+		printf("%s: cannot cycle button '%s'\n", __func__, but->str);
 		return 0;
 	}
 
@@ -179,9 +179,10 @@ typedef struct uiTooltipData {
 BLI_STATIC_ASSERT(UI_TIP_LC_MAX == UI_TIP_LC_ALERT + 1, "invalid lc-max");
 BLI_STATIC_ASSERT(sizeof(((uiTooltipData *)NULL)->format[0]) <= sizeof(int), "oversize");
 
-static void rgb_tint(float col[3],
-                     float h, float h_strength,
-                     float v, float v_strength)
+static void rgb_tint(
+        float col[3],
+        float h, float h_strength,
+        float v, float v_strength)
 {
 	float col_hsv_from[3];
 	float col_hsv_to[3];
@@ -241,10 +242,10 @@ static void ui_tooltip_region_draw_cb(const bContext *UNUSED(C), ARegion *ar)
 	/* tone_fg = rgb_to_grayscale(main_color); */
 
 	/* mix the colors */
-	rgb_tint(value_color,  0.0f, 0.0f, tone_bg, 0.2f);  /* light grey */
+	rgb_tint(value_color,  0.0f, 0.0f, tone_bg, 0.2f);  /* light gray */
 	rgb_tint(active_color, 0.6f, 0.2f, tone_bg, 0.2f);  /* light blue */
-	rgb_tint(normal_color, 0.0f, 0.0f, tone_bg, 0.4f);  /* grey       */
-	rgb_tint(python_color, 0.0f, 0.0f, tone_bg, 0.5f);  /* dark grey  */
+	rgb_tint(normal_color, 0.0f, 0.0f, tone_bg, 0.4f);  /* gray       */
+	rgb_tint(python_color, 0.0f, 0.0f, tone_bg, 0.5f);  /* dark gray  */
 	rgb_tint(alert_color,  0.0f, 0.8f, tone_bg, 0.1f);  /* red        */
 
 	/* draw text */
@@ -261,7 +262,7 @@ static void ui_tooltip_region_draw_cb(const bContext *UNUSED(C), ARegion *ar)
 
 			/* override text-style */
 			fstyle_header.shadow = 1;
-			fstyle_header.shadowcolor = rgb_to_luma(tip_colors[UI_TIP_LC_MAIN]);
+			fstyle_header.shadowcolor = rgb_to_grayscale(tip_colors[UI_TIP_LC_MAIN]);
 			fstyle_header.shadx = fstyle_header.shady = 0;
 			fstyle_header.shadowalpha = 1.0f;
 
@@ -394,7 +395,7 @@ ARegion *ui_tooltip_create(bContext *C, ARegion *butregion, uiBut *but)
 		data->totline++;
 	}
 
-	if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		/* better not show the value of a password */
 		if ((but->rnaprop && (RNA_property_subtype(but->rnaprop) == PROP_PASSWORD)) == 0) {
 			/* full string */
@@ -815,7 +816,7 @@ static void ui_searchbox_select(bContext *C, ARegion *ar, uiBut *but, int step)
 		}
 		else {
 			/* only let users step into an 'unset' state for unlink buttons */
-			data->active = (but->type == UI_BTYPE_SEARCH_MENU_UNLINK) ? -1 : 0;
+			data->active = (but->flag & UI_BUT_SEARCH_UNLINK) ? -1 : 0;
 		}
 	}
 	
@@ -886,7 +887,7 @@ bool ui_searchbox_apply(uiBut *but, ARegion *ar)
 
 		return true;
 	}
-	else if (but->type == UI_BTYPE_SEARCH_MENU_UNLINK) {
+	else if (but->flag & UI_BUT_SEARCH_UNLINK) {
 		/* It is valid for _UNLINK flavor to have no active element (it's a valid way to unlink). */
 		but->editstr[0] = '\0';
 
@@ -1426,7 +1427,8 @@ static void ui_block_position(wmWindow *window, ARegion *butregion, uiBut *but, 
 		if (down || top) {
 			if (dir1 == UI_DIR_UP   && top == 0)  dir1 = UI_DIR_DOWN;
 			if (dir1 == UI_DIR_DOWN && down == 0) dir1 = UI_DIR_UP;
-			if (dir2 == UI_DIR_UP   && top == 0)  dir2 = UI_DIR_DOWN;
+			BLI_assert(dir2 != UI_DIR_UP);
+//			if (dir2 == UI_DIR_UP   && top == 0)  dir2 = UI_DIR_DOWN;
 			if (dir2 == UI_DIR_DOWN && down == 0) dir2 = UI_DIR_UP;
 		}
 
@@ -1808,9 +1810,10 @@ uiBlock *ui_popup_block_refresh(
 	return block;
 }
 
-uiPopupBlockHandle *ui_popup_block_create(bContext *C, ARegion *butregion, uiBut *but,
-                                          uiBlockCreateFunc create_func, uiBlockHandleCreateFunc handle_create_func,
-                                          void *arg)
+uiPopupBlockHandle *ui_popup_block_create(
+        bContext *C, ARegion *butregion, uiBut *but,
+        uiBlockCreateFunc create_func, uiBlockHandleCreateFunc handle_create_func,
+        void *arg)
 {
 	wmWindow *window = CTX_wm_window(C);
 	static ARegionType type;
@@ -1919,7 +1922,7 @@ static void ui_update_color_picker_buts_rgb(uiBlock *block, ColorPicker *cpicker
 			ui_but_v3_set(bt, rgb);
 			
 		}
-		else if (strcmp(bt->str, "Hex: ") == 0) {
+		else if (STREQ(bt->str, "Hex: ")) {
 			float rgb_gamma[3];
 			unsigned char rgb_gamma_uchar[3];
 			double intpart;
@@ -2571,8 +2574,9 @@ static uiBlock *ui_block_func_POPUP(bContext *C, uiPopupBlockHandle *handle, voi
 	return pup->block;
 }
 
-uiPopupBlockHandle *ui_popup_menu_create(bContext *C, ARegion *butregion, uiBut *but,
-                                         uiMenuCreateFunc menu_func, void *arg)
+uiPopupBlockHandle *ui_popup_menu_create(
+        bContext *C, ARegion *butregion, uiBut *but,
+        uiMenuCreateFunc menu_func, void *arg)
 {
 	wmWindow *window = CTX_wm_window(C);
 	uiStyle *style = UI_style_get_dpi();
@@ -2726,7 +2730,8 @@ static uiBlock *ui_block_func_PIE(bContext *UNUSED(C), uiPopupBlockHandle *handl
 
 static float ui_pie_menu_title_width(const char *name, int icon)
 {
-	return (UI_fontstyle_string_width(name) +
+	const uiFontStyle *fstyle = UI_FSTYLE_WIDGET;
+	return (UI_fontstyle_string_width(fstyle, name) +
 	         (UI_UNIT_X * (1.50f + (icon ? 0.25f : 0.0f))));
 }
 
@@ -2849,8 +2854,9 @@ int UI_pie_menu_invoke(struct bContext *C, const char *idname, const wmEvent *ev
 	return OPERATOR_INTERFACE;
 }
 
-int UI_pie_menu_invoke_from_operator_enum(struct bContext *C, const char *title, const char *opname,
-                            const char *propname, const wmEvent *event)
+int UI_pie_menu_invoke_from_operator_enum(
+        struct bContext *C, const char *title, const char *opname,
+        const char *propname, const wmEvent *event)
 {
 	uiPieMenu *pie;
 	uiLayout *layout;
@@ -2866,8 +2872,9 @@ int UI_pie_menu_invoke_from_operator_enum(struct bContext *C, const char *title,
 	return OPERATOR_INTERFACE;
 }
 
-int UI_pie_menu_invoke_from_rna_enum(struct bContext *C, const char *title, const char *path,
-                    const wmEvent *event)
+int UI_pie_menu_invoke_from_rna_enum(
+        struct bContext *C, const char *title, const char *path,
+        const wmEvent *event)
 {
 	PointerRNA ctx_ptr;
 	PointerRNA r_ptr;

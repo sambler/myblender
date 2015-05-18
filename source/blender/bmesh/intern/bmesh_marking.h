@@ -43,21 +43,29 @@ void BM_face_hide_set(BMFace *f, const bool hide);
 /* Selection code */
 void BM_elem_select_set(BMesh *bm, BMElem *ele, const bool select);
 
-void BM_mesh_elem_hflag_enable_test(BMesh *bm, const char htype, const char hflag,
-                                    const bool respecthide, const bool overwrite, const char hflag_test);
-void BM_mesh_elem_hflag_disable_test(BMesh *bm, const char htype, const char hflag,
-                                     const bool respecthide, const bool overwrite, const char hflag_test);
+void BM_mesh_elem_hflag_enable_test(
+        BMesh *bm, const char htype, const char hflag,
+        const bool respecthide, const bool overwrite, const char hflag_test);
+void BM_mesh_elem_hflag_disable_test(
+        BMesh *bm, const char htype, const char hflag,
+        const bool respecthide, const bool overwrite, const char hflag_test);
 
-void BM_mesh_elem_hflag_enable_all(BMesh *bm, const char htype, const char hflag,
-                                   const bool respecthide);
-void BM_mesh_elem_hflag_disable_all(BMesh *bm, const char htype, const char hflag,
-                                    const bool respecthide);
+void BM_mesh_elem_hflag_enable_all(
+        BMesh *bm, const char htype, const char hflag,
+        const bool respecthide);
+void BM_mesh_elem_hflag_disable_all(
+        BMesh *bm, const char htype, const char hflag,
+        const bool respecthide);
 
 /* individual element select functions, BM_elem_select_set is a shortcut for these
  * that automatically detects which one to use*/
 void BM_vert_select_set(BMesh *bm, BMVert *v, const bool select);
 void BM_edge_select_set(BMesh *bm, BMEdge *e, const bool select);
 void BM_face_select_set(BMesh *bm, BMFace *f, const bool select);
+
+/* lower level functions which don't do flushing */
+void BM_edge_select_set_noflush(BMesh *bm, BMEdge *e, const bool select);
+void BM_face_select_set_noflush(BMesh *bm, BMFace *e, const bool select);
 
 void BM_mesh_select_mode_clean_ex(BMesh *bm, const short selectmode);
 void BM_mesh_select_mode_clean(BMesh *bm);

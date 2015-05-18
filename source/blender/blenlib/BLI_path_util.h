@@ -38,7 +38,6 @@ extern "C" {
 #include "BLI_compiler_attrs.h"
 
 struct ListBase;
-struct direntry;
 
 #ifdef WIN32
 #define SEP '\\'
@@ -79,6 +78,11 @@ void        BLI_del_slash(char *string) ATTR_NONNULL();
 const char *BLI_first_slash(const char *string) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
 void        BLI_path_native_slash(char *path) ATTR_NONNULL();
 
+#ifdef _WIN32
+bool BLI_path_program_extensions_add_win32(char *name, const size_t maxlen);
+#endif
+bool BLI_path_program_search(char *fullname, const size_t maxlen, const char *name);
+
 void BLI_getlastdir(const char *dir, char *last, const size_t maxlen);
 bool BLI_testextensie(const char *str, const char *ext) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
 bool BLI_testextensie_n(const char *str, ...) ATTR_NONNULL(1) ATTR_SENTINEL(0);
@@ -87,7 +91,7 @@ bool BLI_testextensie_glob(const char *str, const char *ext_fnmatch) ATTR_NONNUL
 bool BLI_replace_extension(char *path, size_t maxlen, const char *ext) ATTR_NONNULL();
 bool BLI_ensure_extension(char *path, size_t maxlen, const char *ext) ATTR_NONNULL();
 bool BLI_ensure_filename(char *filepath, size_t maxlen, const char *filename) ATTR_NONNULL();
-void BLI_uniquename(struct ListBase *list, void *vlink, const char *defname, char delim, int name_offs, int len);
+bool BLI_uniquename(struct ListBase *list, void *vlink, const char *defname, char delim, int name_offs, int len);
 bool BLI_uniquename_cb(bool (*unique_check)(void *arg, const char *name),
                        void *arg, const char *defname, char delim, char *name, int name_len);
 void BLI_newname(char *name, int add);
@@ -107,6 +111,8 @@ void BLI_cleanup_file(const char *relabase, char *path) ATTR_NONNULL(2);
 void BLI_cleanup_dir(const char *relabase, char *dir) ATTR_NONNULL(2);
 /* doesn't touch trailing slash */
 void BLI_cleanup_path(const char *relabase, char *path) ATTR_NONNULL(2);
+
+void BLI_filename_make_safe(char *fname) ATTR_NONNULL(1);
 
 /* go back one directory */
 bool BLI_parent_dir(char *path) ATTR_NONNULL();
@@ -162,6 +168,15 @@ void BLI_string_to_utf8(char *original, char *utf_8, const char *code);
 #  define FILE_MAXFILE        256
 #  define FILE_MAX            1024
 #endif
+
+/* Parent and current dir helpers. */
+#define FILENAME_PARENT ".."
+#define FILENAME_CURRENT "."
+
+/* Avoid calling strcmp on one or two chars! */
+#define FILENAME_IS_PARENT(_n) (((_n)[0] == '.') && ((_n)[1] == '.') && ((_n)[2] == '\0'))
+#define FILENAME_IS_CURRENT(_n) (((_n)[0] == '.') && ((_n)[1] == '\0'))
+#define FILENAME_IS_CURRPAR(_n) (((_n)[0] == '.') && (((_n)[1] == '\0') || (((_n)[1] == '.') && ((_n)[2] == '\0'))))
 
 #ifdef __cplusplus
 }

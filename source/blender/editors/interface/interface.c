@@ -37,6 +37,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_userdef_types.h"
@@ -297,7 +298,7 @@ void ui_block_bounds_calc(uiBlock *block)
 
 	/* hardcoded exception... but that one is annoying with larger safety */ 
 	bt = block->buttons.first;
-	if (bt && strncmp(bt->str, "ERROR", 5) == 0) xof = 10;
+	if (bt && STREQLEN(bt->str, "ERROR", 5)) xof = 10;
 	else xof = 40;
 
 	block->safety.xmin = block->rect.xmin - xof;
@@ -513,7 +514,7 @@ static void ui_draw_links(uiBlock *block)
 	uiBut *but;
 	uiLinkLine *line;
 
-	/* Draw the grey out lines. Do this first so they appear at the
+	/* Draw the gray out lines. Do this first so they appear at the
 	 * bottom of inactive or active lines.
 	 * As we go, remember if we see any active or selected lines. */
 	bool found_selectline = false;
@@ -548,7 +549,7 @@ static void ui_draw_links(uiBlock *block)
 	}
 
 	/* Draw any active lines (lines with either button being hovered over).
-	 * Do this last so they appear on top of inactive and grey out lines. */
+	 * Do this last so they appear on top of inactive and gray out lines. */
 	if (found_activeline) {
 		for (but = block->buttons.first; but; but = but->next) {
 			if (but->type == UI_BTYPE_LINK && but->link) {
@@ -716,6 +717,7 @@ static bool ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBu
 		if (oldbut->poin != (char *)oldbut) {
 			SWAP(char *, oldbut->poin, but->poin);
 			SWAP(void *, oldbut->func_argN, but->func_argN);
+			SWAP(void *, oldbut->tip_argN, but->tip_argN);
 		}
 
 		oldbut->flag = (oldbut->flag & ~flag_copy) | (but->flag & flag_copy);
@@ -1929,7 +1931,7 @@ void ui_but_value_set(uiBut *but, double value)
 
 int ui_but_string_get_max_length(uiBut *but)
 {
-	if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK))
+	if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU))
 		return but->hardmax;
 	else
 		return UI_MAX_DRAW_STR;
@@ -1949,6 +1951,56 @@ uiBut *ui_but_drag_multi_edit_get(uiBut *but)
 
 	return but_iter;
 }
+
+/** \name Check to show extra icons
+ *
+ * Extra icons are shown on the right hand side of buttons.
+ * \{ */
+
+static bool ui_but_icon_extra_is_visible_search_unlink(const uiBut *but)
+{
+	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
+	return ((but->editstr == NULL) &&
+	        (but->drawstr[0] != '\0') &&
+	        (but->flag & UI_BUT_SEARCH_UNLINK));
+}
+
+static bool ui_but_icon_extra_is_visible_eyedropper(uiBut *but)
+{
+	StructRNA *type;
+	short idcode;
+
+	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU && (but->flag & UI_BUT_SEARCH_UNLINK));
+
+	if (but->rnaprop == NULL) {
+		return false;
+	}
+
+	type = RNA_property_pointer_type(&but->rnapoin, but->rnaprop);
+	idcode = RNA_type_to_ID_code(type);
+
+
+	return ((but->editstr == NULL) &&
+	        (idcode == ID_OB || OB_DATA_SUPPORT_ID(idcode)));
+}
+
+uiButExtraIconType ui_but_icon_extra_get(uiBut *but)
+{
+	if ((but->flag & UI_BUT_SEARCH_UNLINK) == 0) {
+		/* pass */
+	}
+	else if (ui_but_icon_extra_is_visible_search_unlink(but)) {
+		return UI_BUT_ICONEXTRA_UNLINK;
+	}
+	else if (ui_but_icon_extra_is_visible_eyedropper(but)) {
+		return UI_BUT_ICONEXTRA_EYEDROPPER;
+	}
+
+	return UI_BUT_ICONEXTRA_NONE;
+}
+
+/** \} */
+
 
 static double ui_get_but_scale_unit(uiBut *but, double value)
 {
@@ -2030,7 +2082,7 @@ static float ui_get_but_step_unit(uiBut *but, float step_default)
  */
 void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int float_precision)
 {
-	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		PropertyType type;
 		const char *buf = NULL;
 		int buf_len;
@@ -2072,7 +2124,7 @@ void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int 
 		BLI_strncpy(str, but->poin, maxlen);
 		return;
 	}
-	else if (ELEM(but->type, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	else if (but->type == UI_BTYPE_SEARCH_MENU) {
 		/* string */
 		BLI_strncpy(str, but->poin, maxlen);
 		return;
@@ -2193,7 +2245,7 @@ static void ui_but_string_free_internal(uiBut *but)
 
 bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 {
-	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		if (RNA_property_editable(&but->rnapoin, but->rnaprop)) {
 			PropertyType type;
 
@@ -2245,7 +2297,7 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 
 		return true;
 	}
-	else if (ELEM(but->type, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	else if (but->type == UI_BTYPE_SEARCH_MENU) {
 		/* string */
 		BLI_strncpy(but->poin, str, but->hardmax);
 		return true;
@@ -2263,6 +2315,7 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 		double value;
 
 		if (ui_but_string_set_eval_num(C, but, str, &value) == false) {
+			WM_report_banner_show(C);
 			return false;
 		}
 
@@ -2438,6 +2491,10 @@ static void ui_but_free(const bContext *C, uiBut *but)
 
 	if (but->func_argN) {
 		MEM_freeN(but->func_argN);
+	}
+
+	if (but->tip_argN) {
+		MEM_freeN(but->tip_argN);
 	}
 
 	if (but->active) {
@@ -2709,11 +2766,11 @@ void ui_but_update(uiBut *but)
 					}
 					else {
 						const int prec = ui_but_calc_float_precision(but, value);
-						slen += BLI_snprintf(but->drawstr + slen, sizeof(but->drawstr) - slen, "%.*f", prec, value);
+						slen += BLI_snprintf_rlen(but->drawstr + slen, sizeof(but->drawstr) - slen, "%.*f", prec, value);
 					}
 				}
 				else {
-					slen += BLI_snprintf(but->drawstr + slen, sizeof(but->drawstr) - slen, "%d", (int)value);
+					slen += BLI_snprintf_rlen(but->drawstr + slen, sizeof(but->drawstr) - slen, "%d", (int)value);
 				}
 
 				if (but->rnaprop) {
@@ -2749,7 +2806,6 @@ void ui_but_update(uiBut *but)
 
 		case UI_BTYPE_TEXT:
 		case UI_BTYPE_SEARCH_MENU:
-		case UI_BTYPE_SEARCH_MENU_UNLINK:
 			if (!but->editstr) {
 				char str[UI_MAX_DRAW_STR];
 
@@ -3050,9 +3106,10 @@ void ui_block_cm_to_scene_linear_v3(uiBlock *block, float pixel[3])
  * - \a a2 Number of decimal point values to display. 0 defaults to 3 (0.000)
  *      1,2,3, and a maximum of 4, all greater values will be clamped to 4.
  */
-static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
-                         int x, int y, short width, short height,
-                         void *poin, float min, float max, float a1, float a2, const char *tip)
+static uiBut *ui_def_but(
+        uiBlock *block, int type, int retval, const char *str,
+        int x, int y, short width, short height,
+        void *poin, float min, float max, float a1, float a2, const char *tip)
 {
 	uiBut *but;
 	int slen;
@@ -3134,7 +3191,7 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
 	         ELEM(but->type,
 	              UI_BTYPE_MENU, UI_BTYPE_TEXT, UI_BTYPE_LABEL,
 	              UI_BTYPE_BLOCK, UI_BTYPE_BUT_MENU, UI_BTYPE_SEARCH_MENU,
-	              UI_BTYPE_PROGRESS_BAR, UI_BTYPE_SEARCH_MENU_UNLINK))
+	              UI_BTYPE_PROGRESS_BAR))
 	{
 		but->drawflag |= (UI_BUT_TEXT_LEFT | UI_BUT_ICON_LEFT);
 	}
@@ -3179,6 +3236,19 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
 #endif
 
 	return but;
+}
+
+void ui_def_but_icon(uiBut *but, const int icon, const int flag)
+{
+	if (icon) {
+		ui_icon_ensure_deferred(but->block->evil_C, icon, (flag & UI_BUT_ICON_PREVIEW) != 0);
+	}
+	but->icon = (BIFIconID)icon;
+	but->flag |= flag;
+
+	if (but->str && but->str[0]) {
+		but->drawflag |= UI_BUT_ICON_LEFT;
+	}
 }
 
 static void ui_def_but_rna__disable(uiBut *but)
@@ -3320,10 +3390,11 @@ static void ui_def_but_rna__menu(bContext *UNUSED(C), uiLayout *layout, void *bu
  * When this kind of change won't disrupt branches, best look into making more
  * of our UI functions take prop rather then propname.
  */
-static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *str,
-                             int x, int y, short width, short height,
-                             PointerRNA *ptr, PropertyRNA *prop, int index,
-                             float min, float max, float a1, float a2,  const char *tip)
+static uiBut *ui_def_but_rna(
+        uiBlock *block, int type, int retval, const char *str,
+        int x, int y, short width, short height,
+        PointerRNA *ptr, PropertyRNA *prop, int index,
+        float min, float max, float a1, float a2,  const char *tip)
 {
 	const PropertyType proptype = RNA_property_type(prop);
 	uiBut *but;
@@ -3443,11 +3514,7 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 		but->rnaindex = 0;
 
 	if (icon) {
-		but->icon = (BIFIconID)icon;
-		but->flag |= UI_HAS_ICON;
-		if (str[0]) {
-			but->drawflag |= UI_BUT_ICON_LEFT;
-		}
+		ui_def_but_icon(but, icon, UI_HAS_ICON);
 	}
 	
 	if ((type == UI_BTYPE_MENU) && (but->dt == UI_EMBOSS_PULLDOWN)) {
@@ -3634,8 +3701,7 @@ int UI_autocomplete_end(AutoComplete *autocpl, char *autoname)
 static void ui_but_update_and_icon_set(uiBut *but, int icon)
 {
 	if (icon) {
-		but->icon = (BIFIconID) icon;
-		but->flag |= UI_HAS_ICON;
+		ui_def_but_icon(but, icon, UI_HAS_ICON);
 	}
 
 	ui_but_update(but);
@@ -4009,7 +4075,7 @@ void UI_but_drag_set_value(uiBut *but)
 void UI_but_drag_set_image(uiBut *but, const char *path, int icon, struct ImBuf *imb, float scale)
 {
 	but->dragtype = WM_DRAG_PATH;
-	but->icon = icon; /* no flag UI_HAS_ICON, so icon doesnt draw in button */
+	ui_def_but_icon(but, icon, 0);  /* no flag UI_HAS_ICON, so icon doesnt draw in button */
 	but->dragpoin = (void *)path;
 	but->imb = imb;
 	but->imb_scale = scale;
@@ -4113,6 +4179,15 @@ void UI_but_func_complete_set(uiBut *but, uiButCompleteFunc func, void *arg)
 	but->autofunc_arg = arg;
 }
 
+void UI_but_func_tooltip_set(uiBut *but, uiButToolTipFunc func, void *argN)
+{
+	but->tip_func = func;
+	if (but->tip_argN) {
+		MEM_freeN(but->tip_argN);
+	}
+	but->tip_argN = argN;
+}
+
 uiBut *uiDefBlockBut(uiBlock *block, uiBlockCreateFunc func, void *arg, const char *str, int x, int y, short width, short height, const char *tip)
 {
 	uiBut *but = ui_def_but(block, UI_BTYPE_BLOCK, 0, str, x, y, width, height, arg, 0.0, 0.0, 0.0, 0.0, tip);
@@ -4154,8 +4229,7 @@ uiBut *uiDefIconTextMenuBut(uiBlock *block, uiMenuCreateFunc func, void *arg, in
 {
 	uiBut *but = ui_def_but(block, UI_BTYPE_PULLDOWN, 0, str, x, y, width, height, arg, 0.0, 0.0, 0.0, 0.0, tip);
 
-	but->icon = (BIFIconID) icon;
-	but->flag |= UI_HAS_ICON;
+	ui_def_but_icon(but, icon, UI_HAS_ICON);
 
 	but->drawflag |= UI_BUT_ICON_LEFT;
 	but->flag |= UI_BUT_ICON_SUBMENU;
@@ -4170,8 +4244,7 @@ uiBut *uiDefIconMenuBut(uiBlock *block, uiMenuCreateFunc func, void *arg, int ic
 {
 	uiBut *but = ui_def_but(block, UI_BTYPE_PULLDOWN, 0, "", x, y, width, height, arg, 0.0, 0.0, 0.0, 0.0, tip);
 
-	but->icon = (BIFIconID) icon;
-	but->flag |= UI_HAS_ICON;
+	ui_def_but_icon(but, icon, UI_HAS_ICON);
 	but->drawflag &= ~UI_BUT_ICON_LEFT;
 
 	but->menu_create_func = func;
@@ -4187,7 +4260,7 @@ uiBut *uiDefIconTextBlockBut(uiBlock *block, uiBlockCreateFunc func, void *arg, 
 	
 	/* XXX temp, old menu calls pass on icon arrow, which is now UI_BUT_ICON_SUBMENU flag */
 	if (icon != ICON_RIGHTARROW_THIN) {
-		but->icon = (BIFIconID) icon;
+		ui_def_but_icon(but, icon, 0);
 		but->drawflag |= UI_BUT_ICON_LEFT;
 	}
 	but->flag |= UI_HAS_ICON;
@@ -4204,9 +4277,8 @@ uiBut *uiDefIconBlockBut(uiBlock *block, uiBlockCreateFunc func, void *arg, int 
 {
 	uiBut *but = ui_def_but(block, UI_BTYPE_BLOCK, retval, "", x, y, width, height, arg, 0.0, 0.0, 0.0, 0.0, tip);
 	
-	but->icon = (BIFIconID) icon;
-	but->flag |= UI_HAS_ICON;
-	
+	ui_def_but_icon(but, icon, UI_HAS_ICON);
+
 	but->drawflag |= UI_BUT_ICON_LEFT;
 	
 	but->block_create_func = func;
@@ -4239,9 +4311,8 @@ uiBut *uiDefSearchBut(uiBlock *block, void *arg, int retval, int icon, int maxle
 {
 	uiBut *but = ui_def_but(block, UI_BTYPE_SEARCH_MENU, retval, "", x, y, width, height, arg, 0.0, maxlen, a1, a2, tip);
 	
-	but->icon = (BIFIconID) icon;
-	but->flag |= UI_HAS_ICON;
-	
+	ui_def_but_icon(but, icon, UI_HAS_ICON);
+
 	but->drawflag |= UI_BUT_ICON_LEFT | UI_BUT_TEXT_LEFT;
 	
 	ui_but_update(but);
@@ -4322,9 +4393,10 @@ static void operator_enum_call_cb(struct bContext *UNUSED(C), void *but, void *a
 
 /* Same parameters as for uiDefSearchBut, with additional operator type and properties, used by callback
  * to call again the right op with the right options (properties values). */
-uiBut *uiDefSearchButO_ptr(uiBlock *block, wmOperatorType *ot, IDProperty *properties,
-                           void *arg, int retval, int icon, int maxlen, int x, int y,
-                           short width, short height, float a1, float a2, const char *tip)
+uiBut *uiDefSearchButO_ptr(
+        uiBlock *block, wmOperatorType *ot, IDProperty *properties,
+        void *arg, int retval, int icon, int maxlen, int x, int y,
+        short width, short height, float a1, float a2, const char *tip)
 {
 	uiBut *but;
 
@@ -4383,7 +4455,10 @@ void UI_but_string_info_get(bContext *C, uiBut *but, ...)
 			}
 		}
 		else if (type == BUT_GET_TIP) {
-			if (but->tip && but->tip[0])
+			if (but->tip_func) {
+				tmp = but->tip_func(C, but->tip_argN, but->tip);
+			}
+			else if (but->tip && but->tip[0])
 				tmp = BLI_strdup(but->tip);
 			else
 				type = BUT_GET_RNA_TIP;  /* Fail-safe solution... */

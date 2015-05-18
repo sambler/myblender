@@ -295,7 +295,7 @@ int Controller::LoadMesh(Render *re, SceneRenderLayer *srl)
 		}
 		cam->setProjectionMatrix(proj);
 		_RootNode->AddChild(cam);
-		_RootNode->AddChild(new NodeSceneRenderLayer(*srl));
+		_RootNode->AddChild(new NodeSceneRenderLayer(*re->scene, *srl));
 
 		sceneHashFunc.reset();
 		//blenderScene->accept(sceneHashFunc);
@@ -869,7 +869,7 @@ void Controller::DrawStrokes()
 	real d = _Chrono.stop();
 	if (G.debug & G_DEBUG_FREESTYLE) {
 		cout << "Strokes generation  : " << d << endl;
-		cout << "Stroke count  : " << _Canvas->stroke_count << endl;
+		cout << "Stroke count  : " << _Canvas->getStrokeCount() << endl;
 	}
 	resetModified();
 	DeleteViewMap();
@@ -927,13 +927,19 @@ void Controller::InsertStyleModule(unsigned index, const char *iFileName)
 	_Canvas->InsertStyleModule(index, sm);
 }
 
+void Controller::InsertStyleModule(unsigned index, const char *iName, const char *iBuffer)
+{
+	StyleModule *sm = new BufferedStyleModule(iBuffer, iName, _inter);
+	_Canvas->InsertStyleModule(index, sm);
+}
+
 void Controller::InsertStyleModule(unsigned index, const char *iName, struct Text *iText)
 {
 	StyleModule *sm = new BlenderStyleModule(iText, iName, _inter);
 	_Canvas->InsertStyleModule(index, sm);
 }
 
-void Controller::AddStyleModule(const char *iFileName)
+void Controller::AddStyleModule(const char * /*iFileName*/)
 {
 	//_pStyleWindow->Add(iFileName);
 }
@@ -1003,7 +1009,7 @@ void Controller::toggleEdgeTesselationNature(Nature::EdgeNature iNature)
 	ComputeViewMap();
 }
 
-void Controller::setModelsDir(const string& dir)
+void Controller::setModelsDir(const string& /*dir*/)
 {
 	//_current_dirs->setValue("models/dir", dir);
 }
@@ -1015,7 +1021,7 @@ string Controller::getModelsDir() const
 	return dir;
 }
 
-void Controller::setModulesDir(const string& dir)
+void Controller::setModulesDir(const string& /*dir*/)
 {
 	//_current_dirs->setValue("modules/dir", dir);
 }

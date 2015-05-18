@@ -375,7 +375,9 @@ typedef enum ePose_Flags {
 	/* set by BKE_pose_rebuild to give a chance to the IK solver to rebuild IK tree */
 	POSE_WAS_REBUILT = (1 << 5),
 	/* set by game_copy_pose to indicate that this pose is used in the game engine */
-	POSE_GAME_ENGINE = (1 << 6)
+	POSE_GAME_ENGINE = (1 << 6),
+	/* pose constraint flags needs to be updated */
+	POSE_CONSTRAINTS_NEED_UPDATE_FLAGS = (1 << 7),
 } ePose_Flags;
 
 /* IK Solvers ------------------------------------ */
@@ -491,7 +493,7 @@ typedef struct bAction {
 	ID id;              /* ID-serialisation for relinking */
 	
 	ListBase curves;    /* function-curves (FCurve) */
-	ListBase chanbase;  /* legacy data - Action Channels (bActionChannel) in pre-2.5 animation system */
+	ListBase chanbase DNA_DEPRECATED;  /* legacy data - Action Channels (bActionChannel) in pre-2.5 animation system */
 	ListBase groups;    /* groups of function-curves (bActionGroup) */
 	ListBase markers;   /* markers local to the Action (used to provide Pose-Libraries) */
 	

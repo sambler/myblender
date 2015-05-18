@@ -48,6 +48,7 @@
 #include "BLI_listbase.h"
 
 #include "BKE_brush.h"
+#include "BKE_colortools.h"
 #include "BKE_main.h"
 #include "BKE_context.h"
 #include "BKE_crazyspace.h"
@@ -312,24 +313,32 @@ void BKE_paint_curve_set(Brush *br, PaintCurve *pc)
 	}
 }
 
+void BKE_paint_curve_clamp_endpoint_add_index(PaintCurve *pc, const int add_index)
+{
+	pc->add_index = (add_index || pc->tot_points == 1) ? (add_index + 1) : 0;
+}
+
 /* remove colour from palette. Must be certain color is inside the palette! */
 void BKE_palette_color_remove(Palette *palette, PaletteColor *color)
 {
-	if (color) {
-		int numcolors = BLI_listbase_count(&palette->colors);
-		if ((numcolors == palette->active_color + 1) && (numcolors != 1))
-			palette->active_color--;
-		
-		BLI_remlink(&palette->colors, color);
-		BLI_addhead(&palette->deleted, color);
+	if (BLI_listbase_count_ex(&palette->colors, palette->active_color) == palette->active_color) {
+		palette->active_color--;
 	}
+
+	BLI_remlink(&palette->colors, color);
+
+	if (palette->active_color < 0 && !BLI_listbase_is_empty(&palette->colors)) {
+		palette->active_color = 0;
+	}
+
+	MEM_freeN(color);
 }
 
-void BKE_palette_cleanup(Palette *palette)
+void BKE_palette_clear(Palette *palette)
 {
-	BLI_freelistN(&palette->deleted);
+	BLI_freelistN(&palette->colors);
+	palette->active_color = 0;
 }
-
 
 Palette *BKE_palette_add(Main *bmain, const char *name)
 {
@@ -352,7 +361,6 @@ PaletteColor *BKE_palette_color_add(Palette *palette)
 {
 	PaletteColor *color = MEM_callocN(sizeof(*color), "Pallete Color");
 	BLI_addtail(&palette->colors, color);
-	palette->active_color = BLI_listbase_count(&palette->colors) - 1;
 	return color;
 }
 
@@ -395,6 +403,21 @@ bool BKE_paint_select_elem_test(Object *ob)
 	        BKE_paint_select_face_test(ob));
 }
 
+void BKE_paint_cavity_curve_preset(Paint *p, int preset)
+{
+	CurveMap *cm = NULL;
+
+	if (!p->cavity_curve)
+		p->cavity_curve = curvemapping_add(1, 0, 0, 1, 1);
+
+	cm = p->cavity_curve->cm;
+	cm->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
+
+	p->cavity_curve->preset = preset;
+	curvemap_reset(cm, &p->cavity_curve->clipr, p->cavity_curve->preset, CURVEMAP_SLOPE_POSITIVE);
+	curvemapping_changed(p->cavity_curve, false);
+}
+
 void BKE_paint_init(UnifiedPaintSettings *ups, Paint *p, const char col[3])
 {
 	Brush *brush;
@@ -410,12 +433,15 @@ void BKE_paint_init(UnifiedPaintSettings *ups, Paint *p, const char col[3])
 	ups->last_stroke_valid = false;
 	zero_v3(ups->average_stroke_accum);
 	ups->average_stroke_counter = 0;
+	if (!p->cavity_curve)
+		BKE_paint_cavity_curve_preset(p, CURVE_PRESET_LINE);
 }
 
 void BKE_paint_free(Paint *paint)
 {
 	id_us_min((ID *)paint->brush);
 	id_us_min((ID *)paint->palette);
+	curvemapping_free(paint->cavity_curve);
 }
 
 /* called when copying scene settings, so even if 'src' and 'tar' are the same
@@ -427,6 +453,7 @@ void BKE_paint_copy(Paint *src, Paint *tar)
 	tar->brush = src->brush;
 	id_us_plus((ID *)tar->brush);
 	id_us_plus((ID *)tar->palette);
+	tar->cavity_curve = curvemapping_copy(src->cavity_curve);
 }
 
 void BKE_paint_stroke_get_average(Scene *scene, Object *ob, float stroke[3])
@@ -492,7 +519,7 @@ float paint_grid_paint_mask(const GridPaintMask *gpm, unsigned level,
 /* threshold to move before updating the brush rotation */
 #define RAKE_THRESHHOLD 20
 
-static void update_brush_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, float rotation)
+void paint_update_brush_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, float rotation)
 {
 	if (brush->mtex.brush_angle_mode & MTEX_ANGLE_RAKE)
 		ups->brush_rotation = rotation;
@@ -500,7 +527,6 @@ static void update_brush_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, 
 		ups->brush_rotation = 0.0f;
 
 	if (brush->mask_mtex.brush_angle_mode & MTEX_ANGLE_RAKE)
-		/* here, translation contains the mouse coordinates. */
 		ups->brush_rotation_sec = rotation;
 	else
 		ups->brush_rotation_sec = 0.0f;
@@ -509,7 +535,6 @@ static void update_brush_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, 
 void paint_calculate_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, const float mouse_pos[2])
 {
 	if ((brush->mtex.brush_angle_mode & MTEX_ANGLE_RAKE) || (brush->mask_mtex.brush_angle_mode & MTEX_ANGLE_RAKE)) {
-		const float u = 0.5f;
 		const float r = RAKE_THRESHHOLD;
 		float rotation;
 
@@ -519,17 +544,16 @@ void paint_calculate_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, cons
 		if (len_squared_v2(dpos) >= r * r) {
 			rotation = atan2f(dpos[0], dpos[1]);
 
-			interp_v2_v2v2(ups->last_rake, ups->last_rake,
-			               mouse_pos, u);
+			copy_v2_v2(ups->last_rake, mouse_pos);
 
 			ups->last_rake_angle = rotation;
 
-			update_brush_rake_rotation(ups, brush, rotation);
+			paint_update_brush_rake_rotation(ups, brush, rotation);
 		}
 		/* make sure we reset here to the last rotation to avoid accumulating
 		 * values in case a random rotation is also added */
 		else {
-			update_brush_rake_rotation(ups, brush, ups->last_rake_angle);
+			paint_update_brush_rake_rotation(ups, brush, ups->last_rake_angle);
 		}
 	}
 	else {
@@ -537,15 +561,11 @@ void paint_calculate_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, cons
 	}
 }
 
-void BKE_free_sculptsession_deformMats(SculptSession *ss)
+void BKE_sculptsession_free_deformMats(SculptSession *ss)
 {
-	if (ss->orig_cos) MEM_freeN(ss->orig_cos);
-	if (ss->deform_cos) MEM_freeN(ss->deform_cos);
-	if (ss->deform_imats) MEM_freeN(ss->deform_imats);
-
-	ss->orig_cos = NULL;
-	ss->deform_cos = NULL;
-	ss->deform_imats = NULL;
+	MEM_SAFE_FREE(ss->orig_cos);
+	MEM_SAFE_FREE(ss->deform_cos);
+	MEM_SAFE_FREE(ss->deform_imats);
 }
 
 /* Write out the sculpt dynamic-topology BMesh to the Mesh */
@@ -604,7 +624,7 @@ void BKE_sculptsession_bm_to_me_for_render(Object *object)
 	}
 }
 
-void BKE_free_sculptsession(Object *ob)
+void BKE_sculptsession_free(Object *ob)
 {
 	if (ob && ob->sculpt) {
 		SculptSession *ss = ob->sculpt;
@@ -698,7 +718,7 @@ static bool sculpt_modifiers_active(Scene *scene, Sculpt *sd, Object *ob)
 
 	/* exception for shape keys because we can edit those */
 	for (; md; md = md->next) {
-		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+		const ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 		if (!modifier_isEnabled(scene, md, eModifierMode_Realtime)) continue;
 		if (ELEM(md->type, eModifierType_ShapeKey, eModifierType_Multires)) continue;
 
@@ -745,7 +765,12 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 	}
 
 	/* BMESH ONLY --- at some point we should move sculpt code to use polygons only - but for now it needs tessfaces */
-	BKE_mesh_tessface_ensure(me);
+	if (ss->bm) {
+		BKE_mesh_tessface_clear(me);
+	}
+	else {
+		BKE_mesh_tessface_ensure(me);
+	}
 
 	if (!mmd) ss->kb = BKE_keyblock_from_object(ob);
 	else ss->kb = NULL;
@@ -760,7 +785,6 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		ss->mvert = NULL;
 		ss->mpoly = NULL;
 		ss->mloop = NULL;
-		ss->face_normals = NULL;
 	}
 	else {
 		ss->totvert = me->totvert;
@@ -768,7 +792,6 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		ss->mvert = me->mvert;
 		ss->mpoly = me->mpoly;
 		ss->mloop = me->mloop;
-		ss->face_normals = NULL;
 		ss->multires = NULL;
 		ss->vmask = CustomData_get_layer(&me->vdata, CD_PAINT_MASK);
 	}
@@ -782,7 +805,7 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		if (!ss->orig_cos) {
 			int a;
 
-			BKE_free_sculptsession_deformMats(ss);
+			BKE_sculptsession_free_deformMats(ss);
 
 			ss->orig_cos = (ss->kb) ? BKE_keyblock_convert_to_vertcos(ob, ss->kb) : BKE_mesh_vertexCos_get(me, NULL);
 
@@ -795,7 +818,7 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		}
 	}
 	else {
-		BKE_free_sculptsession_deformMats(ss);
+		BKE_sculptsession_free_deformMats(ss);
 	}
 
 	if (ss->kb != NULL && ss->deform_cos == NULL) {

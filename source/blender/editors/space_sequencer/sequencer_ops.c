@@ -88,6 +88,7 @@ void sequencer_operatortypes(void)
 	WM_operatortype_append(SEQUENCER_OT_view_ghost_border);
 
 	WM_operatortype_append(SEQUENCER_OT_rebuild_proxy);
+	WM_operatortype_append(SEQUENCER_OT_enable_proxies);
 	WM_operatortype_append(SEQUENCER_OT_change_effect_input);
 	WM_operatortype_append(SEQUENCER_OT_change_effect_type);
 	WM_operatortype_append(SEQUENCER_OT_change_path);
@@ -364,5 +365,5 @@ void ED_operatormacros_sequencer(void)
 	                                  "Duplicate selected strips and move them", OPTYPE_UNDO | OPTYPE_REGISTER);
 
 	WM_operatortype_macro_define(ot, "SEQUENCER_OT_duplicate");
-	WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
+	WM_operatortype_macro_define(ot, "TRANSFORM_OT_seq_slide");
 }

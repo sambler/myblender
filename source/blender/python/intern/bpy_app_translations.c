@@ -47,8 +47,7 @@
 
 #include "../generic/python_utildefines.h"
 
-typedef struct
-{
+typedef struct {
 	PyObject_HEAD
 	/* The string used to separate context from actual message in PY_TRANSLATE RNA props. */
 	const char *context_separator;
@@ -260,7 +259,7 @@ const char *BPY_app_translations_py_pgettext(const char *msgctxt, const char *ms
 		return msgid;
 
 	tmp = BLF_lang_get();
-	if (strcmp(tmp, locale) || !_translations_cache) {
+	if (!STREQ(tmp, locale) || !_translations_cache) {
 		PyGILState_STATE _py_state;
 
 		BLI_strncpy(locale, tmp, STATIC_LOCALE_SIZE);
@@ -427,11 +426,11 @@ static PyObject *app_translations_contexts_make(void)
 /***** Main BlenderAppTranslations Py object definition *****/
 
 PyDoc_STRVAR(app_translations_contexts_doc,
-	"A named tuple containing all pre-defined translation contexts.\n"
-	"\n"
-	".. warning::\n"
-	"    Never use a (new) context starting with \"" BLF_I18NCONTEXT_DEFAULT_BPYRNA "\", it would be internally \n"
-	"    assimilated as the default one!\n"
+"A named tuple containing all pre-defined translation contexts.\n"
+"\n"
+".. warning::\n"
+"    Never use a (new) context starting with \"" BLF_I18NCONTEXT_DEFAULT_BPYRNA "\", it would be internally \n"
+"    assimilated as the default one!\n"
 );
 
 PyDoc_STRVAR(app_translations_contexts_C_to_py_doc,
@@ -447,8 +446,8 @@ static PyMemberDef app_translations_members[] = {
 };
 
 PyDoc_STRVAR(app_translations_locale_doc,
-	"The actual locale currently in use (will always return a void string when Blender is built without "
-	"internationalization support)."
+"The actual locale currently in use (will always return a void string when Blender is built without "
+"internationalization support)."
 );
 static PyObject *app_translations_locale_get(PyObject *UNUSED(self), void *UNUSED(userdata))
 {
@@ -821,3 +820,12 @@ PyObject *BPY_app_translations_struct(void)
 
 	return ret;
 }
+
+void BPY_app_translations_end(void)
+{
+	/* Incase the object remains in a module's namespace, see T44127. */
+#ifdef WITH_INTERNATIONAL
+	_clear_translations_cache();
+#endif
+}
+

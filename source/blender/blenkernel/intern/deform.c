@@ -52,7 +52,7 @@
 #include "BLF_translation.h"
 
 #include "BKE_customdata.h"
-#include "BKE_object_data_transfer.h"
+#include "BKE_data_transfer.h"
 #include "BKE_deform.h"  /* own include */
 #include "BKE_mesh_mapping.h"
 #include "BKE_object_deform.h"
@@ -542,7 +542,7 @@ static bool defgroup_find_name_dupe(const char *name, bDeformGroup *dg, Object *
 
 	for (curdef = ob->defbase.first; curdef; curdef = curdef->next) {
 		if (dg != curdef) {
-			if (!strcmp(curdef->name, name)) {
+			if (STREQ(curdef->name, name)) {
 				return true;
 			}
 		}
@@ -649,7 +649,7 @@ void BKE_deform_flip_side_name(char name[MAX_VGROUP_NAME], const char from_name[
 	BLI_strncpy(prefix, name, sizeof(prefix));
 
 	/* first case; separator . - _ with extensions r R l L  */
-	if (is_char_sep(name[len - 2])) {
+	if ((len > 1) && is_char_sep(name[len - 2])) {
 		is_set = true;
 		switch (name[len - 1]) {
 			case 'l':
@@ -982,7 +982,7 @@ void BKE_defvert_extract_vgroup_to_vertweights(
 		}
 	}
 	else {
-		fill_vn_fl(r_weights, invert_vgroup ? 1.0f : 0.0f, num_verts);
+		copy_vn_fl(r_weights, num_verts, invert_vgroup ? 1.0f : 0.0f);
 	}
 }
 
@@ -1008,7 +1008,7 @@ void BKE_defvert_extract_vgroup_to_edgeweights(
 		MEM_freeN(tmp_weights);
 	}
 	else {
-		fill_vn_fl(r_weights, 0.0f, num_edges);
+		copy_vn_fl(r_weights, num_edges, 0.0f);
 	}
 }
 
@@ -1031,7 +1031,7 @@ void BKE_defvert_extract_vgroup_to_loopweights(
 		MEM_freeN(tmp_weights);
 	}
 	else {
-		fill_vn_fl(r_weights, 0.0f, num_loops);
+		copy_vn_fl(r_weights, num_loops, 0.0f);
 	}
 }
 
@@ -1060,14 +1060,15 @@ void BKE_defvert_extract_vgroup_to_polyweights(
 		MEM_freeN(tmp_weights);
 	}
 	else {
-		fill_vn_fl(r_weights, 0.0f, num_polys);
+		copy_vn_fl(r_weights, num_polys, 0.0f);
 	}
 }
 
 /*********** Data Transfer **********/
 
-static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap, void *dest,
-                                        void **sources, const float *weights, const int count, const float mix_factor)
+static void vgroups_datatransfer_interp(
+        const CustomDataTransferLayerMap *laymap, void *dest,
+        const void **sources, const float *weights, const int count, const float mix_factor)
 {
 	MDeformVert **data_src = (MDeformVert **)sources;
 	MDeformVert *data_dst = (MDeformVert *)dest;

@@ -72,6 +72,7 @@ void ARMATURE_OT_shortest_path_pick(struct wmOperatorType *ot);
 
 void ARMATURE_OT_delete(struct wmOperatorType *ot);
 void ARMATURE_OT_duplicate(struct wmOperatorType *ot);
+void ARMATURE_OT_symmetrize(struct wmOperatorType *ot);
 void ARMATURE_OT_extrude(struct wmOperatorType *ot);
 void ARMATURE_OT_hide(struct wmOperatorType *ot);
 void ARMATURE_OT_reveal(struct wmOperatorType *ot);
@@ -215,7 +216,7 @@ void POSE_OT_propagate(struct wmOperatorType *ot);
  */
 
 EditBone *make_boneList(struct ListBase *edbo, struct ListBase *bones, struct EditBone *parent, struct Bone *actBone);
-void BIF_sk_selectStroke(struct bContext *C, const int mval[2], short extend);
+bool BIF_sk_selectStroke(struct bContext *C, const int mval[2], const bool extend);
 
 /* duplicate method */
 void preEditBoneDuplicate(struct ListBase *editbones);

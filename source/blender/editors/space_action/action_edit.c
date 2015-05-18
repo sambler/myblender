@@ -40,8 +40,12 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
+#include "BLF_translation.h"
+
 #include "DNA_anim_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_key_types.h"
+#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_mask_types.h"
 
@@ -52,6 +56,8 @@
 #include "BKE_action.h"
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
+#include "BKE_library.h"
+#include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_nla.h"
 #include "BKE_context.h"
@@ -74,72 +80,6 @@
 
 #include "action_intern.h"
 
-/* ************************************************************************** */
-/* ACTION MANAGEMENT */
-
-/* ******************** New Action Operator *********************** */
-
-static int act_new_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	PointerRNA ptr, idptr;
-	PropertyRNA *prop;
-
-	/* hook into UI */
-	UI_context_active_but_prop_get_templateID(C, &ptr, &prop);
-	
-	if (prop) {
-		bAction *action = NULL, *oldact = NULL;
-		PointerRNA oldptr;
-		
-		/* create action - the way to do this depends on whether we've got an
-		 * existing one there already, in which case we make a copy of it
-		 * (which is useful for "versioning" actions within the same file)
-		 */
-		oldptr = RNA_property_pointer_get(&ptr, prop);
-		oldact = (bAction *)oldptr.id.data;
-		
-		if (oldact && GS(oldact->id.name) == ID_AC) {
-			/* make a copy of the existing action */
-			action = BKE_action_copy(oldact);
-		}
-		else {
-			Main *bmain = CTX_data_main(C);
-
-			/* just make a new (empty) action */
-			action = add_empty_action(bmain, "Action");
-		}
-		
-		/* when creating new ID blocks, use is already 1 (fake user), 
-		 * but RNA pointer use also increases user, so this compensates it 
-		 */
-		action->id.us--;
-		
-		RNA_id_pointer_create(&action->id, &idptr);
-		RNA_property_pointer_set(&ptr, prop, idptr);
-		RNA_property_update(C, &ptr, prop);
-	}
-	
-	/* set notifier that keyframes have changed */
-	WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_ADDED, NULL);
-	
-	return OPERATOR_FINISHED;
-}
- 
-void ACTION_OT_new(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "New Action";
-	ot->idname = "ACTION_OT_new";
-	ot->description = "Create new action";
-	
-	/* api callbacks */
-	ot->exec = act_new_exec;
-	/* NOTE: this is used in the NLA too... */
-	//ot->poll = ED_operator_action_active;
-	
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
 
 /* ************************************************************************** */
 /* POSE MARKERS STUFF */
@@ -386,7 +326,7 @@ static bool actkeys_channels_get_selected_extents(bAnimContext *ac, float *min, 
 	y = (float)ACHANNEL_FIRST;
 	
 	for (ale = anim_data.first; ale; ale = ale->next) {
-		bAnimChannelType *acf = ANIM_channel_get_typeinfo(ale);
+		const bAnimChannelType *acf = ANIM_channel_get_typeinfo(ale);
 		
 		/* must be selected... */
 		if (acf && acf->has_setting(ac, ale, ACHANNEL_SETTING_SELECT) && 
@@ -485,7 +425,15 @@ static int actkeys_viewsel_exec(bContext *C, wmOperator *UNUSED(op))
 	/* only selected */
 	return actkeys_viewall(C, true);
 }
- 
+
+static int actkeys_view_frame_exec(bContext *C, wmOperator *op)
+{
+	const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
+	ANIM_center_frame(C, smooth_viewtx);
+
+	return OPERATOR_FINISHED;
+}
+
 void ACTION_OT_view_all(wmOperatorType *ot)
 {
 	/* identifiers */
@@ -512,6 +460,21 @@ void ACTION_OT_view_selected(wmOperatorType *ot)
 	ot->exec = actkeys_viewsel_exec;
 	ot->poll = ED_operator_action_active;
 	
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+void ACTION_OT_view_frame(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "View Frame";
+	ot->idname = "ACTION_OT_view_frame";
+	ot->description = "Reset viewable area to show range around current frame";
+
+	/* api callbacks */
+	ot->exec = actkeys_view_frame_exec;
+	ot->poll = ED_operator_action_active; /* XXX: unchecked poll to get fsamples working too, but makes modifier damage trickier... */
+
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
@@ -716,8 +679,13 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 		else 
 			cfra = (float)CFRA;
 			
-		/* if there's an id */
-		if (ale->id)
+		/* read value from property the F-Curve represents, or from the curve only?
+		 * - ale->id != NULL:    Typically, this means that we have enough info to try resolving the path
+		 * - ale->owner != NULL: If this is set, then the path may not be resolvable from the ID alone,
+		 *                       so it's easier for now to just read the F-Curve directly.
+		 *                       (TODO: add the full-blown PointerRNA relative parsing case here...)
+		 */
+		if (ale->id && !ale->owner)
 			insert_keyframe(reports, ale->id, NULL, ((fcu->grp) ? (fcu->grp->name) : (NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
 		else
 			insert_vert_fcurve(fcu, cfra, fcu->curval, 0);
@@ -790,7 +758,7 @@ static void duplicate_action_keys(bAnimContext *ac)
 	
 	/* loop through filtered data and delete selected keys */
 	for (ale = anim_data.first; ale; ale = ale->next) {
-		if (ale->type == ANIMTYPE_FCURVE)
+		if (ELEM(ale->type, ANIMTYPE_FCURVE, ANIMTYPE_NLACURVE))
 			duplicate_fcurve_keys((FCurve *)ale->key_data);
 		else if (ale->type == ANIMTYPE_GPLAYER)
 			ED_gplayer_frames_duplicate((bGPDlayer *)ale->data);
@@ -824,13 +792,6 @@ static int actkeys_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	return OPERATOR_FINISHED;
 }
-
-static int actkeys_duplicate_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
-{
-	actkeys_duplicate_exec(C, op);
-	
-	return OPERATOR_FINISHED;
-}
  
 void ACTION_OT_duplicate(wmOperatorType *ot)
 {
@@ -840,7 +801,6 @@ void ACTION_OT_duplicate(wmOperatorType *ot)
 	ot->description = "Make a copy of all selected keyframes";
 	
 	/* api callbacks */
-	ot->invoke = actkeys_duplicate_invoke;
 	ot->exec = actkeys_duplicate_exec;
 	ot->poll = ED_operator_action_active;
 	

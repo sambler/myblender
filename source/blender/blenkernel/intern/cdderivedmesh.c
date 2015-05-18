@@ -470,7 +470,7 @@ static void cdDM_drawFacesSolid(DerivedMesh *dm,
 	int a;
 
 	if (cddm->pbvh && cddm->pbvh_draw) {
-		if (dm->numTessFaceData) {
+		if (BKE_pbvh_has_faces(cddm->pbvh)) {
 			float (*face_nors)[3] = CustomData_get_layer(&dm->faceData, CD_NORMAL);
 
 			BKE_pbvh_draw(cddm->pbvh, partial_redraw_planes, face_nors,
@@ -527,7 +527,7 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 	 *       (the same as it'll display without UV maps in textured view)
 	 */
 	if (cddm->pbvh && cddm->pbvh_draw && BKE_pbvh_type(cddm->pbvh) == PBVH_BMESH) {
-		if (dm->numTessFaceData) {
+		if (BKE_pbvh_has_faces(cddm->pbvh)) {
 			GPU_set_tpage(NULL, false, false);
 			BKE_pbvh_draw(cddm->pbvh, NULL, NULL, NULL, false);
 		}
@@ -786,7 +786,7 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm,
 		if (tottri == 0) {
 			/* avoid buffer problems in following code */
 		}
-		if (setDrawOptions == NULL) {
+		else if (setDrawOptions == NULL) {
 			/* just draw the entire face array */
 			glDrawArrays(GL_TRIANGLES, 0, (tottri) * 3);
 		}
@@ -869,59 +869,7 @@ static void cdDM_drawMappedFacesTex(DerivedMesh *dm,
 static void cddm_draw_attrib_vertex(DMVertexAttribs *attribs, const MVert *mvert, int a, int index, int vert,
                                     const short (*lnor)[3], const bool smoothnormal)
 {
-	const float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-	int b;
-
-	/* orco texture coordinates */
-	if (attribs->totorco) {
-		/*const*/ float (*array)[3] = attribs->orco.array;
-		const float *orco = (array) ? array[index] : zero;
-
-		if (attribs->orco.gl_texco)
-			glTexCoord3fv(orco);
-		else
-			glVertexAttrib3fvARB(attribs->orco.gl_index, orco);
-	}
-
-	/* uv texture coordinates */
-	for (b = 0; b < attribs->tottface; b++) {
-		const float *uv;
-
-		if (attribs->tface[b].array) {
-			MTFace *tf = &attribs->tface[b].array[a];
-			uv = tf->uv[vert];
-		}
-		else {
-			uv = zero;
-		}
-
-		if (attribs->tface[b].gl_texco)
-			glTexCoord2fv(uv);
-		else
-			glVertexAttrib2fvARB(attribs->tface[b].gl_index, uv);
-	}
-
-	/* vertex colors */
-	for (b = 0; b < attribs->totmcol; b++) {
-		GLubyte col[4];
-
-		if (attribs->mcol[b].array) {
-			MCol *cp = &attribs->mcol[b].array[a * 4 + vert];
-			col[0] = cp->b; col[1] = cp->g; col[2] = cp->r; col[3] = cp->a;
-		}
-		else {
-			col[0] = 0; col[1] = 0; col[2] = 0; col[3] = 0;
-		}
-
-		glVertexAttrib4ubvARB(attribs->mcol[b].gl_index, col);
-	}
-
-	/* tangent for normal mapping */
-	if (attribs->tottang) {
-		/*const*/ float (*array)[4] = attribs->tang.array;
-		const float *tang = (array) ? array[a * 4 + vert] : zero;
-		glVertexAttrib4fvARB(attribs->tang.gl_index, tang);
-	}
+	DM_draw_attrib_vertex(attribs, a, index, vert);
 
 	/* vertex normal */
 	if (lnor) {
@@ -964,7 +912,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 	 *       works fine for matcap
 	 */
 	if (cddm->pbvh && cddm->pbvh_draw && BKE_pbvh_type(cddm->pbvh) == PBVH_BMESH) {
-		if (dm->numTessFaceData) {
+		if (BKE_pbvh_has_faces(cddm->pbvh)) {
 			setMaterial(1, &gattribs);
 			BKE_pbvh_draw(cddm->pbvh, NULL, NULL, NULL, false);
 		}
@@ -979,7 +927,10 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 
 	glShadeModel(GL_SMOOTH);
 
-	if (setDrawOptions != NULL) {
+	/* workaround for NVIDIA GPUs on Mac not supporting vertex arrays + interleaved formats, see T43342 */
+	if ((GPU_type_matches(GPU_DEVICE_NVIDIA, GPU_OS_MAC, GPU_DRIVER_ANY) && (U.gameflags & USER_DISABLE_VBO)) ||
+	    setDrawOptions != NULL)
+	{
 		DEBUG_VBO("Using legacy code. cdDM_drawMappedFacesGLSL\n");
 		memset(&attribs, 0, sizeof(attribs));
 
@@ -1134,9 +1085,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 						elementsize = GPU_attrib_element_size(datatypes, numdata);
 						buffer = GPU_buffer_alloc(elementsize * dm->drawObject->tot_triangle_point, false);
 						if (buffer == NULL) {
-							GPU_buffer_unbind();
 							buffer = GPU_buffer_alloc(elementsize * dm->drawObject->tot_triangle_point, true);
-							return;
 						}
 						varray = GPU_buffer_lock_stream(buffer);
 						if (varray == NULL) {
@@ -1297,7 +1246,7 @@ static void cdDM_drawMappedFacesMat(DerivedMesh *dm,
 	 *       works fine for matcap
 	 */
 	if (cddm->pbvh && cddm->pbvh_draw && BKE_pbvh_type(cddm->pbvh) == PBVH_BMESH) {
-		if (dm->numTessFaceData) {
+		if (BKE_pbvh_has_faces(cddm->pbvh)) {
 			setMaterial(userData, 1, &gattribs);
 			BKE_pbvh_draw(cddm->pbvh, NULL, NULL, NULL, false);
 		}
@@ -1592,6 +1541,7 @@ static CDDerivedMesh *cdDM_create(const char *desc)
 
 	dm->calcNormals = CDDM_calc_normals;
 	dm->calcLoopNormals = CDDM_calc_loop_normals;
+	dm->calcLoopNormalsSpaceArray = CDDM_calc_loop_normals_spacearr;
 	dm->recalcTessellation = CDDM_recalc_tessellation;
 
 	dm->getVertCos = cdDM_getVertCos;
@@ -2208,7 +2158,15 @@ void CDDM_calc_normals(DerivedMesh *dm)
 
 #endif
 
-void CDDM_calc_loop_normals(DerivedMesh *dm, const float split_angle)
+void CDDM_calc_loop_normals(DerivedMesh *dm, const bool use_split_normals, const float split_angle)
+{
+	CDDM_calc_loop_normals_spacearr(dm, use_split_normals, split_angle, NULL);
+}
+
+/* #define DEBUG_CLNORS */
+
+void CDDM_calc_loop_normals_spacearr(
+        DerivedMesh *dm, const bool use_split_normals, const float split_angle, MLoopNorSpaceArray *r_lnors_spacearr)
 {
 	MVert *mverts = dm->getVertArray(dm);
 	MEdge *medges = dm->getEdgeArray(dm);
@@ -2218,6 +2176,7 @@ void CDDM_calc_loop_normals(DerivedMesh *dm, const float split_angle)
 	CustomData *ldata, *pdata;
 
 	float (*lnors)[3];
+	short (*clnor_data)[2];
 	float (*pnors)[3];
 
 	const int numVerts = dm->getNumVerts(dm);
@@ -2245,8 +2204,37 @@ void CDDM_calc_loop_normals(DerivedMesh *dm, const float split_angle)
 
 	dm->dirty &= ~DM_DIRTY_NORMALS;
 
+	clnor_data = CustomData_get_layer(ldata, CD_CUSTOMLOOPNORMAL);
+
 	BKE_mesh_normals_loop_split(mverts, numVerts, medges, numEdges, mloops, lnors, numLoops,
-	                            mpolys, pnors, numPolys, split_angle);
+	                            mpolys, (const float (*)[3])pnors, numPolys,
+	                            use_split_normals, split_angle,
+	                            r_lnors_spacearr, clnor_data, NULL);
+#ifdef DEBUG_CLNORS
+	if (r_lnors_spacearr) {
+		int i;
+		for (i = 0; i < numLoops; i++) {
+			if (r_lnors_spacearr->lspacearr[i]->ref_alpha != 0.0f) {
+				LinkNode *loops = r_lnors_spacearr->lspacearr[i]->loops;
+				printf("Loop %d uses lnor space %p:\n", i, r_lnors_spacearr->lspacearr[i]);
+				print_v3("\tfinal lnor", lnors[i]);
+				print_v3("\tauto lnor", r_lnors_spacearr->lspacearr[i]->vec_lnor);
+				print_v3("\tref_vec", r_lnors_spacearr->lspacearr[i]->vec_ref);
+				printf("\talpha: %f\n\tbeta: %f\n\tloops: %p\n", r_lnors_spacearr->lspacearr[i]->ref_alpha,
+				       r_lnors_spacearr->lspacearr[i]->ref_beta, r_lnors_spacearr->lspacearr[i]->loops);
+				printf("\t\t(shared with loops");
+				while (loops) {
+					printf(" %d", GET_INT_FROM_POINTER(loops->link));
+					loops = loops->next;
+				}
+				printf(")\n");
+			}
+			else {
+				printf("Loop %d has no lnor space\n", i);
+			}
+		}
+	}
+#endif
 }
 
 
@@ -2557,16 +2545,16 @@ DerivedMesh *CDDM_merge_verts(DerivedMesh *dm, const int *vtargetmap, const int 
 		const unsigned int v1 = (vtargetmap[med->v1] != -1) ? vtargetmap[med->v1] : med->v1;
 		const unsigned int v2 = (vtargetmap[med->v2] != -1) ? vtargetmap[med->v2] : med->v2;
 		if (LIKELY(v1 != v2)) {
-			void **eh_p = BLI_edgehash_lookup_p(ehash, v1, v2);
+			void **val_p;
 
-			if (eh_p) {
-				newe[i] = GET_INT_FROM_POINTER(*eh_p);
+			if (BLI_edgehash_ensure_p(ehash, v1, v2, &val_p)) {
+				newe[i] = GET_INT_FROM_POINTER(*val_p);
 			}
 			else {
 				STACK_PUSH(olde, i);
 				STACK_PUSH(medge, *med);
 				newe[i] = c;
-				BLI_edgehash_insert(ehash, v1, v2, SET_INT_IN_POINTER(c));
+				*val_p = SET_INT_IN_POINTER(c);
 				c++;
 			}
 		}

@@ -181,7 +181,7 @@ static void rna_Material_active_paint_texture_index_update(Main *bmain, Scene *s
 	bScreen *sc;
 	Material *ma = ptr->id.data;
 
-	if (ma->use_nodes && ma->nodetree && BKE_scene_use_new_shading_nodes(scene)) {
+	if (ma->use_nodes && ma->nodetree) {
 		struct bNode *node;
 		int index = 0;
 		for (node = ma->nodetree->nodes.first; node; node = node->next) {
@@ -377,7 +377,7 @@ static EnumPropertyItem *rna_Material_texture_coordinates_itemf(bContext *UNUSED
 
 MTex *rna_mtex_texture_slots_add(ID *self_id, struct bContext *C, ReportList *reports)
 {
-	MTex *mtex = add_mtex_id(self_id, -1);
+	MTex *mtex = BKE_texture_mtex_add_id(self_id, -1);
 	if (mtex == NULL) {
 		BKE_reportf(reports, RPT_ERROR, "Maximum number of textures added %d", MAX_MTEX);
 		return NULL;
@@ -398,7 +398,7 @@ MTex *rna_mtex_texture_slots_create(ID *self_id, struct bContext *C, ReportList 
 		return NULL;
 	}
 
-	mtex = add_mtex_id(self_id, index);
+	mtex = BKE_texture_mtex_add_id(self_id, index);
 
 	/* for redraw only */
 	WM_event_add_notifier(C, NC_TEXTURE, CTX_data_scene(C));

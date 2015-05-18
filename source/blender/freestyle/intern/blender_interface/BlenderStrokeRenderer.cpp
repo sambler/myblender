@@ -94,7 +94,7 @@ BlenderStrokeRenderer::BlenderStrokeRenderer(Render *re, int render_count) : Str
 	//freestyle_scene->r.maximsize = old_scene->r.maximsize; /* DEPRECATED */
 	freestyle_scene->r.ocres = old_scene->r.ocres;
 	freestyle_scene->r.color_mgt_flag = 0; // old_scene->r.color_mgt_flag;
-	freestyle_scene->r.scemode = old_scene->r.scemode & ~(R_SINGLE_LAYER | R_NO_FRAME_UPDATE);
+	freestyle_scene->r.scemode = old_scene->r.scemode & ~(R_SINGLE_LAYER | R_NO_FRAME_UPDATE | R_MULTIVIEW);
 	freestyle_scene->r.flag = old_scene->r.flag;
 	freestyle_scene->r.threads = old_scene->r.threads;
 	freestyle_scene->r.border.xmin = old_scene->r.border.xmin;
@@ -126,7 +126,8 @@ BlenderStrokeRenderer::BlenderStrokeRenderer(Render *re, int render_count) : Str
 	BKE_scene_set_background(freestyle_bmain, freestyle_scene);
 
 	// Camera
-	Object *object_camera = BKE_object_add(freestyle_bmain, freestyle_scene, OB_CAMERA);
+	Object *object_camera = BKE_object_add(freestyle_bmain, freestyle_scene, OB_CAMERA, NULL);
+	DAG_relations_tag_update(freestyle_bmain);
 
 	Camera *camera = (Camera *)object_camera->data;
 	camera->type = CAM_ORTHO;
@@ -506,6 +507,7 @@ void BlenderStrokeRenderer::RenderStrokeRepBasic(StrokeRep *iStrokeRep) const
 		// If still no material, create one
 		if (!has_mat) {
 			Material *ma = BKE_material_add(freestyle_bmain, "stroke_material");
+			DAG_relations_tag_update(freestyle_bmain);
 			ma->mode |= MA_VERTEXCOLP;
 			ma->mode |= MA_TRANSP;
 			ma->mode |= MA_SHLESS;
@@ -654,6 +656,12 @@ int BlenderStrokeRenderer::GenerateScene()
 	{
 		GenerateStrokeMesh(*it, true);
 	}
+	return get_stroke_count();
+}
+
+// Return the number of strokes
+int BlenderStrokeRenderer::get_stroke_count() const
+{
 	return strokeGroups.size() + texturedStrokeGroups.size();
 }
 
@@ -662,6 +670,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
 {
 #if 0
 	Object *object_mesh = BKE_object_add(freestyle_bmain, freestyle_scene, OB_MESH);
+	DAG_relations_tag_update(freestyle_bmain);
 #else
 	Object *object_mesh = NewMesh();
 #endif
@@ -724,7 +733,6 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
 	     it != itend; ++it)
 	{
 		mesh->mat[material_index] = (*it)->getMaterial();
-		material_index++;
 
 		vector<Strip*>& strips = (*it)->getStrips();
 		for (vector<Strip*>::const_iterator s = strips.begin(), send = strips.end(); s != send; ++s) {
@@ -805,6 +813,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
 					// poly
 					polys->loopstart = loop_index;
 					polys->totloop = 3;
+					polys->mat_nr = material_index;
 					++polys;
 
 					// Even and odd loops connect triangles vertices differently
@@ -903,6 +912,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
 				}
 			} // loop over strip vertices
 		} // loop over strips
+		material_index++;
 	} // loop over strokes
 
 	test_object_materials(freestyle_bmain, (ID *)mesh);
@@ -912,7 +922,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
 	BLI_assert(mesh->totedge == edge_index);
 	BLI_assert(mesh->totloop == loop_index);
 	BLI_assert(mesh->totcol == material_index);
-	BKE_mesh_validate(mesh, true);
+	BKE_mesh_validate(mesh, true, true);
 #endif
 }
 
@@ -931,6 +941,7 @@ Object *BlenderStrokeRenderer::NewMesh() const
 	ob->lay = 1;
 
 	base = BKE_scene_base_add(freestyle_scene, ob);
+	DAG_relations_tag_update(freestyle_bmain);
 #if 0
 	BKE_scene_base_deselect_all(scene);
 	BKE_scene_base_select(scene, base);
@@ -943,7 +954,7 @@ Object *BlenderStrokeRenderer::NewMesh() const
 	return ob;
 }
 
-Render *BlenderStrokeRenderer::RenderScene(Render *re, bool render)
+Render *BlenderStrokeRenderer::RenderScene(Render * /*re*/, bool render)
 {
 	Camera *camera = (Camera *)freestyle_scene->camera->data;
 	if (camera->clipend < _z)
@@ -956,7 +967,8 @@ Render *BlenderStrokeRenderer::RenderScene(Render *re, bool render)
 
 	Render *freestyle_render = RE_NewRender(freestyle_scene->id.name);
 
-	RE_RenderFreestyleStrokes(freestyle_render, freestyle_bmain, freestyle_scene, render);
+	RE_RenderFreestyleStrokes(freestyle_render, freestyle_bmain, freestyle_scene,
+	                          render && get_stroke_count() > 0);
 
 	return freestyle_render;
 }

@@ -47,6 +47,10 @@ Camera::Camera()
 	panorama_type = PANORAMA_EQUIRECTANGULAR;
 	fisheye_fov = M_PI_F;
 	fisheye_lens = 10.5f;
+	latitude_min = -M_PI_2_F;
+	latitude_max = M_PI_2_F;
+	longitude_min = -M_PI_F;
+	longitude_max = M_PI_F;
 	fov = M_PI_4_F;
 
 	sensorwidth = 0.036f;
@@ -76,6 +80,7 @@ Camera::Camera()
 
 	need_update = true;
 	need_device_update = true;
+	need_flags_update = true;
 	previous_need_motion = -1;
 }
 
@@ -105,16 +110,17 @@ void Camera::update()
 {
 	if(!need_update)
 		return;
-	
+
+	/* Full viewport to camera border in the viewport. */
+	Transform fulltoborder = transform_from_viewplane(viewport_camera_border);
+	Transform bordertofull = transform_inverse(fulltoborder);
+
 	/* ndc to raster */
 	Transform screentocamera;
-	Transform ndctoraster = transform_scale(width, height, 1.0f);
+	Transform ndctoraster = transform_scale(width, height, 1.0f) * bordertofull;
 
 	/* raster to screen */
-	Transform screentondc = 
-		transform_scale(1.0f/(viewplane.right - viewplane.left),
-		                1.0f/(viewplane.top - viewplane.bottom), 1.0f) *
-		transform_translate(-viewplane.left, -viewplane.bottom, 0.0f);
+	Transform screentondc = fulltoborder * transform_from_viewplane(viewplane);
 
 	Transform screentoraster = ndctoraster * screentondc;
 	Transform rastertoscreen = transform_inverse(screentoraster);
@@ -157,8 +163,8 @@ void Camera::update()
 		     transform_perspective(&rastertocamera, make_float3(0, 0, 0));
 	}
 	else {
-		dx = make_float3(0, 0, 0);
-		dy = make_float3(0, 0, 0);
+		dx = make_float3(0.0f, 0.0f, 0.0f);
+		dy = make_float3(0.0f, 0.0f, 0.0f);
 	}
 
 	dx = transform_direction(&cameratoworld, dx);
@@ -166,6 +172,7 @@ void Camera::update()
 
 	need_update = false;
 	need_device_update = true;
+	need_flags_update = true;
 }
 
 void Camera::device_update(Device *device, DeviceScene *dscene, Scene *scene)
@@ -174,7 +181,7 @@ void Camera::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 
 	update();
 
-	if (previous_need_motion != need_motion) {
+	if(previous_need_motion != need_motion) {
 		/* scene's motion model could have been changed since previous device
 		 * camera update this could happen for example in case when one render
 		 * layer has got motion pass and another not */
@@ -253,6 +260,8 @@ void Camera::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 	kcam->panorama_type = panorama_type;
 	kcam->fisheye_fov = fisheye_fov;
 	kcam->fisheye_lens = fisheye_lens;
+	kcam->equirectangular_range = make_float4(longitude_min - longitude_max, -longitude_min,
+	                                          latitude_min -  latitude_max, -latitude_min + M_PI_2_F);
 
 	/* sensor size */
 	kcam->sensorwidth = sensorwidth;
@@ -271,11 +280,20 @@ void Camera::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 	kcam->nearclip = nearclip;
 	kcam->cliplength = (farclip == FLT_MAX)? FLT_MAX: farclip - nearclip;
 
-	need_device_update = false;
-	previous_need_motion = need_motion;
-
 	/* Camera in volume. */
 	kcam->is_inside_volume = 0;
+
+	previous_need_motion = need_motion;
+}
+
+void Camera::device_update_volume(Device * /*device*/,
+                                  DeviceScene *dscene,
+                                  Scene *scene)
+{
+	if(!need_device_update && !need_flags_update) {
+		return;
+	}
+	KernelCamera *kcam = &dscene->data.cam;
 	BoundBox viewplane_boundbox = viewplane_bounds_get();
 	for(size_t i = 0; i < scene->objects.size(); ++i) {
 		Object *object = scene->objects[i];
@@ -287,9 +305,11 @@ void Camera::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 			break;
 		}
 	}
+	need_device_update = false;
+	need_flags_update = false;
 }
 
-void Camera::device_free(Device *device, DeviceScene *dscene)
+void Camera::device_free(Device * /*device*/, DeviceScene * /*dscene*/)
 {
 	/* nothing to free, only writing to constant memory */
 }
@@ -316,7 +336,11 @@ bool Camera::modified(const Camera& cam)
 		(aperture_ratio == cam.aperture_ratio) &&
 		(panorama_type == cam.panorama_type) &&
 		(fisheye_fov == cam.fisheye_fov) &&
-		(fisheye_lens == cam.fisheye_lens));
+		(fisheye_lens == cam.fisheye_lens) &&
+		(latitude_min == cam.latitude_min) &&
+		(latitude_max == cam.latitude_max) &&
+		(longitude_min == cam.longitude_min) &&
+		(longitude_max == cam.longitude_max));
 }
 
 bool Camera::motion_modified(const Camera& cam)
@@ -336,6 +360,7 @@ float3 Camera::transform_raster_to_world(float raster_x, float raster_y)
 	if(type == CAMERA_PERSPECTIVE) {
 		D = transform_perspective(&rastertocamera,
 		                          make_float3(raster_x, raster_y, 0.0f));
+		float3 Pclip = normalize(D);
 		P = make_float3(0.0f, 0.0f, 0.0f);
 		/* TODO(sergey): Aperture support? */
 		P = transform_point(&cameratoworld, P);
@@ -344,9 +369,9 @@ float3 Camera::transform_raster_to_world(float raster_x, float raster_y)
 		 * be mistakes in here, currently leading to wrong camera-in-volume
 		 * detection.
 		 */
-		P += nearclip * D;
+		P += nearclip * D / Pclip.z;
 	}
-	else if (type == CAMERA_ORTHOGRAPHIC) {
+	else if(type == CAMERA_ORTHOGRAPHIC) {
 		D = make_float3(0.0f, 0.0f, 1.0f);
 		/* TODO(sergey): Aperture support? */
 		P = transform_perspective(&rastertocamera,
@@ -378,7 +403,7 @@ BoundBox Camera::viewplane_bounds_get()
 		bounds.grow(transform_raster_to_world((float)width, (float)height));
 		bounds.grow(transform_raster_to_world((float)width, 0.0f));
 		if(type == CAMERA_PERSPECTIVE) {
-			/* Center point has the most distancei in local Z axis,
+			/* Center point has the most distance in local Z axis,
 			 * use it to construct bounding box/
 			 */
 			bounds.grow(transform_raster_to_world(0.5f*width, 0.5f*height));
@@ -388,4 +413,3 @@ BoundBox Camera::viewplane_bounds_get()
 }
 
 CCL_NAMESPACE_END
-

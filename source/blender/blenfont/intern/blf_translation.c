@@ -133,7 +133,7 @@ void BLF_free_unifont_mono(void)
 bool BLF_is_default_context(const char *msgctxt)
 {
 	/* We use the "short" test, a more complete one could be:
-	 * return (!msgctxt || !msgctxt[0] || !strcmp(msgctxt == BLF_I18NCONTEXT_DEFAULT_BPYRNA))
+	 * return (!msgctxt || !msgctxt[0] || STREQ(msgctxt, BLF_I18NCONTEXT_DEFAULT_BPYRNA))
 	 */
 	/* Note: trying without the void string check for now, it *should* not be necessary... */
 	return (!msgctxt || msgctxt[0] == BLF_I18NCONTEXT_DEFAULT_BPYRNA[0]);
@@ -164,6 +164,15 @@ const char *BLF_pgettext(const char *msgctxt, const char *msgid)
 #endif
 }
 
+bool BLF_translate(void)
+{
+#ifdef WITH_INTERNATIONAL
+	return (U.transopts & USER_DOTRANSLATE) != 0;
+#else
+	return false;
+#endif
+}
+
 bool BLF_translate_iface(void)
 {
 #ifdef WITH_INTERNATIONAL
@@ -188,6 +197,21 @@ bool BLF_translate_new_dataname(void)
 	return (U.transopts & USER_DOTRANSLATE) && (U.transopts & USER_TR_NEWDATANAME);
 #else
 	return false;
+#endif
+}
+
+const char *BLF_translate_do(const char *msgctxt, const char *msgid)
+{
+#ifdef WITH_INTERNATIONAL
+	if (BLF_translate()) {
+		return BLF_pgettext(msgctxt, msgid);
+	}
+	else {
+		return msgid;
+	}
+#else
+	(void)msgctxt;
+	return msgid;
 #endif
 }
 

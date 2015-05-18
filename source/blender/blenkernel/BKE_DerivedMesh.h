@@ -88,6 +88,7 @@ struct MTFace;
 struct Object;
 struct Scene;
 struct Mesh;
+struct MLoopNorSpaceArray;
 struct BMEditMesh;
 struct KeyBlock;
 struct ModifierData;
@@ -96,7 +97,6 @@ struct ColorBand;
 struct GPUVertexAttribs;
 struct GPUDrawObject;
 struct BMEditMesh;
-struct ListBase;
 struct PBVH;
 
 /* number of sub-elements each mesh element has (for interpolation) */
@@ -197,7 +197,11 @@ struct DerivedMesh {
 	void (*calcNormals)(DerivedMesh *dm);
 
 	/** Calculate loop (split) normals */
-	void (*calcLoopNormals)(DerivedMesh *dm, const float split_angle);
+	void (*calcLoopNormals)(DerivedMesh *dm, const bool use_split_normals, const float split_angle);
+
+	/** Calculate loop (split) normals, and returns split loop normal spacearr. */
+	void (*calcLoopNormalsSpaceArray)(DerivedMesh *dm, const bool use_split_normals, const float split_angle,
+	                                  struct MLoopNorSpaceArray *r_lnors_spacearr);
 
 	/** Recalculates mesh tessellation */
 	void (*recalcTessellation)(DerivedMesh *dm);
@@ -498,7 +502,7 @@ int DM_release(DerivedMesh *dm);
 
 /** utility function to convert a DerivedMesh to a Mesh
  */
-void DM_to_mesh(DerivedMesh *dm, struct Mesh *me, struct Object *ob, CustomDataMask mask);
+void DM_to_mesh(DerivedMesh *dm, struct Mesh *me, struct Object *ob, CustomDataMask mask, bool take_ownership);
 
 struct BMEditMesh *DM_to_editbmesh(struct DerivedMesh *dm,
                                    struct BMEditMesh *existing, const bool do_tessellate);
@@ -745,6 +749,8 @@ typedef struct DMVertexAttribs {
 
 void DM_vertex_attributes_from_gpu(DerivedMesh *dm,
                                    struct GPUVertexAttribs *gattribs, DMVertexAttribs *attribs);
+
+void DM_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert);
 
 void DM_add_tangent_layer(DerivedMesh *dm);
 void DM_calc_auto_bump_scale(DerivedMesh *dm);

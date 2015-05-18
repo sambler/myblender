@@ -38,6 +38,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_report.h"
+#include "BKE_editmesh.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -142,6 +143,7 @@ EnumPropertyItem transform_mode_types[] =
 	{TFM_BONE_ENVELOPE, "BONE_ENVELOPE", 0, "Bone_Envelope", ""},
 	{TFM_CURVE_SHRINKFATTEN, "CURVE_SHRINKFATTEN", 0, "Curve_Shrinkfatten", ""},
 	{TFM_MASK_SHRINKFATTEN, "MASK_SHRINKFATTEN", 0, "Mask_Shrinkfatten", ""},
+	{TFM_GPENCIL_SHRINKFATTEN, "GPENCIL_SHRINKFATTEN", 0, "GPencil_Shrinkfatten", ""},
 	{TFM_BONE_ROLL, "BONE_ROLL", 0, "Bone_Roll", ""},
 	{TFM_TIME_TRANSLATE, "TIME_TRANSLATE", 0, "Time_Translate", ""},
 	{TFM_TIME_SLIDE, "TIME_SLIDE", 0, "Time_Slide", ""},
@@ -487,7 +489,7 @@ static int transform_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 		/* add temp handler */
 		WM_event_add_modal_handler(C, op);
 
-		op->flag |= OP_GRAB_POINTER; // XXX maybe we want this with the manipulator only?
+		op->flag |= OP_IS_MODAL_GRAB_CURSOR; // XXX maybe we want this with the manipulator only?
 		return OPERATOR_RUNNING_MODAL;
 	}
 }
@@ -846,7 +848,7 @@ static void TRANSFORM_OT_edge_slide(struct wmOperatorType *ot)
 	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_editmesh;
 
-	RNA_def_float_factor(ot->srna, "value", 0, -1.0f, 1.0f, "Factor", "", -1.0f, 1.0f);
+	RNA_def_float_factor(ot->srna, "value", 0, -10.0f, 10.0f, "Factor", "", -1.0f, 1.0f);
 
 	Transform_Properties(ot, P_MIRROR | P_SNAP | P_CORRECT_UV);
 }
@@ -868,7 +870,7 @@ static void TRANSFORM_OT_vert_slide(struct wmOperatorType *ot)
 
 	RNA_def_float_factor(ot->srna, "value", 0, -10.0f, 10.0f, "Factor", "", -1.0f, 1.0f);
 
-	Transform_Properties(ot, P_MIRROR | P_SNAP);
+	Transform_Properties(ot, P_MIRROR | P_SNAP | P_CORRECT_UV);
 }
 
 static void TRANSFORM_OT_edge_crease(struct wmOperatorType *ot)
@@ -974,7 +976,7 @@ static void TRANSFORM_OT_transform(struct wmOperatorType *ot)
 
 	RNA_def_float_vector(ot->srna, "value", 4, NULL, -FLT_MAX, FLT_MAX, "Values", "", -FLT_MAX, FLT_MAX);
 
-	Transform_Properties(ot, P_AXIS | P_CONSTRAINT | P_PROPORTIONAL | P_MIRROR | P_ALIGN_SNAP);
+	Transform_Properties(ot, P_AXIS | P_CONSTRAINT | P_PROPORTIONAL | P_MIRROR | P_ALIGN_SNAP | P_GPENCIL_EDIT);
 }
 
 void transform_operatortypes(void)
@@ -1113,6 +1115,11 @@ void transform_keymap_for_space(wmKeyConfig *keyconf, wmKeyMap *keymap, int spac
 			/* XXX release_confirm is set in the macro operator definition */
 			WM_keymap_add_item(keymap, "NODE_OT_move_detach_links_release", EVT_TWEAK_A, KM_ANY, KM_ALT, 0);
 			WM_keymap_add_item(keymap, "NODE_OT_move_detach_links", EVT_TWEAK_S, KM_ANY, KM_ALT, 0);
+
+			kmi = WM_keymap_add_item(keymap, "WM_OT_context_toggle", TABKEY, KM_PRESS, KM_SHIFT, 0);
+			RNA_string_set(kmi->ptr, "data_path", "tool_settings.use_snap");
+			kmi = WM_keymap_add_item(keymap, "WM_OT_context_menu_enum", TABKEY, KM_PRESS, KM_SHIFT | KM_CTRL, 0);
+			RNA_string_set(kmi->ptr, "data_path", "tool_settings.snap_node_element");
 			break;
 		case SPACE_SEQ:
 			WM_keymap_add_item(keymap, OP_SEQ_SLIDE, GKEY, KM_PRESS, 0, 0);

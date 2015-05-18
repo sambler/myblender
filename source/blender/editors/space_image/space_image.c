@@ -156,7 +156,9 @@ static SpaceLink *image_new(const bContext *UNUSED(C))
 	simage->iuser.ok = true;
 	simage->iuser.fie_ima = 2;
 	simage->iuser.frames = 100;
-	
+	simage->iuser.flag = IMA_SHOW_STEREO;
+	simage->iuser.passtype = SCE_PASS_COMBINED;
+
 	scopes_new(&simage->scopes);
 	simage->sample_line_hist.height = 100;
 
@@ -681,7 +683,7 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 	View2D *v2d = &ar->v2d;
 	//View2DScrollers *scrollers;
 	float col[3];
-	
+
 	/* XXX not supported yet, disabling for now */
 	scene->r.scemode &= ~R_COMP_CROP;
 	
@@ -693,7 +695,7 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 	/* put scene context variable in iuser */
 	if (sima->image && sima->image->type == IMA_TYPE_R_RESULT) {
 		/* for render result, try to use the currently rendering scene */
-		Scene *render_scene = ED_render_job_get_scene(C);
+		Scene *render_scene = ED_render_job_get_current_scene(C);
 		if (render_scene)
 			sima->iuser.scene = render_scene;
 		else
@@ -899,9 +901,9 @@ static void image_tools_area_draw(const bContext *C, ARegion *ar)
 				BKE_histogram_update_sample_line(&sima->sample_line_hist, ibuf, &scene->view_settings, &scene->display_settings);
 			}
 			if (sima->image->flag & IMA_VIEW_AS_RENDER)
-				scopes_update(&sima->scopes, ibuf, &scene->view_settings, &scene->display_settings);
+				ED_space_image_scopes_update(C, sima, ibuf, true);
 			else
-				scopes_update(&sima->scopes, ibuf, NULL, &scene->display_settings);
+				ED_space_image_scopes_update(C, sima, ibuf, false);
 		}
 	}
 	ED_space_image_release_buffer(sima, ibuf, lock);

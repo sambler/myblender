@@ -300,7 +300,11 @@ static int ss_sync_from_uv(CCGSubSurf *ss, CCGSubSurf *origss, DerivedMesh *dm, 
 	float uv[3] = {0.0f, 0.0f, 0.0f}; /* only first 2 values are written into */
 
 	limit[0] = limit[1] = STD_UV_CONNECT_LIMIT;
-	vmap = BKE_mesh_uv_vert_map_create(mpoly, mloop, mloopuv, totface, totvert, 0, limit);
+	/* previous behavior here is without accounting for winding, however this causes stretching in
+	 * UV map in really simple cases with mirror + subsurf, see second part of T44530. Also, initially
+	 * intention is to treat merged vertices from mirror modifier as seams, see code below with ME_VERT_MERGED
+	 * This fixes a very old regression (2.49 was correct here) */
+	vmap = BKE_mesh_uv_vert_map_create(mpoly, mloop, mloopuv, totface, totvert, limit, false, true);
 	if (!vmap)
 		return 0;
 	
@@ -1059,8 +1063,9 @@ void subsurf_copy_grid_hidden(DerivedMesh *dm, const MPoly *mpoly,
 			const MDisps *md = &mdisps[mpoly[i].loopstart + j];
 			int hidden_gridsize = BKE_ccg_gridsize(md->level);
 			int factor = BKE_ccg_factor(level, md->level);
+			BLI_bitmap *hidden = md->hidden;
 			
-			if (!md->hidden)
+			if (!hidden)
 				continue;
 			
 			for (y = 0; y < gridSize; y++) {
@@ -1069,7 +1074,7 @@ void subsurf_copy_grid_hidden(DerivedMesh *dm, const MPoly *mpoly,
 					
 					vndx = getFaceIndex(ss, f, j, x, y, edgeSize, gridSize);
 					offset = (y * factor) * hidden_gridsize + (x * factor);
-					if (BLI_BITMAP_TEST(md->hidden, offset))
+					if (BLI_BITMAP_TEST(hidden, offset))
 						mvert[vndx].flag |= ME_HIDE;
 				}
 			}
@@ -1761,7 +1766,7 @@ static void ccgDM_drawFacesSolid(DerivedMesh *dm, float (*partial_redraw_planes)
 	ccgdm_pbvh_update(ccgdm);
 
 	if (ccgdm->pbvh && ccgdm->multires.mmd && !fast) {
-		if (dm->numTessFaceData) {
+		if (BKE_pbvh_has_faces(ccgdm->pbvh)) {
 			BKE_pbvh_draw(ccgdm->pbvh, partial_redraw_planes, NULL,
 			              setMaterial, false);
 			glShadeModel(GL_FLAT);
@@ -1870,64 +1875,6 @@ static void ccgDM_drawFacesSolid(DerivedMesh *dm, float (*partial_redraw_planes)
 	}
 }
 
-static void ccgdm_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert)
-{
-	const float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-	int b;
-
-	/* orco texture coordinates */
-	if (attribs->totorco) {
-		/*const*/ float (*array)[3] = attribs->orco.array;
-		const float *orco = (array) ? array[index] : zero;
-
-		if (attribs->orco.gl_texco)
-			glTexCoord3fv(orco);
-		else
-			glVertexAttrib3fvARB(attribs->orco.gl_index, orco);
-	}
-
-	/* uv texture coordinates */
-	for (b = 0; b < attribs->tottface; b++) {
-		const float *uv;
-
-		if (attribs->tface[b].array) {
-			MTFace *tf = &attribs->tface[b].array[a];
-			uv = tf->uv[vert];
-		}
-		else {
-			uv = zero;
-		}
-
-		if (attribs->tface[b].gl_texco)
-			glTexCoord2fv(uv);
-		else
-			glVertexAttrib2fvARB(attribs->tface[b].gl_index, uv);
-	}
-
-	/* vertex colors */
-	for (b = 0; b < attribs->totmcol; b++) {
-		GLubyte col[4];
-
-		if (attribs->mcol[b].array) {
-			MCol *cp = &attribs->mcol[b].array[a * 4 + vert];
-			col[0] = cp->b; col[1] = cp->g; col[2] = cp->r; col[3] = cp->a;
-		}
-		else {
-			col[0] = 0; col[1] = 0; col[2] = 0; col[3] = 0;
-		}
-
-		glVertexAttrib4ubvARB(attribs->mcol[b].gl_index, col);
-	}
-
-	/* tangent for normal mapping */
-	if (attribs->tottang) {
-		/*const*/ float (*array)[4] = attribs->tang.array;
-		const float *tang = (array) ? array[a * 4 + vert] : zero;
-
-		glVertexAttrib4fvARB(attribs->tang.gl_index, tang);
-	}
-}
-
 /* Only used by non-editmesh types */
 static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm,
                                       DMSetMaterial setMaterial,
@@ -1958,7 +1905,7 @@ static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm,
 		index = getFaceIndex(ss, f, S, x + dx, y + dy, edgeSize, gridSize);   \
 	else                                                                      \
 		index = 0;                                                            \
-	ccgdm_draw_attrib_vertex(&attribs, a, index, vert);                       \
+	DM_draw_attrib_vertex(&attribs, a, index, vert);                          \
 } (void)0
 
 	totface = ccgSubSurf_getNumFaces(ss);
@@ -2129,7 +2076,7 @@ static void ccgDM_drawMappedFacesMat(DerivedMesh *dm,
 		index = getFaceIndex(ss, f, S, x + dx, y + dy, edgeSize, gridSize);   \
 	else                                                                      \
 		index = 0;                                                            \
-	ccgdm_draw_attrib_vertex(&attribs, a, index, vert);                       \
+	DM_draw_attrib_vertex(&attribs, a, index, vert);                          \
 } (void)0
 
 	totface = ccgSubSurf_getNumFaces(ss);
@@ -3522,6 +3469,7 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 
 	ccgdm->dm.calcNormals = ccgDM_calcNormals;
 	ccgdm->dm.calcLoopNormals = CDDM_calc_loop_normals;
+	ccgdm->dm.calcLoopNormalsSpaceArray = CDDM_calc_loop_normals_spacearr;
 	ccgdm->dm.recalcTessellation = ccgDM_recalcTessellation;
 
 	ccgdm->dm.getVertCos = ccgdm_getVertCos;
@@ -3884,7 +3832,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 	/* note: editmode calculation can only run once per
 	 * modifier stack evaluation (uses freed cache) [#36299] */
 	if (flags & SUBSURF_FOR_EDIT_MODE) {
-		int levels = (smd->modifier.scene) ? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels) : smd->levels;
+		int levels = (smd->modifier.scene) ? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels, false) : smd->levels;
 
 		smd->emCache = _getSubSurf(smd->emCache, levels, 3, useSimple | useAging | CCG_CALC_NORMALS);
 		ss_sync_from_derivedmesh(smd->emCache, dm, vertCos, useSimple);
@@ -3896,7 +3844,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 	else if (flags & SUBSURF_USE_RENDER_PARAMS) {
 		/* Do not use cache in render mode. */
 		CCGSubSurf *ss;
-		int levels = (smd->modifier.scene) ? get_render_subsurf_level(&smd->modifier.scene->r, smd->renderLevels) : smd->renderLevels;
+		int levels = (smd->modifier.scene) ? get_render_subsurf_level(&smd->modifier.scene->r, smd->renderLevels, true) : smd->renderLevels;
 
 		if (levels == 0)
 			return dm;
@@ -3912,7 +3860,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 	}
 	else {
 		int useIncremental = (smd->flags & eSubsurfModifierFlag_Incremental);
-		int levels = (smd->modifier.scene) ? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels) : smd->levels;
+		int levels = (smd->modifier.scene) ? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels, false) : smd->levels;
 		CCGSubSurf *ss;
 
 		/* It is quite possible there is a much better place to do this. It

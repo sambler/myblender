@@ -244,8 +244,9 @@ static void create_mesh_bmvert(BMesh *bm, VMesh *vm, int i, int j, int k, BMVert
 	BM_elem_flag_disable(nv->v, BM_ELEM_TAG);
 }
 
-static void copy_mesh_vert(VMesh *vm, int ito, int jto, int kto,
-                           int ifrom, int jfrom, int kfrom)
+static void copy_mesh_vert(
+        VMesh *vm, int ito, int jto, int kto,
+        int ifrom, int jfrom, int kfrom)
 {
 	NewVert *nvto, *nvfrom;
 
@@ -361,8 +362,9 @@ static BMFace *boundvert_rep_face(BoundVert *v)
  *
  * \note ALL face creation goes through this function, this is important to keep!
  */
-static BMFace *bev_create_ngon(BMesh *bm, BMVert **vert_arr, const int totv,
-                               BMFace **face_arr, BMFace *facerep, int mat_nr, bool do_interp)
+static BMFace *bev_create_ngon(
+        BMesh *bm, BMVert **vert_arr, const int totv,
+        BMFace **face_arr, BMFace *facerep, int mat_nr, bool do_interp)
 {
 	BMIter iter;
 	BMLoop *l;
@@ -402,15 +404,17 @@ static BMFace *bev_create_ngon(BMesh *bm, BMVert **vert_arr, const int totv,
 	return f;
 }
 
-static BMFace *bev_create_quad_tri(BMesh *bm, BMVert *v1, BMVert *v2, BMVert *v3, BMVert *v4,
-                                   BMFace *facerep, int mat_nr, bool do_interp)
+static BMFace *bev_create_quad_tri(
+        BMesh *bm, BMVert *v1, BMVert *v2, BMVert *v3, BMVert *v4,
+        BMFace *facerep, int mat_nr, bool do_interp)
 {
 	BMVert *varr[4] = {v1, v2, v3, v4};
 	return bev_create_ngon(bm, varr, v4 ? 4 : 3, NULL, facerep, mat_nr, do_interp);
 }
 
-static BMFace *bev_create_quad_tri_ex(BMesh *bm, BMVert *v1, BMVert *v2, BMVert *v3, BMVert *v4,
-                                      BMFace *f1, BMFace *f2, BMFace *f3, BMFace *f4, int mat_nr)
+static BMFace *bev_create_quad_tri_ex(
+        BMesh *bm, BMVert *v1, BMVert *v2, BMVert *v3, BMVert *v4,
+        BMFace *f1, BMFace *f2, BMFace *f3, BMFace *f4, int mat_nr)
 {
 	BMVert *varr[4] = {v1, v2, v3, v4};
 	BMFace *farr[4] = {f1, f2, f3, f4};
@@ -419,8 +423,9 @@ static BMFace *bev_create_quad_tri_ex(BMesh *bm, BMVert *v1, BMVert *v2, BMVert 
 
 
 /* Is Loop layer layer_index contiguous across shared vertex of l1 and l2? */
-static bool contig_ldata_across_loops(BMesh *bm, BMLoop *l1, BMLoop *l2,
-                                      int layer_index)
+static bool contig_ldata_across_loops(
+        BMesh *bm, BMLoop *l1, BMLoop *l2,
+        int layer_index)
 {
 	const int offset = bm->ldata.layers[layer_index].offset;
 	const int type = bm->ldata.layers[layer_index].type;
@@ -478,7 +483,10 @@ static bool contig_ldata_across_edge(BMesh *bm, BMEdge *e, BMFace *f1, BMFace *f
 	return true;
 }
 
-/* Like bev_create_quad_tri, but when verts straddle an old edge.
+/**
+ * Like #bev_create_quad_tri, but when verts straddle an old edge.
+ *
+ * <pre>
  *        e
  *        |
  *  v1+---|---+v4
@@ -487,13 +495,16 @@ static bool contig_ldata_across_edge(BMesh *bm, BMEdge *e, BMFace *f1, BMFace *f
  *  v2+---|---+v3
  *        |
  *    f1  |  f2
+ * </pre>
  *
  * Most CustomData for loops can be interpolated in their respective
  * faces' loops, but for UVs and other 'has_math_cd' layers, only
  * do this if the UVs are continuous across the edge e, otherwise pick
  * one side (f1, arbitrarily), and interpolate them all on that side.
- * For face data, use f1 (arbitrarily) as face representative. */
-static BMFace *bev_create_quad_straddle(BMesh *bm, BMVert *v1, BMVert *v2, BMVert *v3, BMVert *v4,
+ * For face data, use f1 (arbitrarily) as face representative.
+ */
+static BMFace *bev_create_quad_straddle(
+        BMesh *bm, BMVert *v1, BMVert *v2, BMVert *v3, BMVert *v4,
         BMFace *f1, BMFace *f2, int mat_nr, bool is_seam)
 {
 	BMFace *f, *facerep;
@@ -525,23 +536,28 @@ static void bev_merge_uvs(BMesh *bm, BMVert *v)
 	BMLoop *l;
 	float uv[2];
 	int n;
-	int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
+	int num_of_uv_layers = CustomData_number_of_layers(&bm->ldata, CD_MLOOPUV);
+	int i;
 
-	if (cd_loop_uv_offset == -1)
-		return;
+	for (i = 0; i < num_of_uv_layers; i++) {
+		int cd_loop_uv_offset = CustomData_get_n_offset(&bm->ldata, CD_MLOOPUV, i);
 
-	n = 0;
-	zero_v2(uv);
-	BM_ITER_ELEM (l, &iter, v, BM_LOOPS_OF_VERT) {
-		luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-		add_v2_v2(uv, luv->uv);
-		n++;
-	}
-	if (n > 1) {
-		mul_v2_fl(uv, 1.0f / (float)n);
+		if (cd_loop_uv_offset == -1)
+			return;
+
+		n = 0;
+		zero_v2(uv);
 		BM_ITER_ELEM (l, &iter, v, BM_LOOPS_OF_VERT) {
 			luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-			copy_v2_v2(luv->uv, uv);
+			add_v2_v2(uv, luv->uv);
+			n++;
+		}
+		if (n > 1) {
+			mul_v2_fl(uv, 1.0f / (float)n);
+			BM_ITER_ELEM (l, &iter, v, BM_LOOPS_OF_VERT) {
+				luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
+				copy_v2_v2(luv->uv, uv);
+			}
 		}
 	}
 }
@@ -732,8 +748,9 @@ static bool offset_meet_edge(EdgeHalf *e1, EdgeHalf *e2, BMVert *v,  float meetc
  * already, prefer to keep the offset the same on this end.
  * Otherwise, pick a point between the two intersection points on emid that minimizes
  * the sum of squares of errors from desired offset. */
-static void offset_on_edge_between(BevelParams *bp, EdgeHalf *e1, EdgeHalf *e2, EdgeHalf *emid,
-                                   BMVert *v, float meetco[3])
+static void offset_on_edge_between(
+        BevelParams *bp, EdgeHalf *e1, EdgeHalf *e2, EdgeHalf *emid,
+        BMVert *v, float meetco[3])
 {
 	float d, ang1, ang2, sina1, sina2, lambda;
 	float meet1[3], meet2[3];
@@ -788,8 +805,9 @@ static void offset_on_edge_between(BevelParams *bp, EdgeHalf *e1, EdgeHalf *e2, 
  * Viewed from the vertex normal side, the CCW order of the edges is e1, emid, e2.
  * The offset lines may not meet exactly: the lines may be angled so that they can't meet.
  * In that case, pick  the offset_on_edge_between. */
-static void offset_in_two_planes(BevelParams *bp, EdgeHalf *e1, EdgeHalf *e2, EdgeHalf *emid,
-                                 BMVert *v,  float meetco[3])
+static void offset_in_two_planes(
+        BevelParams *bp, EdgeHalf *e1, EdgeHalf *e2, EdgeHalf *emid,
+        BMVert *v,  float meetco[3])
 {
 	float dir1[3], dir2[3], dirmid[3], norm_perp1[3], norm_perp2[3],
 	      off1a[3], off1b[3], off2a[3], off2b[3], isect2[3],
@@ -904,11 +922,11 @@ static void project_to_edge(BMEdge *e, const float co_a[3], const float co_b[3],
 /* If there is a bndv->ebev edge, find the mid control point if necessary.
  * It is the closest point on the beveled edge to the line segment between
  * bndv and bndv->next.  */
-static void set_profile_params(BevelParams *bp, BoundVert *bndv)
+static void set_profile_params(BevelParams *bp, BevVert *bv, BoundVert *bndv)
 {
 	EdgeHalf *e;
 	Profile *pro;
-	float co1[3], co2[3], co3[3], d1[3], d2[3], d3[3], l;
+	float co1[3], co2[3], co3[3], d1[3], d2[3], l;
 	bool do_linear_interp;
 
 	copy_v3_v3(co1, bndv->nv.co);
@@ -942,18 +960,37 @@ static void set_profile_params(BevelParams *bp, BoundVert *bndv)
 		cross_v3_v3v3(pro->plane_no, d1, d2);
 		l = normalize_v3(pro->plane_no);
 		if (l  <= BEVEL_EPSILON_BIG) {
-			/* co1 - midco -co2 are collinear - project plane that contains that line
-			 * and is perpendicular to the plane containing it and the beveled edge */
-			cross_v3_v3v3(d3, d1, pro->proj_dir);
-			normalize_v3(d3);
-			cross_v3_v3v3(pro->plane_no, d1, d3);
-			l = normalize_v3(pro->plane_no);
-			if (l <= BEVEL_EPSILON_BIG) {
-				/* whole profile is collinear with edge: just interpolate */
+			/* co1 - midco -co2 are collinear.
+			 * Should be case that beveled edge is coplanar with two boundary verts.
+			 * If the profile is going to lead into unbeveled edges on each side
+			 * (that is, both BoundVerts are "on-edge" points on non-beveled edges)
+			 * then in order to get curve in multi-segment case, change projection plane
+			 * to be that common plane, projection dir to be the plane normal,
+			 * and mid to be the original vertex.
+			 * Otherwise, we just want to linearly interpolate between co1 and co2.
+			 */
+			if (e->prev->is_bev || e->next->is_bev) {
 				do_linear_interp = true;
 			}
-			/* signal to weld that this is linear */
-			pro->super_r = PRO_LINE_R;
+			else {
+				copy_v3_v3(pro->coa, co1);
+				copy_v3_v3(pro->midco, bv->v->co);
+				copy_v3_v3(pro->cob, co2);
+				sub_v3_v3v3(d1, pro->midco, co1);
+				normalize_v3(d1);
+				sub_v3_v3v3(d2, pro->midco, co2);
+				normalize_v3(d2);
+				cross_v3_v3v3(pro->plane_no, d1, d2);
+				l = normalize_v3(pro->plane_no);
+				if (l <= BEVEL_EPSILON_BIG) {
+					/* whole profile is collinear with edge: just interpolate */
+					do_linear_interp = true;
+				}
+				else {
+					copy_v3_v3(pro->plane_co, bv->v->co);
+					copy_v3_v3(pro->proj_dir, pro->plane_no);
+				}
+			}
 		}
 		copy_v3_v3(pro->plane_co, co1);
 	}
@@ -1055,8 +1092,9 @@ static int bev_ccw_test(BMEdge *a, BMEdge *b, BMFace *f)
  * and B has the right side as columns - both extended into homogeneous coords.
  * So M = B*(Ainverse).  Doing Ainverse by hand gives the code below.
  */
-static bool make_unit_square_map(const float va[3], const float vmid[3], const float vb[3],
-                                 float r_mat[4][4])
+static bool make_unit_square_map(
+        const float va[3], const float vmid[3], const float vb[3],
+        float r_mat[4][4])
 {
 	float vo[3], vd[3], vb_vmid[3], va_vmid[3], vddir[3];
 
@@ -1104,8 +1142,9 @@ static bool make_unit_square_map(const float va[3], const float vmid[3], const f
  * and 1/2{va+vb+vc-vd}
  * and Blender matrices have cols at m[i][*].
  */
-static void make_unit_cube_map(const float va[3], const float vb[3], const float vc[3],
-                               const float vd[3], float r_mat[4][4])
+static void make_unit_cube_map(
+        const float va[3], const float vb[3], const float vc[3],
+        const float vd[3], float r_mat[4][4])
 {
 	copy_v3_v3(r_mat[0], va);
 	sub_v3_v3(r_mat[0], vb);
@@ -1469,7 +1508,7 @@ static void build_boundary(BevelParams *bp, BevVert *bv, bool construct)
 		else {
 			adjust_bound_vert(e->next->leftv, co);
 		}
-		set_profile_params(bp, vm->boundstart);
+		set_profile_params(bp, bv, vm->boundstart);
 		calculate_profile(bp, vm->boundstart);
 		return;
 	}
@@ -1575,7 +1614,7 @@ static void build_boundary(BevelParams *bp, BevVert *bv, bool construct)
 
 	v = vm->boundstart;
 	do {
-		set_profile_params(bp, v);
+		set_profile_params(bp, bv, v);
 		calculate_profile(bp, v);
 	} while ((v = v->next) != vm->boundstart);
 
@@ -1837,9 +1876,10 @@ static void vmesh_center(VMesh *vm, float r_cent[3])
 	}
 }
 
-static void avg4(float co[3],
-                 const NewVert *v0, const NewVert *v1,
-                 const NewVert *v2, const NewVert *v3)
+static void avg4(
+        float co[3],
+        const NewVert *v0, const NewVert *v1,
+        const NewVert *v2, const NewVert *v3)
 {
 	add_v3_v3v3(co, v0->co, v1->co);
 	add_v3_v3(co, v2->co);
@@ -2710,23 +2750,60 @@ static void bevel_build_quadstrip(BevelParams *bp, BMesh *bm, BevVert *bv)
 	}
 }
 
-/* Special case: there is no vmesh pattern because this has only two boundary verts,
- * and there are no faces in the original mesh at the original vertex.
- * Since there will be no rebuilt face to make the edge between the boundary verts,
+/* Special case: vertex bevel with only two boundary verts.
+ * Want to make a curved edge if seg > 0.
+ * If there are no faces in the original mesh at the original vertex,
+ * there will be no rebuilt face to make the edge between the boundary verts,
  * we have to make it here. */
-static void bevel_build_one_wire(BMesh *bm, BevVert *bv)
+static void bevel_vert_two_edges(BevelParams *bp, BMesh *bm, BevVert *bv)
 {
 	VMesh *vm = bv->vmesh;
 	BMVert *v1, *v2;
 	BMEdge *e_eg;
+	Profile *pro;
+	float co[3];
+	BoundVert *bndv;
+	int ns, k;
 
-	BLI_assert(vm->count == 2);
+	BLI_assert(vm->count == 2 && bp->vertex_only);
 
 	v1 = mesh_vert(vm, 0, 0, 0)->v;
 	v2 = mesh_vert(vm, 1, 0, 0)->v;
-	e_eg = bv->edges[0].e;
-	BLI_assert(v1 != NULL && v2 != NULL && e_eg != NULL);
-	BM_edge_create(bm, v1, v2, e_eg, BM_CREATE_NO_DOUBLE);
+
+	ns = vm->seg;
+	if (ns > 1) {
+		/* Set up profile parameters */
+		bndv = vm->boundstart;
+		pro = &bndv->profile;
+		pro->super_r = bp->pro_super_r;
+		copy_v3_v3(pro->coa, v1->co);
+		copy_v3_v3(pro->cob, v2->co);
+		copy_v3_v3(pro->midco, bv->v->co);
+		/* don't use projection */
+		zero_v3(pro->plane_co);
+		zero_v3(pro->plane_no);
+		zero_v3(pro->proj_dir);
+		calculate_profile(bp, bndv);
+		for (k = 1; k < ns; k++) {
+			get_profile_point(bp, pro, k, ns, co);
+			copy_v3_v3(mesh_vert(vm, 0, 0, k)->co, co);
+			create_mesh_bmvert(bm, vm, 0, 0, k, bv->v);
+		}
+		copy_v3_v3(mesh_vert(vm, 0, 0, ns)->co, v2->co);
+		for (k = 1; k < ns; k++)
+			copy_mesh_vert(vm, 1, 0, ns - k, 0, 0, k);
+	}
+
+	if (BM_vert_face_check(bv->v) == false) {
+		e_eg = bv->edges[0].e;
+		BLI_assert(e_eg != NULL);
+		for (k = 0; k < ns; k++) {
+			v1 = mesh_vert(vm, 0, 0, k)->v;
+			v2 = mesh_vert(vm, 0, 0, k + 1)->v;
+			BLI_assert(v1 != NULL && v2 != NULL);
+			BM_edge_create(bm, v1, v2, e_eg, BM_CREATE_NO_DOUBLE);
+		}
+	}
 }
 
 /* Given that the boundary is built, now make the actual BMVerts
@@ -2812,8 +2889,8 @@ static void build_vmesh(BevelParams *bp, BMesh *bm, BevVert *bv)
 
 	switch (vm->mesh_kind) {
 		case M_NONE:
-			if  (n == 2 && BM_vert_face_count(bv->v) == 0)
-				bevel_build_one_wire(bm, bv);
+			if  (n == 2 && bp->vertex_only)
+				bevel_vert_two_edges(bp, bm, bv);
 			break;
 		case M_POLY:
 			bevel_build_poly(bp, bm, bv);
@@ -2896,8 +2973,9 @@ static BevVert *bevel_vert_construct(BMesh *bm, BevelParams *bp, BMVert *v)
 			nwire++;
 			/* If edge beveling, exclude wire edges from edges array.
 			 * Mark this edge as "chosen" so loop below won't choose it. */
-			 if (!bp->vertex_only)
+			if (!bp->vertex_only) {
 				BM_BEVEL_EDGE_TAG_ENABLE(bme);
+			}
 		}
 	}
 	if (!first_bme)
@@ -3169,7 +3247,7 @@ static bool bev_rebuild_polygon(BMesh *bm, BevelParams *bp, BMFace *f)
 							BLI_array_append(vv_fix, bmv);
 					}
 				}
-				else if (vm->mesh_kind == M_ADJ && vm->seg > 1 && !e->is_bev && !eprev->is_bev) {
+				else if ((vm->mesh_kind == M_ADJ || bp->vertex_only) && vm->seg > 1 && !e->is_bev && !eprev->is_bev) {
 					BLI_assert(v->prev == vend);
 					i = vend->index;
 					for (k = vm->seg - 1; k > 0; k--) {
@@ -3693,10 +3771,11 @@ static float bevel_limit_offset(BMesh *bm, BevelParams *bp)
  *
  * \warning all tagged edges _must_ be manifold.
  */
-void BM_mesh_bevel(BMesh *bm, const float offset, const int offset_type,
-                   const float segments, const float profile,
-                   const bool vertex_only, const bool use_weights, const bool limit_offset,
-                   const struct MDeformVert *dvert, const int vertex_group, const int mat)
+void BM_mesh_bevel(
+        BMesh *bm, const float offset, const int offset_type,
+        const float segments, const float profile,
+        const bool vertex_only, const bool use_weights, const bool limit_offset,
+        const struct MDeformVert *dvert, const int vertex_group, const int mat)
 {
 	BMIter iter;
 	BMVert *v, *v_next;

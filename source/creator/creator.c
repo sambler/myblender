@@ -93,6 +93,8 @@
 #include "BKE_image.h"
 #include "BKE_particle.h"
 
+#include "DEG_depsgraph.h"
+
 #include "IMB_imbuf.h"  /* for IMB_init */
 
 #ifdef WITH_PYTHON
@@ -195,6 +197,7 @@ static void setCallbacks(void);
 #ifndef WITH_PYTHON_MODULE
 
 static bool use_crash_handler = true;
+static bool use_abort_handler = true;
 
 /* set breakpoints here when running in debug mode, useful to catch floating point errors */
 #if defined(__linux__) || defined(_WIN32) || defined(OSX_SSE_FPE)
@@ -356,6 +359,10 @@ static int print_help(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	printf("Other Options:\n");
 	BLI_argsPrintOtherDoc(ba);
 
+	printf("\n");
+	printf("Experimental features:\n");
+	BLI_argsPrintArgDoc(ba, "--enable-new-depsgraph");
+
 	printf("Argument Parsing:\n");
 	printf("\targuments must be separated by white space. eg\n");
 	printf("\t\t\"blender -ba test.blend\"\n");
@@ -415,6 +422,12 @@ static int disable_python(int UNUSED(argc), const char **UNUSED(argv), void *UNU
 static int disable_crash_handler(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
 	use_crash_handler = false;
+	return 0;
+}
+
+static int disable_abort_handler(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
+{
+	use_abort_handler = false;
 	return 0;
 }
 
@@ -590,6 +603,93 @@ static void blender_crash_handler(int signum)
 #endif
 }
 
+#ifdef WIN32
+LONG WINAPI windows_exception_handler(EXCEPTION_POINTERS *ExceptionInfo)
+{
+	switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+		case EXCEPTION_ACCESS_VIOLATION:
+			fputs("Error: EXCEPTION_ACCESS_VIOLATION\n", stderr);
+			break;
+		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+			fputs("Error: EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n", stderr);
+			break;
+		case EXCEPTION_BREAKPOINT:
+			fputs("Error: EXCEPTION_BREAKPOINT\n", stderr);
+			break;
+		case EXCEPTION_DATATYPE_MISALIGNMENT:
+			fputs("Error: EXCEPTION_DATATYPE_MISALIGNMENT\n", stderr);
+			break;
+		case EXCEPTION_FLT_DENORMAL_OPERAND:
+			fputs("Error: EXCEPTION_FLT_DENORMAL_OPERAND\n", stderr);
+			break;
+		case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+			fputs("Error: EXCEPTION_FLT_DIVIDE_BY_ZERO\n", stderr);
+			break;
+		case EXCEPTION_FLT_INEXACT_RESULT:
+			fputs("Error: EXCEPTION_FLT_INEXACT_RESULT\n", stderr);
+			break;
+		case EXCEPTION_FLT_INVALID_OPERATION:
+			fputs("Error: EXCEPTION_FLT_INVALID_OPERATION\n", stderr);
+			break;
+		case EXCEPTION_FLT_OVERFLOW:
+			fputs("Error: EXCEPTION_FLT_OVERFLOW\n", stderr);
+			break;
+		case EXCEPTION_FLT_STACK_CHECK:
+			fputs("Error: EXCEPTION_FLT_STACK_CHECK\n", stderr);
+			break;
+		case EXCEPTION_FLT_UNDERFLOW:
+			fputs("Error: EXCEPTION_FLT_UNDERFLOW\n", stderr);
+			break;
+		case EXCEPTION_ILLEGAL_INSTRUCTION:
+			fputs("Error: EXCEPTION_ILLEGAL_INSTRUCTION\n", stderr);
+			break;
+		case EXCEPTION_IN_PAGE_ERROR:
+			fputs("Error: EXCEPTION_IN_PAGE_ERROR\n", stderr);
+			break;
+		case EXCEPTION_INT_DIVIDE_BY_ZERO:
+			fputs("Error: EXCEPTION_INT_DIVIDE_BY_ZERO\n", stderr);
+			break;
+		case EXCEPTION_INT_OVERFLOW:
+			fputs("Error: EXCEPTION_INT_OVERFLOW\n", stderr);
+			break;
+		case EXCEPTION_INVALID_DISPOSITION:
+			fputs("Error: EXCEPTION_INVALID_DISPOSITION\n", stderr);
+			break;
+		case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+			fputs("Error: EXCEPTION_NONCONTINUABLE_EXCEPTION\n", stderr);
+			break;
+		case EXCEPTION_PRIV_INSTRUCTION:
+			fputs("Error: EXCEPTION_PRIV_INSTRUCTION\n", stderr);
+			break;
+		case EXCEPTION_SINGLE_STEP:
+			fputs("Error: EXCEPTION_SINGLE_STEP\n", stderr);
+			break;
+		case EXCEPTION_STACK_OVERFLOW:
+			fputs("Error: EXCEPTION_STACK_OVERFLOW\n", stderr);
+			break;
+		default:
+			fputs("Error: Unrecognized Exception\n", stderr);
+			break;
+	}
+
+	fflush(stderr);
+
+	/* If this is a stack overflow then we can't walk the stack, so just show
+	 * where the error happened */
+	if (EXCEPTION_STACK_OVERFLOW != ExceptionInfo->ExceptionRecord->ExceptionCode) {
+		blender_crash_handler(SIGSEGV);
+	}
+
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
+
+
+static void blender_abort_handler(int UNUSED(signum))
+{
+	/* Delete content of temp dir! */
+	BKE_tempdir_session_purge();
+}
 
 static int set_factory_startup(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
@@ -717,7 +817,7 @@ static int no_glsl(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(dat
 
 static int no_audio(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
-	sound_force_device(0);
+	BKE_sound_force_device(0);
 	return 0;
 }
 
@@ -728,7 +828,7 @@ static int set_audio(int argc, const char **argv, void *UNUSED(data))
 		exit(1);
 	}
 
-	sound_force_device(sound_define_from_str(argv[1]));
+	BKE_sound_force_device(BKE_sound_define_from_str(argv[1]));
 	return 1;
 }
 
@@ -755,7 +855,7 @@ static int set_engine(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
 	if (argc >= 2) {
-		if (!strcmp(argv[1], "help")) {
+		if (STREQ(argv[1], "help")) {
 			RenderEngineType *type = NULL;
 			printf("Blender Engine Listing:\n");
 			for (type = R_engines.first; type; type = type->next) {
@@ -773,6 +873,7 @@ static int set_engine(int argc, const char **argv, void *data)
 				}
 				else {
 					printf("\nError: engine not found '%s'\n", argv[1]);
+					exit(1);
 				}
 			}
 			else {
@@ -832,6 +933,12 @@ static int set_threads(int argc, const char **argv, void *UNUSED(data))
 		printf("\nError: you must specify a number of threads between 0 and %d '-t / --threads'.\n", BLENDER_MAX_THREADS);
 		return 0;
 	}
+}
+
+static int depsgraph_use_new(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
+{
+	DEG_depsgraph_switch_to_new();
+	return 0;
 }
 
 static int set_verbosity(int argc, const char **argv, void *UNUSED(data))
@@ -924,11 +1031,12 @@ static int set_ge_parameters(int argc, const char **argv, void *data)
 			SYS_WriteCommandLineInt(syshandle, argv[a], 1);
 #endif
 			/* doMipMap */
-			if (!strcmp(argv[a], "nomipmap")) {
+			if (STREQ(argv[a], "nomipmap")) {
 				GPU_set_mipmap(0); //doMipMap = 0;
 			}
 			/* linearMipMap */
-			if (!strcmp(argv[a], "linearmipmap")) {
+			if (STREQ(argv[a], "linearmipmap")) {
+				GPU_set_mipmap(1);
 				GPU_set_linear_mipmap(1); //linearMipMap = 1;
 			}
 
@@ -1090,19 +1198,24 @@ static int set_skip_frame(int argc, const char **argv, void *data)
 #define BPY_CTX_SETUP(_cmd)                                                   \
 	{                                                                         \
 		wmWindowManager *wm = CTX_wm_manager(C);                              \
-		wmWindow *prevwin = CTX_wm_window(C);                                 \
-		Scene *prevscene = CTX_data_scene(C);                                 \
-		if (wm->windows.first) {                                              \
+		Scene *scene_prev = CTX_data_scene(C);                                \
+		wmWindow *win_prev;                                                   \
+		const bool has_win = !BLI_listbase_is_empty(&wm->windows);            \
+		if (has_win) {                                                        \
+			win_prev = CTX_wm_window(C);                                      \
 			CTX_wm_window_set(C, wm->windows.first);                          \
-			_cmd;                                                             \
-			CTX_wm_window_set(C, prevwin);                                    \
 		}                                                                     \
 		else {                                                                \
 			fprintf(stderr, "Python script \"%s\" "                           \
 			        "running with missing context data.\n", argv[1]);         \
+		}                                                                     \
+		{                                                                     \
 			_cmd;                                                             \
 		}                                                                     \
-		CTX_data_scene_set(C, prevscene);                                     \
+		if (has_win) {                                                        \
+			CTX_wm_window_set(C, win_prev);                                   \
+		}                                                                     \
+		CTX_data_scene_set(C, scene_prev);                                    \
 	} (void)0                                                                 \
 
 #endif /* WITH_PYTHON */
@@ -1240,7 +1353,14 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 
 			CTX_wm_manager_set(C, NULL); /* remove wm to force check */
 			WM_check(C);
-			G.relbase_valid = 1;
+			if (bmain->name[0]) {
+				G.save_over = 1;
+				G.relbase_valid = 1;
+			}
+			else {
+				G.save_over = 0;
+				G.relbase_valid = 0;
+			}
 			if (CTX_wm_manager(C) == NULL) CTX_wm_manager_set(C, wm);  /* reset wm */
 
 			/* WM_file_read would call normally */
@@ -1262,8 +1382,8 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 		BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
 
 		/* happens for the UI on file reading too (huh? (ton))*/
-		// XXX		BKE_reset_undo();
-		//			BKE_write_undo("original");	/* save current state */
+		// XXX		BKE_undo_reset();
+		//			BKE_undo_write("original");	/* save current state */
 	}
 	else {
 		/* we are not running in background mode here, but start blender in UI mode with
@@ -1346,6 +1466,7 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 1, "-Y", "--disable-autoexec", "\n\tDisable automatic python script execution (pydrivers & startup scripts)" PY_DISABLE_AUTO, disable_python, NULL);
 
 	BLI_argsAdd(ba, 1, NULL, "--disable-crash-handler", "\n\tDisable the crash handler", disable_crash_handler, NULL);
+	BLI_argsAdd(ba, 1, NULL, "--disable-abort-handler", "\n\tDisable the abort handler", disable_abort_handler, NULL);
 
 #undef PY_ENABLE_AUTO
 #undef PY_DISABLE_AUTO
@@ -1383,6 +1504,9 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 1, NULL, "--debug-value", "<value>\n\tSet debug value of <value> on startup\n", set_debug_value, NULL);
 	BLI_argsAdd(ba, 1, NULL, "--debug-jobs",  "\n\tEnable time profiling for background jobs.", debug_mode_generic, (void *)G_DEBUG_JOBS);
 	BLI_argsAdd(ba, 1, NULL, "--debug-depsgraph", "\n\tEnable debug messages from dependency graph", debug_mode_generic, (void *)G_DEBUG_DEPSGRAPH);
+	BLI_argsAdd(ba, 1, NULL, "--debug-gpumem", "\n\tEnable GPU memory stats in status bar", debug_mode_generic, (void *)G_DEBUG_GPU_MEM);
+
+	BLI_argsAdd(ba, 1, NULL, "--enable-new-depsgraph", "\n\tUse new dependency graph", depsgraph_use_new, NULL);
 
 	BLI_argsAdd(ba, 1, NULL, "--verbose", "<verbose>\n\tSet logging verbosity level.", set_verbosity, NULL);
 
@@ -1451,13 +1575,13 @@ char **environ = NULL;
  *   or exit when running in background mode.
  */
 int main(
-       int argc,
+        int argc,
 #ifdef WIN32
         const char **UNUSED(argv_c)
 #else
         const char **argv
 #endif
-         )
+        )
 {
 	bContext *C;
 	SYS_SystemHandle syshandle;
@@ -1465,6 +1589,14 @@ int main(
 #ifndef WITH_PYTHON_MODULE
 	bArgs *ba;
 #endif
+
+#ifdef WIN32
+	char **argv;
+	int argv_num;
+#endif
+
+	/* --- end declarations --- */
+
 
 #ifdef WIN32
 	/* FMA3 support in the 2013 CRT is broken on Vista and Windows 7 RTM (fixed in SP1). Just disable it. */
@@ -1476,16 +1608,15 @@ int main(
 	/* NOTE: cannot use guardedalloc malloc here, as it's not yet initialized
 	 *       (it depends on the args passed in, which is what we're getting here!)
 	 */
-	wchar_t **argv_16 = CommandLineToArgvW(GetCommandLineW(), &argc);
-	char **argv = malloc(argc * sizeof(char *));
-	int argci = 0;
-	
-	for (argci = 0; argci < argc; argci++) {
-		argv[argci] = alloc_utf_8_from_16(argv_16[argci], 0);
+	{
+		wchar_t **argv_16 = CommandLineToArgvW(GetCommandLineW(), &argc);
+		argv = malloc(argc * sizeof(char *));
+		for (argv_num = 0; argv_num < argc; argv_num++) {
+			argv[argv_num] = alloc_utf_8_from_16(argv_16[argv_num], 0);
+		}
+		LocalFree(argv_16);
 	}
-	
-	LocalFree(argv_16);
-#endif
+#endif  /* WIN32 */
 
 	/* NOTE: Special exception for guarded allocator type switch:
 	 *       we need to perform switch from lock-free to fully
@@ -1553,8 +1684,8 @@ int main(
 	setCallbacks();
 	
 #if defined(__APPLE__) && !defined(WITH_PYTHON_MODULE)
-/* patch to ignore argument finder gives us (pid?) */
-	if (argc == 2 && strncmp(argv[1], "-psn_", 5) == 0) {
+	/* patch to ignore argument finder gives us (pid?) */
+	if (argc == 2 && STREQLEN(argv[1], "-psn_", 5)) {
 		extern int GHOST_HACK_getFirstFile(char buf[]);
 		static char firstfilebuf[512];
 
@@ -1603,9 +1734,18 @@ int main(
 	BLI_argsParse(ba, 1, NULL, NULL);
 
 	if (use_crash_handler) {
+#ifdef WIN32
+		SetUnhandledExceptionFilter(windows_exception_handler);
+#else
 		/* after parsing args */
 		signal(SIGSEGV, blender_crash_handler);
+#endif
 	}
+
+	if (use_abort_handler) {
+		signal(SIGABRT, blender_abort_handler);
+	}
+
 #else
 	G.factory_startup = true;  /* using preferences or user startup makes no sense for py-as-module */
 	(void)syshandle;
@@ -1638,7 +1778,7 @@ int main(
 
 	/* Initialize ffmpeg if built in, also needed for bg mode if videos are
 	 * rendered via ffmpeg */
-	sound_init_once();
+	BKE_sound_init_once();
 	
 	init_def_material();
 
@@ -1702,8 +1842,8 @@ int main(
 #endif
 
 #ifdef WIN32
-	while (argci) {
-		free(argv[--argci]);
+	while (argv_num) {
+		free(argv[--argv_num]);
 	}
 	free(argv);
 	argv = NULL;

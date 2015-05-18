@@ -621,7 +621,7 @@ MovieClip *BKE_movieclip_file_add(Main *bmain, const char *name)
 		BLI_strncpy(strtest, clip->name, sizeof(clip->name));
 		BLI_path_abs(strtest, G.main->name);
 
-		if (strcmp(strtest, str) == 0) {
+		if (STREQ(strtest, str)) {
 			BLI_strncpy(clip->name, name, sizeof(clip->name));  /* for stringcode */
 			clip->id.us++;  /* officially should not, it doesn't link here! */
 
@@ -790,10 +790,10 @@ static ImBuf *postprocess_frame(MovieClip *clip, MovieClipUser *user, ImBuf *ibu
 	}
 
 	if (postprocess_flag) {
-		bool disable_red   = (postprocess_flag & MOVIECLIP_DISABLE_RED) != 0,
-			 disable_green = (postprocess_flag & MOVIECLIP_DISABLE_GREEN) != 0,
-			 disable_blue  = (postprocess_flag & MOVIECLIP_DISABLE_BLUE) != 0,
-			 grayscale     = (postprocess_flag & MOVIECLIP_PREVIEW_GRAYSCALE) != 0;
+		bool disable_red   = (postprocess_flag & MOVIECLIP_DISABLE_RED) != 0;
+		bool disable_green = (postprocess_flag & MOVIECLIP_DISABLE_GREEN) != 0;
+		bool disable_blue  = (postprocess_flag & MOVIECLIP_DISABLE_BLUE) != 0;
+		bool grayscale     = (postprocess_flag & MOVIECLIP_PREVIEW_GRAYSCALE) != 0;
 
 		if (disable_red || disable_green || disable_blue || grayscale)
 			BKE_tracking_disable_channels(postproc_ibuf, disable_red, disable_green, disable_blue, 1);
@@ -1129,15 +1129,15 @@ void BKE_movieclip_get_aspect(MovieClip *clip, float *aspx, float *aspy)
 }
 
 /* get segments of cached frames. useful for debugging cache policies */
-void BKE_movieclip_get_cache_segments(MovieClip *clip, MovieClipUser *user, int *totseg_r, int **points_r)
+void BKE_movieclip_get_cache_segments(MovieClip *clip, MovieClipUser *user, int *r_totseg, int **r_points)
 {
-	*totseg_r = 0;
-	*points_r = NULL;
+	*r_totseg = 0;
+	*r_points = NULL;
 
 	if (clip->cache) {
 		int proxy = rendersize_to_proxy(user, clip->flag);
 
-		IMB_moviecache_get_cache_segments(clip->cache->moviecache, proxy, user->render_flag, totseg_r, points_r);
+		IMB_moviecache_get_cache_segments(clip->cache->moviecache, proxy, user->render_flag, r_totseg, r_points);
 	}
 }
 
@@ -1168,7 +1168,7 @@ static void free_buffers(MovieClip *clip)
 		clip->anim = NULL;
 	}
 
-	BKE_free_animdata((ID *) clip);
+	BKE_animdata_free((ID *) clip);
 }
 
 void BKE_movieclip_clear_cache(MovieClip *clip)

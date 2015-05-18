@@ -25,7 +25,7 @@ def init():
     path = os.path.dirname(__file__)
     user_path = os.path.dirname(os.path.abspath(bpy.utils.user_resource('CONFIG', '')))
 
-    _cycles.init(path, user_path)
+    _cycles.init(path, user_path, bpy.app.background)
 
 
 def create(engine, data, scene, region=None, v3d=None, rv3d=None, preview_osl=False):
@@ -59,11 +59,11 @@ def render(engine):
         _cycles.render(engine.session)
 
 
-def bake(engine, obj, pass_type, pixel_array, num_pixels, depth, result):
+def bake(engine, obj, pass_type, object_id, pixel_array, num_pixels, depth, result):
     import _cycles
     session = getattr(engine, "session", None)
     if session is not None:
-        _cycles.bake(engine.session, obj.as_pointer(), pass_type, pixel_array.as_pointer(), num_pixels, depth, result.as_pointer())
+        _cycles.bake(engine.session, obj.as_pointer(), pass_type, object_id, pixel_array.as_pointer(), num_pixels, depth, result.as_pointer())
 
 
 def reset(engine, data, scene):
@@ -100,6 +100,7 @@ def with_osl():
 def with_network():
     import _cycles
     return _cycles.with_network
+
 
 def system_info():
     import _cycles

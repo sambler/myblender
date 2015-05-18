@@ -87,6 +87,7 @@
 #include "ED_keyframing.h"
 #include "ED_markers.h"
 #include "ED_mesh.h"
+#include "ED_object.h"
 #include "ED_particle.h"
 #include "ED_screen_types.h"
 #include "ED_space_api.h"
@@ -807,6 +808,10 @@ static void recalcData_objects(TransInfo *t)
 					ebo->rad_head *= ebo->length / ebo->oldlength;
 					ebo->rad_tail *= ebo->length / ebo->oldlength;
 					ebo->oldlength = ebo->length;
+
+					if (ebo_parent) {
+						ebo_parent->rad_tail = ebo->rad_head;
+					}
 				}
 			}
 			
@@ -1196,7 +1201,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			if (ELEM(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL)) {
 				const bool use_island = transdata_check_local_islands(t, t->around);
 
-				if (!use_island) {
+				if (obedit && !use_island) {
 					t->options |= CTX_NO_PET;
 				}
 			}
@@ -1220,7 +1225,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 				}
 			}
 			else {
-				RNA_property_boolean_set(op->ptr, prop, t->settings->uvcalc_flag & UVCALC_TRANSFORM_CORRECT);
+				RNA_property_boolean_set(op->ptr, prop, (t->settings->uvcalc_flag & UVCALC_TRANSFORM_CORRECT) != 0);
 			}
 		}
 
@@ -1315,7 +1320,13 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			/* use settings from scene only if modal */
 			if (t->flag & T_MODAL) {
 				if ((t->options & CTX_NO_PET) == 0) {
-					if (t->obedit) {
+					if (t->spacetype == SPACE_IPO) {
+						t->flag |= initTransInfo_edit_pet_to_flag(ts->proportional_fcurve);
+					}
+					else if (t->spacetype == SPACE_ACTION) {
+						t->flag |= initTransInfo_edit_pet_to_flag(ts->proportional_action);
+					}
+					else if (t->obedit) {
 						t->flag |= initTransInfo_edit_pet_to_flag(ts->proportional);
 					}
 					else if (t->options & CTX_GPENCIL_STROKES) {
@@ -1682,63 +1693,8 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
 	bool ok = false;
 
 	if (t->obedit) {
-		switch (t->obedit->type) {
-			case OB_MESH:
-			{
-				BMEditSelection ese;
-				BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
-
-				if (BM_select_history_active_get(em->bm, &ese)) {
-					BM_editselection_center(&ese, r_center);
-					ok = true;
-				}
-				break;
-			}
-			case OB_ARMATURE:
-			{
-				bArmature *arm = t->obedit->data;
-				EditBone *ebo = arm->act_edbone;
-
-				if (ebo && (!select_only || (ebo->flag & (BONE_SELECTED | BONE_ROOTSEL)))) {
-					copy_v3_v3(r_center, ebo->head);
-					ok = true;
-				}
-
-				break;
-			}
-			case OB_CURVE:
-			case OB_SURF:
-			{
-				float center[3];
-				Curve *cu = (Curve *)t->obedit->data;
-
-				if (ED_curve_active_center(cu, center)) {
-					copy_v3_v3(r_center, center);
-					ok = true;
-				}
-				break;
-			}
-			case OB_MBALL:
-			{
-				MetaBall *mb = (MetaBall *)t->obedit->data;
-				MetaElem *ml_act = mb->lastelem;
-
-				if (ml_act && (!select_only || (ml_act->flag & SELECT))) {
-					copy_v3_v3(r_center, &ml_act->x);
-					ok = true;
-				}
-				break;
-			}
-			case OB_LATTICE:
-			{
-				BPoint *actbp = BKE_lattice_active_point_get(t->obedit->data);
-
-				if (actbp) {
-					copy_v3_v3(r_center, actbp->vec);
-					ok = true;
-				}
-				break;
-			}
+		if (ED_object_editmode_calc_active_center(t->obedit, select_only, r_center)) {
+			ok = true;
 		}
 	}
 	else if (t->flag & T_POSE) {
@@ -1874,9 +1830,12 @@ void calculatePropRatio(TransInfo *t)
 	TransData *td = t->data;
 	int i;
 	float dist;
-	short connected = t->flag & T_PROP_CONNECTED;
+	const bool connected = (t->flag & T_PROP_CONNECTED) != 0;
+
+	t->proptext[0] = '\0';
 
 	if (t->flag & T_PROP_EDIT) {
+		const char *pet_id = NULL;
 		for (i = 0; i < t->total; i++, td++) {
 			if (td->flag & TD_SELECTED) {
 				td->factor = 1.0f;
@@ -1937,6 +1896,9 @@ void calculatePropRatio(TransInfo *t)
 					case PROP_RANDOM:
 						td->factor = BLI_frand() * dist;
 						break;
+					case PROP_INVSQUARE:
+						td->factor = dist * (2.0f - dist);
+						break;
 					default:
 						td->factor = 1;
 						break;
@@ -1945,35 +1907,40 @@ void calculatePropRatio(TransInfo *t)
 		}
 		switch (t->prop_mode) {
 			case PROP_SHARP:
-				strcpy(t->proptext, IFACE_("(Sharp)"));
+				pet_id = N_("(Sharp)");
 				break;
 			case PROP_SMOOTH:
-				strcpy(t->proptext, IFACE_("(Smooth)"));
+				pet_id = N_("(Smooth)");
 				break;
 			case PROP_ROOT:
-				strcpy(t->proptext, IFACE_("(Root)"));
+				pet_id = N_("(Root)");
 				break;
 			case PROP_LIN:
-				strcpy(t->proptext, IFACE_("(Linear)"));
+				pet_id = N_("(Linear)");
 				break;
 			case PROP_CONST:
-				strcpy(t->proptext, IFACE_("(Constant)"));
+				pet_id = N_("(Constant)");
 				break;
 			case PROP_SPHERE:
-				strcpy(t->proptext, IFACE_("(Sphere)"));
+				pet_id = N_("(Sphere)");
 				break;
 			case PROP_RANDOM:
-				strcpy(t->proptext, IFACE_("(Random)"));
+				pet_id = N_("(Random)");
+				break;
+			case PROP_INVSQUARE:
+				pet_id = N_("(InvSquare)");
 				break;
 			default:
-				t->proptext[0] = '\0';
 				break;
+		}
+
+		if (pet_id) {
+			BLI_strncpy(t->proptext, IFACE_(pet_id), sizeof(t->proptext));
 		}
 	}
 	else {
 		for (i = 0; i < t->total; i++, td++) {
 			td->factor = 1.0;
 		}
-		t->proptext[0] = '\0';
 	}
 }

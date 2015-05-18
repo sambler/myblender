@@ -53,6 +53,7 @@
 #include "BLI_listbase.h"		
 #include "BLI_utildefines.h"
 #include "BLI_string.h"
+#include "BLI_array_utils.h"
 
 #include "BKE_animsys.h"
 #include "BKE_displist.h"
@@ -66,6 +67,8 @@
 #include "BKE_scene.h"
 #include "BKE_node.h"
 #include "BKE_curve.h"
+#include "BKE_editmesh.h"
+#include "BKE_font.h"
 
 #include "GPU_material.h"
 
@@ -99,11 +102,11 @@ void BKE_material_free_ex(Material *ma, bool do_id_user)
 	if (ma->ramp_col) MEM_freeN(ma->ramp_col);
 	if (ma->ramp_spec) MEM_freeN(ma->ramp_spec);
 	
-	BKE_free_animdata((ID *)ma);
+	BKE_animdata_free((ID *)ma);
 	
 	if (ma->preview)
 		BKE_previewimg_free(&ma->preview);
-	BKE_icon_delete((struct ID *)ma);
+	BKE_icon_id_delete((struct ID *)ma);
 	ma->id.icon_id = 0;
 	
 	/* is no lib link block, but material extension */
@@ -806,9 +809,13 @@ void assign_material_id(ID *id, Material *ma, short act)
 	if (act > MAXMAT) return;
 	if (act < 1) act = 1;
 
+	/* this is needed for Python overrides,
+	 * we just have to take care that the UI can't do this */
+#if 0
 	/* prevent crashing when using accidentally */
 	BLI_assert(id->lib == NULL);
 	if (id->lib) return;
+#endif
 
 	/* test arraylens */
 
@@ -917,6 +924,35 @@ void assign_material(Object *ob, Material *ma, short act, int assign_type)
 		id_us_plus((ID *)ma);
 	test_object_materials(G.main, ob->data);
 }
+
+
+void BKE_material_remap_object(Object *ob, const unsigned int *remap)
+{
+	Material ***matar = give_matarar(ob);
+	const short *totcol_p = give_totcolp(ob);
+
+	BLI_array_permute(ob->mat, ob->totcol, remap);
+
+	if (ob->matbits) {
+		BLI_array_permute(ob->matbits, ob->totcol, remap);
+	}
+
+	if (matar) {
+		BLI_array_permute(*matar, *totcol_p, remap);
+	}
+
+	if (ob->type == OB_MESH) {
+		BKE_mesh_material_remap(ob->data, remap, ob->totcol);
+	}
+	else if (ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
+		BKE_curve_material_remap(ob->data, remap, ob->totcol);
+	}
+	else {
+		/* add support for this object data! */
+		BLI_assert(matar == NULL);
+	}
+}
+
 
 /* XXX - this calls many more update calls per object then are needed, could be optimized */
 void assign_matarar(struct Object *ob, struct Material ***matar, short totcol)
@@ -1027,7 +1063,7 @@ static void do_init_render_material(Material *ma, int r_mode, float *amb)
 		Group *group;
 
 		for (group = G.main->group.first; group; group = group->id.next) {
-			if (!group->id.lib && strcmp(group->id.name, ma->group->id.name) == 0) {
+			if (!group->id.lib && STREQ(group->id.name, ma->group->id.name)) {
 				ma->group = group;
 			}
 		}
@@ -1317,6 +1353,26 @@ static bool get_mtex_slot_valid_texpaint(struct MTex *mtex)
 	        mtex->tex->ima);
 }
 
+static bNode *nodetree_uv_node_recursive(bNode *node)
+{
+	bNode *inode;
+	bNodeSocket *sock;
+	
+	for (sock = node->inputs.first; sock; sock = sock->next) {
+		if (sock->link) {
+			inode = sock->link->fromnode;
+			if (inode->typeinfo->nclass == NODE_CLASS_INPUT && inode->typeinfo->type == SH_NODE_UVMAP) {
+				return inode;
+			}
+			else {
+				return nodetree_uv_node_recursive(inode);
+			}
+		}
+	}
+	
+	return NULL;
+}
+
 void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma)
 {
 	MTex **mtex;
@@ -1368,7 +1424,27 @@ void BKE_texpaint_slot_refresh_cache(Scene *scene, Material *ma)
 			if (node->typeinfo->nclass == NODE_CLASS_TEXTURE && node->typeinfo->type == SH_NODE_TEX_IMAGE && node->id) {
 				if (active_node == node)
 					ma->paint_active_slot = index;
-				ma->texpaintslot[index++].ima = (Image *)node->id;
+				ma->texpaintslot[index].ima = (Image *)node->id;
+				
+				/* for new renderer, we need to traverse the treeback in search of a UV node */
+				if (use_nodes) {
+					bNode *uvnode = nodetree_uv_node_recursive(node);
+					
+					if (uvnode) {
+						NodeShaderUVMap *storage = (NodeShaderUVMap *)uvnode->storage;
+						ma->texpaintslot[index].uvname = storage->uv_map;
+						/* set a value to index so UI knows that we have a valid pointer for the mesh */
+						ma->texpaintslot[index].index = 0;
+					}
+					else {
+						/* just invalidate the index here so UV map does not get displayed on the UI */
+						ma->texpaintslot[index].index = -1;
+					}
+				}
+				else {
+					ma->texpaintslot[index].index = -1;
+				}
+				index++;
 			}
 		}
 	}

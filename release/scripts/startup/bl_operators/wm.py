@@ -20,12 +20,13 @@
 
 import bpy
 from bpy.types import Operator
-from bpy.props import (StringProperty,
-                       BoolProperty,
-                       IntProperty,
-                       FloatProperty,
-                       EnumProperty,
-                       )
+from bpy.props import (
+        StringProperty,
+        BoolProperty,
+        IntProperty,
+        FloatProperty,
+        EnumProperty,
+        )
 
 from bpy.app.translations import pgettext_tip as tip_
 
@@ -718,7 +719,7 @@ class WM_OT_context_modal_mouse(Operator):
     """Adjust arbitrary values with mouse input"""
     bl_idname = "wm.context_modal_mouse"
     bl_label = "Context Modal Mouse"
-    bl_options = {'GRAB_POINTER', 'BLOCKING', 'UNDO', 'INTERNAL'}
+    bl_options = {'GRAB_CURSOR', 'BLOCKING', 'UNDO', 'INTERNAL'}
 
     data_path_iter = data_path_iter
     data_path_item = data_path_item
@@ -1295,9 +1296,13 @@ class WM_OT_properties_remove(Operator):
     property = rna_property
 
     def execute(self, context):
+        from rna_prop_ui import rna_idprop_ui_prop_clear
         data_path = self.data_path
         item = eval("context.%s" % data_path)
-        del item[self.property]
+        prop = self.property
+        del item[prop]
+        rna_idprop_ui_prop_clear(item, prop)
+
         return {'FINISHED'}
 
 
@@ -1737,7 +1742,7 @@ class WM_OT_addon_enable(Operator):
             err_str = traceback.format_exc()
             print(err_str)
 
-        mod = addon_utils.enable(self.module, handle_error=err_cb)
+        mod = addon_utils.enable(self.module, default_set=True, handle_error=err_cb)
 
         if mod:
             info = addon_utils.module_bl_info(mod)
@@ -1987,7 +1992,6 @@ class WM_OT_addon_install(Operator):
             # if not compressed file just copy into the addon path
             try:
                 shutil.copyfile(pyfile, path_dest)
-
             except:
                 traceback.print_exc()
                 return {'CANCELLED'}

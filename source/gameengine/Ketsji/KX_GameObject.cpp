@@ -36,14 +36,6 @@
 #  pragma warning( disable:4786 )
 #endif
 
-#if defined(_WIN64) && !defined(FREE_WINDOWS64)
-typedef unsigned __int64 uint_ptr;
-#elif defined(FREE_WINDOWS64)
-typedef unsigned long long uint_ptr;
-#else
-typedef unsigned long uint_ptr;
-#endif
-
 #include "RAS_IPolygonMaterial.h"
 #include "KX_BlenderMaterial.h"
 #include "KX_GameObject.h"
@@ -55,6 +47,7 @@ typedef unsigned long uint_ptr;
 #include "KX_MeshProxy.h"
 #include "KX_PolyProxy.h"
 #include <stdio.h> // printf
+#include <climits> // USHRT_MAX
 #include "SG_Controller.h"
 #include "PHY_IGraphicController.h"
 #include "SG_Node.h"
@@ -76,7 +69,10 @@ typedef unsigned long uint_ptr;
 #include "BL_ActionManager.h"
 #include "BL_Action.h"
 
+#include "KX_PythonCallBack.h"
 #include "PyObjectPlus.h" /* python stuff */
+#include "BLI_utildefines.h"
+#include "python_utildefines.h"
 
 // This file defines relationships between parents and children
 // in the game engine.
@@ -97,9 +93,10 @@ KX_GameObject::KX_GameObject(
     : SCA_IObject(),
       m_bDyna(false),
       m_layer(0),
+      m_currentLodLevel(0),
+      m_previousLodLevel(0),
       m_pBlenderObject(NULL),
       m_pBlenderGroupObject(NULL),
-      m_bSuspendDynamics(false),
       m_bUseObjectColor(false),
       m_bIsNegativeScaling(false),
       m_objectColor(1.0, 1.0, 1.0, 1.0),
@@ -295,6 +292,21 @@ void KX_GameObject::SetDupliGroupObject(KX_GameObject* obj)
 {
 	obj->AddRef();
 	m_pDupliGroupObject = obj;
+}
+
+void KX_GameObject::AddConstraint(bRigidBodyJointConstraint *cons)
+{
+	m_constraints.push_back(cons);
+}
+
+std::vector<bRigidBodyJointConstraint*> KX_GameObject::GetConstraints()
+{
+	return m_constraints;
+}
+
+void KX_GameObject::ClearConstraints()
+{
+	m_constraints.clear();
 }
 
 KX_GameObject* KX_GameObject::GetParent()
@@ -551,13 +563,26 @@ void KX_GameObject::ActivateGraphicController(bool recurse)
 	}
 }
 
-void KX_GameObject::SetUserCollisionGroup(short group)
+void KX_GameObject::SetUserCollisionGroup(unsigned short group)
 {
 	m_userCollisionGroup = group;
+	if (m_pPhysicsController)
+		m_pPhysicsController->RefreshCollisions();
 }
-void KX_GameObject::SetUserCollisionMask(short mask)
+void KX_GameObject::SetUserCollisionMask(unsigned short mask)
 {
 	m_userCollisionMask = mask;
+	if (m_pPhysicsController)
+		m_pPhysicsController->RefreshCollisions();
+}
+
+unsigned short KX_GameObject::GetUserCollisionGroup()
+{
+	return m_userCollisionGroup;
+}
+unsigned short KX_GameObject::GetUserCollisionMask()
+{
+	return m_userCollisionMask;
 }
 
 bool KX_GameObject::CheckCollision(KX_GameObject* other)
@@ -575,6 +600,46 @@ CValue* KX_GameObject::GetReplica()
 	return replica;
 }
 
+bool KX_GameObject::IsDynamicsSuspended() const
+{
+	if (m_pPhysicsController)
+		return m_pPhysicsController->IsSuspended();
+	return false;
+}
+
+float KX_GameObject::getLinearDamping() const
+{
+	if (m_pPhysicsController)
+		return m_pPhysicsController->GetLinearDamping();
+	return 0;
+}
+
+float KX_GameObject::getAngularDamping() const
+{
+	if (m_pPhysicsController)
+		return m_pPhysicsController->GetAngularDamping();
+	return 0;
+}
+
+void KX_GameObject::setLinearDamping(float damping)
+{
+	if (m_pPhysicsController)
+		m_pPhysicsController->SetLinearDamping(damping);
+}
+
+
+void KX_GameObject::setAngularDamping(float damping)
+{
+	if (m_pPhysicsController)
+		m_pPhysicsController->SetAngularDamping(damping);
+}
+
+
+void KX_GameObject::setDamping(float linear, float angular)
+{
+	if (m_pPhysicsController)
+		m_pPhysicsController->SetDamping(linear, angular);
+}
 
 
 void KX_GameObject::ApplyForce(const MT_Vector3& force,bool local)
@@ -741,35 +806,74 @@ void KX_GameObject::AddLodMesh(RAS_MeshObject* mesh)
 	m_lodmeshes.push_back(mesh);
 }
 
+
+static float calcHysteresis(KX_Scene *kxscene, LodLevel *lod)
+{
+	float hystvariance = 0.0f;
+
+	if (!kxscene->IsActivedLodHysteresis())
+		return hystvariance;
+			
+	short hysteresis = 0;
+	// if exists, LoD level hysteresis will override scene hysteresis
+	if (lod->next->flags & OB_LOD_USE_HYST)
+		hysteresis = lod->next->obhysteresis;
+	else
+		hysteresis = kxscene->GetLodHysteresisValue();
+
+	return hystvariance = MT_abs(lod->next->distance - lod->distance) * hysteresis / 100;
+}
+
 void KX_GameObject::UpdateLod(MT_Vector3 &cam_pos)
 {
 	// Handle dupligroups
-	if (this->m_pInstanceObjects) {
-		KX_GameObject * instob;
-		int count = this->m_pInstanceObjects->GetCount();
+	if (m_pInstanceObjects) {
+		KX_GameObject *instob;
+		int count = m_pInstanceObjects->GetCount();
 		for (int i = 0; i < count; i++) {
-			instob = (KX_GameObject*)this->m_pInstanceObjects->GetValue(i);
+			instob = (KX_GameObject*)m_pInstanceObjects->GetValue(i);
 			instob->UpdateLod(cam_pos);
 		}
 	}
 
-	if (this->m_lodmeshes.empty()) return;
+	if (m_lodmeshes.empty())
+		return;
 
-	MT_Vector3 delta = this->NodeGetWorldPosition() - cam_pos;
+	MT_Vector3 delta = NodeGetWorldPosition() - cam_pos;
 	float distance2 = delta.length2();
 
 	int level = 0;
-	Object *bob = this->GetBlenderObject();
-	LodLevel *lod = (LodLevel*) bob->lodlevels.first;
+	float hystvariance = 0.0f;
+	Object *bob = GetBlenderObject();
+	LodLevel *lod = (LodLevel *)bob->lodlevels.first;
+	KX_Scene *kxscene = GetScene();
+
 	for (; lod; lod = lod->next, level++) {
-		if (!lod->source || lod->source->type != OB_MESH) level--;
-		if (!lod->next || lod->next->distance * lod->next->distance > distance2) break;
+		if (!lod->source || lod->source->type != OB_MESH)
+			level--;
+
+		if (!lod->next)
+			break;
+
+		if (level == m_previousLodLevel || level == (m_previousLodLevel + 1)) {
+			hystvariance = calcHysteresis(kxscene, lod);
+			float newdistance = lod->next->distance + hystvariance;
+			if (newdistance * newdistance > distance2)
+				break;
+		}
+		else if (level == (m_previousLodLevel - 1)) {
+			hystvariance = calcHysteresis(kxscene, lod);
+			float newdistance = lod->next->distance - hystvariance;
+			if (newdistance * newdistance > distance2)
+				break;
+		}
 	}
 
-	RAS_MeshObject *mesh = this->m_lodmeshes[level];
-
-	if (mesh != this->m_meshes[0]) {
-		this->GetScene()->ReplaceMesh(this, mesh, true, false);
+	RAS_MeshObject *mesh = m_lodmeshes[level];
+	m_currentLodLevel = level;
+	if (mesh != m_meshes[0]) {
+		m_previousLodLevel = level;
+		GetScene()->ReplaceMesh(this, mesh, true, false);
 	}
 }
 
@@ -1465,36 +1569,19 @@ void KX_GameObject::RegisterCollisionCallbacks()
 			pe->AddSensor(spc);
 	}
 }
-void KX_GameObject::RunCollisionCallbacks(KX_GameObject *collider)
+void KX_GameObject::RunCollisionCallbacks(KX_GameObject *collider, const MT_Vector3 &point, const MT_Vector3 &normal)
 {
-	#ifdef WITH_PYTHON
-	Py_ssize_t len;
-	PyObject* collision_callbacks = m_collisionCallbacks;
+#ifdef WITH_PYTHON
+	if (!m_collisionCallbacks || PyList_GET_SIZE(m_collisionCallbacks) == 0)
+		return;
 
-	if (collision_callbacks && (len=PyList_GET_SIZE(collision_callbacks)))
-	{
-		PyObject* args = Py_BuildValue("(O)", collider->GetProxy()); // save python creating each call
-		PyObject *func;
-		PyObject *ret;
+	PyObject *args[] = {collider->GetProxy(), PyObjectFrom(point), PyObjectFrom(normal)};
+	RunPythonCallBackList(m_collisionCallbacks, args, 1, ARRAY_SIZE(args));
 
-		// Iterate the list and run the callbacks
-		for (Py_ssize_t pos=0; pos < len; pos++)
-		{
-			func = PyList_GET_ITEM(collision_callbacks, pos);
-			ret = PyObject_Call(func, args, NULL);
-
-			if (ret == NULL) {
-				PyErr_Print();
-				PyErr_Clear();
-			}
-			else {
-				Py_DECREF(ret);
-			}
-		}
-
-		Py_DECREF(args);
+	for (unsigned int i = 0; i < ARRAY_SIZE(args); ++i) {
+		Py_DECREF(args[i]);
 	}
-	#endif
+#endif
 }
 
 /* Suspend/ resume: for the dynamic behavior, there is a simple
@@ -1822,10 +1909,11 @@ PyMethodDef KX_GameObject::Methods[] = {
 	{"getAngularVelocity", (PyCFunction) KX_GameObject::sPyGetAngularVelocity, METH_VARARGS},
 	{"setAngularVelocity", (PyCFunction) KX_GameObject::sPySetAngularVelocity, METH_VARARGS},
 	{"getVelocity", (PyCFunction) KX_GameObject::sPyGetVelocity, METH_VARARGS},
+	{"setDamping", (PyCFunction) KX_GameObject::sPySetDamping, METH_VARARGS},
 	{"getReactionForce", (PyCFunction) KX_GameObject::sPyGetReactionForce, METH_NOARGS},
 	{"alignAxisToVect",(PyCFunction) KX_GameObject::sPyAlignAxisToVect, METH_VARARGS},
 	{"getAxisVect",(PyCFunction) KX_GameObject::sPyGetAxisVect, METH_O},
-	{"suspendDynamics", (PyCFunction)KX_GameObject::sPySuspendDynamics,METH_NOARGS},
+	{"suspendDynamics", (PyCFunction)KX_GameObject::sPySuspendDynamics, METH_VARARGS},
 	{"restoreDynamics", (PyCFunction)KX_GameObject::sPyRestoreDynamics,METH_NOARGS},
 	{"enableRigidBody", (PyCFunction)KX_GameObject::sPyEnableRigidBody,METH_NOARGS},
 	{"disableRigidBody", (PyCFunction)KX_GameObject::sPyDisableRigidBody,METH_NOARGS},
@@ -1863,6 +1951,7 @@ PyMethodDef KX_GameObject::Methods[] = {
 };
 
 PyAttributeDef KX_GameObject::Attributes[] = {
+	KX_PYATTRIBUTE_INT_RO("currentLodLevel", KX_GameObject, m_currentLodLevel),
 	KX_PYATTRIBUTE_RO_FUNCTION("name",		KX_GameObject, pyattr_get_name),
 	KX_PYATTRIBUTE_RO_FUNCTION("parent",	KX_GameObject, pyattr_get_parent),
 	KX_PYATTRIBUTE_RO_FUNCTION("groupMembers",	KX_GameObject, pyattr_get_group_members),
@@ -1870,6 +1959,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	KX_PYATTRIBUTE_RO_FUNCTION("scene",		KX_GameObject, pyattr_get_scene),
 	KX_PYATTRIBUTE_RO_FUNCTION("life",		KX_GameObject, pyattr_get_life),
 	KX_PYATTRIBUTE_RW_FUNCTION("mass",		KX_GameObject, pyattr_get_mass,		pyattr_set_mass),
+	KX_PYATTRIBUTE_RO_FUNCTION("isSuspendDynamics",		KX_GameObject, pyattr_get_is_suspend_dynamics),
 	KX_PYATTRIBUTE_RW_FUNCTION("linVelocityMin",		KX_GameObject, pyattr_get_lin_vel_min, pyattr_set_lin_vel_min),
 	KX_PYATTRIBUTE_RW_FUNCTION("linVelocityMax",		KX_GameObject, pyattr_get_lin_vel_max, pyattr_set_lin_vel_max),
 	KX_PYATTRIBUTE_RW_FUNCTION("visible",	KX_GameObject, pyattr_get_visible,	pyattr_set_visible),
@@ -1881,6 +1971,8 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	KX_PYATTRIBUTE_RW_FUNCTION("scaling",	KX_GameObject, pyattr_get_worldScaling,	pyattr_set_localScaling),
 	KX_PYATTRIBUTE_RW_FUNCTION("timeOffset",KX_GameObject, pyattr_get_timeOffset,pyattr_set_timeOffset),
 	KX_PYATTRIBUTE_RW_FUNCTION("collisionCallbacks",		KX_GameObject, pyattr_get_collisionCallbacks,	pyattr_set_collisionCallbacks),
+	KX_PYATTRIBUTE_RW_FUNCTION("collisionGroup",			KX_GameObject, pyattr_get_collisionGroup, pyattr_set_collisionGroup),
+	KX_PYATTRIBUTE_RW_FUNCTION("collisionMask",				KX_GameObject, pyattr_get_collisionMask, pyattr_set_collisionMask),
 	KX_PYATTRIBUTE_RW_FUNCTION("state",		KX_GameObject, pyattr_get_state,	pyattr_set_state),
 	KX_PYATTRIBUTE_RO_FUNCTION("meshes",	KX_GameObject, pyattr_get_meshes),
 	KX_PYATTRIBUTE_RW_FUNCTION("localOrientation",KX_GameObject,pyattr_get_localOrientation,pyattr_set_localOrientation),
@@ -1897,6 +1989,8 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	KX_PYATTRIBUTE_RW_FUNCTION("angularVelocity", KX_GameObject, pyattr_get_localAngularVelocity, pyattr_set_worldAngularVelocity),
 	KX_PYATTRIBUTE_RW_FUNCTION("localAngularVelocity", KX_GameObject, pyattr_get_localAngularVelocity, pyattr_set_localAngularVelocity),
 	KX_PYATTRIBUTE_RW_FUNCTION("worldAngularVelocity", KX_GameObject, pyattr_get_worldAngularVelocity, pyattr_set_worldAngularVelocity),
+	KX_PYATTRIBUTE_RW_FUNCTION("linearDamping", KX_GameObject, pyattr_get_linearDamping, pyattr_set_linearDamping),
+	KX_PYATTRIBUTE_RW_FUNCTION("angularDamping", KX_GameObject, pyattr_get_angularDamping, pyattr_set_angularDamping),
 	KX_PYATTRIBUTE_RO_FUNCTION("children",	KX_GameObject, pyattr_get_children),
 	KX_PYATTRIBUTE_RO_FUNCTION("childrenRecursive",	KX_GameObject, pyattr_get_children_recursive),
 	KX_PYATTRIBUTE_RO_FUNCTION("attrDict",	KX_GameObject, pyattr_get_attrDict),
@@ -2225,6 +2319,56 @@ int KX_GameObject::pyattr_set_collisionCallbacks(void *self_v, const KX_PYATTRIB
 	return PY_SET_ATTR_SUCCESS;
 }
 
+PyObject *KX_GameObject::pyattr_get_collisionGroup(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	return PyLong_FromLong(self->GetUserCollisionGroup());
+}
+
+int KX_GameObject::pyattr_set_collisionGroup(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	int val = PyLong_AsLong(value);
+
+	if (val == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "gameOb.collisionGroup = int: KX_GameObject, expected an int bit field");
+		return PY_SET_ATTR_FAIL;
+	}
+
+	if (val < 0 || val > USHRT_MAX) {
+		PyErr_Format(PyExc_AttributeError, "gameOb.collisionGroup = int: KX_GameObject, expected a int bit field between 0 and %i", USHRT_MAX);
+		return PY_SET_ATTR_FAIL;
+	}
+
+	self->SetUserCollisionGroup(val);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_collisionMask(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	return PyLong_FromLong(self->GetUserCollisionMask());
+}
+
+int KX_GameObject::pyattr_set_collisionMask(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	int val = PyLong_AsLong(value);
+
+	if (val == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "gameOb.collisionMask = int: KX_GameObject, expected an int bit field");
+		return PY_SET_ATTR_FAIL;
+	}
+
+	if (val < 0 || val > USHRT_MAX) {
+		PyErr_Format(PyExc_AttributeError, "gameOb.collisionMask = int: KX_GameObject, expected a int bit field between 0 and %i", USHRT_MAX);
+		return PY_SET_ATTR_FAIL;
+	}
+
+	self->SetUserCollisionMask(val);
+	return PY_SET_ATTR_SUCCESS;
+}
+
 PyObject* KX_GameObject::pyattr_get_scene(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_GameObject *self = static_cast<KX_GameObject*>(self_v);
@@ -2279,6 +2423,19 @@ int KX_GameObject::pyattr_set_mass(void *self_v, const KX_PYATTRIBUTE_DEF *attrd
 		spc->SetMass(val);
 
 	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_is_suspend_dynamics(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+
+	// Only objects with a physics controller can be suspended
+	if (!self->GetPhysicsController()) {
+		PyErr_SetString(PyExc_AttributeError, "This object has not Physics Controller");
+		return NULL;
+	}
+
+	return PyBool_FromLong(self->IsDynamicsSuspended());
 }
 
 PyObject *KX_GameObject::pyattr_get_lin_vel_min(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
@@ -2687,6 +2844,34 @@ int KX_GameObject::pyattr_set_localAngularVelocity(void *self_v, const KX_PYATTR
 	return PY_SET_ATTR_SUCCESS;
 }
 
+PyObject *KX_GameObject::pyattr_get_linearDamping(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	return PyFloat_FromDouble(self->getLinearDamping());
+}
+
+int KX_GameObject::pyattr_set_linearDamping(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	float val = PyFloat_AsDouble(value);
+	self->setLinearDamping(val);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_GameObject::pyattr_get_angularDamping(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	return PyFloat_FromDouble(self->getAngularDamping());
+}
+
+int KX_GameObject::pyattr_set_angularDamping(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
+	float val = PyFloat_AsDouble(value);
+	self->setAngularDamping(val);
+	return PY_SET_ATTR_SUCCESS;
+}
+
 
 PyObject *KX_GameObject::pyattr_get_timeOffset(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef)
 {
@@ -2983,6 +3168,18 @@ PyObject *KX_GameObject::PySetAngularVelocity(PyObject *args)
 	return NULL;
 }
 
+PyObject *KX_GameObject::PySetDamping(PyObject *args)
+{
+	float linear;
+	float angular;
+
+	if (!PyArg_ParseTuple(args,"ff|i:setDamping", &linear, &angular))
+		return NULL;
+
+	setDamping(linear, angular);
+	Py_RETURN_NONE;
+}
+
 PyObject *KX_GameObject::PySetVisible(PyObject *args)
 {
 	int visible, recursive = 0;
@@ -3127,10 +3324,16 @@ PyObject *KX_GameObject::PyApplyImpulse(PyObject *args)
 
 
 
-PyObject *KX_GameObject::PySuspendDynamics()
+PyObject *KX_GameObject::PySuspendDynamics(PyObject *args)
 {
+	bool ghost = false;
+
+	if (!PyArg_ParseTuple(args, "|b", &ghost))
+		return NULL;
+
 	if (GetPhysicsController())
-		GetPhysicsController()->SuspendDynamics();
+		GetPhysicsController()->SuspendDynamics(ghost);
+
 	Py_RETURN_NONE;
 }
 
@@ -3180,12 +3383,12 @@ PyObject *KX_GameObject::PyGetAxisVect(PyObject *value)
 PyObject *KX_GameObject::PyGetPhysicsId()
 {
 	PHY_IPhysicsController* ctrl = GetPhysicsController();
-	uint_ptr physid=0;
+	unsigned long long physid = 0;
 	if (ctrl)
 	{
-		physid= (uint_ptr)ctrl;
+		physid = (unsigned long long)ctrl;
 	}
-	return PyLong_FromLong((long)physid);
+	return PyLong_FromUnsignedLongLong(physid);
 }
 
 PyObject *KX_GameObject::PyGetPropertyNames()

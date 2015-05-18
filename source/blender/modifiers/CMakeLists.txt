@@ -30,6 +30,7 @@ set(INC
 	../blenkernel
 	../blenlib
 	../blenfont
+	../depsgraph
 	../makesdna
 	../makesrna
 	../bmesh
@@ -51,6 +52,7 @@ set(SRC
 	intern/MOD_cast.c
 	intern/MOD_cloth.c
 	intern/MOD_collision.c
+	intern/MOD_correctivesmooth.c
 	intern/MOD_curve.c
 	intern/MOD_datatransfer.c
 	intern/MOD_decimate.c
@@ -73,6 +75,7 @@ set(SRC
 	intern/MOD_mirror.c
 	intern/MOD_multires.c
 	intern/MOD_none.c
+	intern/MOD_normal_edit.c
 	intern/MOD_ocean.c
 	intern/MOD_particleinstance.c
 	intern/MOD_particlesystem.c

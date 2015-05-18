@@ -107,25 +107,25 @@ static struct WMInitStruct {
 
 /* XXX this one should correctly check for apple top header...
  * done for Cocoa : returns window contents (and not frame) max size*/
-void wm_get_screensize(int *width_r, int *height_r)
+void wm_get_screensize(int *r_width, int *r_height)
 {
 	unsigned int uiwidth;
 	unsigned int uiheight;
 	
 	GHOST_GetMainDisplayDimensions(g_system, &uiwidth, &uiheight);
-	*width_r = uiwidth;
-	*height_r = uiheight;
+	*r_width = uiwidth;
+	*r_height = uiheight;
 }
 
 /* size of all screens (desktop), useful since the mouse is bound by this */
-void wm_get_desktopsize(int *width_r, int *height_r)
+void wm_get_desktopsize(int *r_width, int *r_height)
 {
 	unsigned int uiwidth;
 	unsigned int uiheight;
 
 	GHOST_GetAllDisplayDimensions(g_system, &uiwidth, &uiheight);
-	*width_r = uiwidth;
-	*height_r = uiheight;
+	*r_width = uiwidth;
+	*r_height = uiheight;
 }
 
 /* keeps offset and size within monitor bounds */
@@ -206,12 +206,13 @@ void wm_window_free(bContext *C, wmWindowManager *wm, wmWindow *win)
 	
 	wm_event_free_all(win);
 	wm_subwindows_free(win);
-	
-	if (win->drawdata)
-		MEM_freeN(win->drawdata);
-	
+
+	wm_draw_data_free(win);
+
 	wm_ghostwindow_destroy(win);
-	
+
+	MEM_freeN(win->stereo3d_format);
+
 	MEM_freeN(win);
 }
 
@@ -236,6 +237,8 @@ wmWindow *wm_window_new(bContext *C)
 	BLI_addtail(&wm->windows, win);
 	win->winid = find_free_winid(wm);
 
+	win->stereo3d_format = MEM_callocN(sizeof(Stereo3dFormat), "Stereo 3D Format (window)");
+
 	return win;
 }
 
@@ -259,8 +262,11 @@ wmWindow *wm_window_copy(bContext *C, wmWindow *winorig)
 	win->screen->do_draw = true;
 
 	win->drawmethod = U.wmdrawmethod;
-	win->drawdata = NULL;
-	
+
+	BLI_listbase_clear(&win->drawdata);
+
+	*win->stereo3d_format = *winorig->stereo3d_format;
+
 	return win;
 }
 
@@ -356,6 +362,7 @@ float wm_window_pixelsize(wmWindow *win)
 static void wm_window_add_ghostwindow(wmWindowManager *wm, const char *title, wmWindow *win)
 {
 	GHOST_WindowHandle ghostwin;
+	GHOST_GLSettings glSettings = {0};
 	static int multisamples = -1;
 	int scr_w, scr_h, posy;
 	
@@ -363,7 +370,16 @@ static void wm_window_add_ghostwindow(wmWindowManager *wm, const char *title, wm
 	 * mix it, either all windows have it, or none (tested in OSX opengl) */
 	if (multisamples == -1)
 		multisamples = U.ogl_multisamples;
-	
+
+	glSettings.numOfAASamples = multisamples;
+
+	/* a new window is created when pageflip mode is required for a window */
+	if (win->stereo3d_format->display_mode == S3D_DISPLAY_PAGEFLIP)
+		glSettings.flags |= GHOST_glStereoVisual;
+
+	if (!(U.uiflag2 & USER_OPENGL_NO_WARN_SUPPORT))
+		glSettings.flags |= GHOST_glWarnSupport;
+
 	wm_get_screensize(&scr_w, &scr_h);
 	posy = (scr_h - win->posy - win->sizey);
 	
@@ -371,8 +387,7 @@ static void wm_window_add_ghostwindow(wmWindowManager *wm, const char *title, wm
 	                              win->posx, posy, win->sizex, win->sizey,
 	                              (GHOST_TWindowState)win->windowstate,
 	                              GHOST_kDrawingContextTypeOpenGL,
-	                              0 /* no stereo */,
-	                              multisamples /* AA */);
+	                              glSettings);
 	
 	if (ghostwin) {
 		GHOST_RectangleHandle bounds;
@@ -514,8 +529,7 @@ wmWindow *WM_window_open(bContext *C, const rcti *rect)
 	win->sizey = BLI_rcti_size_y(rect);
 
 	win->drawmethod = U.wmdrawmethod;
-	win->drawdata = NULL;
-	
+
 	WM_check(C);
 	
 	return win;
@@ -1127,7 +1141,7 @@ static int wm_window_timer(const bContext *C)
 					wm_event_init_from_window(win, &event);
 					
 					event.type = wt->event_type;
-					event.val = 0;
+					event.val = KM_NOTHING;
 					event.keymodifier = 0;
 					event.custom = EVT_DATA_TIMER;
 					event.customdata = wt;
@@ -1390,10 +1404,10 @@ void WM_progress_clear(wmWindow *win)
 
 /* ************************************ */
 
-void wm_window_get_position(wmWindow *win, int *posx_r, int *posy_r) 
+void wm_window_get_position(wmWindow *win, int *r_pos_x, int *r_pos_y)
 {
-	*posx_r = win->posx;
-	*posy_r = win->posy;
+	*r_pos_x = win->posx;
+	*r_pos_y = win->posy;
 }
 
 void wm_window_set_size(wmWindow *win, int width, int height) 

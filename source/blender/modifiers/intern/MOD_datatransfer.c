@@ -37,7 +37,8 @@
 #include "DNA_object_types.h"
 
 #include "BKE_customdata.h"
-#include "BKE_object_data_transfer.h"
+#include "BKE_cdderivedmesh.h"
+#include "BKE_data_transfer.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_library.h"
 #include "BKE_mesh_mapping.h"
@@ -130,7 +131,9 @@ static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *u
 	foreachObjectLink(md, ob, (ObjectWalkFunc)walk, userData);
 }
 
-static void updateDepgraph(ModifierData *md, DagForest *forest, struct Scene *UNUSED(scene),
+static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *UNUSED(bmain),
+                           struct Scene *UNUSED(scene),
                            Object *UNUSED(ob), DagNode *obNode)
 {
 	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
@@ -144,6 +147,18 @@ static void updateDepgraph(ModifierData *md, DagForest *forest, struct Scene *UN
 	}
 }
 
+static void updateDepsgraph(ModifierData *md,
+                            struct Main *UNUSED(bmain),
+                            struct Scene *UNUSED(scene),
+                            Object *UNUSED(ob),
+                            struct DepsNodeHandle *node)
+{
+	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
+	if (dtmd->ob_source != NULL) {
+		DEG_add_object_relation(node, dtmd->ob_source, DEG_OB_COMP_GEOMETRY, "DataTransfer Modifier");
+	}
+}
+
 static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 {
 	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
@@ -152,6 +167,12 @@ static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 }
 
 #define HIGH_POLY_WARNING 10000
+#define DT_TYPES_AFFECT_MESH ( \
+	DT_TYPE_BWEIGHT_VERT | \
+	DT_TYPE_BWEIGHT_EDGE | DT_TYPE_CREASE | DT_TYPE_SHARP_EDGE | \
+	DT_TYPE_LNOR | \
+	DT_TYPE_SHARP_FACE \
+)
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *derivedData,
                                   ModifierApplyFlag UNUSED(flag))
@@ -159,6 +180,10 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
 	DerivedMesh *dm = derivedData;
 	ReportList reports;
+
+	/* Only used to check wehther we are operating on org data or not... */
+	Mesh *me = ob->data;
+	MVert *mvert;
 
 	const bool invert_vgroup = (dtmd->flags & MOD_DATATRANSFER_INVERT_VGROUP) != 0;
 
@@ -169,6 +194,13 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 
 	if (space_transform) {
 		BLI_SPACE_TRANSFORM_SETUP(space_transform, ob, dtmd->ob_source);
+	}
+
+	mvert = dm->getVertArray(dm);
+	if ((me->mvert == mvert) && (dtmd->data_types & DT_TYPES_AFFECT_MESH)) {
+		/* We need to duplicate data here, otherwise setting custom normals, edges' shaprness, etc., could
+		 * modify org mesh, see T43671. */
+		dm = CDDM_copy(dm);
 	}
 
 	BKE_reports_init(&reports, RPT_STORE);
@@ -190,6 +222,8 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 	return dm;
 }
 
+#undef HIGH_POLY_WARNING
+#undef DT_TYPES_AFFECT_MESH
 
 ModifierTypeInfo modifierType_DataTransfer = {
 	/* name */              "DataTransfer",
@@ -213,6 +247,7 @@ ModifierTypeInfo modifierType_DataTransfer = {
 	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
+	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     NULL,
 	/* dependsOnNormals */  dependsOnNormals,
 	/* foreachObjectLink */ foreachObjectLink,

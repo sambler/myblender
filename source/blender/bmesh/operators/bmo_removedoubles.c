@@ -380,8 +380,11 @@ void bmo_collapse_exec(BMesh *bm, BMOperator *op)
 	float min[3], max[3], center[3];
 	unsigned int i, tot;
 	BMOpSlot *slot_targetmap;
-	
-	BMO_op_callf(bm, op->flag, "collapse_uvs edges=%s", op, "edges");
+
+	if (BMO_slot_bool_get(op->slots_in, "uvs")) {
+		BMO_op_callf(bm, op->flag, "collapse_uvs edges=%s", op, "edges");
+	}
+
 	BMO_op_init(bm, &weldop, op->flag, "weld_verts");
 	slot_targetmap = BMO_slot_get(weldop.slots_in, "targetmap");
 
@@ -519,8 +522,9 @@ void bmo_collapse_uvs_exec(BMesh *bm, BMOperator *op)
 
 }
 
-static void bmesh_find_doubles_common(BMesh *bm, BMOperator *op,
-                                      BMOperator *optarget, BMOpSlot *optarget_slot)
+static void bmesh_find_doubles_common(
+        BMesh *bm, BMOperator *op,
+        BMOperator *optarget, BMOpSlot *optarget_slot)
 {
 	BMVert  **verts;
 	int       verts_len;
@@ -529,7 +533,7 @@ static void bmesh_find_doubles_common(BMesh *bm, BMOperator *op,
 
 	const float dist  = BMO_slot_float_get(op->slots_in, "dist");
 	const float dist_sq = dist * dist;
-	const float dist3 = (M_SQRT3 + 0.00005f) * dist;   /* Just above sqrt(3) */
+	const float dist3 = ((float)M_SQRT3 + 0.00005f) * dist;   /* Just above sqrt(3) */
 
 	/* Test whether keep_verts arg exists and is non-empty */
 	if (BMO_slot_exists(op->slots_in, "keep_verts")) {

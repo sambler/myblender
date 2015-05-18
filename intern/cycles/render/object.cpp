@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "camera.h"
 #include "device.h"
 #include "light.h"
 #include "mesh.h"
@@ -23,6 +24,7 @@
 #include "scene.h"
 
 #include "util_foreach.h"
+#include "util_logging.h"
 #include "util_map.h"
 #include "util_progress.h"
 #include "util_vector.h"
@@ -104,11 +106,11 @@ void Object::apply_transform(bool apply_to_motion)
 		if(apply_to_motion) {
 			Attribute *attr = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
 
-			if (attr) {
+			if(attr) {
 				size_t steps_size = mesh->verts.size() * (mesh->motion_steps - 1);
 				float3 *vert_steps = attr->data_float3();
 
-				for (size_t i = 0; i < steps_size; i++)
+				for(size_t i = 0; i < steps_size; i++)
 					vert_steps[i] = transform_point(&tfm, vert_steps[i]);
 			}
 
@@ -119,7 +121,7 @@ void Object::apply_transform(bool apply_to_motion)
 				size_t steps_size = mesh->verts.size() * (mesh->motion_steps - 1);
 				float3 *normal_steps = attr_N->data_float3();
 
-				for (size_t i = 0; i < steps_size; i++)
+				for(size_t i = 0; i < steps_size; i++)
 					normal_steps[i] = normalize(transform_direction(&ntfm, normal_steps[i]));
 			}
 		}
@@ -146,12 +148,12 @@ void Object::apply_transform(bool apply_to_motion)
 		if(apply_to_motion) {
 			Attribute *curve_attr = mesh->curve_attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
 
-			if (curve_attr) {
+			if(curve_attr) {
 				/* apply transform to motion curve keys */
 				size_t steps_size = mesh->curve_keys.size() * (mesh->motion_steps - 1);
 				float4 *key_steps = curve_attr->data_float4();
 
-				for (size_t i = 0; i < steps_size; i++) {
+				for(size_t i = 0; i < steps_size; i++) {
 					float3 co = transform_point(&tfm, float4_to_float3(key_steps[i]));
 					float radius = key_steps[i].w * scalar;
 
@@ -191,6 +193,7 @@ void Object::tag_update(Scene *scene)
 		}
 	}
 
+	scene->camera->need_flags_update = true;
 	scene->curve_system_manager->need_update = true;
 	scene->mesh_manager->need_update = true;
 	scene->object_manager->need_update = true;
@@ -221,6 +224,7 @@ vector<float> Object::motion_times()
 ObjectManager::ObjectManager()
 {
 	need_update = true;
+	need_flags_update = true;
 }
 
 ObjectManager::~ObjectManager()
@@ -376,6 +380,8 @@ void ObjectManager::device_update_transforms(Device *device, DeviceScene *dscene
 
 void ObjectManager::device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress& progress)
 {
+	VLOG(1) << "Total " << scene->objects.size() << " objects.";
+
 	if(!need_update)
 		return;
 	
@@ -401,13 +407,16 @@ void ObjectManager::device_update(Device *device, DeviceScene *dscene, Scene *sc
 	}
 }
 
-void ObjectManager::device_update_flags(Device *device, DeviceScene *dscene,
-                                        Scene *scene, Progress& progress)
+void ObjectManager::device_update_flags(Device *device,
+                                        DeviceScene *dscene,
+                                        Scene *scene,
+                                        Progress& /*progress*/)
 {
-	if(!need_update)
+	if(!need_update && !need_flags_update)
 		return;
 
 	need_update = false;
+	need_flags_update = false;
 
 	if(scene->objects.size() == 0)
 		return;
@@ -426,6 +435,9 @@ void ObjectManager::device_update_flags(Device *device, DeviceScene *dscene,
 	foreach(Object *object, scene->objects) {
 		if(object->mesh->has_volume) {
 			object_flag[object_index] |= SD_OBJECT_HAS_VOLUME;
+		}
+		else {
+			object_flag[object_index] &= ~SD_OBJECT_HAS_VOLUME;
 		}
 
 		foreach(Object *volume_object, volume_objects) {

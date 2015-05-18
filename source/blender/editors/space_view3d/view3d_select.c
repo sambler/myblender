@@ -725,7 +725,7 @@ static void do_lasso_select_meshobject__doSelectVert(void *userData, MVert *mv, 
 }
 static void do_lasso_select_paintvert(ViewContext *vc, const int mcords[][2], short moves, bool extend, bool select)
 {
-	const int use_zbuf = (vc->v3d->flag & V3D_ZBUF_SELECT);
+	const bool use_zbuf = (vc->v3d->flag & V3D_ZBUF_SELECT) != 0;
 	Object *ob = vc->obact;
 	Mesh *me = ob->data;
 	rcti rect;
@@ -1345,7 +1345,7 @@ Base *ED_view3d_give_base_under_cursor(bContext *C, const int mval[2])
 {
 	ViewContext vc;
 	Base *basact = NULL;
-	unsigned int buffer[4 * MAXPICKBUF];
+	unsigned int buffer[MAXPICKBUF];
 	int hits;
 	bool do_nearest;
 	
@@ -1443,7 +1443,7 @@ static bool mouse_select(bContext *C, const int mval[2],
 		}
 	}
 	else {
-		unsigned int buffer[4 * MAXPICKBUF];
+		unsigned int buffer[MAXPICKBUF];
 		bool do_nearest;
 
 		/* if objects have posemode set, the bones are in the same selection buffer */
@@ -1641,7 +1641,7 @@ static void do_paintvert_box_select__doSelectVert(void *userData, MVert *mv, con
 }
 static int do_paintvert_box_select(ViewContext *vc, rcti *rect, bool select, bool extend)
 {
-	const int use_zbuf = (vc->v3d->flag & V3D_ZBUF_SELECT);
+	const bool use_zbuf = (vc->v3d->flag & V3D_ZBUF_SELECT) != 0;
 	Mesh *me;
 	MVert *mvert;
 	struct ImBuf *ibuf;
@@ -1662,7 +1662,7 @@ static int do_paintvert_box_select(ViewContext *vc, rcti *rect, bool select, boo
 
 	if (use_zbuf) {
 		selar = MEM_callocN(me->totvert + 1, "selar");
-		view3d_validate_backbuf(vc);
+		ED_view3d_backbuf_validate(vc);
 
 		ibuf = IMB_allocImBuf(sx, sy, 32, IB_rect);
 		rt = ibuf->rect;
@@ -1876,7 +1876,7 @@ static int do_meta_box_select(ViewContext *vc, rcti *rect, bool select, bool ext
 	MetaElem *ml;
 	int a;
 
-	unsigned int buffer[4 * MAXPICKBUF];
+	unsigned int buffer[MAXPICKBUF];
 	short hits;
 
 	hits = view3d_opengl_select(vc, buffer, MAXPICKBUF, rect, false);
@@ -1910,7 +1910,7 @@ static int do_armature_box_select(ViewContext *vc, rcti *rect, bool select, bool
 	EditBone *ebone;
 	int a;
 
-	unsigned int buffer[4 * MAXPICKBUF];
+	unsigned int buffer[MAXPICKBUF];
 	short hits;
 
 	hits = view3d_opengl_select(vc, buffer, MAXPICKBUF, rect, false);
@@ -2006,8 +2006,8 @@ static int do_object_pose_box_select(bContext *C, ViewContext *vc, rcti *rect, b
 	}
 
 	/* selection buffer now has bones potentially too, so we add MAXPICKBUF */
-	vbuffer = MEM_mallocN(4 * (totobj + MAXPICKBUF) * sizeof(unsigned int), "selection buffer");
-	hits = view3d_opengl_select(vc, vbuffer, 4 * (totobj + MAXPICKBUF), rect, false);
+	vbuffer = MEM_mallocN(4 * (totobj + MAXPICKELEMS) * sizeof(unsigned int), "selection buffer");
+	hits = view3d_opengl_select(vc, vbuffer, 4 * (totobj + MAXPICKELEMS), rect, false);
 	/*
 	 * LOGIC NOTES (theeth):
 	 * The buffer and ListBase have the same relative order, which makes the selection
@@ -2185,7 +2185,7 @@ void VIEW3D_OT_select_border(wmOperatorType *ot)
 static bool mouse_weight_paint_vertex_select(bContext *C, const int mval[2], bool extend, bool deselect, bool toggle, Object *obact)
 {
 	View3D *v3d = CTX_wm_view3d(C);
-	const int use_zbuf = (v3d->flag & V3D_ZBUF_SELECT);
+	const bool use_zbuf = (v3d->flag & V3D_ZBUF_SELECT) != 0;
 
 	Mesh *me = obact->data; /* already checked for NULL */
 	unsigned int index = 0;
@@ -2453,7 +2453,7 @@ static void paint_vertsel_circle_select_doSelectVert(void *userData, MVert *mv, 
 }
 static void paint_vertsel_circle_select(ViewContext *vc, const bool select, const int mval[2], float rad)
 {
-	const int use_zbuf = (vc->v3d->flag & V3D_ZBUF_SELECT);
+	const bool use_zbuf = (vc->v3d->flag & V3D_ZBUF_SELECT) != 0;
 	Object *ob = vc->obact;
 	Mesh *me = ob->data;
 	bool bbsel;

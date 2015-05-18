@@ -517,9 +517,9 @@ int main(int argc, char** argv)
 	// enable fast mipmap generation
 	U.use_gpu_mipmap = 1;
 
-	sound_init_once();
+	BKE_sound_init_once();
 
-	set_free_windowmanager_cb(wm_free);
+	BKE_library_callback_free_window_manager_set(wm_free);
 
 	/* if running blenderplayer the last argument can't be parsed since it has to be the filename. else it is bundled */
 	isBlenderPlayer = !BLO_is_a_runtime(argv[0]);

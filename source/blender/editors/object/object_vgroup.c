@@ -1646,7 +1646,7 @@ static void vgroup_blend_subset(Object *ob, const bool *vgroup_validmap, const i
 	BMesh *bm = em ? em->bm : NULL;
 	Mesh  *me = em ? NULL   : ob->data;
 
-	MeshElemMap *emap ;
+	MeshElemMap *emap;
 	int *emap_mem;
 
 	BLI_SMALLSTACK_DECLARE(dv_stack, MDeformVert *);
@@ -2062,7 +2062,7 @@ void ED_vgroup_mirror(Object *ob,
 			/* object mode / weight paint */
 			MVert *mv, *mv_mirr;
 			int vidx, vidx_mirr;
-			const int use_vert_sel = (me->editflag & ME_EDIT_PAINT_VERT_SEL) != 0;
+			const bool use_vert_sel = (me->editflag & ME_EDIT_PAINT_VERT_SEL) != 0;
 
 			if (me->dvert == NULL) {
 				goto cleanup;

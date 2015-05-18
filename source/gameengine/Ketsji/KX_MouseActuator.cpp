@@ -138,7 +138,7 @@ bool KX_MouseActuator::Update()
 					center_x = ((m_canvas->GetWidth() - 1.0) / 2.0) / (m_canvas->GetWidth());
 				}
 				if ((m_canvas->GetHeight() % 2) != 0) {
-				    center_y = ((m_canvas->GetHeight() - 1.0) / 2.0) / (m_canvas->GetHeight());
+					center_y = ((m_canvas->GetHeight() - 1.0) / 2.0) / (m_canvas->GetHeight());
 				}
 
 				//preventing initial skipping.
@@ -278,7 +278,10 @@ bool KX_MouseActuator::Update()
 					setposition[1] = center_y;
 				}
 
-				setMousePosition(setposition[0], setposition[1]);
+				// only trigger mouse event when it is necessary
+				if (m_oldposition[0] != position[0] || m_oldposition[1] != position[1]) {
+					setMousePosition(setposition[0], setposition[1]);
+				}
 
 				m_oldposition[0] = position[0];
 				m_oldposition[1] = position[1];
@@ -316,7 +319,7 @@ void KX_MouseActuator::ProcessReplica()
 
 void KX_MouseActuator::getMousePosition(float* pos)
 {
-	MT_assert(!m_mouse);
+	MT_assert(m_mouse);
 	const SCA_InputEvent & xevent = m_mouse->GetEventValue(SCA_IInputDevice::KX_MOUSEX);
 	const SCA_InputEvent & yevent = m_mouse->GetEventValue(SCA_IInputDevice::KX_MOUSEY);
 

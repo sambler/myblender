@@ -368,7 +368,7 @@ static bool surface_duplicateNameExists(void *arg, const char *name)
 	DynamicPaintSurface *surface = t_surface->canvas->surfaces.first;
 
 	for (; surface; surface = surface->next) {
-		if (surface != t_surface && !strcmp(name, surface->name)) return true;
+		if (surface != t_surface && STREQ(name, surface->name)) return true;
 	}
 	return false;
 }
@@ -527,7 +527,7 @@ static int subframe_updateObject(Scene *scene, Object *ob, int flags, int parent
 
 		/* also update constraint targets */
 		for (con = ob->constraints.first; con; con = con->next) {
-			bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+			const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 			ListBase targets = {NULL, NULL};
 
 			if (cti && cti->get_constraint_targets) {
@@ -579,7 +579,7 @@ static void scene_setSubframe(Scene *scene, float subframe)
 	scene->r.subframe = subframe;
 }
 
-static int surface_getBrushFlags(DynamicPaintSurface *surface, Scene *scene)
+static int surface_getBrushFlags(DynamicPaintSurface *surface, const Scene *scene)
 {
 	Base *base = NULL;
 	GroupObject *go = NULL;
@@ -1447,7 +1447,7 @@ static void dynamicPaint_initAdjacencyData(DynamicPaintSurface *surface, int for
 	MEM_freeN(temp_data);
 }
 
-static void dynamicPaint_setInitialColor(Scene *scene, DynamicPaintSurface *surface)
+static void dynamicPaint_setInitialColor(const Scene *scene, DynamicPaintSurface *surface)
 {
 	PaintSurfaceData *sData = surface->data;
 	PaintPoint *pPoint = (PaintPoint *)sData->type_data;
@@ -1502,7 +1502,7 @@ static void dynamicPaint_setInitialColor(Scene *scene, DynamicPaintSurface *surf
 					uv[0] = tface[i].uv[j][0] * 2.0f - 1.0f;
 					uv[1] = tface[i].uv[j][1] * 2.0f - 1.0f;
 
-					multitex_ext_safe(tex, uv, &texres, pool, scene_color_manage);
+					multitex_ext_safe(tex, uv, &texres, pool, scene_color_manage, false);
 
 					if (texres.tin > pPoint[*vert].alpha) {
 						copy_v3_v3(pPoint[*vert].color, &texres.tr);
@@ -1536,7 +1536,7 @@ static void dynamicPaint_setInitialColor(Scene *scene, DynamicPaintSurface *surf
 				uv_final[0] = uv_final[0] * 2.0f - 1.0f;
 				uv_final[1] = uv_final[1] * 2.0f - 1.0f;
 
-				multitex_ext_safe(tex, uv_final, &texres, NULL, scene_color_manage);
+				multitex_ext_safe(tex, uv_final, &texres, NULL, scene_color_manage, false);
 
 				/* apply color */
 				copy_v3_v3(pPoint[i].color, &texres.tr);
@@ -1595,7 +1595,7 @@ static void dynamicPaint_setInitialColor(Scene *scene, DynamicPaintSurface *surf
 }
 
 /* clears surface data back to zero */
-void dynamicPaint_clearSurface(Scene *scene, DynamicPaintSurface *surface)
+void dynamicPaint_clearSurface(const Scene *scene, DynamicPaintSurface *surface)
 {
 	PaintSurfaceData *sData = surface->data;
 	if (sData && sData->type_data) {
@@ -1620,7 +1620,7 @@ void dynamicPaint_clearSurface(Scene *scene, DynamicPaintSurface *surface)
 }
 
 /* completely (re)initializes surface (only for point cache types)*/
-bool dynamicPaint_resetSurface(Scene *scene, DynamicPaintSurface *surface)
+bool dynamicPaint_resetSurface(const Scene *scene, DynamicPaintSurface *surface)
 {
 	int numOfPoints = dynamicPaint_surfaceNumOfPoints(surface);
 	/* free existing data */
@@ -1647,7 +1647,7 @@ bool dynamicPaint_resetSurface(Scene *scene, DynamicPaintSurface *surface)
 }
 
 /* make sure allocated surface size matches current requirements */
-static bool dynamicPaint_checkSurfaceData(Scene *scene, DynamicPaintSurface *surface)
+static bool dynamicPaint_checkSurfaceData(const Scene *scene, DynamicPaintSurface *surface)
 {
 	if (!surface->data || ((dynamicPaint_surfaceNumOfPoints(surface) != surface->data->total_points))) {
 		return dynamicPaint_resetSurface(scene, surface);
@@ -2705,7 +2705,7 @@ void dynamicPaint_outputSurfaceImage(DynamicPaintSurface *surface, char *filenam
 	if (format == R_IMF_IMTYPE_OPENEXR) format = R_IMF_IMTYPE_PNG;
 #endif
 	BLI_strncpy(output_file, filename, sizeof(output_file));
-	BKE_add_image_extension_from_type(output_file, format);
+	BKE_image_path_ensure_ext_from_imtype(output_file, format);
 
 	/* Validate output file path	*/
 	BLI_path_abs(output_file, G.main->name);
@@ -4696,7 +4696,7 @@ static int dynamicPaint_surfaceHasMoved(DynamicPaintSurface *surface, Object *ob
 	return ret;
 }
 
-static int surface_needsVelocityData(DynamicPaintSurface *surface, Scene *scene)
+static int surface_needsVelocityData(DynamicPaintSurface *surface, const Scene *scene)
 {
 	if (surface->effect & MOD_DPAINT_EFFECT_DO_DRIP)
 		return 1;
@@ -4716,7 +4716,7 @@ static int surface_needsAccelerationData(DynamicPaintSurface *surface)
 }
 
 /* Prepare for surface step by creating PaintBakeNormal data */
-static int dynamicPaint_generateBakeData(DynamicPaintSurface *surface, Scene *scene, Object *ob)
+static int dynamicPaint_generateBakeData(DynamicPaintSurface *surface, const Scene *scene, Object *ob)
 {
 	PaintSurfaceData *sData = surface->data;
 	PaintAdjData *adj_data = sData->adj_data;

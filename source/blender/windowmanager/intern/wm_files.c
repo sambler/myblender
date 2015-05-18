@@ -101,7 +101,6 @@
 #include "GHOST_Path-api.h"
 
 #include "UI_interface.h"
-#include "UI_interface_icons.h"
 #include "UI_view2d.h"
 
 #include "GPU_draw.h"
@@ -302,7 +301,7 @@ static void wm_init_userdef(bContext *C, const bool from_memory)
 	UI_init_userdef();
 	
 	MEM_CacheLimiter_set_maximum(((size_t)U.memcachelimit) * 1024 * 1024);
-	sound_init(bmain);
+	BKE_sound_init(bmain);
 
 	/* needed so loading a file from the command line respects user-pref [#26156] */
 	BKE_BIT_TEST_SET(G.fileflags, U.flag & USER_FILENOUI, G_FILE_NO_UI);
@@ -356,7 +355,7 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 		else {
 			len = gzread(gzfile, header, sizeof(header));
 			gzclose(gzfile);
-			if (len == sizeof(header) && strncmp(header, "BLENDER", 7) == 0) {
+			if (len == sizeof(header) && STREQLEN(header, "BLENDER", 7)) {
 				retval = BKE_READ_EXOTIC_OK_BLEND;
 			}
 			else {
@@ -507,13 +506,13 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 		}
 #endif
 
-		BKE_reset_undo();
-		BKE_write_undo(C, "original");  /* save current state */
+		BKE_undo_reset();
+		BKE_undo_write(C, "original");  /* save current state */
 
 		success = true;
 	}
 	else if (retval == BKE_READ_EXOTIC_OK_OTHER)
-		BKE_write_undo(C, "Import file");
+		BKE_undo_write(C, "Import file");
 	else if (retval == BKE_READ_EXOTIC_FAIL_OPEN) {
 		BKE_reportf(reports, RPT_ERROR, "Cannot read file '%s': %s", filepath,
 		            errno ? strerror(errno) : TIP_("unable to open the file"));
@@ -536,11 +535,13 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 }
 
 
-/* called on startup,  (context entirely filled with NULLs) */
-/* or called for 'New File' */
-/* both startup.blend and userpref.blend are checked */
-/* the optional paramater custom_file points to an alterntive startup page */
-/* custom_file can be NULL */
+/**
+ * called on startup,  (context entirely filled with NULLs)
+ * or called for 'New File'
+ * both startup.blend and userpref.blend are checked
+ * the optional parameter custom_file points to an alternative startup page
+ * custom_file can be NULL
+ */
 int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const char *custom_file)
 {
 	ListBase wmbase;
@@ -561,6 +562,10 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 
 	/* options exclude eachother */
 	BLI_assert((from_memory && custom_file) == 0);
+
+	if ((G.f & G_SCRIPT_OVERRIDE_PREF) == 0) {
+		BKE_BIT_TEST_SET(G.f, (U.flag & USER_SCRIPT_AUTOEXEC_DISABLE) == 0, G_SCRIPT_AUTOEXEC);
+	}
 
 	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
 
@@ -655,8 +660,8 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 //	refresh_interface_font();
 	
 //	undo_editmode_clear();
-	BKE_reset_undo();
-	BKE_write_undo(C, "original");  /* save current state */
+	BKE_undo_reset();
+	BKE_undo_write(C, "original");  /* save current state */
 
 	ED_editors_init(C);
 	DAG_on_visible_update(CTX_data_main(C), true);
@@ -841,11 +846,11 @@ static ImBuf *blend_file_thumb(Scene *scene, bScreen *screen, int **thumb_pt)
 	if (scene->camera) {
 		ibuf = ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
 		                                             BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-		                                             IB_rect, OB_SOLID, false, false, false, R_ADDSKY, err_out);
+		                                             IB_rect, OB_SOLID, false, false, false, R_ALPHAPREMUL, NULL, err_out);
 	}
 	else {
 		ibuf = ED_view3d_draw_offscreen_imbuf(scene, v3d, ar, BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-		                                      IB_rect, false, R_ADDSKY, err_out);
+		                                      IB_rect, false, R_ALPHAPREMUL, NULL, err_out);
 	}
 
 	if (ibuf) {
@@ -855,7 +860,7 @@ static ImBuf *blend_file_thumb(Scene *scene, bScreen *screen, int **thumb_pt)
 		IMB_scaleImBuf(ibuf, BLEN_THUMB_SIZE, BLEN_THUMB_SIZE);
 
 		/* add pretty overlay */
-		IMB_overlayblend_thumb(ibuf->rect, ibuf->x, ibuf->y, aspect);
+		IMB_thumb_overlay_blend(ibuf->rect, ibuf->x, ibuf->y, aspect);
 		
 		/* first write into thumb buffer */
 		thumb = MEM_mallocN(((2 + (BLEN_THUMB_SIZE * BLEN_THUMB_SIZE))) * sizeof(int), "write_file thumb");
@@ -892,24 +897,6 @@ bool write_crash_blend(void)
 	else {
 		printf("failed: %s\n", path);
 		return 0;
-	}
-}
-
-static void UNUSED_FUNCTION(wm_ensure_previews)(bContext *C, Main *mainvar)
-{
-	ListBase *lb[] = {&mainvar->mat, &mainvar->tex, &mainvar->image, &mainvar->world, &mainvar->lamp, NULL};
-	ID *id;
-	int i;
-
-	for (i = 0; lb[i]; i++) {
-		for (id = lb[i]->first; id; id = id->next) {
-			/* Only preview non-library datablocks, lib ones do not pertain to this .blend file!
-			 * Same goes for ID with no user. */
-			if (!id->lib && (id->us != 0)) {
-				UI_id_icon_render(C, id, false, false);
-				UI_id_icon_render(C, id, true, false);
-			}
-		}
 	}
 }
 
@@ -964,7 +951,7 @@ int wm_file_write(bContext *C, const char *filepath, int fileflags, ReportList *
 	/* operator now handles overwrite checks */
 
 	if (G.fileflags & G_AUTOPACK) {
-		packAll(G.main, reports);
+		packAll(G.main, reports, false);
 	}
 
 	/* don't forget not to return without! */
@@ -1099,7 +1086,7 @@ void wm_autosave_location(char *filepath)
 	if (G.main && G.relbase_valid) {
 		const char *basename = BLI_path_basename(G.main->name);
 		int len = strlen(basename) - 6;
-		BLI_snprintf(path, sizeof(path), "%.*s-%d.blend", len, basename, pid);
+		BLI_snprintf(path, sizeof(path), "%.*s.blend", len, basename);
 	}
 	else {
 		BLI_snprintf(path, sizeof(path), "%d.blend", pid);
@@ -1150,8 +1137,6 @@ void wm_autosave_timer(const bContext *C, wmWindowManager *wm, wmTimer *UNUSED(w
 		}
 	}
 
-	ED_editors_flush_edits(C, false);
-
 	wm_autosave_location(filepath);
 
 	if (U.uiflag & USER_GLOBALUNDO) {
@@ -1161,6 +1146,8 @@ void wm_autosave_timer(const bContext *C, wmWindowManager *wm, wmTimer *UNUSED(w
 	else {
 		/*  save as regular blend file */
 		int fileflags = G.fileflags & ~(G_FILE_COMPRESS | G_FILE_AUTOPLAY | G_FILE_LOCK | G_FILE_SIGN | G_FILE_HISTORY);
+
+		ED_editors_flush_edits(C, false);
 
 		/* no error reporting to console */
 		BLO_write_file(CTX_data_main(C), filepath, fileflags, NULL, NULL);

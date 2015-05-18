@@ -31,7 +31,7 @@ from bl_ui.properties_paint_common import (
         )
 
 
-class View3DPanel():
+class View3DPanel:
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
 
@@ -100,7 +100,7 @@ class VIEW3D_PT_tools_object(View3DPanel, Panel):
                 row.operator("object.shade_smooth", text="Smooth")
                 row.operator("object.shade_flat", text="Flat")
 
-            if obj_type in {'MESH'}:
+            if obj_type == 'MESH':
                 col = layout.column(align=True)
                 col.label(text="Data Transfer:")
                 row = col.row(align=True)
@@ -323,6 +323,7 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col.menu("VIEW3D_MT_edit_mesh_extrude")
         col.operator("view3d.edit_mesh_extrude_move_normal", text="Extrude Region")
         col.operator("view3d.edit_mesh_extrude_individual_move", text="Extrude Individual")
+        col.operator("mesh.inset", text="Inset Faces")
         col.operator("mesh.edge_face_add")
         col.operator("mesh.subdivide")
         col.operator("mesh.loopcut_slide")
@@ -406,9 +407,9 @@ class VIEW3D_PT_tools_shading(View3DPanel, Panel):
         row.operator("mesh.mark_sharp", text="Sharp")
         col.label(text="Vertices:")
         row = col.row(align=True)
-        op = row.operator("mesh.mark_sharp", text="Smooth")
-        op.use_verts = True
-        op.clear = True
+        props = row.operator("mesh.mark_sharp", text="Smooth")
+        props.use_verts = True
+        props.clear = True
         row.operator("mesh.mark_sharp", text="Sharp").use_verts = True
 
         col = layout.column(align=True)
@@ -572,6 +573,7 @@ class VIEW3D_PT_tools_surfaceedit(View3DPanel, Panel):
         col = layout.column(align=True)
         col.label(text="Modeling:")
         col.operator("curve.extrude", text="Extrude")
+        col.operator("curve.spin")
         col.operator("curve.subdivide")
 
         col = layout.column(align=True)
@@ -757,6 +759,10 @@ class VIEW3D_PT_tools_posemode(View3DPanel, Panel):
         row.operator("pose.copy", text="Copy")
         row.operator("pose.paste", text="Paste")
 
+        row = layout.row(align=True)
+        row.operator("pose.propagate", text="Propagate")
+        row.menu("VIEW3D_MT_pose_propagate", icon='TRIA_RIGHT', text="")
+
         col = layout.column(align=True)
         col.operator("poselib.pose_add", text="Add To Library")
 
@@ -786,6 +792,7 @@ class View3DPaintPanel(UnifiedPaintPanel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
 
+
 class VIEW3D_PT_imapaint_tools_missing(Panel, View3DPaintPanel):
     bl_category = "Tools"
     bl_label = "Missing Data"
@@ -806,14 +813,13 @@ class VIEW3D_PT_imapaint_tools_missing(Panel, View3DPaintPanel):
             col.label("Missing UVs", icon='INFO')
             col.label("Unwrap the mesh in edit mode or generate a simple UV layer")
             col.operator("paint.add_simple_uvs")
-    
+
         if toolsettings.mode == 'MATERIAL':
             if toolsettings.missing_materials:
                 col.separator()
                 col.label("Missing Materials", icon='INFO')
                 col.label("Add a material and paint slot below")
                 col.operator_menu_enum("paint.add_texture_paint_slot", "type", text="Add Paint Slot")
-                   
             elif toolsettings.missing_texture:
                 ob = context.active_object
                 mat = ob.active_material
@@ -827,7 +833,6 @@ class VIEW3D_PT_imapaint_tools_missing(Panel, View3DPaintPanel):
                     col.label("Missing Materials", icon='INFO')
                     col.label("Add a material and paint slot below")
                     col.operator_menu_enum("paint.add_texture_paint_slot", "type", text="Add Paint Slot")
- 
 
         elif toolsettings.mode == 'IMAGE':
             if toolsettings.missing_texture:
@@ -845,6 +850,7 @@ class VIEW3D_PT_imapaint_tools_missing(Panel, View3DPaintPanel):
             col.label("Stencil Image")
             col.template_ID(toolsettings, "stencil_image")
             col.operator("image.new", text="New").gen_context = 'PAINT_STENCIL'
+
 
 class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
     bl_category = "Tools"
@@ -881,10 +887,8 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
                 col.prop(brush, "count")
                 col = layout.column()
                 col.prop(settings, "use_default_interpolate")
-                sub = col.column(align=True)
-                sub.active = settings.use_default_interpolate
-                sub.prop(brush, "steps", slider=True)
-                sub.prop(settings, "default_key_count", slider=True)
+                col.prop(brush, "steps", slider=True)
+                col.prop(settings, "default_key_count", slider=True)
             elif tool == 'LENGTH':
                 layout.prop(brush, "length_mode", expand=True)
             elif tool == 'PUFF':
@@ -1072,9 +1076,10 @@ class TEXTURE_UL_texpaintslots(UIList):
             if (not mat.use_nodes) and context.scene.render.engine in {'BLENDER_RENDER', 'BLENDER_GAME'}:
                 mtex_index = mat.texture_paint_slots[index].index
                 layout.prop(mat, "use_textures", text="", index=mtex_index)
-        elif self.layout_type in {'GRID'}:
+        elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label(text="")
+
 
 class VIEW3D_MT_tools_projectpaint_uvlayer(Menu):
     bl_label = "Clone Layer"
@@ -1126,18 +1131,23 @@ class VIEW3D_PT_slots_projectpaint(View3DPanel, Panel):
                                   mat, "texture_paint_images",
                                   mat, "paint_active_slot", rows=2)
 
+                if mat.texture_paint_slots:
+                    slot = mat.texture_paint_slots[mat.paint_active_slot]
+                else:
+                    slot = None
+
                 if (not mat.use_nodes) and context.scene.render.engine in {'BLENDER_RENDER', 'BLENDER_GAME'}:
                     row = col.row(align=True)
                     row.operator_menu_enum("paint.add_texture_paint_slot", "type")
                     row.operator("paint.delete_texture_paint_slot", text="", icon='X')
 
-                    if mat.texture_paint_slots:
-                        slot = mat.texture_paint_slots[mat.paint_active_slot]
-
+                    if slot:
                         col.prop(mat.texture_slots[slot.index], "blend_type")
                         col.separator()
-                        col.label("UV Map")
-                        col.prop_search(slot, "uv_layer", ob.data, "uv_textures", text="")
+
+                if slot and slot.index != -1:
+                    col.label("UV Map")
+                    col.prop_search(slot, "uv_layer", ob.data, "uv_textures", text="")
 
         elif settings.mode == 'IMAGE':
             mesh = ob.data
@@ -1186,7 +1196,6 @@ class VIEW3D_PT_stencil_projectpaint(View3DPanel, Panel):
         col.template_ID(ipaint, "stencil_image")
         col.operator("image.new", text="New").gen_context = 'PAINT_STENCIL'
 
- 
         col.label("Visualization")
         row = col.row(align=True)
         row.prop(ipaint, "stencil_color", text="")
@@ -1463,6 +1472,8 @@ class VIEW3D_PT_sculpt_dyntopo(Panel, View3DPaintPanel):
             row = sub.row(align=True)
             row.prop(sculpt, "constant_detail")
             row.operator("sculpt.sample_detail_size", text="", icon='EYEDROPPER')
+        elif (sculpt.detail_type_method == 'BRUSH'):
+            sub.prop(sculpt, "detail_percent")
         else:
             sub.prop(sculpt, "detail_size")
         sub.prop(sculpt, "detail_refine_method", text="")
@@ -1597,9 +1608,9 @@ class VIEW3D_PT_tools_weightpaint(View3DPanel, Panel):
 
         col = layout.column()
         col.operator("paint.weight_gradient")
-        prop = col.operator("object.data_transfer", text="Transfer Weights")
-        prop.use_reverse_transfer = True
-        prop.data_type = 'VGROUP_WEIGHTS'
+        props = col.operator("object.data_transfer", text="Transfer Weights")
+        props.use_reverse_transfer = True
+        props.data_type = 'VGROUP_WEIGHTS'
 
 
 class VIEW3D_PT_tools_weightpaint_options(Panel, View3DPaintPanel):
@@ -1690,6 +1701,25 @@ class VIEW3D_PT_tools_imagepaint_external(Panel, View3DPaintPanel):
         col.operator("paint.project_image", text="Apply Camera Image")
 
 
+class VIEW3D_PT_tools_imagepaint_symmetry(Panel, View3DPaintPanel):
+    bl_category = "Tools"
+    bl_context = "imagepaint"
+    bl_label = "Symmetry"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        toolsettings = context.tool_settings
+        ipaint = toolsettings.image_paint
+
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(ipaint, "use_symmetry_x", text="X", toggle=True)
+        row.prop(ipaint, "use_symmetry_y", text="Y", toggle=True)
+        row.prop(ipaint, "use_symmetry_z", text="Z", toggle=True)
+
+
 class VIEW3D_PT_tools_projectpaint(View3DPaintPanel, Panel):
     bl_category = "Options"
     bl_context = "imagepaint"
@@ -1718,7 +1748,12 @@ class VIEW3D_PT_tools_projectpaint(View3DPaintPanel, Panel):
         sub.active = (ipaint.use_normal_falloff)
         sub.prop(ipaint, "normal_angle", text="")
 
+        layout.prop(ipaint, "use_cavity")
+        if ipaint.use_cavity:
+            layout.template_curve_mapping(ipaint, "cavity_curve", brush=True)
+
         layout.prop(ipaint, "seam_bleed")
+        layout.prop(ipaint, "dither")
         self.unified_paint_settings(layout, context)
 
 
@@ -1802,6 +1837,9 @@ class VIEW3D_PT_tools_particlemode(View3DPanel, Panel):
             col.prop(pe, "use_auto_velocity", text="Velocity")
         col.prop(ob.data, "use_mirror_x")
 
+        col.prop(pe, "shape_object")
+        col.operator("particle.shape_cut")
+
         col = layout.column(align=True)
         col.active = pe.is_editable
         col.label(text="Draw:")
@@ -1842,7 +1880,7 @@ class VIEW3D_PT_tools_history(View3DPanel, Panel):
         row = col.row(align=True)
         row.operator("ed.undo")
         row.operator("ed.redo")
-        if obj is None or obj.mode not in {'SCULPT'}:
+        if obj is None or obj.mode != 'SCULPT':
             # Sculpt mode does not generate an undo menu it seems...
             col.operator("ed.undo_history")
 

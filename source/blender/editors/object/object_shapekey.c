@@ -48,7 +48,6 @@
 #include "DNA_lattice_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
 #include "BKE_context.h"
@@ -120,9 +119,16 @@ static bool ED_object_shape_key_remove(Main *bmain, Object *ob)
 	kb = BLI_findlink(&key->block, ob->shapenr - 1);
 
 	if (kb) {
-		for (rkb = key->block.first; rkb; rkb = rkb->next)
-			if (rkb->relative == ob->shapenr - 1)
+		for (rkb = key->block.first; rkb; rkb = rkb->next) {
+			if (rkb->relative == ob->shapenr - 1) {
+				/* remap to the 'Basis' */
 				rkb->relative = 0;
+			}
+			else if (rkb->relative >= ob->shapenr) {
+				/* Fix positional shift of the keys when kb is deleted from the list */
+				rkb->relative -= 1;
+			}
+		}
 
 		BLI_remlink(&key->block, kb);
 		key->totkey--;
@@ -324,6 +330,8 @@ static int shape_key_add_exec(bContext *C, wmOperator *op)
 	const bool from_mix = RNA_boolean_get(op->ptr, "from_mix");
 
 	ED_object_shape_key_add(C, ob, from_mix);
+
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 	return OPERATOR_FINISHED;
 }

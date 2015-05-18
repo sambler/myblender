@@ -23,7 +23,7 @@ from bpy.types import Menu, Panel, UIList
 
 # Render properties
 
-class RenderFreestyleButtonsPanel():
+class RenderFreestyleButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "render"
@@ -62,7 +62,7 @@ class RENDER_PT_freestyle(RenderFreestyleButtonsPanel, Panel):
 
 # Render layer properties
 
-class RenderLayerFreestyleButtonsPanel():
+class RenderLayerFreestyleButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "render_layer"
@@ -74,8 +74,8 @@ class RenderLayerFreestyleButtonsPanel():
         rd = context.scene.render
         with_freestyle = bpy.app.build_options.freestyle
 
-        return (scene and with_freestyle and rd.use_freestyle
-            and rd.layers.active and(scene.render.engine in cls.COMPAT_ENGINES))
+        return (scene and with_freestyle and rd.use_freestyle and
+                rd.layers.active and(scene.render.engine in cls.COMPAT_ENGINES))
 
 
 class RenderLayerFreestyleEditorButtonsPanel(RenderLayerFreestyleButtonsPanel):
@@ -95,7 +95,7 @@ class RENDERLAYER_UL_linesets(UIList):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(lineset, "name", text="", emboss=False, icon_value=icon)
             layout.prop(lineset, "show_render", text="", index=index)
-        elif self.layout_type in {'GRID'}:
+        elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label("", icon_value=icon)
 
@@ -690,10 +690,11 @@ class RENDERLAYER_PT_freestyle_linestyle(RenderLayerFreestyleEditorButtonsPanel,
             row.prop(linestyle, "texture_spacing", text="Spacing Along Stroke")
 
             row = layout.row()
-            op = row.operator("wm.properties_context_change",
-                         text="Go to Linestyle Textures Properties",
-                         icon='TEXTURE')
-            op.context = 'TEXTURE'
+            props = row.operator(
+                    "wm.properties_context_change",
+                    text="Go to Linestyle Textures Properties",
+                    icon='TEXTURE')
+            props.context = 'TEXTURE'
 
         elif linestyle.panel == 'MISC':
             pass
@@ -701,7 +702,7 @@ class RENDERLAYER_PT_freestyle_linestyle(RenderLayerFreestyleEditorButtonsPanel,
 
 # Material properties
 
-class MaterialFreestyleButtonsPanel():
+class MaterialFreestyleButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "material"

@@ -155,19 +155,35 @@ typedef struct Library {
 
 enum eIconSizes {
 	ICON_SIZE_ICON = 0,
-	ICON_SIZE_PREVIEW = 1
+	ICON_SIZE_PREVIEW = 1,
+
+	NUM_ICON_SIZES
 };
-#define NUM_ICON_SIZES (ICON_SIZE_PREVIEW + 1)
+
+/* for PreviewImage->flag */
+enum ePreviewImage_Flag {
+	PRV_CHANGED          = (1 << 0),
+	PRV_USER_EDITED      = (1 << 1),  /* if user-edited, do not auto-update this anymore! */
+};
 
 typedef struct PreviewImage {
 	/* All values of 2 are really NUM_ICON_SIZES */
 	unsigned int w[2];
 	unsigned int h[2];
-	short changed[2];
+	short flag[2];
 	short changed_timestamp[2];
 	unsigned int *rect[2];
+
+	/* Runtime-only data. */
 	struct GPUTexture *gputexture[2];
+	int icon_id;  /* Used by previews outside of ID context. */
+
+	char pad[3];
+	char use_deferred;  /* for now a mere bool, if we add more deferred loading methods we can switch to bitflag. */
 } PreviewImage;
+
+#define PRV_DEFERRED_DATA(prv) \
+	(CHECK_TYPE_INLINE(prv, PreviewImage *), BLI_assert((prv)->use_deferred), (void *)((prv) + 1))
 
 /**
  * Defines for working with IDs.
@@ -243,8 +259,7 @@ typedef struct PreviewImage {
 #ifdef GS
 #  undef GS
 #endif
-// #define GS(a)	(*((short *)(a)))
-#define GS(a)	(CHECK_TYPE_INLINE(a, char *), (*((short *)(a))))
+#define GS(a)	(CHECK_TYPE_ANY(a, char *, const char *, char [66], const char[66]), (*((const short *)(a))))
 
 #define ID_NEW(a)		if (      (a) && (a)->id.newid ) (a) = (void *)(a)->id.newid
 #define ID_NEW_US(a)	if (      (a)->id.newid)       { (a) = (void *)(a)->id.newid;       (a)->id.us++; }
@@ -271,6 +286,8 @@ enum {
 	LIB_ID_RECALC       = 1 << 12,
 	LIB_ID_RECALC_DATA  = 1 << 13,
 	LIB_ANIM_NO_RECALC  = 1 << 14,
+
+	LIB_ID_RECALC_ALL   = (LIB_ID_RECALC|LIB_ID_RECALC_DATA),
 };
 
 #ifdef __cplusplus

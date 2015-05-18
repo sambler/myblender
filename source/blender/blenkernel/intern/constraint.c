@@ -79,6 +79,8 @@
 #include "BKE_tracking.h"
 #include "BKE_movieclip.h"
 
+#include "BIK_api.h"
+
 #ifdef WITH_PYTHON
 #  include "BPY_extern.h"
 #endif
@@ -2715,19 +2717,19 @@ static void stretchto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
 				
 				float range = bulge_max - 1.0f;
 				float scale = (range > 0.0f) ? 1.0f / range : 0.0f;
-				float soft = 1.0f + range * atanf((bulge - 1.0f) * scale) / (0.5f * M_PI);
+				float soft = 1.0f + range * atanf((bulge - 1.0f) * scale) / (float)M_PI_2;
 				
 				bulge = interpf(soft, hard, data->bulge_smooth);
 			}
 		}
 		if (bulge < 1.0f) {
 			if (data->flag & STRETCHTOCON_USE_BULGE_MIN) {
-				float bulge_min = CLAMPIS(data->bulge_max, 0.0f, 1.0f);
+				float bulge_min = CLAMPIS(data->bulge_min, 0.0f, 1.0f);
 				float hard = max_ff(bulge, bulge_min);
 				
 				float range = 1.0f - bulge_min;
 				float scale = (range > 0.0f) ? 1.0f / range : 0.0f;
-				float soft = 1.0f - range * atanf((1.0f - bulge) * scale) / (0.5f * M_PI);
+				float soft = 1.0f - range * atanf((1.0f - bulge) * scale) / (float)M_PI_2;
 				
 				bulge = interpf(soft, hard, data->bulge_smooth);
 			}
@@ -3698,6 +3700,9 @@ static void splineik_new_data(void *cdata)
 	bSplineIKConstraint *data = (bSplineIKConstraint *)cdata;
 
 	data->chainlen = 1;
+	data->bulge = 1.0;
+	data->bulge_max = 1.0f;
+	data->bulge_min = 1.0f;
 }
 
 static void splineik_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)
@@ -4313,7 +4318,7 @@ static void constraints_init_typeinfo(void)
 /* This function should be used for getting the appropriate type-info when only
  * a constraint type is known
  */
-bConstraintTypeInfo *BKE_constraint_typeinfo_from_type(int type)
+const bConstraintTypeInfo *BKE_constraint_typeinfo_from_type(int type)
 {
 	/* initialize the type-info list? */
 	if (CTI_INIT) {
@@ -4338,7 +4343,7 @@ bConstraintTypeInfo *BKE_constraint_typeinfo_from_type(int type)
 /* This function should always be used to get the appropriate type-info, as it
  * has checks which prevent segfaults in some weird cases.
  */
-bConstraintTypeInfo *BKE_constraint_typeinfo_get(bConstraint *con)
+const bConstraintTypeInfo *BKE_constraint_typeinfo_get(bConstraint *con)
 {
 	/* only return typeinfo for valid constraints */
 	if (con)
@@ -4365,10 +4370,10 @@ static void con_unlink_refs_cb(bConstraint *UNUSED(con), ID **idpoin, bool is_re
  * be sure to run BIK_clear_data() when freeing an IK constraint,
  * unless DAG_relations_tag_update is called. 
  */
-void BKE_constraint_free_data(bConstraint *con)
+void BKE_constraint_free_data_ex(bConstraint *con, bool do_id_user)
 {
 	if (con->data) {
-		bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+		const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 		
 		if (cti) {
 			/* perform any special freeing constraint may have */
@@ -4376,7 +4381,7 @@ void BKE_constraint_free_data(bConstraint *con)
 				cti->free_data(con);
 				
 			/* unlink the referenced resources it uses */
-			if (cti->id_looper)
+			if (do_id_user && cti->id_looper)
 				cti->id_looper(con, con_unlink_refs_cb, NULL);
 		}
 		
@@ -4385,19 +4390,28 @@ void BKE_constraint_free_data(bConstraint *con)
 	}
 }
 
+void BKE_constraint_free_data(bConstraint *con)
+{
+	BKE_constraint_free_data_ex(con, true);
+}
+
 /* Free all constraints from a constraint-stack */
-void BKE_constraints_free(ListBase *list)
+void BKE_constraints_free_ex(ListBase *list, bool do_id_user)
 {
 	bConstraint *con;
 	
 	/* Free constraint data and also any extra data */
 	for (con = list->first; con; con = con->next)
-		BKE_constraint_free_data(con);
+		BKE_constraint_free_data_ex(con, do_id_user);
 	
 	/* Free the whole list */
 	BLI_freelistN(list);
 }
 
+void BKE_constraints_free(ListBase *list)
+{
+	BKE_constraints_free_ex(list, true);
+}
 
 /* Remove the specified constraint from the given constraint stack */
 bool BKE_constraint_remove(ListBase *list, bConstraint *con)
@@ -4407,8 +4421,24 @@ bool BKE_constraint_remove(ListBase *list, bConstraint *con)
 		BLI_freelinkN(list, con);
 		return true;
 	}
-	else
+	else {
 		return false;
+	}
+}
+
+bool BKE_constraint_remove_ex(ListBase *list, Object *ob, bConstraint *con, bool clear_dep)
+{
+	const short type = con->type;
+	if (BKE_constraint_remove(list, con)) {
+		/* ITASC needs to be rebuilt once a constraint is removed [#26920] */
+		if (clear_dep && ELEM(type, CONSTRAINT_TYPE_KINEMATIC, CONSTRAINT_TYPE_SPLINEIK)) {
+			BIK_clear_data(ob->pose);
+		}
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 /* ......... */
@@ -4417,7 +4447,7 @@ bool BKE_constraint_remove(ListBase *list, bConstraint *con)
 static bConstraint *add_new_constraint_internal(const char *name, short type)
 {
 	bConstraint *con = MEM_callocN(sizeof(bConstraint), "Constraint");
-	bConstraintTypeInfo *cti = BKE_constraint_typeinfo_from_type(type);
+	const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_from_type(type);
 	const char *newName;
 
 	/* Set up a generic constraint datablock */
@@ -4544,7 +4574,7 @@ void BKE_constraints_id_loop(ListBase *conlist, ConstraintIDFunc func, void *use
 	bConstraint *con;
 	
 	for (con = conlist->first; con; con = con->next) {
-		bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+		const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 		
 		if (cti) {
 			if (cti->id_looper)
@@ -4579,7 +4609,7 @@ void BKE_constraints_copy(ListBase *dst, const ListBase *src, bool do_extern)
 	BLI_duplicatelist(dst, src);
 	
 	for (con = dst->first, srccon = src->first; con && srccon; srccon = srccon->next, con = con->next) {
-		bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+		const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 		
 		/* make a new copy of the constraint's data */
 		con->data = MEM_dupallocN(con->data);
@@ -4694,7 +4724,7 @@ bool BKE_constraints_proxylocked_owner(Object *ob, bPoseChannel *pchan)
  */
 void BKE_constraint_target_matrix_get(Scene *scene, bConstraint *con, int index, short ownertype, void *ownerdata, float mat[4][4], float ctime)
 {
-	bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+	const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 	ListBase targets = {NULL, NULL};
 	bConstraintOb *cob;
 	bConstraintTarget *ct;
@@ -4761,7 +4791,7 @@ void BKE_constraint_target_matrix_get(Scene *scene, bConstraint *con, int index,
 /* Get the list of targets required for solving a constraint */
 void BKE_constraint_targets_for_solving_get(bConstraint *con, bConstraintOb *cob, ListBase *targets, float ctime)
 {
-	bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+	const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 	
 	if (cti && cti->get_constraint_targets) {
 		bConstraintTarget *ct;
@@ -4806,7 +4836,7 @@ void BKE_constraints_solve(ListBase *conlist, bConstraintOb *cob, float ctime)
 	
 	/* loop over available constraints, solving and blending them */
 	for (con = conlist->first; con; con = con->next) {
-		bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+		const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 		ListBase targets = {NULL, NULL};
 		
 		/* these we can skip completely (invalid constraints...) */

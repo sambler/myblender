@@ -144,7 +144,7 @@ BF_REDCODE_LIB = ''
 BF_REDCODE_INC = '${BF_REDCODE}/../' #C files request "libredcode/format.h" which is in "#extern/libredcode/format.h", stupid but compiles for now.
 BF_REDCODE_LIBPATH='${BF_REDCODE}/lib'
 
-# Mesa Libs should go here if your using them as well....
+# Mesa Libs should go here if you're using them as well....
 WITH_BF_STATICOPENGL = False
 BF_OPENGL = '/usr'
 BF_OPENGL_INC = '${BF_OPENGL}/include'
@@ -230,7 +230,8 @@ WITH_BF_FREESTYLE = True
 CC = 'gcc'
 CXX = 'g++'
 
-CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+CFLAGS = ['-std=gnu89']
 CXXFLAGS = []
 
 CPPFLAGS = []

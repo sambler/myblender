@@ -52,9 +52,6 @@
 
 #include "RNA_access.h"
 
-/* TODO(sergey): Could be considered a bad level call, but
- * need this for gaussian table.
- */
 #include "RE_pipeline.h"
 
 static void slice_get_byte_buffers(const SeqRenderData *context, const ImBuf *ibuf1, const ImBuf *ibuf2,
@@ -2670,8 +2667,8 @@ static void do_gaussian_blur_effect_byte(Sequence *seq,
 {
 #define INDEX(_x, _y) (((_y) * (x) + (_x)) * 4)
 	GaussianBlurVars *data = seq->effectdata;
-	const int size_x = (int) (data->size_x + 0.5f),
-	          size_y = (int) (data->size_y + 0.5f);
+	const int size_x = (int) (data->size_x + 0.5f);
+	const int size_y = (int) (data->size_y + 0.5f);
 	int i, j;
 
 	/* Make gaussian weight tabke. */
@@ -2754,8 +2751,8 @@ static void do_gaussian_blur_effect_float(Sequence *seq,
 {
 #define INDEX(_x, _y) (((_y) * (x) + (_x)) * 4)
 	GaussianBlurVars *data = seq->effectdata;
-	const int size_x = (int) (data->size_x + 0.5f),
-	          size_y = (int) (data->size_y + 0.5f);
+	const int size_x = (int) (data->size_x + 0.5f);
+	const int size_y = (int) (data->size_y + 0.5f);
 	int i, j;
 
 	/* Make gaussian weight tabke. */

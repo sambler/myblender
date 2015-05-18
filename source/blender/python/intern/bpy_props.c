@@ -68,7 +68,8 @@ static EnumPropertyItem property_flag_items[] = {
 	{0, NULL, 0, NULL, NULL}};
 
 #define BPY_PROPDEF_OPTIONS_DOC \
-"   :arg options: Enumerator in ['HIDDEN', 'SKIP_SAVE', 'ANIMATABLE', 'LIBRARY_EDITABLE', 'PROPORTIONAL'].\n" \
+"   :arg options: Enumerator in ['HIDDEN', 'SKIP_SAVE', 'ANIMATABLE', 'LIBRARY_EDITABLE', 'PROPORTIONAL'," \
+                                "'TEXTEDIT_UPDATE'].\n" \
 "   :type options: set\n" \
 
 static EnumPropertyItem property_flag_enum_items[] = {
@@ -2600,7 +2601,7 @@ PyDoc_STRVAR(BPy_EnumProperty_doc,
 ".. function:: EnumProperty(items, "
                            "name=\"\", "
                            "description=\"\", "
-                           "default=\"\", "
+                           "default=None, "
                            "options={'ANIMATABLE'}, "
                            "update=None, "
                            "get=None, "
@@ -2625,6 +2626,8 @@ BPY_PROPDEF_NAME_DOC
 BPY_PROPDEF_DESC_DOC
 "   :arg default: The default value for this enum, a string from the identifiers used in *items*.\n"
 "      If the *ENUM_FLAG* option is used this must be a set of such string identifiers instead.\n"
+"      WARNING: It shall not be specified (or specified to its default *None* value) for dynamic enums\n"
+"      (i.e. if a callback function is given as *items* parameter).\n"
 "   :type default: string or set\n"
 BPY_PROPDEF_OPTIONS_ENUM_DOC
 BPY_PROPDEF_UPDATE_DOC
@@ -2674,6 +2677,12 @@ static PyObject *BPy_EnumProperty(PyObject *self, PyObject *args, PyObject *kw)
 		}
 		if (bpy_prop_callback_check(set_cb, "set", 2) == -1) {
 			return NULL;
+		}
+
+		if (def == Py_None) {
+			/* This allows to get same behavior when explicitely passing None as default value,
+			 * and not defining a default value at all! */
+			def = NULL;
 		}
 
 		/* items can be a list or a callable */
@@ -2957,9 +2966,10 @@ static struct PyMethodDef props_methods[] = {
 static struct PyModuleDef props_module = {
 	PyModuleDef_HEAD_INIT,
 	"bpy.props",
-	"This module defines properties to extend blenders internal data, the result of these functions"
-	" is used to assign properties to classes registered with blender and can't be used directly.\n"
-	".. warning:: All parameters to these functions must be passed as keywords.",
+	"This module defines properties to extend Blender's internal data. The result of these functions"
+	" is used to assign properties to classes registered with Blender and can't be used directly.\n"
+	"\n"
+	".. warning:: All parameters to these functions must be passed as keywords.\n",
 	-1, /* multiple "initialization" just copies the module dict. */
 	props_methods,
 	NULL, NULL, NULL, NULL

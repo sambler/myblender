@@ -50,6 +50,17 @@ typedef unsigned short GHOST_TUns16;
 typedef int GHOST_TInt32;
 typedef unsigned int GHOST_TUns32;
 
+typedef struct {
+	GHOST_TUns16 numOfAASamples;
+	int flags;
+} GHOST_GLSettings;
+
+typedef enum {
+	GHOST_glStereoVisual = (1 << 0),
+	GHOST_glWarnSupport  = (1 << 1)
+} GHOST_GLFlags;
+
+
 #ifdef _MSC_VER
 typedef __int64 GHOST_TInt64;
 typedef unsigned __int64 GHOST_TUns64;
@@ -115,12 +126,8 @@ typedef enum {
 	GHOST_kWindowStateMinimized,
 	GHOST_kWindowStateFullScreen,
 	GHOST_kWindowStateEmbedded,
-	GHOST_kWindowState8Normal = 8,
-	GHOST_kWindowState8Maximized,
-	GHOST_kWindowState8Minimized,
-	GHOST_kWindowState8FullScreen,
-	GHOST_kWindowStateModified,
-	GHOST_kWindowStateUnModified
+	// GHOST_kWindowStateModified,
+	// GHOST_kWindowStateUnModified,
 } GHOST_TWindowState;
 
 

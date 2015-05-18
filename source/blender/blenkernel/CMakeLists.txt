@@ -28,6 +28,7 @@ set(INC
 	../blenfont
 	../blenlib
 	../blenloader
+	../depsgraph
 	../gpu
 	../ikplugin
 	../imbuf
@@ -36,6 +37,7 @@ set(INC
 	../bmesh
 	../modifiers
 	../nodes
+	../physics
 	../render/extern/include
 	../../../intern/ghost
 	../../../intern/guardedalloc
@@ -45,8 +47,8 @@ set(INC
 	../../../intern/mikktspace
 	../../../intern/raskter
 	../../../intern/smoke/extern
-	../../../extern/libmv
 	../../../intern/atomic
+	../../../extern/libmv
 
 	# XXX - BAD LEVEL CALL WM_api.h
 	../windowmanager
@@ -66,6 +68,7 @@ set(SRC
 	intern/anim_sys.c
 	intern/appdir.c
 	intern/armature.c
+	intern/armature_update.c
 	intern/autoexec.c
 	intern/blender.c
 	intern/bmfont.c
@@ -85,6 +88,7 @@ set(SRC
 	intern/curve.c
 	intern/customdata.c
 	intern/customdata_file.c
+	intern/data_transfer.c
 	intern/deform.c
 	intern/depsgraph.c
 	intern/displist.c
@@ -105,7 +109,6 @@ set(SRC
 	intern/idprop.c
 	intern/image.c
 	intern/image_gen.c
-	intern/implicit.c
 	intern/ipo.c
 	intern/key.c
 	intern/lamp.c
@@ -118,6 +121,7 @@ set(SRC
 	intern/mask_rasterize.c
 	intern/material.c
 	intern/mball.c
+	intern/mball_tessellate.c
 	intern/mesh.c
 	intern/mesh_evaluate.c
 	intern/mesh_mapping.c
@@ -130,13 +134,16 @@ set(SRC
 	intern/nla.c
 	intern/node.c
 	intern/object.c
-	intern/object_data_transfer.c
 	intern/object_deform.c
 	intern/object_dupli.c
+	intern/object_update.c
 	intern/ocean.c
+	intern/outliner_treehash.c
 	intern/packedFile.c
 	intern/paint.c
 	intern/particle.c
+	intern/particle_child.c
+	intern/particle_distribute.c
 	intern/particle_system.c
 	intern/pbvh.c
 	intern/pbvh_bmesh.c
@@ -169,7 +176,6 @@ set(SRC
 	intern/tracking_solver.c
 	intern/tracking_stabilize.c
 	intern/tracking_util.c
-	intern/treehash.c
 	intern/unit.c
 	intern/world.c
 	intern/writeavi.c
@@ -203,10 +209,13 @@ set(SRC
 	BKE_curve.h
 	BKE_customdata.h
 	BKE_customdata_file.h
+	BKE_data_transfer.h
 	BKE_deform.h
 	BKE_depsgraph.h
 	BKE_displist.h
 	BKE_dynamicpaint.h
+	BKE_editmesh.h
+	BKE_editmesh_bvh.h
 	BKE_effect.h
 	BKE_fcurve.h
 	BKE_fluidsim.h
@@ -230,6 +239,7 @@ set(SRC
 	BKE_mask.h
 	BKE_material.h
 	BKE_mball.h
+	BKE_mball_tessellate.h
 	BKE_mesh.h
 	BKE_mesh_mapping.h
 	BKE_mesh_remap.h
@@ -239,9 +249,9 @@ set(SRC
 	BKE_nla.h
 	BKE_node.h
 	BKE_object.h
-	BKE_object_data_transfer.h
 	BKE_object_deform.h
 	BKE_ocean.h
+	BKE_outliner_treehash.h
 	BKE_packedFile.h
 	BKE_paint.h
 	BKE_particle.h
@@ -262,12 +272,9 @@ set(SRC
 	BKE_speaker.h
 	BKE_subsurf.h
 	BKE_suggestions.h
-	BKE_editmesh.h
-	BKE_editmesh_bvh.h
 	BKE_text.h
 	BKE_texture.h
 	BKE_tracking.h
-	BKE_treehash.h
 	BKE_unit.h
 	BKE_utildefines.h
 	BKE_world.h
@@ -420,9 +427,16 @@ if(WITH_JACK)
 endif()
 
 if(WITH_LZO)
-	list(APPEND INC_SYS
-		../../../extern/lzo/minilzo
-	)
+	if(WITH_SYSTEM_LZO)
+		list(APPEND INC_SYS
+			${LZO_INCLUDE_DIR}
+		)
+		add_definitions(-DWITH_SYSTEM_LZO)
+	else()
+		list(APPEND INC_SYS
+			../../../extern/lzo/minilzo
+		)
+	endif()
 	add_definitions(-DWITH_LZO)
 endif()
 
@@ -468,5 +482,9 @@ endif()
 #if(MSVC)
 #	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
 #endif()
+
+if(WITH_LEGACY_DEPSGRAPH)
+	add_definitions(-DWITH_LEGACY_DEPSGRAPH)
+endif()
 
 blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}")

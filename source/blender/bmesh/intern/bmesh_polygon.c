@@ -102,8 +102,9 @@ static float bm_face_calc_poly_normal(const BMFace *f, float n[3])
  * Same as #calc_poly_normal and #bm_face_calc_poly_normal
  * but takes an array of vertex locations.
  */
-static float bm_face_calc_poly_normal_vertex_cos(BMFace *f, float r_no[3],
-                                                float const (*vertexCos)[3])
+static float bm_face_calc_poly_normal_vertex_cos(
+        BMFace *f, float r_no[3],
+        float const (*vertexCos)[3])
 {
 	BMLoop *l_first = BM_FACE_FIRST_LOOP(f);
 	BMLoop *l_iter  = l_first;
@@ -127,8 +128,9 @@ static float bm_face_calc_poly_normal_vertex_cos(BMFace *f, float r_no[3],
 /**
  * \brief COMPUTE POLY CENTER (BMFace)
  */
-static void bm_face_calc_poly_center_mean_vertex_cos(BMFace *f, float r_cent[3],
-                                                     float const (*vertexCos)[3])
+static void bm_face_calc_poly_center_mean_vertex_cos(
+        BMFace *f, float r_cent[3],
+        float const (*vertexCos)[3])
 {
 	BMLoop *l_first = BM_FACE_FIRST_LOOP(f);
 	BMLoop *l_iter  = l_first;
@@ -213,9 +215,6 @@ float BM_face_calc_area(BMFace *f)
 
 	if (f->len == 3) {
 		area = area_tri_v3(verts[0], verts[1], verts[2]);
-	}
-	else if (f->len == 4) {
-		area = area_quad_v3(verts[0], verts[1], verts[2], verts[3]);
 	}
 	else {
 		area = area_poly_v3((const float (*)[3])verts, f->len);
@@ -551,8 +550,9 @@ void BM_face_normal_update(BMFace *f)
 }
 
 /* exact same as 'BM_face_calc_normal' but accepts vertex coords */
-float BM_face_calc_normal_vcos(BMesh *bm, BMFace *f, float r_no[3],
-                               float const (*vertexCos)[3])
+float BM_face_calc_normal_vcos(
+        BMesh *bm, BMFace *f, float r_no[3],
+        float const (*vertexCos)[3])
 {
 	BMLoop *l;
 
@@ -610,8 +610,9 @@ float BM_face_calc_normal_subset(BMLoop *l_first, BMLoop *l_last, float r_no[3])
 }
 
 /* exact same as 'BM_face_calc_normal' but accepts vertex coords */
-void BM_face_calc_center_mean_vcos(BMesh *bm, BMFace *f, float r_cent[3],
-                                   float const (*vertexCos)[3])
+void BM_face_calc_center_mean_vcos(
+        BMesh *bm, BMFace *f, float r_cent[3],
+        float const (*vertexCos)[3])
 {
 	/* must have valid index data */
 	BLI_assert((bm->elem_index_dirty & BM_VERT) == 0);
@@ -746,7 +747,9 @@ bool BM_face_point_inside_test(BMFace *f, const float co[3])
 void BM_face_triangulate(
         BMesh *bm, BMFace *f,
         BMFace **r_faces_new,
-        int *r_faces_new_tot,
+        int     *r_faces_new_tot,
+        BMEdge **r_edges_new,
+        int     *r_edges_new_tot,
         const int quad_method,
         const int ngon_method,
         const bool use_tag,
@@ -758,6 +761,7 @@ void BM_face_triangulate(
 	BMLoop *l_iter, *l_first, *l_new;
 	BMFace *f_new;
 	int nf_i = 0;
+	int ne_i = 0;
 	bool use_beauty = (ngon_method == MOD_TRIANGULATE_NGON_BEAUTY);
 
 	BLI_assert(BM_face_is_normal_valid(f));
@@ -838,6 +842,9 @@ void BM_face_triangulate(
 		if (r_faces_new) {
 			r_faces_new[nf_i++] = f_new;
 		}
+		if (r_edges_new) {
+			r_edges_new[ne_i++] = l_new->e;
+		}
 	}
 	else if (f->len > 4) {
 
@@ -898,8 +905,7 @@ void BM_face_triangulate(
 				}
 			}
 
-			/* we know any edge that we create and _isnt_ */
-			if (use_tag) {
+			if (use_tag || r_edges_new) {
 				/* new faces loops */
 				l_iter = l_first = l_new;
 				do {
@@ -909,7 +915,12 @@ void BM_face_triangulate(
 					bool is_new_edge = (l_iter == l_iter->radial_next);
 
 					if (is_new_edge) {
-						BM_elem_flag_enable(e, BM_ELEM_TAG);
+						if (use_tag) {
+							BM_elem_flag_enable(e, BM_ELEM_TAG);
+						}
+						if (r_edges_new) {
+							r_edges_new[ne_i++] = e;
+						}
 					}
 					/* note, never disable tag's */
 				} while ((l_iter = l_iter->next) != l_first);
@@ -927,6 +938,10 @@ void BM_face_triangulate(
 
 	if (r_faces_new_tot) {
 		*r_faces_new_tot = nf_i;
+	}
+
+	if (r_edges_new_tot) {
+		*r_edges_new_tot = ne_i;
 	}
 }
 

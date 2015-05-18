@@ -28,7 +28,13 @@ if not sys.version.startswith("3"):
           sys.version.partition(" ")[0])
     sys.exit(1)
 
-from cmake_consistency_check_config import IGNORE, UTF8_CHECK, SOURCE_DIR
+from cmake_consistency_check_config import (
+        IGNORE,
+        UTF8_CHECK,
+        SOURCE_DIR,
+        BUILD_DIR,
+        )
+
 
 import os
 from os.path import join, dirname, normpath, splitext
@@ -134,6 +140,7 @@ def cmake_get_src(f):
 
         if found:
             cmake_base = dirname(f)
+            cmake_base_bin = os.path.join(BUILD_DIR, os.path.relpath(cmake_base, SOURCE_DIR))
 
             while it is not None:
                 i += 1
@@ -154,6 +161,8 @@ def cmake_get_src(f):
 
                     # replace dirs
                     l = l.replace("${CMAKE_CURRENT_SOURCE_DIR}", cmake_base)
+                    l = l.replace("${CMAKE_CURRENT_BINARY_DIR}", cmake_base_bin)
+                    l = l.strip('"')
 
                     if not l:
                         pass
@@ -187,11 +196,16 @@ def cmake_get_src(f):
                                 pass
                             elif new_file.endswith(".osl"):  # open shading language
                                 pass
+                            elif new_file.endswith(".glsl"):
+                                pass
                             else:
                                 raise Exception("unknown file type - not c or h %s -> %s" % (f, new_file))
 
                         elif context_name == "INC":
-                            if os.path.isdir(new_file):
+                            if new_file.startswith(BUILD_DIR):
+                                # assume generated path
+                                pass
+                            elif os.path.isdir(new_file):
                                 new_path_rel = os.path.relpath(new_file, cmake_base)
 
                                 if new_path_rel != l:
@@ -244,7 +258,7 @@ print("\nChecking for missing references:")
 is_err = False
 errs = []
 for f in (global_h | global_c):
-    if f.endswith("dna.c"):
+    if f.startswith(BUILD_DIR):
         continue
 
     if not os.path.exists(f):
@@ -305,7 +319,7 @@ if UTF8_CHECK:
                     try:
                         for l in open(f, "r", encoding="utf8"):
                             i += 1
-                    except:
+                    except UnicodeDecodeError:
                         print("Non utf8: %s:%d" % (f, i))
                         if i > 1:
                             traceback.print_exc()

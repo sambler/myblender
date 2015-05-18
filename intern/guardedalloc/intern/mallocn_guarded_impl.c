@@ -22,6 +22,7 @@
  *
  * Contributor(s): Brecht Van Lommel
  *                 Campbell Barton
+ *                 Sergey Sharybin
  *
  * ***** END GPL LICENSE BLOCK *****
  */
@@ -717,7 +718,7 @@ void MEM_guarded_printmemlist_stats(void)
 		totpb++;
 		pb++;
 
-		if (!membl->mmap) {
+		if (!membl->mmap && membl->alignment == 0) {
 			mem_in_use_slop += (sizeof(MemHead) + sizeof(MemTail) +
 			                    malloc_usable_size((void *)membl)) - membl->len;
 		}
@@ -1154,7 +1155,7 @@ size_t MEM_guarded_get_peak_memory(void)
 void MEM_guarded_reset_peak_memory(void)
 {
 	mem_lock_thread();
-	peak_mem = 0;
+	peak_mem = mem_in_use;
 	mem_unlock_thread();
 }
 

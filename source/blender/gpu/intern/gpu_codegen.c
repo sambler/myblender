@@ -311,18 +311,16 @@ static void codegen_convert_datatype(DynStr *ds, int from, int to, const char *t
 		BLI_dynstr_append(ds, name);
 	}
 	else if (to == GPU_FLOAT) {
-		if (from == GPU_VEC4)
-			BLI_dynstr_appendf(ds, "dot(%s.rgb, vec3(0.35, 0.45, 0.2))", name);
-		else if (from == GPU_VEC3)
-			BLI_dynstr_appendf(ds, "dot(%s, vec3(0.33))", name);
+		if (from == GPU_VEC4 || from == GPU_VEC3)
+			BLI_dynstr_appendf(ds, "(%s.r + %s.g + %s.b) / 3.0", name, name, name);
 		else if (from == GPU_VEC2)
 			BLI_dynstr_appendf(ds, "%s.r", name);
 	}
 	else if (to == GPU_VEC2) {
 		if (from == GPU_VEC4)
-			BLI_dynstr_appendf(ds, "vec2(dot(%s.rgb, vec3(0.35, 0.45, 0.2)), %s.a)", name, name);
+			BLI_dynstr_appendf(ds, "vec2((%s.r + %s.g + %s.b) / 3.0, %s.a)", name, name, name, name);
 		else if (from == GPU_VEC3)
-			BLI_dynstr_appendf(ds, "vec2(dot(%s.rgb, vec3(0.33)), 1.0)", name);
+			BLI_dynstr_appendf(ds, "vec2((%s.r + %s.g + %s.b) / 3.0, 1.0)", name, name, name);
 		else if (from == GPU_FLOAT)
 			BLI_dynstr_appendf(ds, "vec2(%s, 1.0)", name);
 	}
@@ -852,10 +850,19 @@ void GPU_pass_update_uniforms(GPUPass *pass)
 		return;
 
 	/* pass dynamic inputs to opengl, others were removed */
-	for (input = inputs->first; input; input = input->next)
-		if (!(input->ima || input->tex || input->prv))
-			GPU_shader_uniform_vector(shader, input->shaderloc, input->type, 1,
-				input->dynamicvec);
+	for (input = inputs->first; input; input = input->next) {
+		if (!(input->ima || input->tex || input->prv)) {
+			if (input->dynamictype == GPU_DYNAMIC_MAT_HARD) {
+				// The hardness is actually a short pointer, so we convert it here
+				float val = (float)(*(short*)input->dynamicvec);
+				GPU_shader_uniform_vector(shader, input->shaderloc, 1, 1, &val);
+			}
+			else {
+				GPU_shader_uniform_vector(shader, input->shaderloc, input->type, 1,
+					input->dynamicvec);
+			}
+		}
+	}
 }
 
 void GPU_pass_unbind(GPUPass *pass)

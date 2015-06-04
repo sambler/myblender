@@ -1634,8 +1634,8 @@ extern const char *RE_engine_id_CYCLES;
 /* **************** SCENE ********************* */
 
 /* for general use */
-#define MAXFRAME	300000
-#define MAXFRAMEF	300000.0f
+#define MAXFRAME	900000
+#define MAXFRAMEF	900000.0f
 
 #define MINFRAME	0
 #define MINFRAMEF	0.0f

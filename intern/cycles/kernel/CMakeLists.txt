@@ -47,6 +47,7 @@ set(SRC_HEADERS
 	kernel_montecarlo.h
 	kernel_passes.h
 	kernel_path.h
+	kernel_path_branched.h
 	kernel_path_common.h
 	kernel_path_state.h
 	kernel_path_surface.h
@@ -169,7 +170,6 @@ set(SRC_SPLIT_HEADERS
 	split/kernel_holdout_emission_blurring_pathtermination_ao.h
 	split/kernel_lamp_emission.h
 	split/kernel_next_iteration_setup.h
-	split/kernel_queue_enqueue.h
 	split/kernel_scene_intersect.h
 	split/kernel_shader_eval.h
 	split/kernel_shadow_blocked.h

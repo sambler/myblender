@@ -425,6 +425,13 @@ void DepsgraphRelationBuilder::build_object(Main *bmain, Scene *scene, Object *o
 				build_camera(ob);
 				break;
 		}
+
+		Key *key = BKE_key_from_object(ob);
+		if (key != NULL) {
+			ComponentKey geometry_key((ID *)ob->data, DEPSNODE_TYPE_GEOMETRY);
+			ComponentKey key_key(&key->id, DEPSNODE_TYPE_GEOMETRY);
+			add_relation(key_key, geometry_key, DEPSREL_TYPE_GEOMETRY_EVAL, "Shapekeys");
+		}
 	}
 
 	/* particle systems */
@@ -811,6 +818,10 @@ void DepsgraphRelationBuilder::build_driver(ID *id, FCurve *fcu)
 			OperationKey local_transform_key(id, DEPSNODE_TYPE_TRANSFORM, DEG_OPCODE_TRANSFORM_LOCAL);
 			add_relation(driver_key, local_transform_key, DEPSREL_TYPE_OPERATION, "[Driver -> Transform]");
 		}
+		else if (GS(id->name) == ID_KE) {
+			ComponentKey geometry_key(id, DEPSNODE_TYPE_GEOMETRY);
+			add_relation(driver_key, geometry_key, DEPSREL_TYPE_GEOMETRY_EVAL, "[Driver -> Shapekey Geometry]");
+		}
 	}
 
 	/* ensure that affected prop's update callbacks will be triggered once done */
@@ -998,6 +1009,11 @@ void DepsgraphRelationBuilder::build_rigidbody(Scene *scene)
 
 void DepsgraphRelationBuilder::build_particles(Scene *scene, Object *ob)
 {
+	TimeSourceKey time_src_key;
+	OperationKey obdata_ubereval_key(&ob->id,
+	                                 DEPSNODE_TYPE_GEOMETRY,
+	                                 DEG_OPCODE_GEOMETRY_UBEREVAL);
+
 	/* particle systems */
 	for (ParticleSystem *psys = (ParticleSystem *)ob->particlesystem.first; psys; psys = psys->next) {
 		ParticleSettings *part = psys->part;
@@ -1011,6 +1027,22 @@ void DepsgraphRelationBuilder::build_particles(Scene *scene, Object *ob)
 		/* XXX: if particle system is later re-enabled, we must do full rebuild? */
 		if (!psys_check_enabled(ob, psys))
 			continue;
+
+		/* TODO(sergey): Are all particle systems depends on time?
+		 * Hair without dynamics i.e.
+		 */
+		add_relation(time_src_key, psys_key,
+		             DEPSREL_TYPE_TIME,
+		             "TimeSrc -> PSys");
+
+		/* TODO(sergey): Currently particle update is just a placeholder,
+		 * hook it to the ubereval node so particle system is getting updated
+		 * on playback.
+		 */
+		add_relation(psys_key,
+		             obdata_ubereval_key,
+		             DEPSREL_TYPE_OPERATION,
+		             "PSys -> UberEval");
 
 #if 0
 		if (ELEM(part->phystype, PART_PHYS_KEYED, PART_PHYS_BOIDS)) {

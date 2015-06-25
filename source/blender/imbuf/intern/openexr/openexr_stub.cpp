@@ -35,10 +35,11 @@
 void   *IMB_exr_get_handle          (void) {return NULL;}
 void   *IMB_exr_get_handle_name     (const char * /*name*/) { return NULL;}
 void    IMB_exr_add_channel         (void * /*handle*/, const char * /*layname*/, const char * /*passname*/, const char * /*view*/,
-                                     int /*xstride*/, int /*ystride*/, float * /*rect*/) { }
+                                     int /*xstride*/, int /*ystride*/, float * /*rect*/,
+                                     bool /*use_half_float*/) { }
 
 int     IMB_exr_begin_read          (void * /*handle*/, const char * /*filename*/, int * /*width*/, int * /*height*/) { return 0;}
-int     IMB_exr_begin_write         (void * /*handle*/, const char * /*filename*/, int /*width*/, int /*height*/, int /*compress*/) { return 0;}
+int     IMB_exr_begin_write         (void * /*handle*/, const char * /*filename*/, int /*width*/, int /*height*/, int /*compress*/, const struct StampData * /*stamp*/) { return 0;}
 void    IMB_exrtile_begin_write     (void * /*handle*/, const char * /*filename*/, int /*mipmap*/, int /*width*/, int /*height*/, int /*tilex*/, int /*tiley*/) { }
 
 void    IMB_exr_set_channel         (void * /*handle*/, const char * /*layname*/, const char * /*passname*/, int /*xstride*/, int /*ystride*/, float * /*rect*/) { }

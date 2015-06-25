@@ -85,10 +85,6 @@ short BPy_reports_to_error(ReportList *reports, PyObject *exception, const bool 
 bool BPy_errors_to_report_ex(ReportList *reports, const bool use_full, const bool use_location)
 {
 	PyObject *pystring;
-	const char *cstring;
-
-	const char *filename;
-	int lineno;
 
 	if (!PyErr_Occurred())
 		return 1;
@@ -112,10 +108,12 @@ bool BPy_errors_to_report_ex(ReportList *reports, const bool use_full, const boo
 		return 0;
 	}
 
-	cstring = _PyUnicode_AsString(pystring);
-
 	if (use_location) {
+		const char *filename;
+		int lineno;
+
 		PyObject *pystring_format;  /* workaround, see below */
+		const char *cstring;
 
 		PyC_FileAndNum(&filename, &lineno);
 		if (filename == NULL) {
@@ -123,20 +121,25 @@ bool BPy_errors_to_report_ex(ReportList *reports, const bool use_full, const boo
 		}
 
 #if 0 /* ARG!. workaround for a bug in blenders use of vsnprintf */
-		BKE_reportf(reports, RPT_ERROR, "%s\nlocation: %s:%d\n", cstring, filename, lineno);
+		BKE_reportf(reports, RPT_ERROR, "%s\nlocation: %s:%d\n", _PyUnicode_AsString(pystring), filename, lineno);
 #else
-		pystring_format = PyUnicode_FromFormat(TIP_("%s\nlocation: %s:%d\n"), cstring, filename, lineno);
+		pystring_format = PyUnicode_FromFormat(
+		        TIP_("%s\nlocation: %s:%d\n"),
+		        _PyUnicode_AsString(pystring), filename, lineno);
+
 		cstring = _PyUnicode_AsString(pystring_format);
 		BKE_report(reports, RPT_ERROR, cstring);
+
+		/* not exactly needed. just for testing */
+		fprintf(stderr, TIP_("%s\nlocation: %s:%d\n"), cstring, filename, lineno);
+
 		Py_DECREF(pystring_format);  /* workaround */
 #endif
 	}
 	else {
-		BKE_report(reports, RPT_ERROR, cstring);
+		BKE_report(reports, RPT_ERROR, _PyUnicode_AsString(pystring));
 	}
 
-	/* not exactly needed. just for testing */
-	fprintf(stderr, TIP_("%s\nlocation: %s:%d\n"), cstring, filename, lineno);
 
 	Py_DECREF(pystring);
 	return 1;

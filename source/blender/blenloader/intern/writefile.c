@@ -1096,7 +1096,7 @@ static void write_pointcaches(WriteData *wd, ListBase *ptcaches)
 				
 				for (i=0; i<BPHYS_TOT_DATA; i++) {
 					if (pm->data[i] && pm->data_types & (1<<i)) {
-						if (ptcache_data_struct[i][0]=='\0')
+						if (ptcache_data_struct[i][0] == '\0')
 							writedata(wd, DATA, MEM_allocN_len(pm->data[i]), pm->data[i]);
 						else
 							writestruct(wd, DATA, ptcache_data_struct[i], pm->totpoint, pm->data[i]);
@@ -1104,7 +1104,7 @@ static void write_pointcaches(WriteData *wd, ListBase *ptcaches)
 				}
 
 				for (; extra; extra=extra->next) {
-					if (ptcache_extra_struct[extra->type][0]=='\0')
+					if (ptcache_extra_struct[extra->type][0] == '\0')
 						continue;
 					writestruct(wd, DATA, "PTCacheExtra", 1, extra);
 					writestruct(wd, DATA, ptcache_extra_struct[extra->type], extra->totdata, extra->data);
@@ -2161,6 +2161,13 @@ static void write_images(WriteData *wd, ListBase *idbase)
 	ima= idbase->first;
 	while (ima) {
 		if (ima->id.us>0 || wd->current) {
+			/* Some trickery to keep forward compatibility of packed images. */
+			BLI_assert(ima->packedfile == NULL);
+			if (ima->packedfiles.first != NULL) {
+				imapf = ima->packedfiles.first;
+				ima->packedfile = imapf->packedfile;
+			}
+
 			/* write LibData */
 			writestruct(wd, ID_IM, "Image", 1, ima);
 			if (ima->id.properties) IDP_WriteProperty(ima->id.properties, wd);
@@ -2179,6 +2186,8 @@ static void write_images(WriteData *wd, ListBase *idbase)
 			for (iv = ima->views.first; iv; iv = iv->next)
 				writestruct(wd, DATA, "ImageView", 1, iv);
 			writestruct(wd, DATA, "Stereo3dFormat", 1, ima->stereo3d_format);
+
+			ima->packedfile = NULL;
 		}
 		ima= ima->id.next;
 	}

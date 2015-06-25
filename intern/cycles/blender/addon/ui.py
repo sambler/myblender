@@ -431,6 +431,9 @@ class CyclesRender_PT_layer_passes(CyclesButtonsPanel, Panel):
         col.prop(rl, "use_pass_emit", text="Emission")
         col.prop(rl, "use_pass_environment")
 
+        if hasattr(rd, "debug_pass_type"):
+            layout.prop(rd, "debug_pass_type")
+
 
 class CyclesRender_PT_views(CyclesButtonsPanel, Panel):
     bl_label = "Views"
@@ -644,7 +647,13 @@ class CyclesObject_PT_motion_blur(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return CyclesButtonsPanel.poll(context) and ob and ob.type in {'MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META'}
+        if CyclesButtonsPanel.poll(context) and ob:
+            if ob.type in {'MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META'}:
+                return True
+            if ob.dupli_type == 'GROUP' and ob.dupli_group:
+                return True
+            # TODO(sergey): More duplicator types here?
+        return False
 
     def draw_header(self, context):
         layout = self.layout
@@ -687,8 +696,8 @@ class CyclesObject_PT_ray_visibility(CyclesButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         return (CyclesButtonsPanel.poll(context) and
-                ob and ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LAMP'} or
-                ob and ob.dupli_type == 'GROUP' and ob.dupli_group)
+                ob and ((ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LAMP'}) or
+                        (ob.dupli_type == 'GROUP' and ob.dupli_group)))
 
     def draw(self, context):
         layout = self.layout
@@ -733,9 +742,14 @@ def find_node(material, nodetype):
     if material and material.node_tree:
         ntree = material.node_tree
 
+        active_output_node = None
         for node in ntree.nodes:
             if getattr(node, "type", None) == nodetype:
-                return node
+                if getattr(node, "is_active_output", True):
+                    return node
+                if not active_output_node:
+                    active_output_node = node
+        return active_output_node
 
     return None
 

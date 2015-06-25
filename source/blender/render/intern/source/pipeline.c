@@ -154,6 +154,7 @@ static void stats_background(void *UNUSED(arg), RenderStats *rs)
 {
 	uintptr_t mem_in_use, mmap_in_use, peak_memory;
 	float megs_used_memory, mmap_used_memory, megs_peak_memory;
+	char info_time_str[32];
 
 	mem_in_use = MEM_get_memory_in_use();
 	mmap_in_use = MEM_get_mapped_memory_in_use();
@@ -171,8 +172,11 @@ static void stats_background(void *UNUSED(arg), RenderStats *rs)
 	if (rs->curblur)
 		fprintf(stdout, IFACE_("Blur %d "), rs->curblur);
 
+	BLI_timestr(PIL_check_seconds_timer() - rs->starttime, info_time_str, sizeof(info_time_str));
+	fprintf(stdout, IFACE_("| Time:%s | "), info_time_str);
+
 	if (rs->infostr) {
-		fprintf(stdout, "| %s", rs->infostr);
+		fprintf(stdout, "%s", rs->infostr);
 	}
 	else {
 		if (rs->tothalo)
@@ -181,6 +185,9 @@ static void stats_background(void *UNUSED(arg), RenderStats *rs)
 		else
 			fprintf(stdout, IFACE_("Sce: %s Ve:%d Fa:%d La:%d"), rs->scene_name, rs->totvert, rs->totface, rs->totlamp);
 	}
+
+	/* Flush stdout to be sure python callbacks are printing stuff after blender. */
+	fflush(stdout);
 
 	BLI_callback_exec(G.main, NULL, BLI_CB_EVT_RENDER_STATS);
 
@@ -1113,13 +1120,28 @@ static bool find_next_pano_slice(Render *re, int *slice, int *minx, rctf *viewpl
 	return found;
 }
 
-static RenderPart *find_next_part(Render *re, int minx)
+typedef struct SortRenderPart {
+	RenderPart *pa;
+	long long int dist;
+} SortRenderPart;
+
+static int sort_render_part(const void *pa1, const void *pa2) {
+	const SortRenderPart *rpa1 = pa1;
+	const SortRenderPart *rpa2 = pa2;
+
+	if (rpa1->dist > rpa2->dist) return 1;
+	else if (rpa1->dist < rpa2->dist) return -1;
+
+	return 0;
+}
+
+static int sort_and_queue_parts(Render *re, int minx, ThreadQueue *workqueue)
 {
-	RenderPart *pa, *best = NULL;
+	RenderPart *pa;
 
 	/* long long int's needed because of overflow [#24414] */
 	long long int centx = re->winx / 2, centy = re->winy / 2, tot = 1;
-	long long int mindist = (long long int)re->winx * (long long int)re->winy;
+	int totsort = 0;
 	
 	/* find center of rendered parts, image center counts for 1 too */
 	for (pa = re->parts.first; pa; pa = pa->next) {
@@ -1128,31 +1150,48 @@ static RenderPart *find_next_part(Render *re, int minx)
 			centy += BLI_rcti_cent_y(&pa->disprect);
 			tot++;
 		}
+		else if (pa->status == PART_STATUS_NONE && pa->nr == 0) {
+			if (!(re->r.mode & R_PANORAMA) || pa->disprect.xmin == minx) {
+				totsort++;
+			}
+		}
 	}
 	centx /= tot;
 	centy /= tot;
 	
-	/* closest of the non-rendering parts */
-	for (pa = re->parts.first; pa; pa = pa->next) {
-		if (pa->status == PART_STATUS_NONE && pa->nr == 0) {
-			long long int distx = centx - BLI_rcti_cent_x(&pa->disprect);
-			long long int disty = centy - BLI_rcti_cent_y(&pa->disprect);
-			distx = (long long int)sqrt(distx * distx + disty * disty);
-			if (distx < mindist) {
-				if (re->r.mode & R_PANORAMA) {
-					if (pa->disprect.xmin == minx) {
-						best = pa;
-						mindist = distx;
-					}
-				}
-				else {
-					best = pa;
-					mindist = distx;
+	if (totsort > 0) {
+		SortRenderPart *sortlist = MEM_mallocN(sizeof(*sortlist) * totsort, "renderpartsort");
+		long int i = 0;
+
+		/* prepare the list */
+		for (pa = re->parts.first; pa; pa = pa->next) {
+			if (pa->status == PART_STATUS_NONE && pa->nr == 0) {
+				if (!(re->r.mode & R_PANORAMA) || pa->disprect.xmin == minx) {
+					long long int distx = centx - BLI_rcti_cent_x(&pa->disprect);
+					long long int disty = centy - BLI_rcti_cent_y(&pa->disprect);
+					sortlist[i].dist = (long long int)sqrt(distx * distx + disty * disty);
+					sortlist[i].pa = pa;
+					i++;
 				}
 			}
 		}
+
+		/* Now sort it */
+		qsort(sortlist, totsort, sizeof(*sortlist), sort_render_part);
+
+		/* Finally flush it to the workqueue */
+		for (i = 0; i < totsort; i++) {
+			pa = sortlist[i].pa;
+			pa->nr = i + 1; /* for nicest part, and for stats */
+			BLI_thread_queue_push(workqueue, pa);
+		}
+
+		MEM_freeN(sortlist);
+
+		return totsort;
 	}
-	return best;
+
+	return 0;
 }
 
 static void print_part_stats(Render *re, RenderPart *pa)
@@ -1264,11 +1303,7 @@ static void threaded_tile_processor(Render *re)
 	/* for panorama we loop over slices */
 	while (find_next_pano_slice(re, &slice, &minx, &viewplane)) {
 		/* gather parts into queue */
-		while ((pa = find_next_part(re, minx))) {
-			pa->nr = totpart + 1; /* for nicest part, and for stats */
-			totpart++;
-			BLI_thread_queue_push(workqueue, pa);
-		}
+		totpart = sort_and_queue_parts(re, minx, workqueue);
 		
 		BLI_thread_queue_nowait(workqueue);
 		
@@ -1354,7 +1389,13 @@ static void threaded_tile_processor(Render *re)
 
 	BLI_thread_queue_free(donequeue);
 	BLI_thread_queue_free(workqueue);
-	
+
+	if (re->result->do_exr_tile) {
+		BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
+		render_result_save_empty_result_tiles(re);
+		BLI_rw_mutex_unlock(&re->resultmutex);
+	}
+
 	/* unset threadsafety */
 	g_break = 0;
 	BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
@@ -2164,7 +2205,7 @@ static void free_all_freestyle_renders(void)
 			/* detach the window manager from freestyle bmain (see comments
 			 * in add_freestyle() for more detail)
 			 */
-			re1->freestyle_bmain->wm.first = re1->freestyle_bmain->wm.last = NULL;
+			BLI_listbase_clear(&re1->freestyle_bmain->wm);
 
 			BKE_main_free(re1->freestyle_bmain);
 			re1->freestyle_bmain = NULL;
@@ -2459,6 +2500,8 @@ static void do_render_composite_fields_blur_3d(Render *re)
 				/* in case it was never initialized */
 				R.sdh = re->sdh;
 				R.stats_draw = re->stats_draw;
+				R.i.starttime = re->i.starttime;
+				R.i.cfra = re->i.cfra;
 				
 				if (update_newframe)
 					BKE_scene_update_for_newframe(re->eval_ctx, re->main, re->scene, re->lay);
@@ -3174,14 +3217,14 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 					ibuf->planes = 24;
 
 					IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings,
-					                                    &scene->display_settings, &rd->im_format);
+					                                    &scene->display_settings, &imf);
 
 					if (stamp) {
 						/* writes the name of the individual cameras */
-						ok = BKE_imbuf_write_stamp(scene, rr, ibuf, name, &rd->im_format);
+						ok = BKE_imbuf_write_stamp(scene, rr, ibuf, name, &imf);
 					}
 					else {
-						ok = BKE_imbuf_write(ibuf, name, &rd->im_format);
+						ok = BKE_imbuf_write(ibuf, name, &imf);
 					}
 					printf("Saved: %s\n", name);
 				}
@@ -3375,7 +3418,10 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 	
 	BLI_timestr(re->i.lastframetime, name, sizeof(name));
 	printf(" Time: %s", name);
-	
+
+	/* Flush stdout to be sure python callbacks are printing stuff after blender. */
+	fflush(stdout);
+
 	BLI_callback_exec(G.main, NULL, BLI_CB_EVT_RENDER_STATS);
 
 	BLI_timestr(re->i.lastframetime - render_time, name, sizeof(name));

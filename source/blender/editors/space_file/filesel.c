@@ -250,6 +250,7 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 
 	/* operator has no setting for this */
 	params->sort = FILE_SORT_ALPHA;
+	params->active_file = -1;
 
 
 	/* initialize the list with previous folders */
@@ -283,6 +284,7 @@ void ED_fileselect_reset_params(SpaceFile *sfile)
 	sfile->params->type = FILE_UNIX;
 	sfile->params->flag = 0;
 	sfile->params->title[0] = '\0';
+	sfile->params->active_file = -1;
 }
 
 int ED_fileselect_layout_numfiles(FileLayout *layout, ARegion *ar)
@@ -401,8 +403,20 @@ void ED_fileselect_layout_tilepos(FileLayout *layout, int tile, int *x, int *y)
 float file_string_width(const char *str)
 {
 	uiStyle *style = UI_style_get();
+	float width;
+
 	UI_fontstyle_set(&style->widget);
-	return BLF_width(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
+	if (style->widget.kerning == 1) {  /* for BLF_width */
+		BLF_enable(style->widget.uifont_id, BLF_KERNING_DEFAULT);
+	}
+
+	width = BLF_width(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
+
+	if (style->widget.kerning == 1) {
+		BLF_disable(style->widget.uifont_id, BLF_KERNING_DEFAULT);
+	}
+
+	return width;
 }
 
 float file_font_pointsize(void)
@@ -685,7 +699,7 @@ void ED_fileselect_clear(struct wmWindowManager *wm, struct SpaceFile *sfile)
 		filelist_free(sfile->files);
 	}
 
-	sfile->params->active_file = -1;
+	sfile->params->highlight_file = -1;
 	WM_main_add_notifier(NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 }
 

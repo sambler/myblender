@@ -378,51 +378,18 @@ typedef struct DisplaceModifierData {
 	int texmapping;
 	/* end MappingInfoModifierData */
 
-	/* Noise modes settings. */
-	float noise_probability;    /* Probability that an item is affected by modifier */
-	float noise_std_deviation;  /* Standard deviation in case of Gaussian */
-	int noise_seed;
-	int noise_mode;             /* Either "Constant", "Linear" or "Gaussian" */
-	/* End noise-specific settings. */
-
-	/* Common settings. */
-	int displace_mode;          /* Either "Texture" or various "Random" ones. */
-
-	int direction;              /* Value to XYZ or normal, or RGB to XYZ. */
-	char defgrp_name[64];       /* The affected vgroup, or defining pivot point. */ /* MAX_VGROUP_NAME */
-	/* Final value = (org_value - midlevel) * strength. */
-	float midlevel;
 	float strength;
-
-	/* Component refining factors. */
-	float translation[3];       /* Used by all modes. */
-	/* Noise loose parts and whole mesh modes only. */
-	float rotation[3];
-	float scale[4];             /* Forth factor is a uniform scaling one. */
-	struct Object *offset_ob;   /* Object providing max translation, rotation and scale. */
-
-	int flags;
-
-	/* Temp data. */
-	int cached_lpmap_totvert;   /* totvert at the time the loosepart map was cached */
-	int cached_lpmap_totedge;   /* totedge at the time the loosepart map was cached */
-	int loosepart_count;        /* number of looseparts in cached loosepart_vertex_map */
-	void *loosepart_vertex_map; /* (MeshElemMap*) cached loosepart-to-vertex mapping (must be freed) */
-	int *loosepart_vertex_mem;  /* The vertex indices pointed to by loosepart_vertex_map (must be freed) */
+	int direction;
+	char defgrp_name[64];   /* MAX_VGROUP_NAME */
+	float midlevel;
+	int pad;
 } DisplaceModifierData;
-
-/* DisplaceModifierData->displace_mode */
-enum {
-	MOD_DISP_MODE_TEXTURE         = 0,
-	MOD_DISP_MODE_RAND_VERTEX     = 1,
-	MOD_DISP_MODE_RAND_LOOSEPARTS = 2,
-	MOD_DISP_MODE_RAND_WHOLEMESH  = 3,
-};
 
 /* DisplaceModifierData->direction */
 enum {
-	MOD_DISP_DIR_XYZ       = 0,
-	/* 1 and 2 no more used, do not use (for compatibility). */
+	MOD_DISP_DIR_X       = 0,
+	MOD_DISP_DIR_Y       = 1,
+	MOD_DISP_DIR_Z       = 2,
 	MOD_DISP_DIR_NOR     = 3,
 	MOD_DISP_DIR_RGB_XYZ = 4,
 	MOD_DISP_DIR_CLNOR   = 5,
@@ -434,19 +401,6 @@ enum {
 	MOD_DISP_MAP_GLOBAL = 1,
 	MOD_DISP_MAP_OBJECT = 2,
 	MOD_DISP_MAP_UV     = 3,
-};
-
-/* DisplaceModifierData->noise_mode (used in MOD_DISP_MODE_RAND_...). */
-enum {
-	MOD_DISP_NOISE_MODE_CONSTANT = 0,
-	MOD_DISP_NOISE_MODE_LINEAR   = 1,
-	MOD_DISP_NOISE_MODE_GAUSSIAN = 2,
-};
-
-/* DisplaceModifierData->flags */
-enum {
-	MOD_DISP_NOISE_SEED_OBJID   = (1 << 0),
-	MOD_DISP_USE_OBJECT_OFFSET  = (1 << 1),
 };
 
 typedef struct UVProjectModifierData {

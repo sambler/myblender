@@ -184,9 +184,6 @@ void OBJECT_OT_skin_loose_mark_clear(struct wmOperatorType *ot);
 void OBJECT_OT_skin_radii_equalize(struct wmOperatorType *ot);
 void OBJECT_OT_skin_armature_create(struct wmOperatorType *ot);
 void OBJECT_OT_laplaciandeform_bind(struct wmOperatorType *ot);
-void OBJECT_OT_array_rand_seed_t(struct wmOperatorType *ot);
-void OBJECT_OT_array_rand_seed_g(struct wmOperatorType *ot);
-void OBJECT_OT_array_rand_seed_m(struct wmOperatorType *ot);
 
 /* object_constraint.c */
 void OBJECT_OT_constraint_add(struct wmOperatorType *ot);

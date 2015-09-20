@@ -533,9 +533,7 @@ static void rna_##_type##Modifier_##_prop##_set(PointerRNA *ptr, PointerRNA valu
 
 RNA_MOD_OBJECT_SET(Armature, object, OB_ARMATURE);
 RNA_MOD_OBJECT_SET(Array, start_cap, OB_MESH);
-RNA_MOD_OBJECT_SET(Array, mid_cap, OB_MESH);
 RNA_MOD_OBJECT_SET(Array, end_cap, OB_MESH);
-RNA_MOD_OBJECT_SET(Array, curve_cap, OB_CURVE);
 RNA_MOD_OBJECT_SET(Array, curve_ob, OB_CURVE);
 RNA_MOD_OBJECT_SET(Boolean, object, OB_MESH);
 RNA_MOD_OBJECT_SET(Cast, object, OB_EMPTY);
@@ -1845,33 +1843,11 @@ static void rna_def_modifier_array(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 
-	static EnumPropertyItem prop_type_items[] = {
-		{MOD_ARR_MOD_NRM, "REGULAR", 0, "Regular", "Standart Array"},
-		{MOD_ARR_MOD_CURVE, "PATH", 0, "Path", "Array along a path"},
-		{0, NULL, 0, NULL, NULL}};
-
-	static EnumPropertyItem prop_material_items[] = {
-		{MOD_ARR_MAT, "RANDOM", 0, "Random", "Use a random material"},
-		{MOD_ARR_SEQ, "SEQUENCE", 0, "Sequence", "Use the materials in sequence"},
-		{0, NULL, 0, NULL, NULL}};
-
-	static EnumPropertyItem prop_mid_cap_items[] = {
-		{MOD_ARR_DIST_SEQ, "SEQUENCE", 0, "Sequence", "Use the mid cap in sequence"},
-		{MOD_ARR_DIST_HALF, "HALF", 0, "Half", "Use the mid cap from the center"},
-		{MOD_ARR_DIST_CURVE, "CURVE", 0, "Curve", "Use the mid cap on points of the curve"},
-		{0, NULL, 0, NULL, NULL}};
-
 	static EnumPropertyItem prop_fit_type_items[] = {
 		{MOD_ARR_FIXEDCOUNT, "FIXED_COUNT", 0, "Fixed Count", "Duplicate the object a certain number of times"},
 		{MOD_ARR_FITLENGTH, "FIT_LENGTH", 0, "Fit Length",
 		                    "Duplicate the object as many times as fits in a certain length"},
-		{MOD_ARR_FITBETWEEN, "FIT_BETWEEN", 0, "Fit Between", "Number of duplicates between two objects"},
-		{0, NULL, 0, NULL, NULL}
-	};
-	static EnumPropertyItem prop_rays_dir_items[] = {
-		{MOD_ARR_RAYS_X, "X", 0, "X", "Rays Direction X"},
-		{MOD_ARR_RAYS_Y, "Y", 0, "Y", "Rays Direction Y"},
-		{MOD_ARR_RAYS_Z, "Z", 0, "Z", "Rays Direction Z"},
+		{MOD_ARR_FITCURVE, "FIT_CURVE", 0, "Fit Curve", "Fit the duplicated objects to a curve"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1881,12 +1857,6 @@ static void rna_def_modifier_array(BlenderRNA *brna)
 	RNA_def_struct_ui_icon(srna, ICON_MOD_ARRAY);
 
 	/* Length parameters */
-	prop= RNA_def_property(srna, "type_array", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_sdna(prop, NULL, "type");
-	RNA_def_property_enum_items(prop, prop_type_items);
-	RNA_def_property_ui_text(prop, "Type Array", "Select if you want to do blender’s standart array or a array along a path");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
 	prop = RNA_def_property(srna, "fit_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, prop_fit_type_items);
 	RNA_def_property_ui_text(prop, "Fit Type", "Array length calculation method");
@@ -1975,242 +1945,11 @@ static void rna_def_modifier_array(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop= RNA_def_property(srna, "mid_cap", PROP_POINTER, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Mid Cap", "Mesh object to use as a mid cap");
-	RNA_def_property_pointer_funcs(prop, NULL, "rna_ArrayModifier_mid_cap_set", NULL, "rna_Mesh_object_poll");
-	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_SELF_CHECK);
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "count_mc", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 1, INT_MAX);
-	RNA_def_property_ui_range(prop, 1, 1000, 1, 0);
-	RNA_def_property_ui_text(prop, "Count Mid Cap",  "Number of duplicates of Mid Cap");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "dist_mid_cap", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_sdna(prop, NULL, "dist_mc");
-	RNA_def_property_enum_items(prop, prop_mid_cap_items);
-	RNA_def_property_ui_text(prop, "Offset Mid Cap", "");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "curve_cap", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "curve_cap");
-	RNA_def_property_ui_text(prop, "Curve Cap", "Curve to distribute Mid Cap");
-	RNA_def_property_pointer_funcs(prop, NULL, "rna_ArrayModifier_curve_cap_set", NULL, "rna_Curve_object_poll");
-	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_SELF_CHECK);
-	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
-
-	prop= RNA_def_property(srna, "first_start_cap", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "outer_cp", MOD_ARR_CP_FIRST);
-	RNA_def_property_ui_text(prop, "First Start Cap", "Use Start Cap on the first control point");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "last_end_cap", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "outer_cp", MOD_ARR_CP_LAST);
-	RNA_def_property_ui_text(prop, "Last End Cap", "Use End Cap on the last control point");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "use_advanced_mid_cap", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mode", MOD_ARR_MOD_ADV_MID);
-	RNA_def_property_ui_text(prop, "Advanced MidCap", "Settings of the mid cap in an array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "dis_advanced_mid_cap", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "displays", MOD_ARR_DIS_ADV_MID);
-	RNA_def_property_ui_text(prop, "Advanced MidCap", "Settings of the mid cap in an array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
 	prop = RNA_def_property(srna, "end_cap", PROP_POINTER, PROP_NONE);
 	RNA_def_property_ui_text(prop, "End Cap", "Mesh object to use as an end cap");
 	RNA_def_property_pointer_funcs(prop, NULL, "rna_ArrayModifier_end_cap_set", NULL, "rna_Mesh_object_poll");
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
 	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
-
-	prop= RNA_def_property(srna, "rand_mat_array", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mat_ob", MOD_ARR_AR_MAT_RND);
-	RNA_def_property_ui_text(prop, "Array", "Material random to Array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rand_mat_sc", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mat_ob", MOD_ARR_SC_MAT_RND);
-	RNA_def_property_ui_text(prop, "Start Cap", "Material random to Start Cap");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rand_mat_mc", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mat_ob", MOD_ARR_MC_MAT_RND);
-	RNA_def_property_ui_text(prop, "Mid Cap", "Material random to Mid Cap");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rand_mat_ec", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mat_ob", MOD_ARR_EC_MAT_RND);
-	RNA_def_property_ui_text(prop, "End Cap", "Material random to End Cap");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	/* Advanced parameters */
-	prop= RNA_def_property(srna, "use_advanced", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mode", MOD_ARR_MOD_ADV);
-	RNA_def_property_ui_text(prop, "Advanced", "Use Advanced Array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "dis_advanced", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "displays", MOD_ARR_DIS_ADV);
-	RNA_def_property_ui_text(prop, "Advanced", "Use Advanced Array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "sign_p", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "sign", MOD_ARR_SIGN_P);
-	RNA_def_property_ui_text(prop, "+", "Random Sign Between + and -");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "sign_l", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "sign", MOD_ARR_SIGN_L);
-	RNA_def_property_ui_text(prop, "-", "Random Sign Between + and -");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "seed_t", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_ui_range(prop, 1, 10000, 1, 0);
-	RNA_def_property_range(prop, 1, 10000);
-	RNA_def_property_int_sdna(prop, NULL, "seed[0]");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Random Seed", "");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "seed_g", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_ui_range(prop, 1, 10000, 1, 0);
-	RNA_def_property_range(prop, 1, 10000);
-	RNA_def_property_int_sdna(prop, NULL, "seed[1]");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Random Seed", "");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "seed_m", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_ui_range(prop, 1, 10000, 1, 0);
-	RNA_def_property_range(prop, 1, 10000);
-	RNA_def_property_int_sdna(prop, NULL, "seed[2]");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Random Seed", "");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "location_offset", PROP_FLOAT, PROP_TRANSLATION);
-	RNA_def_property_float_sdna(prop, NULL, "loc_offset");
-	RNA_def_property_range(prop, 0, FLT_MAX);
-	RNA_def_property_ui_range(prop, 0, FLT_MAX, 1, 5);
-	RNA_def_property_ui_text(prop, "Location Offset Displacement", "Add a location offset to vertices or object");
-	RNA_def_property_update(prop, NC_OBJECT|ND_TRANSFORM, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rotation_offset", PROP_FLOAT,  PROP_EULER);
-	RNA_def_property_float_sdna(prop, NULL, "rot_offset");
-	RNA_def_property_ui_text(prop, "Rotation Offset Displacement", "Add a rotation offset to vertices or object");
-	RNA_def_property_update(prop, NC_OBJECT|ND_TRANSFORM, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "scale_offset", PROP_FLOAT, PROP_XYZ);
-	RNA_def_property_float_sdna(prop, NULL, "scale_offset");
-	RNA_def_property_range(prop, 0, 10);
-	RNA_def_property_ui_range(prop, 0, 10, 1, 3);
-	RNA_def_property_ui_text(prop, "Scale Offset Displacement", "Add a scale offset to vertices or object");
-	RNA_def_property_update(prop, NC_OBJECT|ND_TRANSFORM, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "lock_loc", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "lock", MOD_ARR_LOCK_LOC);
-	RNA_def_property_ui_text(prop, "Lock location", "Lock location");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "lock_scale", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "lock", MOD_ARR_LOCK_SCALE);
-	RNA_def_property_ui_text(prop, "Lock scale", "Lock scale");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "lock_rot", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "lock", MOD_ARR_LOCK_ROT);
-	RNA_def_property_ui_text(prop, "Lock rotation", "Lock rotation");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "scale", PROP_FLOAT, PROP_XYZ);
-	RNA_def_property_float_sdna(prop, NULL, "scale_offset[0]");
-	RNA_def_property_range(prop, 0, 10);
-	RNA_def_property_ui_range(prop, 0, 10, 1, 3);
-	RNA_def_property_ui_text(prop, "Scale Offset Displacement", "Add a scale offset to vertices or object");
-	RNA_def_property_update(prop, NC_OBJECT|ND_TRANSFORM, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "proportion", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag_offset", MOD_ARR_PROP);
-	RNA_def_property_ui_text(prop, "Constrain Proportions", "Constrain Proportions");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "local_rot", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag_offset", MOD_ARR_LOCAL);
-	RNA_def_property_ui_text(prop, "Local Rotation Offset Displacement", "Add a local rotation offset to vertices or object");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "material", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_sdna(prop, NULL, "rand_mat");
-	RNA_def_property_enum_items(prop, prop_material_items);
-	RNA_def_property_ui_text(prop, "Offset Material", "");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "cont_mat", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 1, INT_MAX);
-	RNA_def_property_ui_range(prop, 1, 1000, 1, 0);
-	RNA_def_property_ui_text(prop, "Count Material",  "Repetition of material");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "use_advanced_clone", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mode", MOD_ARR_MOD_ADV_CLONE);
-	RNA_def_property_ui_text(prop, "Advanced Clone", "Set other types of Cloning");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "dis_advanced_clone", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "displays", MOD_ARR_DIS_ADV_CLONE);
-	RNA_def_property_ui_text(prop, "Advanced Clone", "Set other types of Cloning");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rays", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 1, 365);
-	RNA_def_property_ui_range(prop, 1, 365, 1,0);
-	RNA_def_property_ui_text(prop, "Rays", "Rays");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rays_dir", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_items(prop, prop_rays_dir_items);
-	RNA_def_property_ui_text(prop, "Rays Direction", "");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "array_group", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "arr_group");
-	RNA_def_property_struct_type(prop, "Group");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
-	RNA_def_property_ui_text(prop, "Dupli Group", "Show Group");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rand_group", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "rand_group", MOD_ARR_RAND_GROUP);
-	RNA_def_property_ui_text(prop, "Rand Object", "Object random group");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "rand_mat_group", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "rand_group", MOD_ARR_RAND_MAT_GROUP);
-	RNA_def_property_ui_text(prop, "Dupli Group", "Material random to Dupli Group");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "all_curve", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "dist_cu", MOD_ARR_DIST_EVENLY);
-	RNA_def_property_ui_text(prop, "Spread Evenly", "Spread evenly on a curve");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "for_segment", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "dist_cu", MOD_ARR_DIST_SEGMENT);
-	RNA_def_property_ui_text(prop, "For Segment", "Spread evenly for all segments");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "use_advanced_material", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "mode", MOD_ARR_MOD_ADV_MAT);
-	RNA_def_property_ui_text(prop, "Advanced Material", "Settings of the material in an array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "dis_advanced_material", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "displays", MOD_ARR_DIS_ADV_MAT);
-	RNA_def_property_ui_text(prop, "Advanced Material", "Settings of the material in an array");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
 static void rna_def_modifier_edgesplit(BlenderRNA *brna)

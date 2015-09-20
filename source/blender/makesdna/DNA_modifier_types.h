@@ -205,53 +205,17 @@ enum {
 	MOD_MASK_INV         = (1 << 0),
 };
 
-typedef struct ArrayChangeObject {
-	float rot[3];
-	float scale[3];
-	float loc[3];
-
-	float cu_cent[3];
-	float cu_loc[4];
-	int transform; /* 0 not modified, 1 modified */
-	int id_mat;
-	int rand_group_obj;
-} ArrayChangeObject;
-
-/*typedef struct ObjectCap {
-	struct Object *ob_cap;
-	struct Object *curve;
-	int count;
-	int distribution;
-} ObjectCap;*/
-
-typedef struct Mat_ObCap {
-	int *mid_cap;
-	int start_cap;
-	int end_cap;
-} Mat_ObCap;
-
 typedef struct ArrayModifierData {
 	ModifierData modifier;
 
 	/* the object with which to cap the start of the array  */
 	struct Object *start_cap;
-	/* the object with which to cap the mid of the array  */
-	struct Object *mid_cap;
 	/* the object with which to cap the end of the array  */
 	struct Object *end_cap;
-	/* the curve object to use for MOD_ARR_MOD_CURVE */
+	/* the curve object to use for MOD_ARR_FITCURVE */
 	struct Object *curve_ob;
-	/* the curve object to use for Object Cap */
-	struct Object *curve_cap;
 	/* the object to use for object offset */
 	struct Object *offset_ob;
-	/* stores information about objects subject to random */
-	struct ArrayChangeObject *Mem_Ob;
-	/* stores the material of the "Object Cap" */
-	struct Mat_ObCap Mem_Mat_Ob;
-	/* group linked to the modifier */
-	struct Group *arr_group;
-
 	/* a constant duplicate offset;
 	 * 1 means the duplicates are 1 unit apart
 	 */
@@ -260,21 +224,14 @@ typedef struct ArrayModifierData {
 	 * 1 means the duplicates are 1 object-width apart
 	 */
 	float scale[3];
-	/* Offset for clone group */
-	float delta[4][4];
 	/* the length over which to distribute the duplicates */
 	float length;
 	/* the limit below which to merge vertices in adjacent duplicates */
 	float merge_dist;
-	/* randomize Offset */
-	float loc_offset[3];
-	float rot_offset[3];
-	float scale_offset[3];
-
 	/* determines how duplicate count is calculated; one of:
 	 * - MOD_ARR_FIXEDCOUNT -> fixed
 	 * - MOD_ARR_FITLENGTH  -> calculated to fit a set length
-	 * - MOD_ARR_FITBETWEEN   -> Number of duplicates between two objects
+	 * - MOD_ARR_FITCURVE   -> calculated to fit the length of a Curve object
 	 */
 	int fit_type;
 	/* flags specifying how total offset is calculated; binary OR of:
@@ -288,52 +245,15 @@ typedef struct ArrayModifierData {
 	 * MOD_ARR_MERGE -> merge vertices in adjacent duplicates
 	 */
 	int flags;
-	/* The pseudo-random number generator is initialized using the argument passed as seed.
-	 * seed[0] = transform
-	 * seed[1] = group
-	 * seed[2] = material
-	 */
-	int seed[3];
 	/* the number of duplicates to generate for MOD_ARR_FIXEDCOUNT */
 	int count;
-	/* the number of duplicates of Mid Cap and type of distribution */
-	int count_mc;
-	int dist_mc;
-	/* Indicates whether you use a random material or the original*/
-	int mat_ob;
-	/* Indicates whether to use the Start Cap and End Cap on the curve of the Mid Cap */
-	int outer_cp;
-	/* number of rays and the direction of the Clones */
-	int rays;
-	int rays_dir;
-	/* Number of copies of the same material */
-	int cont_mat;
-	/* randomizes the materials */
-	int rand_mat;
-	/* lock the noise offset */
-	int lock;
-	/* Normal Mode - Advanced Mode - Advanced Material - Advanced MidCap - Advanced Cloning */
-	int mode;
-	int displays;
-	/* indicates how the modifier should be used */
-	int type;
-	/* direction Offset */
-	int sign;
-	/* keeps the ratio on the scale */
-	int flag_offset;
-	/* how to distribute the clones on a curve */
-	int dist_cu;
-	/* ability to randomization of objects belonging to the group linked */
-	int rand_group;
-	char pad[8];
 } ArrayModifierData;
 
 /* ArrayModifierData->fit_type */
 enum {
-	MOD_ARR_FIXEDCOUNT  = 0,
-	MOD_ARR_FITLENGTH   = 1,
-	MOD_ARR_FITCURVE    = 2,
-	MOD_ARR_FITBETWEEN  = 3
+	MOD_ARR_FIXEDCOUNT = 0,
+	MOD_ARR_FITLENGTH  = 1,
+	MOD_ARR_FITCURVE   = 2,
 };
 
 /* ArrayModifierData->offset_type */
@@ -347,102 +267,6 @@ enum {
 enum {
 	MOD_ARR_MERGE      = (1 << 0),
 	MOD_ARR_MERGEFINAL = (1 << 1),
-};
-
-/* ArrayModifierData->mat_ob */
-enum {
-	/* Array */
-	MOD_ARR_AR_MAT_RND  =  (1<<0),
-	/* Start Cap */
-	MOD_ARR_SC_MAT_RND  =  (1<<1),
-	MOD_ARR_SC_MAT_OR   =  (1<<2),
-	/* Mid Cap */
-	MOD_ARR_MC_MAT_RND  =  (1<<3),
-	MOD_ARR_MC_MAT_OR   =  (1<<4),
-	/* End Cap */
-	MOD_ARR_EC_MAT_RND  =  (1<<5),
-	MOD_ARR_EC_MAT_OR   =  (1<<6)
-};
-
-/* ArrayModifierData->type */
-enum {
-	MOD_ARR_MOD_NRM    =  (1<<0),
-	MOD_ARR_MOD_CURVE  =  (1<<1)
-};
-
-/* ArrayModifierData->outer_cp */
-enum {
-	MOD_ARR_CP_FIRST  =  (1<<0),
-	MOD_ARR_CP_LAST   =  (1<<1)
-};
-
-/* ArrayModifierData->mode */
-enum {
-	MOD_ARR_MOD_ADV        =  (1<<0),
-	MOD_ARR_MOD_ADV_MAT    =  (1<<1),
-	MOD_ARR_MOD_ADV_MID    =  (1<<3),
-	MOD_ARR_MOD_ADV_CLONE  =  (1<<4)
-};
-
-/* ArrayModifierData->displays */
-enum {
-	MOD_ARR_DIS_ADV        =  (1<<0),
-	MOD_ARR_DIS_ADV_MAT    =  (1<<1),
-	MOD_ARR_DIS_ADV_MID    =  (1<<3),
-	MOD_ARR_DIS_ADV_CLONE  =  (1<<4)
-};
-
-/* ArrayModifierData->sign */
-enum {
-	MOD_ARR_SIGN_P  =  (1<<0),
-	MOD_ARR_SIGN_L  =  (1<<1)
-};
-
-/* ArrayModifierData->lock */
-enum {
-	MOD_ARR_LOCK        =  (4+8+16+32),
-	MOD_ARR_LOCK_LOC    =  4,
-	MOD_ARR_LOCK_SCALE  =  8,
-	MOD_ARR_LOCK_ROT    =  16,
-	MOD_ARR_LOCK_MAT    =  32
-};
-
-/* ArrayModifierData->flag_offset */
-enum {
-	MOD_ARR_PROP   =  (1<<0),
-	MOD_ARR_LOCAL  =  (1<<1)
-};
-
-/* ArrayModifierData->rand_mat */
-enum {
-	MOD_ARR_MAT  =  (1<<0),
-	MOD_ARR_SEQ  =  (1<<1)
-};
-
-/* ArrayModifierData->rays_dir */
-enum {
-	MOD_ARR_RAYS_X  =  0,
-	MOD_ARR_RAYS_Y  =  1,
-	MOD_ARR_RAYS_Z  =  2
-};
-
-/* ArrayModifierData->rand_group */
-enum {
-	MOD_ARR_RAND_GROUP      =  (1<<0),
-	MOD_ARR_RAND_MAT_GROUP  =  (1<<1)
-};
-
-/* ArrayModifierData->dist_cu */
-enum {
-	MOD_ARR_DIST_EVENLY   =  (1<<0),
-	MOD_ARR_DIST_SEGMENT  =  (1<<1)
-};
-
-/* ArrayModifierData->dist_mc */
-enum {
-	MOD_ARR_DIST_SEQ    =  (1<<0),
-	MOD_ARR_DIST_HALF   =  (1<<1),
-	MOD_ARR_DIST_CURVE  =  (1<<2)
 };
 
 typedef struct MirrorModifierData {

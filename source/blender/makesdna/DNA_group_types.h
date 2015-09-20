@@ -42,11 +42,6 @@ struct Object;
 typedef struct GroupObject {
 	struct GroupObject *next, *prev;
 	struct Object *ob;
-	/* rot - scale - loc: It is the information obtained from the AMA */
-	/* float rot[3];
-	float scale[3];
-	float loc[3];
-	int rand_group_obj;*/
 	void *lampren;		/* used while render */
 	short recalc;			/* copy of ob->recalc, used to set animated groups OK */
 	char pad[6];
@@ -65,11 +60,6 @@ typedef struct Group {
 	 * on the last used scene */
 	unsigned int layer;
 	float dupli_ofs[3];
-	/* It is the information obtained from the AMA */
-	/*float delta[4][4];
-	int count;
-	int rays;
-	int rays_dir;*/
 } Group;
 
 #endif  /* __DNA_GROUP_TYPES_H__ */

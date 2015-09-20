@@ -32,7 +32,6 @@
 #include "MEM_guardedalloc.h"
 
 #include <stdlib.h>
-///#include <time.h>
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
@@ -42,7 +41,6 @@
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_key_types.h"
-///#include "DNA_modifier_types.h"
 #include "DNA_scene_types.h"
 
 #include "BKE_curve.h"
@@ -50,7 +48,6 @@
 #include "BKE_global.h"
 #include "BKE_key.h"
 #include "BKE_main.h"
-///#include "BKE_material.h"
 #include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_scene.h"

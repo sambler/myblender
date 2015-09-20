@@ -75,211 +75,50 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         split.prop(md, "use_multi_modifier")
 
     def ARRAY(self, layout, ob, md):
-        row = layout.row()
-        row.prop(md, "type_array", expand=True)
-
-        if (md.type_array == "PATH"):
-            layout.prop(md, "curve")
-
         layout.prop(md, "fit_type")
 
         if md.fit_type == 'FIXED_COUNT':
             layout.prop(md, "count")
         elif md.fit_type == 'FIT_LENGTH':
             layout.prop(md, "fit_length")
-        elif md.fit_type == 'FIT_BETWEEN':
-            layout.prop(md, "count", text = "Divider")
+        elif md.fit_type == 'FIT_CURVE':
+            layout.prop(md, "curve")
 
         layout.separator()
 
         split = layout.split()
 
         col = split.column()
-        if ((md.type_array != "PATH") or (md.fit_type != 'FIT_BETWEEN')):
-            col.prop(md, "use_constant_offset")
-            sub = col.column()
-            sub.active = md.use_constant_offset
-            sub.prop(md, "constant_offset_displace", text="")
+        col.prop(md, "use_constant_offset")
+        sub = col.column()
+        sub.active = md.use_constant_offset
+        sub.prop(md, "constant_offset_displace", text="")
 
-        if (md.type_array == "REGULAR"):
-            col.separator()
-            col.prop(md, "use_merge_vertices", text="Merge")
-            sub = col.column()
-            sub.active = md.use_merge_vertices
-            sub.prop(md, "use_merge_vertices_cap", text="First Last")
-            sub.prop(md, "merge_threshold", text="Distance")
-        else:
-            col.separator()
-            col.prop(md, "all_curve")
+        col.separator()
+
+        col.prop(md, "use_merge_vertices", text="Merge")
+        sub = col.column()
+        sub.active = md.use_merge_vertices
+        sub.prop(md, "use_merge_vertices_cap", text="First Last")
+        sub.prop(md, "merge_threshold", text="Distance")
 
         col = split.column()
+        col.prop(md, "use_relative_offset")
+        sub = col.column()
+        sub.active = md.use_relative_offset
+        sub.prop(md, "relative_offset_displace", text="")
 
-        if (md.type_array != "PATH") or (md.fit_type != 'FIT_BETWEEN'):
-            col.prop(md, "use_relative_offset")
-            sub = col.column()
-            sub.active = md.use_relative_offset
-            sub.prop(md, "relative_offset_displace", text="")
+        col.separator()
 
-        if (md.type_array == "REGULAR"):
-            col.separator()
-            col.prop(md, "use_object_offset")
-            sub = col.column()
-            sub.active = md.use_object_offset
-            sub.prop(md, "offset_object", text="")
-            layout.separator()
-            layout.prop(md, "start_cap")
-            layout.prop(md, "mid_cap")
-            layout.prop(md, "end_cap")
-        else:
-            col.separator()
-            col.prop(md, "for_segment")
+        col.prop(md, "use_object_offset")
+        sub = col.column()
+        sub.active = md.use_object_offset
+        sub.prop(md, "offset_object", text="")
 
         layout.separator()
-        if (not md.mid_cap is None):
-            col = layout.column()
-            box = col.box()
-            row = box.row()
-            if md.dis_advanced_mid_cap:
-                row.prop(md, "dis_advanced_mid_cap", text="", icon="DOWNARROW_HLT", emboss=False)
-            else:
-                row.prop(md, "dis_advanced_mid_cap", text="", icon="RIGHTARROW", emboss=False)
-            row.prop(md, "use_advanced_mid_cap", text="Advanced Mid Cap")
-            if (md.dis_advanced_mid_cap):
-                col = box.column()
-                if md.use_advanced_mid_cap:
-                    col.active = True
-                else:
-                    col.active = False
-                row = col.row()
-                row.prop(md, "dist_mid_cap", expand=True)
-                if md.dist_mid_cap == 'CURVE':
-                    col.prop(md, "curve_cap")
-                col.prop(md, "count_mc")
-                if md.dist_mid_cap == 'CURVE':
-                    split = col.split()
-                    col = split.column()
-                    col.active = False if md.start_cap is None else True
-                    col.prop(md, "first_start_cap")
-                    col = split.column()
-                    col.active = False if md.end_cap is None else True
-                    col.prop(md, "last_end_cap")
 
-        col = layout.column()
-        box = col.box()
-        row = box.row()
-        if md.dis_advanced:
-            row.prop(md, "dis_advanced", text="", icon="DOWNARROW_HLT", emboss=False)
-        else:
-            row.prop(md, "dis_advanced", text="", icon="RIGHTARROW", emboss=False)
-        row.prop(md, "use_advanced", text="Randomize Transform")
-        if (md.dis_advanced):
-            col = box.column()
-            if md.use_advanced:
-                col.active = True
-            else:
-                col.active = False
-            row = col.row()
-            row = row.split(percentage=0.9)
-            row.prop(md, "seed_t")
-            row.operator("object.array_rand_seed_t")
-            row = col.row()
-            row.prop(md, "lock_loc", text="Location")
-            row.prop(md, "lock_rot", text="Rotation")
-            row.prop(md, "lock_scale", text="Scale")
-            row = col.row()
-            sub = row.row()
-            sub.active = md.lock_loc
-            sub.column().prop(md, "location_offset", text="")
-            row = row.row()
-            sub = row.row()
-            sub.active = md.lock_rot
-            sub.column().prop(md, "rotation_offset", text="")
-            sub = row.row()
-            sub.active = md.lock_scale
-            if (md.proportion):
-                sub.prop(md, "scale", text="")
-            else:
-                sub.column().prop(md, "scale_offset", text="")
-            row = col.row()
-            row.prop(md, "local_rot", text="Local Rotation")
-            row.prop(md, "proportion", text="Scale")
-            row = col.row()
-            row.label(text="Offset:")
-            row.prop(md, "sign_p")
-            row.prop(md, "sign_l")
-
-        col = layout.column()
-        box = col.box()
-        row = box.row()
-        if (md.dis_advanced_clone):
-            row.prop(md, "dis_advanced_clone", text="", icon="DOWNARROW_HLT", emboss=False)
-        else:
-            row.prop(md, "dis_advanced_clone", text="", icon="RIGHTARROW", emboss=False)
-        row.prop(md, "use_advanced_clone", text="Advanced Cloning")
-        if (md.dis_advanced_clone):
-            col = box.column()
-            if md.use_advanced_clone:
-                col.active = True
-            else:
-                col.active = False
-            split = col.split()
-            col = split.column()
-            col.label(text="Dupli Group:")
-            col.prop(md, "array_group", text="")
-            sub = col.column()
-            sub.active = False if md.array_group is None else True
-            sub.prop(md, "rand_group")
-            sub = sub.split(percentage=0.8)
-            sub.prop(md, "seed_g")
-            sub.operator("object.array_rand_seed_g")
-            col = split.column()
-            col.label(text="Rays Direction:")
-            col.prop(md,"rays_dir", text="")
-            col.prop(md,"rays")
-
-        col = layout.column()
-        box = col.box()
-        row = box.row()
-        if (md.dis_advanced_material):
-            row.prop(md, "dis_advanced_material", text="", icon="DOWNARROW_HLT", emboss=False)
-        else:
-            row.prop(md, "dis_advanced_material", text="", icon="RIGHTARROW", emboss=False)
-        row.prop(md, "use_advanced_material", text="Randomize Material")
-        if (md.dis_advanced_material):
-            col = box.column()
-            if md.use_advanced_material:
-                col.active = True
-            else:
-                col.active = False
-            row = col.row()
-            row.prop(md, "material", expand=True)
-            row = col.row()
-            if md.material == 'SEQUENCE' :
-                row.prop(md, "cont_mat")
-            else:
-                row = row.split(percentage=0.9)
-                row.prop(md, "seed_m")
-                row.operator("object.array_rand_seed_m")
-                row = col.row()
-                col = row.column()
-                split = col.split()
-                col = split.column()
-                col.prop(md, "rand_mat_array")
-                col.separator()
-                sub = col.column()
-                sub.active = False if md.array_group is None else True
-                sub.prop(md, "rand_mat_group")
-                col = split.column()
-                sub = col.column()
-                sub.active = False if md.start_cap is None else True
-                sub.prop(md, "rand_mat_sc")
-                sub = col.column()
-                sub.active = False if md.mid_cap is None else True
-                sub.prop(md, "rand_mat_mc")
-                sub = col.column()
-                sub.active = False if md.end_cap is None else True
-                sub.prop(md, "rand_mat_ec")
-
+        layout.prop(md, "start_cap")
+        layout.prop(md, "end_cap")
 
     def BEVEL(self, layout, ob, md):
         split = layout.split()

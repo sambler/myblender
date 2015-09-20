@@ -53,9 +53,11 @@ struct StructRNA;
 struct ToolSettings;
 struct Image;
 struct Text;
-struct ImBuf;
 struct EditBone;
 struct bPoseChannel;
+struct bGPdata;
+struct bGPDlayer;
+struct bGPDframe;
 struct wmWindow;
 struct wmWindowManager;
 struct SpaceText;
@@ -234,7 +236,6 @@ int ctx_data_list_count(const bContext *C, int (*func)(const bContext *, ListBas
 struct Main *CTX_data_main(const bContext *C);
 struct Scene *CTX_data_scene(const bContext *C);
 struct ToolSettings *CTX_data_tool_settings(const bContext *C);
-struct FreestyleLineStyle *CTX_data_linestyle_from_scene(struct Scene *scene);
 
 const char *CTX_data_mode_string(const bContext *C);
 int CTX_data_mode_enum(const bContext *C);
@@ -275,6 +276,14 @@ int CTX_data_editable_bones(const bContext *C, ListBase *list);
 struct bPoseChannel *CTX_data_active_pose_bone(const bContext *C);
 int CTX_data_selected_pose_bones(const bContext *C, ListBase *list);
 int CTX_data_visible_pose_bones(const bContext *C, ListBase *list);
+
+struct bGPdata *CTX_data_gpencil_data(const bContext *C);
+struct bGPDlayer *CTX_data_active_gpencil_layer(const bContext *C);
+struct bGPDframe *CTX_data_active_gpencil_frame(const bContext *C);
+int CTX_data_visible_gpencil_layers(const bContext *C, ListBase *list);
+int CTX_data_editable_gpencil_layers(const bContext *C, ListBase *list);
+int CTX_data_editable_gpencil_strokes(const bContext *C, ListBase *list);
+
 
 #ifdef __cplusplus
 }

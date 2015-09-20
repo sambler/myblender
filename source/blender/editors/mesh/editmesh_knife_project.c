@@ -65,7 +65,7 @@ static LinkNode *knifeproject_poly_from_object(ARegion *ar, Scene *scene, Object
 		dm = ob->derivedFinal ? ob->derivedFinal : mesh_get_derived_final(scene, ob, CD_MASK_BAREMESH);
 		dm_needsFree = false;
 	}
-	else if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
+	else if (ELEM(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
 		dm = CDDM_from_curve(ob);
 		dm_needsFree = true;
 	}
@@ -166,7 +166,7 @@ void MESH_OT_knife_project(wmOperatorType *ot)
 
 	/* callbacks */
 	ot->exec = knifeproject_exec;
-	ot->poll = ED_operator_editmesh_view3d;
+	ot->poll = ED_operator_editmesh_region_view3d;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;

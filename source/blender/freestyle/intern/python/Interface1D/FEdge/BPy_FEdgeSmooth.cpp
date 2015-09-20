@@ -86,7 +86,7 @@ static int FEdgeSmooth_init(BPy_FEdgeSmooth *self, PyObject *args, PyObject *kwd
 	}
 	self->py_fe.fe = self->fes;
 	self->py_fe.py_if1D.if1D = self->fes;
-	self->py_fe.py_if1D.borrowed = 0;
+	self->py_fe.py_if1D.borrowed = false;
 	return 0;
 }
 
@@ -99,7 +99,7 @@ static int FEdgeSmooth_mathutils_check(BaseMathObject *bmo)
 	return 0;
 }
 
-static int FEdgeSmooth_mathutils_get(BaseMathObject *bmo, int subtype)
+static int FEdgeSmooth_mathutils_get(BaseMathObject *bmo, int /*subtype*/)
 {
 	BPy_FEdgeSmooth *self = (BPy_FEdgeSmooth *)bmo->cb_user;
 	Vec3r p(self->fes->normal());
@@ -109,7 +109,7 @@ static int FEdgeSmooth_mathutils_get(BaseMathObject *bmo, int subtype)
 	return 0;
 }
 
-static int FEdgeSmooth_mathutils_set(BaseMathObject *bmo, int subtype)
+static int FEdgeSmooth_mathutils_set(BaseMathObject *bmo, int /*subtype*/)
 {
 	BPy_FEdgeSmooth *self = (BPy_FEdgeSmooth *)bmo->cb_user;
 	Vec3r p(bmo->data[0], bmo->data[1], bmo->data[2]);
@@ -117,7 +117,7 @@ static int FEdgeSmooth_mathutils_set(BaseMathObject *bmo, int subtype)
 	return 0;
 }
 
-static int FEdgeSmooth_mathutils_get_index(BaseMathObject *bmo, int subtype, int index)
+static int FEdgeSmooth_mathutils_get_index(BaseMathObject *bmo, int /*subtype*/, int index)
 {
 	BPy_FEdgeSmooth *self = (BPy_FEdgeSmooth *)bmo->cb_user;
 	Vec3r p(self->fes->normal());
@@ -125,7 +125,7 @@ static int FEdgeSmooth_mathutils_get_index(BaseMathObject *bmo, int subtype, int
 	return 0;
 }
 
-static int FEdgeSmooth_mathutils_set_index(BaseMathObject *bmo, int subtype, int index)
+static int FEdgeSmooth_mathutils_set_index(BaseMathObject *bmo, int /*subtype*/, int index)
 {
 	BPy_FEdgeSmooth *self = (BPy_FEdgeSmooth *)bmo->cb_user;
 	Vec3r p(self->fes->normal());
@@ -164,8 +164,9 @@ static PyObject *FEdgeSmooth_normal_get(BPy_FEdgeSmooth *self, void *UNUSED(clos
 static int FEdgeSmooth_normal_set(BPy_FEdgeSmooth *self, PyObject *value, void *UNUSED(closure))
 {
 	float v[3];
-	if (!float_array_from_PyObject(value, v, 3)) {
-		PyErr_SetString(PyExc_ValueError, "value must be a 3-dimensional vector");
+	if (mathutils_array_parse(v, 3, 3, value,
+	                          "value must be a 3-dimensional vector") == -1)
+	{
 		return -1;
 	}
 	Vec3r p(v[0], v[1], v[2]);

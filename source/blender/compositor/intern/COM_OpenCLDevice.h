@@ -26,7 +26,7 @@ class OpenCLDevice;
 #define _COM_OpenCLDevice_h
 
 #include "COM_Device.h"
-#include "OCL_opencl.h"
+#include "clew.h"
 #include "COM_WorkScheduler.h"
 #include "COM_ReadBufferOperation.h"
 
@@ -93,6 +93,12 @@ public:
 	 * @param work the WorkPackage to execute
 	 */
 	void execute(WorkPackage *work);
+
+	/**
+	* @brief determine an image format
+	* @param memorybuffer
+	*/
+	static const cl_image_format *determineImageFormat(MemoryBuffer *memoryBuffer);
 
 	cl_context getContext() { return this->m_context; }
 

@@ -104,7 +104,7 @@ DocumentImporter::DocumentImporter(bContext *C, const ImportSettings *import_set
 	import_settings(import_settings),
 	mImportStage(General),
 	mContext(C),
-	armature_importer(&unit_converter, &mesh_importer, CTX_data_scene(C)),
+	armature_importer(&unit_converter, &mesh_importer, CTX_data_scene(C), import_settings),
 	mesh_importer(&unit_converter, &armature_importer, CTX_data_scene(C)),
 	anim_importer(&unit_converter, &armature_importer, CTX_data_scene(C))
 {
@@ -136,11 +136,14 @@ bool DocumentImporter::import()
 	const std::string encodedFilename = bc_url_encode(mFilename);
 	if (!root.loadDocument(encodedFilename)) {
 		fprintf(stderr, "COLLADAFW::Root::loadDocument() returned false on 1st pass\n");
+		delete ehandler;
 		return false;
 	}
 	
-	if (errorHandler.hasError())
+	if (errorHandler.hasError()) {
+		delete ehandler;
 		return false;
+	}
 	
 	/** TODO set up scene graph and such here */
 	
@@ -151,14 +154,11 @@ bool DocumentImporter::import()
 	
 	if (!root2.loadDocument(encodedFilename)) {
 		fprintf(stderr, "COLLADAFW::Root::loadDocument() returned false on 2nd pass\n");
+		delete ehandler;
 		return false;
 	}
-	
-	
-	delete ehandler;
 
-	//XXX No longer needed (geometries are now created as bmesh)
-	//mesh_importer.bmeshConversion();
+	delete ehandler;
 
 	return true;
 }
@@ -226,6 +226,7 @@ void DocumentImporter::finish()
 		for (unsigned int i = 0; i < roots.getCount(); i++) {
 			std::vector<Object *> *objects_done = write_node(roots[i], NULL, sce, NULL, false);
 			objects_to_scale->insert(objects_to_scale->end(), objects_done->begin(), objects_done->end());
+			delete objects_done;
 		}
 
 		// update scene
@@ -278,6 +279,8 @@ void DocumentImporter::finish()
 	}
 	
 	bc_match_scale(objects_to_scale, unit_converter, !this->import_settings->import_units);
+
+	delete objects_to_scale;
 }
 
 
@@ -483,6 +486,17 @@ void DocumentImporter::create_constraints(ExtraTags *et, Object *ob)
 	}
 }
 
+void DocumentImporter::report_unknown_reference(const COLLADAFW::Node &node, const std::string object_type)
+{
+	std::string id = node.getOriginalId();
+	std::string name = node.getName();
+	fprintf(stderr,
+		"error: node id=\"%s\", name=\"%s\" refers to an undefined %s.\n",
+		id.c_str(),
+		name.c_str(),
+		object_type.c_str());
+}
+
 std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent_node, Scene *sce, Object *par, bool is_library_node)
 {
 	Object *ob = NULL;
@@ -490,6 +504,9 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 	bool read_transform = true;
 	std::string id   = node->getOriginalId();
 	std::string name = node->getName();
+
+	// if node has child nodes write them
+	COLLADAFW::NodePointerArray &child_nodes = node->getChildNodes();
 
 	std::vector<Object *> *objects_done = new std::vector<Object *>();
 	std::vector<Object *> *root_objects = new std::vector<Object *>();
@@ -516,7 +533,7 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 		if (parent_node == NULL) {
 			// for skeletons without root node all has been done above.
 			// Skeletons with root node are handled further down.
-			return root_objects;
+			goto finally;
 		}
 	}
 	else {
@@ -538,10 +555,7 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 			ob = mesh_importer.create_mesh_object(node, geom[geom_done], false, uid_material_map,
 			                                      material_texture_mapping_map);
 			if (ob == NULL) {
-				fprintf(stderr,
-						"<node id=\"%s\", name=\"%s\" >...contains a reference to an unknown instance_mesh.\n",
-						id.c_str(),
-						name.c_str());
+				report_unknown_reference(*node, "instance_mesh");
 			}
 			else {
 				objects_done->push_back(ob);
@@ -554,9 +568,7 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 		while (camera_done < camera.getCount()) {
 			ob = create_camera_object(camera[camera_done], sce);
 			if (ob == NULL) {
-				std::string id   = node->getOriginalId();
-				std::string name = node->getName();
-				fprintf(stderr, "<node id=\"%s\", name=\"%s\" >...contains a reference to an unknown instance_camera.\n", id.c_str(), name.c_str());
+				report_unknown_reference(*node, "instance_camera");
 			}
 			else {
 				objects_done->push_back(ob);
@@ -568,18 +580,28 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 		}
 		while (lamp_done < lamp.getCount()) {
 			ob = create_lamp_object(lamp[lamp_done], sce);
-			objects_done->push_back(ob);
-			if (parent_node == NULL) {
-				root_objects->push_back(ob);
+			if (ob == NULL) {
+				report_unknown_reference(*node, "instance_lamp");
+			}
+			else {
+				objects_done->push_back(ob);
+				if (parent_node == NULL) {
+					root_objects->push_back(ob);
+				}
 			}
 			++lamp_done;
 		}
 		while (controller_done < controller.getCount()) {
 			COLLADAFW::InstanceGeometry *geom = (COLLADAFW::InstanceGeometry *)controller[controller_done];
 			ob = mesh_importer.create_mesh_object(node, geom, true, uid_material_map, material_texture_mapping_map);
-			objects_done->push_back(ob);
-			if (parent_node == NULL) {
-				root_objects->push_back(ob);
+			if (ob == NULL) {
+				report_unknown_reference(*node, "instance_controller");
+			}
+			else {
+				objects_done->push_back(ob);
+				if (parent_node == NULL) {
+					root_objects->push_back(ob);
+				}
 			}
 			++controller_done;
 		}
@@ -625,7 +647,9 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 		
 		// XXX: if there're multiple instances, only one is stored
 
-		if (!ob) return root_objects;
+		if (!ob) {
+			goto finally;
+		}
 
 		for (std::vector<Object *>::iterator it = objects_done->begin(); it != objects_done->end(); ++it) {
 			ob = *it;
@@ -660,9 +684,6 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 		}
 	}
 
-	// if node has child nodes write them
-	COLLADAFW::NodePointerArray &child_nodes = node->getChildNodes();
-
 	if (objects_done->size() > 0) {
 		ob = *objects_done->begin();
 	}
@@ -671,8 +692,14 @@ std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLA
 	}
 
 	for (unsigned int i = 0; i < child_nodes.getCount(); i++) {
-		write_node(child_nodes[i], node, sce, ob, is_library_node);
+		std::vector<Object *> *child_objects;
+		child_objects = write_node(child_nodes[i], node, sce, ob, is_library_node);
+		delete child_objects;
 	}
+
+
+finally:
+	delete objects_done;
 
 	return root_objects;
 }
@@ -712,7 +739,9 @@ bool DocumentImporter::writeLibraryNodes(const COLLADAFW::LibraryNodes *libraryN
 	const COLLADAFW::NodePointerArray& nodes = libraryNodes->getNodes();
 
 	for (unsigned int i = 0; i < nodes.getCount(); i++) {
-		write_node(nodes[i], NULL, sce, NULL, true);
+		std::vector<Object *> *child_objects;
+		child_objects = write_node(nodes[i], NULL, sce, NULL, true);
+		delete child_objects;
 	}
 
 	return true;
@@ -758,9 +787,9 @@ MTex *DocumentImporter::create_texture(COLLADAFW::EffectCommon *ef, COLLADAFW::T
 		return NULL;
 	}
 	
-	ma->mtex[i] = add_mtex();
+	ma->mtex[i] = BKE_texture_mtex_add();
 	ma->mtex[i]->texco = TEXCO_UV;
-	ma->mtex[i]->tex = add_texture(G.main, "Texture");
+	ma->mtex[i]->tex = BKE_texture_add(G.main, "Texture");
 	ma->mtex[i]->tex->type = TEX_IMAGE;
 	ma->mtex[i]->tex->ima = uid_image_map[ima_uid];
 	
@@ -805,10 +834,14 @@ void DocumentImporter::write_profile_COMMON(COLLADAFW::EffectCommon *ef, Materia
 	// DIFFUSE
 	// color
 	if (ef->getDiffuse().isColor()) {
+		/* too high intensity can create artefacts (fireflies)
+		   So here we take care that intensity is set to 0.8 wherever possible
+		*/
 		col = ef->getDiffuse().getColor();
-		ma->r = col.getRed();
-		ma->g = col.getGreen();
-		ma->b = col.getBlue();
+		ma->ref = max_ffff(col.getRed(), col.getGreen(), col.getBlue(), 0.8);
+		ma->r = col.getRed()   / ma->ref;
+		ma->g = col.getGreen() / ma->ref;
+		ma->b = col.getBlue()  / ma->ref;
 	}
 	// texture
 	else if (ef->getDiffuse().isTexture()) {

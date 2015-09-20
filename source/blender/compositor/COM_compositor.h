@@ -38,7 +38,7 @@ extern "C" {
  * @defgroup Node All nodes of the compositor
  * @defgroup Operation All operations of the compositor
  *
- * @mainpage Introduction of the Blender Compositor
+ * @page Introduction of the Blender Compositor
  *
  * @section bcomp Blender compositor
  * This project redesigns the internals of Blender's compositor. The project has been executed in 2011 by At Mind.
@@ -208,7 +208,7 @@ extern "C" {
  *
  * @see ExecutionGroup.execute Execute a complete ExecutionGroup. Halts until finished or breaked by user
  * @see ExecutionGroup.scheduleChunkWhenPossible Tries to schedule a single chunk,
- * checks if all input data is available. Can trigger dependant chunks to be calculated
+ * checks if all input data is available. Can trigger dependent chunks to be calculated
  * @see ExecutionGroup.scheduleAreaWhenPossible Tries to schedule an area. This can be multiple chunks
  * (is called from [@ref ExecutionGroup.scheduleChunkWhenPossible])
  * @see ExecutionGroup.scheduleChunk Schedule a chunk on the WorkScheduler
@@ -316,7 +316,8 @@ extern "C" {
  *            generation in display space
  */
 void COM_execute(RenderData *rd, Scene *scene, bNodeTree *editingtree, int rendering,
-                 const ColorManagedViewSettings *viewSettings, const ColorManagedDisplaySettings *displaySettings);
+                 const ColorManagedViewSettings *viewSettings, const ColorManagedDisplaySettings *displaySettings,
+                 const char *viewName);
 
 /**
  * @brief Deinitialize the compositor caches and allocated memory.

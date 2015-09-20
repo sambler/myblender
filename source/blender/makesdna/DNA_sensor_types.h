@@ -57,7 +57,9 @@ typedef struct bMouseSensor {
 	short type;
 	short flag;
 	short pad1;
-	short pad2;
+	short mode;			/* flag to choose material or property */
+	char propname[64];
+	char matname[64];
 } bMouseSensor;
 
 /* DEPRECATED */
@@ -162,7 +164,7 @@ typedef struct bSensor {
 	struct bSensor *next, *prev;
 	/* pulse and freq are the bool toggle and frame count for pulse mode */
 	short type, otype, flag, pulse;
-	short freq, totlinks, pad1, pad2;
+	short freq, totlinks, pad1, pad2; /* freq makes reference to skipped ticks between 2 active pulses */
 	char name[64];	/* MAX_NAME */
 	void *data;
 	
@@ -202,6 +204,8 @@ typedef struct bJoystickSensor {
 #define SENS_PROP_INTERVAL	2
 #define SENS_PROP_CHANGED	3
 #define SENS_PROP_EXPRESSION	4
+#define SENS_PROP_LESSTHAN	5
+#define SENS_PROP_GREATERTHAN	6
 
 /* raysensor->axisflag */
 /* flip x and y to make y default!!! */

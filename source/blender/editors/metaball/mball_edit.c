@@ -47,7 +47,6 @@
 
 #include "RNA_define.h"
 #include "RNA_access.h"
-#include "RNA_enum_types.h"
 
 #include "BKE_depsgraph.h"
 #include "BKE_context.h"
@@ -191,7 +190,7 @@ enum {
 static EnumPropertyItem prop_similar_types[] = {
 	{SIMMBALL_TYPE, "TYPE", 0, "Type", ""},
 	{SIMMBALL_RADIUS, "RADIUS", 0, "Radius", ""},
-    {SIMMBALL_STIFFNESS, "STIFFNESS", 0, "Stiffness", ""},
+	{SIMMBALL_STIFFNESS, "STIFFNESS", 0, "Stiffness", ""},
 	{SIMMBALL_ROTATION, "ROTATION", 0, "Rotation", ""},
 	{0, NULL, 0, NULL, NULL}
 };
@@ -405,7 +404,8 @@ void MBALL_OT_select_random_metaelems(struct wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_float_percentage(ot->srna, "percent", 50.f, 0.0f, 100.0f, "Percent", "Percentage of elements to select randomly", 0.f, 100.0f);
+	RNA_def_float_percentage(ot->srna, "percent", 50.f, 0.0f, 100.0f,
+	                         "Percent", "Percentage of elements to select randomly", 0.0f, 100.0f);
 	WM_operator_properties_select_action_simple(ot, SEL_SELECT);
 }
 
@@ -533,7 +533,7 @@ void MBALL_OT_hide_metaelems(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* props */
-	RNA_def_boolean(ot->srna, "unselected", 0, "Unselected", "Hide unselected rather than selected");
+	RNA_def_boolean(ot->srna, "unselected", false, "Unselected", "Hide unselected rather than selected");
 }
 
 /***************************** Unhide operator *****************************/
@@ -584,7 +584,7 @@ bool mouse_mball(bContext *C, const int mval[2], bool extend, bool deselect, boo
 	MetaBall *mb = (MetaBall *)obedit->data;
 	MetaElem *ml, *ml_act = NULL;
 	int a, hits;
-	unsigned int buffer[4 * MAXPICKBUF];
+	unsigned int buffer[MAXPICKBUF];
 	rcti rect;
 
 	view3d_set_viewcontext(C, &vc);
@@ -594,7 +594,7 @@ bool mouse_mball(bContext *C, const int mval[2], bool extend, bool deselect, boo
 	rect.ymin = mval[1] - 12;
 	rect.ymax = mval[1] + 12;
 
-	hits = view3d_opengl_select(&vc, buffer, MAXPICKBUF, &rect);
+	hits = view3d_opengl_select(&vc, buffer, MAXPICKBUF, &rect, true);
 
 	/* does startelem exist? */
 	ml = mb->editelems->first;
@@ -742,29 +742,4 @@ static void *get_data(bContext *C)
 void undo_push_mball(bContext *C, const char *name)
 {
 	undo_editmode_push(C, name, get_data, free_undoMball, undoMball_to_editMball, editMball_to_undoMball, NULL);
-}
-
-void ED_mball_transform(MetaBall *mb, float mat[4][4])
-{
-	MetaElem *me;
-	float quat[4];
-	const float scale = mat4_to_scale(mat);
-	const float scale_sqrt = sqrtf(scale);
-
-	mat4_to_quat(quat, mat);
-
-	for (me = mb->elems.first; me; me = me->next) {
-		mul_m4_v3(mat, &me->x);
-		mul_qt_qtqt(me->quat, quat, me->quat);
-		me->rad *= scale;
-		/* hrmf, probably elems shouldn't be
-		 * treating scale differently - campbell */
-		if (!MB_TYPE_SIZE_SQUARED(me->type)) {
-			mul_v3_fl(&me->expx, scale);
-		}
-		else {
-			mul_v3_fl(&me->expx, scale_sqrt);
-		}
-	}
-	DAG_id_tag_update(&mb->id, 0);
 }

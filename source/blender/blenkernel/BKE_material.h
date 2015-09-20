@@ -40,8 +40,6 @@ struct Main;
 struct Material;
 struct ID;
 struct Object;
-struct Mesh;
-struct MTFace;
 struct Scene;
 
 /* materials */
@@ -52,6 +50,7 @@ void BKE_material_free_ex(struct Material *ma, bool do_id_user);
 void test_object_materials(struct Main *bmain, struct ID *id);
 void BKE_material_resize_object(struct Object *ob, const short totcol, bool do_id_user);
 void init_material(struct Material *ma);
+void BKE_material_remap_object(struct Object *ob, const unsigned int *remap);
 struct Material *BKE_material_add(struct Main *bmain, const char *name);
 struct Material *BKE_material_copy(struct Material *ma);
 struct Material *localize_material(struct Material *ma);
@@ -70,6 +69,8 @@ struct Material ***give_matarar_id(struct ID *id); /* same but for ID's */
 short *give_totcolp_id(struct ID *id);
 
 enum {
+	/* use existing link option */
+	BKE_MAT_ASSIGN_EXISTING,
 	BKE_MAT_ASSIGN_USERPREF,
 	BKE_MAT_ASSIGN_OBDATA,
 	BKE_MAT_ASSIGN_OBJECT
@@ -86,6 +87,9 @@ short find_material_index(struct Object *ob, struct Material *ma);
 bool object_add_material_slot(struct Object *ob);
 bool object_remove_material_slot(struct Object *ob);
 
+void BKE_texpaint_slot_refresh_cache(struct Scene *scene, struct Material *ma);
+void BKE_texpaint_slots_refresh_object(struct Scene *scene, struct Object *ob);
+
 /* rna api */
 void BKE_material_resize_id(struct ID *id, short totcol, bool do_id_user);
 void BKE_material_append_id(struct ID *id, struct Material *ma);
@@ -94,7 +98,7 @@ void BKE_material_clear_id(struct ID *id, bool update_data);
 /* rendering */
 
 void init_render_material(struct Material *, int, float *);
-void init_render_materials(struct Main *, int, float *);
+void init_render_materials(struct Main *, int r_mode, float *amd, bool do_default_material);
 void end_render_material(struct Material *);
 void end_render_materials(struct Main *);
 

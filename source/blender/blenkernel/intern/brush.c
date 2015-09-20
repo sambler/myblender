@@ -33,7 +33,6 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
-#include "BLI_rect.h"
 
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
@@ -49,7 +48,6 @@
 #include "IMB_imbuf_types.h"
 
 #include "RE_render_ext.h" /* externtex */
-#include "RE_shader_ext.h"
 
 static RNG *brush_rng;
 
@@ -83,12 +81,15 @@ static void brush_defaults(Brush *brush)
 	brush->plane_trim = 0.5f;
 	brush->clone.alpha = 0.5f;
 	brush->normal_weight = 0.0f;
+	brush->fill_threshold = 0.2f;
 	brush->flag |= BRUSH_ALPHA_PRESSURE;
 
 	/* BRUSH PAINT TOOL SETTINGS */
 	brush->rgb[0] = 1.0f; /* default rgb color of the brush when painting - white */
 	brush->rgb[1] = 1.0f;
 	brush->rgb[2] = 1.0f;
+
+	zero_v3(brush->secondary_rgb);
 
 	/* BRUSH STROKE SETTINGS */
 	brush->flag |= (BRUSH_SPACE | BRUSH_SPACE_ATTEN);
@@ -102,8 +103,8 @@ static void brush_defaults(Brush *brush)
 	brush->jitter = 0.0f;
 
 	/* BRUSH TEXTURE SETTINGS */
-	default_mtex(&brush->mtex);
-	default_mtex(&brush->mask_mtex);
+	BKE_texture_mtex_default(&brush->mtex);
+	BKE_texture_mtex_default(&brush->mask_mtex);
 
 	brush->texture_sample_bias = 0; /* value to added to texture samples */
 	brush->texture_overlay_alpha = 33;
@@ -130,7 +131,7 @@ static void brush_defaults(Brush *brush)
 
 /* Datablock add/copy/free/make_local */
 
-Brush *BKE_brush_add(Main *bmain, const char *name)
+Brush *BKE_brush_add(Main *bmain, const char *name, short ob_mode)
 {
 	Brush *brush;
 
@@ -142,11 +143,23 @@ Brush *BKE_brush_add(Main *bmain, const char *name)
 	brush_defaults(brush);
 
 	brush->sculpt_tool = SCULPT_TOOL_DRAW; /* sculpting defaults to the draw tool for new brushes */
+	brush->ob_mode = ob_mode;
 
 	/* the default alpha falloff curve */
 	BKE_brush_curve_preset(brush, CURVE_PRESET_SMOOTH);
 
 	return brush;
+}
+
+struct Brush *BKE_brush_first_search(struct Main *bmain, short ob_mode)
+{
+	Brush *brush;
+
+	for (brush = bmain->brush.first; brush; brush = brush->id.next) {
+		if (brush->ob_mode & ob_mode)
+			return brush;
+	}
+	return NULL;
 }
 
 Brush *BKE_brush_copy(Brush *brush)
@@ -161,6 +174,9 @@ Brush *BKE_brush_copy(Brush *brush)
 	if (brush->mask_mtex.tex)
 		id_us_plus((ID *)brush->mask_mtex.tex);
 
+	if (brush->paint_curve)
+		id_us_plus((ID *)brush->paint_curve);
+
 	if (brush->icon_imbuf)
 		brushn->icon_imbuf = IMB_dupImBuf(brush->icon_imbuf);
 
@@ -174,17 +190,19 @@ Brush *BKE_brush_copy(Brush *brush)
 		brushn->id.us++;
 	}
 	
+	if (brush->id.lib) {
+		BKE_id_lib_local_paths(G.main, brush->id.lib, &brushn->id);
+	}
+
 	return brushn;
 }
 
 /* not brush itself */
 void BKE_brush_free(Brush *brush)
 {
-	if (brush->mtex.tex)
-		brush->mtex.tex->id.us--;
-
-	if (brush->mask_mtex.tex)
-		brush->mask_mtex.tex->id.us--;
+	id_us_min((ID *)brush->mtex.tex);
+	id_us_min((ID *)brush->mask_mtex.tex);
+	id_us_min((ID *)brush->paint_curve);
 
 	if (brush->icon_imbuf)
 		IMB_freeImBuf(brush->icon_imbuf);
@@ -192,6 +210,9 @@ void BKE_brush_free(Brush *brush)
 	BKE_previewimg_free(&(brush->preview));
 
 	curvemapping_free(brush->curve);
+
+	if (brush->gradient)
+		MEM_freeN(brush->gradient);
 }
 
 static void extern_local_brush(Brush *brush)
@@ -199,6 +220,7 @@ static void extern_local_brush(Brush *brush)
 	id_lib_extern((ID *)brush->mtex.tex);
 	id_lib_extern((ID *)brush->mask_mtex.tex);
 	id_lib_extern((ID *)brush->clone.image);
+	id_lib_extern((ID *)brush->paint_curve);
 }
 
 void BKE_brush_make_local(Brush *brush)
@@ -287,12 +309,10 @@ void BKE_brush_debug_print_state(Brush *br)
 
 	/* br->flag */
 	BR_TEST_FLAG(BRUSH_AIRBRUSH);
-	BR_TEST_FLAG(BRUSH_TORUS);
 	BR_TEST_FLAG(BRUSH_ALPHA_PRESSURE);
 	BR_TEST_FLAG(BRUSH_SIZE_PRESSURE);
 	BR_TEST_FLAG(BRUSH_JITTER_PRESSURE);
 	BR_TEST_FLAG(BRUSH_SPACING_PRESSURE);
-	BR_TEST_FLAG(BRUSH_RAKE);
 	BR_TEST_FLAG(BRUSH_ANCHORED);
 	BR_TEST_FLAG(BRUSH_DIR_IN);
 	BR_TEST_FLAG(BRUSH_SPACE);
@@ -308,7 +328,6 @@ void BKE_brush_debug_print_state(Brush *br)
 	BR_TEST_FLAG(BRUSH_EDGE_TO_EDGE);
 	BR_TEST_FLAG(BRUSH_DRAG_DOT);
 	BR_TEST_FLAG(BRUSH_INVERSE_SMOOTH_PRESSURE);
-	BR_TEST_FLAG(BRUSH_RANDOM_ROTATION);
 	BR_TEST_FLAG(BRUSH_PLANE_TRIM);
 	BR_TEST_FLAG(BRUSH_FRONTFACE);
 	BR_TEST_FLAG(BRUSH_CUSTOM_ICON);
@@ -461,7 +480,7 @@ int BKE_brush_texture_set_nr(Brush *brush, int nr)
 	idtest = (ID *)BLI_findlink(&G.main->tex, nr - 1);
 	if (idtest == NULL) { /* new tex */
 		if (id) idtest = (ID *)BKE_texture_copy((Tex *)id);
-		else idtest = (ID *)add_texture(G.main, "Tex");
+		else idtest = (ID *)BKE_texture_add(G.main, "Tex");
 		idtest->us--;
 	}
 	if (idtest != id) {
@@ -534,7 +553,7 @@ float BKE_brush_sample_tex_3D(const Scene *scene, Brush *br,
 		/* Get strength by feeding the vertex
 		 * location directly into a texture */
 		hasrgb = externtex(mtex, point, &intensity,
-		                   rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool);
+		                   rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool, false);
 	}
 	else if (mtex->brush_map_mode == MTEX_MAP_MODE_STENCIL) {
 		float rotation = -mtex->rot;
@@ -565,7 +584,7 @@ float BKE_brush_sample_tex_3D(const Scene *scene, Brush *br,
 		co[2] = 0.0f;
 
 		hasrgb = externtex(mtex, co, &intensity,
-		                   rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool);
+		                   rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool, false);
 	}
 	else {
 		float rotation = -mtex->rot;
@@ -622,7 +641,7 @@ float BKE_brush_sample_tex_3D(const Scene *scene, Brush *br,
 		co[2] = 0.0f;
 
 		hasrgb = externtex(mtex, co, &intensity,
-		                   rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool);
+		                   rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool, false);
 	}
 
 	intensity += br->texture_sample_bias;
@@ -682,7 +701,7 @@ float BKE_brush_sample_masktex(const Scene *scene, Brush *br,
 		co[2] = 0.0f;
 
 		externtex(mtex, co, &intensity,
-		          rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool);
+		          rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool, false);
 	}
 	else {
 		float rotation = -mtex->rot;
@@ -694,7 +713,7 @@ float BKE_brush_sample_masktex(const Scene *scene, Brush *br,
 		if (mtex->brush_map_mode == MTEX_MAP_MODE_VIEW) {
 			/* keep coordinates relative to mouse */
 
-			rotation += ups->brush_rotation;
+			rotation += ups->brush_rotation_sec;
 
 			x = point_2d[0] - ups->mask_tex_mouse[0];
 			y = point_2d[1] - ups->mask_tex_mouse[1];
@@ -712,7 +731,7 @@ float BKE_brush_sample_masktex(const Scene *scene, Brush *br,
 			y = point_2d[1];
 		}
 		else if (mtex->brush_map_mode == MTEX_MAP_MODE_RANDOM) {
-			rotation += ups->brush_rotation;
+			rotation += ups->brush_rotation_sec;
 			/* these contain a random coordinate */
 			x = point_2d[0] - ups->mask_tex_mouse[0];
 			y = point_2d[1] - ups->mask_tex_mouse[1];
@@ -739,13 +758,26 @@ float BKE_brush_sample_masktex(const Scene *scene, Brush *br,
 		co[2] = 0.0f;
 
 		externtex(mtex, co, &intensity,
-		          rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool);
+		          rgba, rgba + 1, rgba + 2, rgba + 3, thread, pool, false);
+	}
+
+	CLAMP(intensity, 0.0f, 1.0f);
+
+	switch (br->mask_pressure) {
+		case BRUSH_MASK_PRESSURE_CUTOFF:
+			intensity  = ((1.0f - intensity) < ups->size_pressure_value) ? 1.0f : 0.0f;
+			break;
+		case BRUSH_MASK_PRESSURE_RAMP:
+			intensity = ups->size_pressure_value + intensity * (1.0f - ups->size_pressure_value);
+			break;
+		default:
+			break;
 	}
 
 	return intensity;
 }
 
-/* Unified Size and Strength */
+/* Unified Size / Strength / Color */
 
 /* XXX: be careful about setting size and unprojected radius
  * because they depend on one another
@@ -760,19 +792,45 @@ float BKE_brush_sample_masktex(const Scene *scene, Brush *br,
  * In any case, a better solution is needed to prevent
  * inconsistency. */
 
+
+const float *BKE_brush_color_get(const struct Scene *scene, const struct Brush *brush)
+{
+	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
+	return (ups->flag & UNIFIED_PAINT_COLOR) ? ups->rgb : brush->rgb;
+}
+
+const float *BKE_brush_secondary_color_get(const struct Scene *scene, const struct Brush *brush)
+{
+	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
+	return (ups->flag & UNIFIED_PAINT_COLOR) ? ups->secondary_rgb : brush->secondary_rgb;
+}
+
+void BKE_brush_color_set(struct Scene *scene, struct Brush *brush, const float color[3])
+{
+	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
+
+	if (ups->flag & UNIFIED_PAINT_COLOR)
+		copy_v3_v3(ups->rgb, color);
+	else
+		copy_v3_v3(brush->rgb, color);
+}
+
 void BKE_brush_size_set(Scene *scene, Brush *brush, int size)
 {
 	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
 	
 	size = (int)((float)size / U.pixelsize);
 	
+	/* make sure range is sane */
+	CLAMP(size, 1, MAX_BRUSH_PIXEL_RADIUS);
+
 	if (ups->flag & UNIFIED_PAINT_SIZE)
 		ups->size = size;
 	else
 		brush->size = size;
 }
 
-int BKE_brush_size_get(const Scene *scene, Brush *brush)
+int BKE_brush_size_get(const Scene *scene, const Brush *brush)
 {
 	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
 	int size = (ups->flag & UNIFIED_PAINT_SIZE) ? ups->size : brush->size;
@@ -780,7 +838,7 @@ int BKE_brush_size_get(const Scene *scene, Brush *brush)
 	return (int)((float)size * U.pixelsize);
 }
 
-int BKE_brush_use_locked_size(const Scene *scene, Brush *brush)
+int BKE_brush_use_locked_size(const Scene *scene, const Brush *brush)
 {
 	const short us_flag = scene->toolsettings->unified_paint_settings.flag;
 
@@ -789,7 +847,7 @@ int BKE_brush_use_locked_size(const Scene *scene, Brush *brush)
 	       (brush->flag & BRUSH_LOCK_SIZE);
 }
 
-int BKE_brush_use_size_pressure(const Scene *scene, Brush *brush)
+int BKE_brush_use_size_pressure(const Scene *scene, const Brush *brush)
 {
 	const short us_flag = scene->toolsettings->unified_paint_settings.flag;
 
@@ -798,7 +856,7 @@ int BKE_brush_use_size_pressure(const Scene *scene, Brush *brush)
 	       (brush->flag & BRUSH_SIZE_PRESSURE);
 }
 
-int BKE_brush_use_alpha_pressure(const Scene *scene, Brush *brush)
+int BKE_brush_use_alpha_pressure(const Scene *scene, const Brush *brush)
 {
 	const short us_flag = scene->toolsettings->unified_paint_settings.flag;
 
@@ -817,7 +875,7 @@ void BKE_brush_unprojected_radius_set(Scene *scene, Brush *brush, float unprojec
 		brush->unprojected_radius = unprojected_radius;
 }
 
-float BKE_brush_unprojected_radius_get(const Scene *scene, Brush *brush)
+float BKE_brush_unprojected_radius_get(const Scene *scene, const Brush *brush)
 {
 	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
 
@@ -836,14 +894,14 @@ void BKE_brush_alpha_set(Scene *scene, Brush *brush, float alpha)
 		brush->alpha = alpha;
 }
 
-float BKE_brush_alpha_get(const Scene *scene, Brush *brush)
+float BKE_brush_alpha_get(const Scene *scene, const Brush *brush)
 {
 	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
 
 	return (ups->flag & UNIFIED_PAINT_ALPHA) ? ups->alpha : brush->alpha;
 }
 
-float BKE_brush_weight_get(const Scene *scene, Brush *brush)
+float BKE_brush_weight_get(const Scene *scene, const Brush *brush)
 {
 	UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
 
@@ -873,9 +931,10 @@ void BKE_brush_scale_unprojected_radius(float *unprojected_radius,
 }
 
 /* scale brush size to reflect a change in the brush's unprojected radius */
-void BKE_brush_scale_size(int *r_brush_size,
-                          float new_unprojected_radius,
-                          float old_unprojected_radius)
+void BKE_brush_scale_size(
+        int *r_brush_size,
+        float new_unprojected_radius,
+        float old_unprojected_radius)
 {
 	float scale = new_unprojected_radius;
 	/* avoid division by zero */
@@ -886,42 +945,30 @@ void BKE_brush_scale_size(int *r_brush_size,
 
 void BKE_brush_jitter_pos(const Scene *scene, Brush *brush, const float pos[2], float jitterpos[2])
 {
-	int use_jitter = (brush->flag & BRUSH_ABSOLUTE_JITTER) ?
-		(brush->jitter_absolute != 0) : (brush->jitter != 0);
+	float rand_pos[2];
+	float spread;
+	int diameter;
 
-	/* jitter-ed brush gives weird and unpredictable result for this
-	 * kinds of stroke, so manually disable jitter usage (sergey) */
-	use_jitter &= (brush->flag & (BRUSH_DRAG_DOT | BRUSH_ANCHORED)) == 0;
-
-	if (use_jitter) {
-		float rand_pos[2];
-		float spread;
-		int diameter;
-
-		do {
-			rand_pos[0] = BLI_rng_get_float(brush_rng) - 0.5f;
-			rand_pos[1] = BLI_rng_get_float(brush_rng) - 0.5f;
-		} while (len_squared_v2(rand_pos) > (0.5f * 0.5f));
+	do {
+		rand_pos[0] = BLI_rng_get_float(brush_rng) - 0.5f;
+		rand_pos[1] = BLI_rng_get_float(brush_rng) - 0.5f;
+	} while (len_squared_v2(rand_pos) > SQUARE(0.5f));
 
 
-		if (brush->flag & BRUSH_ABSOLUTE_JITTER) {
-			diameter = 2 * brush->jitter_absolute;
-			spread = 1.0;
-		}
-		else {
-			diameter = 2 * BKE_brush_size_get(scene, brush);
-			spread = brush->jitter;
-		}
-		/* find random position within a circle of diameter 1 */
-		jitterpos[0] = pos[0] + 2 * rand_pos[0] * diameter * spread;
-		jitterpos[1] = pos[1] + 2 * rand_pos[1] * diameter * spread;
+	if (brush->flag & BRUSH_ABSOLUTE_JITTER) {
+		diameter = 2 * brush->jitter_absolute;
+		spread = 1.0;
 	}
 	else {
-		copy_v2_v2(jitterpos, pos);
+		diameter = 2 * BKE_brush_size_get(scene, brush);
+		spread = brush->jitter;
 	}
+	/* find random position within a circle of diameter 1 */
+	jitterpos[0] = pos[0] + 2 * rand_pos[0] * diameter * spread;
+	jitterpos[1] = pos[1] + 2 * rand_pos[1] * diameter * spread;
 }
 
-void BKE_brush_randomize_texture_coordinates(UnifiedPaintSettings *ups, bool mask)
+void BKE_brush_randomize_texture_coords(UnifiedPaintSettings *ups, bool mask)
 {
 	/* we multiply with brush radius as an optimization for the brush
 	 * texture sampling functions */
@@ -935,8 +982,8 @@ void BKE_brush_randomize_texture_coordinates(UnifiedPaintSettings *ups, bool mas
 	}
 }
 
-/* Uses the brush curve control to find a strength value between 0 and 1 */
-float BKE_brush_curve_strength_clamp(Brush *br, float p, const float len)
+/* Uses the brush curve control to find a strength value */
+float BKE_brush_curve_strength(Brush *br, float p, const float len)
 {
 	float strength;
 
@@ -945,20 +992,18 @@ float BKE_brush_curve_strength_clamp(Brush *br, float p, const float len)
 
 	strength = curvemapping_evaluateF(br->curve, 0, p);
 
+	return strength;
+}
+
+
+/* Uses the brush curve control to find a strength value between 0 and 1 */
+float BKE_brush_curve_strength_clamped(Brush *br, float p, const float len)
+{
+	float strength = BKE_brush_curve_strength(br, p, len);
+
 	CLAMP(strength, 0.0f, 1.0f);
 
 	return strength;
-}
-/* same as above but can return negative values if the curve enables
- * used for sculpt only */
-float BKE_brush_curve_strength(Brush *br, float p, const float len)
-{
-	if (p >= len)
-		p = 1.0f;
-	else
-		p = p / len;
-
-	return curvemapping_evaluateF(br->curve, 0, p);
 }
 
 /* TODO: should probably be unified with BrushPainter stuff? */
@@ -986,7 +1031,7 @@ unsigned int *BKE_brush_gen_texture_cache(Brush *br, int half_side, bool use_sec
 				/* This is copied from displace modifier code */
 				/* TODO(sergey): brush are always cacheing with CM enabled for now. */
 				externtex(mtex, co, &intensity,
-				          rgba, rgba + 1, rgba + 2, rgba + 3, 0, NULL);
+				          rgba, rgba + 1, rgba + 2, rgba + 3, 0, NULL, false);
 
 				((char *)texcache)[(iy * side + ix) * 4] =
 				((char *)texcache)[(iy * side + ix) * 4 + 1] =
@@ -1016,8 +1061,8 @@ struct ImBuf *BKE_brush_gen_radial_control_imbuf(Brush *br, bool secondary)
 
 	for (i = 0; i < side; ++i) {
 		for (j = 0; j < side; ++j) {
-			float magn = sqrtf(powf(i - half, 2) + powf(j - half, 2));
-			im->rect_float[i * side + j] = BKE_brush_curve_strength_clamp(br, magn, half);
+			float magn = sqrtf(pow2f(i - half) + pow2f(j - half));
+			im->rect_float[i * side + j] = BKE_brush_curve_strength_clamped(br, magn, half);
 		}
 	}
 

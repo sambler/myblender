@@ -25,8 +25,6 @@
  *  \ingroup blenloader
  */
 
-#include "zlib.h"
-
 #include "BLI_utildefines.h"
 
 /* allow readfile to use deprecated functionality */
@@ -59,7 +57,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_anim.h"
 #include "BKE_image.h"
@@ -277,7 +275,7 @@ static void do_versions_nodetree_multi_file_output_format_2_62_1(Scene *sce, bNo
 
 				BLI_snprintf(sockpath, sizeof(sockpath), "%s_Image", filename);
 				sock = ntreeCompositOutputFileAddSocket(ntree, node, sockpath, &nimf->format);
-				/* XXX later do_versions copies path from socket name, need to set this explicitely */
+				/* XXX later do_versions copies path from socket name, need to set this explicitly */
 				BLI_strncpy(sock->name, sockpath, sizeof(sock->name));
 				if (old_image->link) {
 					old_image->link->tosock = sock;
@@ -286,7 +284,7 @@ static void do_versions_nodetree_multi_file_output_format_2_62_1(Scene *sce, bNo
 
 				BLI_snprintf(sockpath, sizeof(sockpath), "%s_Z", filename);
 				sock = ntreeCompositOutputFileAddSocket(ntree, node, sockpath, &nimf->format);
-				/* XXX later do_versions copies path from socket name, need to set this explicitely */
+				/* XXX later do_versions copies path from socket name, need to set this explicitly */
 				BLI_strncpy(sock->name, sockpath, sizeof(sock->name));
 				if (old_z->link) {
 					old_z->link->tosock = sock;
@@ -295,7 +293,7 @@ static void do_versions_nodetree_multi_file_output_format_2_62_1(Scene *sce, bNo
 			}
 			else {
 				sock = ntreeCompositOutputFileAddSocket(ntree, node, filename, &nimf->format);
-				/* XXX later do_versions copies path from socket name, need to set this explicitely */
+				/* XXX later do_versions copies path from socket name, need to set this explicitly */
 				BLI_strncpy(sock->name, filename, sizeof(sock->name));
 				if (old_image->link) {
 					old_image->link->tosock = sock;
@@ -829,7 +827,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *main)
 				for (i = 0; i < 3; i++) {
 					if ( (ob->dsize[i] == 0.0f) || /* simple case, user never touched dsize */
 					     (ob->size[i]  == 0.0f))   /* cant scale the dsize to give a non zero result,
-					                                  so fallback to 1.0f */
+					                                * so fallback to 1.0f */
 					{
 						ob->dscale[i] = 1.0f;
 					}
@@ -847,7 +845,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *main)
 		Object *ob;
 		for (ob = main->object.first; ob; ob = ob->id.next) {
 			if (is_zero_v3(ob->dscale)) {
-				fill_vn_fl(ob->dscale, 3, 1.0f);
+				copy_vn_fl(ob->dscale, 3, 1.0f);
 			}
 		}
 	}
@@ -1885,7 +1883,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *main)
 			SEQ_END
 
 			if (scene->r.bake_samples == 0)
-			scene->r.bake_samples = 256;
+				scene->r.bake_samples = 256;
 
 			if (scene->world) {
 				World *world = blo_do_versions_newlibadr(fd, scene->id.lib, scene->world);
@@ -2098,7 +2096,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *main)
 	if (!MAIN_VERSION_ATLEAST(main, 266, 4)) {
 		Brush *brush;
 		for (brush = main->brush.first; brush; brush = brush->id.next) {
-			default_mtex(&brush->mask_mtex);
+			BKE_texture_mtex_default(&brush->mask_mtex);
 
 			if (brush->ob_mode & OB_MODE_TEXTURE_PAINT) {
 				brush->spacing /= 2;
@@ -2454,9 +2452,9 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *main)
 					if (sl->spacetype == SPACE_OUTLINER) {
 						SpaceOops *so = (SpaceOops *)sl;
 
-						if (!ELEM11(so->outlinevis, SO_ALL_SCENES, SO_CUR_SCENE, SO_VISIBLE, SO_SELECTED, SO_ACTIVE,
-						                            SO_SAME_TYPE, SO_GROUPS, SO_LIBRARIES, SO_SEQUENCE, SO_DATABLOCKS,
-						                            SO_USERDEF))
+						if (!ELEM(so->outlinevis, SO_ALL_SCENES, SO_CUR_SCENE, SO_VISIBLE, SO_SELECTED, SO_ACTIVE,
+						                          SO_SAME_TYPE, SO_GROUPS, SO_LIBRARIES, SO_SEQUENCE, SO_DATABLOCKS,
+						                          SO_USERDEF))
 						{
 							so->outlinevis = SO_ALL_SCENES;
 						}

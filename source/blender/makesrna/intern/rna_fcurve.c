@@ -61,7 +61,7 @@ EnumPropertyItem fmodifier_type_items[] = {
 	{FMODIFIER_TYPE_NOISE, "NOISE", 0, "Noise",
 	                       "Add pseudo-random noise on top of F-Curves"},
 	/*{FMODIFIER_TYPE_FILTER, "FILTER", 0, "Filter", ""},*/ /* FIXME: not implemented yet! */
-	/*{FMODIFIER_TYPE_PYTHON, "PYTHON", 0, "Python", ""},	 *//* FIXME: not implemented yet! */
+	{FMODIFIER_TYPE_PYTHON, "PYTHON", 0, "Python", ""},
 	{FMODIFIER_TYPE_LIMITS, "LIMITS", 0, "Limits",
 	                        "Restrict maximum and minimum values of F-Curve"},
 	{FMODIFIER_TYPE_STEPPED, "STEPPED", 0, "Stepped Interpolation",
@@ -457,7 +457,7 @@ static void rna_FCurve_range(FCurve *fcu, float range[2])
 static void rna_FCurve_update_data_ex(FCurve *fcu)
 {
 	sort_time_fcurve(fcu);
-	testhandles_fcurve(fcu, true);
+	calchandles_fcurve(fcu);
 }
 
 /* RNA update callback for F-Curves after curve shape changes */
@@ -574,7 +574,7 @@ static void rna_FModifier_blending_range(PointerRNA *ptr, float *min, float *max
 static void rna_FModifier_verify_data_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	FModifier *fcm = (FModifier *)ptr->data;
-	FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
+	const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
 
 	/* call the verify callback on the modifier if applicable */
 	if (fmi && fmi->verify_data)
@@ -820,7 +820,7 @@ static FCM_EnvelopeData *rna_FModifierEnvelope_points_add(FModifier *fmod, Repor
 	return (env->data + i);
 }
 
-void rna_FModifierEnvelope_points_remove(FModifier *fmod, ReportList *reports, PointerRNA *point)
+static void rna_FModifierEnvelope_points_remove(FModifier *fmod, ReportList *reports, PointerRNA *point)
 {
 	FCM_EnvelopeData *cp = point->data;
 	FMod_Envelope *env = (FMod_Envelope *)fmod->data;
@@ -1948,6 +1948,10 @@ static void rna_def_fcurve(BlenderRNA *brna)
 	parm = RNA_def_pointer(func, "data", "AnyType", "Data",
 	                       "Data containing the property controlled by given FCurve");
 	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_RNAPTR | PROP_NEVER_NULL);
+
+
+	/* Functions */
+	RNA_api_fcurves(srna);
 }
 
 /* *********************** */

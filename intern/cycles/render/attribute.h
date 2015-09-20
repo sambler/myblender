@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #ifndef __ATTRIBUTE_H__
@@ -68,6 +68,7 @@ public:
 	float3 *data_float3() { return (float3*)data(); }
 	float4 *data_float4() { return (float4*)data(); }
 	float *data_float() { return (float*)data(); }
+	uchar4 *data_uchar4() { return (uchar4*)data(); }
 	Transform *data_transform() { return (Transform*)data(); }
 	VoxelAttribute *data_voxel()  { return ( VoxelAttribute*)data(); }
 
@@ -80,6 +81,7 @@ public:
 
 	void add(const float& f);
 	void add(const float3& f);
+	void add(const uchar4& f);
 	void add(const Transform& f);
 	void add(const VoxelAttribute& f);
 	void add(const char *data);

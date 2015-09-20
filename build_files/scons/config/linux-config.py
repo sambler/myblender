@@ -1,4 +1,4 @@
-from Modules.FindPython import FindPython
+from FindPython import FindPython
 
 py = FindPython()
 
@@ -25,6 +25,8 @@ BF_OPENAL_LIB_STATIC = '${BF_OPENAL}/lib/libopenal.a'
 BF_CXX = '/usr'
 WITH_BF_STATICCXX = False
 BF_CXX_LIB_STATIC = '${BF_CXX}/lib/libstdc++.a'
+
+WITH_BF_AUDASPACE = True
 
 WITH_BF_JACK = False
 BF_JACK = '/usr'
@@ -144,7 +146,7 @@ BF_REDCODE_LIB = ''
 BF_REDCODE_INC = '${BF_REDCODE}/../' #C files request "libredcode/format.h" which is in "#extern/libredcode/format.h", stupid but compiles for now.
 BF_REDCODE_LIBPATH='${BF_REDCODE}/lib'
 
-# Mesa Libs should go here if your using them as well....
+# Mesa Libs should go here if you're using them as well....
 WITH_BF_STATICOPENGL = False
 BF_OPENGL = '/usr'
 BF_OPENGL_INC = '${BF_OPENGL}/include'
@@ -197,7 +199,7 @@ BF_BOOST = '/usr'
 BF_BOOST_INC = '${BF_BOOST}/include'
 BF_BOOST_LIB = 'boost_filesystem boost_regex boost_system boost_thread boost_date_time'
 BF_BOOST_LIB_STATIC = '${BF_BOOST_LIBPATH}/libboost_filesystem.a ${BF_BOOST_LIBPATH}/libboost_date_time.a ' + \
-    '${BF_BOOST_LIBPATH}/libboost_regex.a ${BF_BOOST_LIBPATH}/libboost_locale.a ${BF_BOOST_LIBPATH}/libboost_system.a' + \
+    '${BF_BOOST_LIBPATH}/libboost_regex.a ${BF_BOOST_LIBPATH}/libboost_locale.a ${BF_BOOST_LIBPATH}/libboost_system.a ' + \
     '${BF_BOOST_LIBPATH}/libboost_thread.a'
 BF_BOOST_LIB_INTERNATIONAL = 'boost_locale'
 BF_BOOST_LIBPATH = '${BF_BOOST}/lib'
@@ -206,7 +208,7 @@ WITH_BF_CYCLES = WITH_BF_OIIO and WITH_BF_BOOST
 
 WITH_BF_CYCLES_CUDA_BINARIES = False
 BF_CYCLES_CUDA_NVCC = '/usr/local/cuda/bin/nvcc'
-BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_20', 'sm_21', 'sm_30', 'sm_35', 'sm_50']
+BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_20', 'sm_21', 'sm_30', 'sm_35', 'sm_50', 'sm_52']
 
 WITH_BF_OPENMP = True
 
@@ -226,11 +228,20 @@ BF_3DMOUSE_LIB_STATIC = '${BF_3DMOUSE_LIBPATH}/libspnav.a'
 #Freestyle
 WITH_BF_FREESTYLE = True
 
+WITH_BF_OPENSUBDIV = False
+WITH_BF_STATICOPENSUBDIV = False
+BF_OPENSUBDIV = '/usr'
+BF_OPENSUBDIV_INC = '${BF_OPENSUBDIV}/include'
+BF_OPENSUBDIV_LIB = 'osdCPU osdGPU'
+BF_OPENSUBDIV_LIB_STATIC = '${BF_OPENSUBDIV_LIBPATH}/libosdGPU.a ${BF_OPENSUBDIV_LIBPATH}/libosdCPU.a'
+BF_OPENSUBDIV_LIBPATH = '${BF_OPENSUBDIV}/lib'
+
 ##
 CC = 'gcc'
 CXX = 'g++'
 
-CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+CFLAGS = ['-std=gnu89']
 CXXFLAGS = []
 
 CPPFLAGS = []
@@ -241,7 +252,7 @@ if WITH_BF_FFMPEG:
     CXXFLAGS += ['-D__STDC_CONSTANT_MACROS', ]
 REL_CFLAGS = []
 REL_CXXFLAGS = []
-REL_CCFLAGS = ['-DNDEBUG', '-O2']
+REL_CCFLAGS = ['-O2']
 
 C_WARN = ['-Wno-char-subscripts', '-Wdeclaration-after-statement', '-Wunused-parameter', '-Wstrict-prototypes', '-Werror=declaration-after-statement', '-Werror=implicit-function-declaration', '-Werror=return-type']
 CC_WARN = ['-Wall']
@@ -254,7 +265,7 @@ BF_PROFILE_CCFLAGS = ['-pg','-g']
 BF_PROFILE_LINKFLAGS = ['-pg']
 
 BF_DEBUG = False
-BF_DEBUG_CCFLAGS = ['-g', '-D_DEBUG']
+BF_DEBUG_CCFLAGS = ['-g']
 
 BF_BUILDDIR = '../build/linux'
 BF_INSTALLDIR='../install/linux'
@@ -262,6 +273,6 @@ BF_INSTALLDIR='../install/linux'
 #Link against pthread
 PLATFORM_LINKFLAGS = ['-pthread']
 
-#Fix for LLVM conflict with Mesa llvmpipe
-if WITH_BF_LLVM:
-    PLATFORM_LINKFLAGS += ['-Wl,--version-script=source/creator/blender.map']
+#Fix for LLVM conflict with Mesa llvmpipe, SDL dynload also requires symbols to be hidden.
+# TODO(sergey): Move this to SConstruct, so we can have this line depended on user config.
+PLATFORM_LINKFLAGS += ['-Wl,--version-script=source/creator/blender.map']

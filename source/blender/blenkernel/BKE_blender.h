@@ -41,9 +41,9 @@ extern "C" {
 /* these lines are grep'd, watch out for our not-so-awesome regex
  * and keep comment above the defines.
  * Use STRINGIFY() rather than defining with quotes */
-#define BLENDER_VERSION         270
-#define BLENDER_SUBVERSION      5
-/* 262 was the last editmesh release but it has compatibility code for bmesh data */
+#define BLENDER_VERSION         276
+#define BLENDER_SUBVERSION      0
+/* Several breakages with 270, e.g. constraint deg vs rad */
 #define BLENDER_MINVERSION      270
 #define BLENDER_MINSUBVERSION   5
 
@@ -51,11 +51,10 @@ extern "C" {
 /* can be left blank, otherwise a,b,c... etc with no quotes */
 #define BLENDER_VERSION_CHAR   
 /* alpha/beta/rc/release, docs use this */
-#define BLENDER_VERSION_CYCLE   alpha
+#define BLENDER_VERSION_CYCLE   rc
 
 extern char versionstr[]; /* from blender.c */
 
-struct ListBase;
 struct MemFile;
 struct bContext;
 struct ReportList;
@@ -69,10 +68,12 @@ int BKE_read_file(struct bContext *C, const char *filepath, struct ReportList *r
 #define BKE_READ_FILE_OK                1 /* OK */
 #define BKE_READ_FILE_OK_USERPREFS      2 /* OK, and with new user settings */
 
-int BKE_read_file_from_memory(struct bContext *C, const void *filebuf,
-	int filelength, struct ReportList *reports, int update_defaults);
-int BKE_read_file_from_memfile(struct bContext *C, struct MemFile *memfile,
-	struct ReportList *reports);
+bool BKE_read_file_from_memory(
+        struct bContext *C, const void *filebuf,
+        int filelength, struct ReportList *reports, bool update_defaults);
+bool BKE_read_file_from_memfile(
+        struct bContext *C, struct MemFile *memfile,
+        struct ReportList *reports);
 
 int BKE_read_file_userdef(const char *filepath, struct ReportList *reports);
 int BKE_write_file_userdef(const char *filepath, struct ReportList *reports);
@@ -86,21 +87,21 @@ void BKE_userdef_free(void);
 void BKE_userdef_state(void);
 	
 /* set this callback when a UI is running */
-void set_blender_test_break_cb(void (*func)(void) );
+void BKE_blender_callback_test_break_set(void (*func)(void));
 int blender_test_break(void);
 
 #define BKE_UNDO_STR_MAX 64
 
 /* global undo */
-extern void BKE_write_undo(struct bContext *C, const char *name);
-extern void BKE_undo_step(struct bContext *C, int step);
-extern void BKE_undo_name(struct bContext *C, const char *name);
-extern int BKE_undo_valid(const char *name);
-extern void BKE_reset_undo(void);
-extern void BKE_undo_number(struct bContext *C, int nr);
-extern const char *BKE_undo_get_name(int nr, int *active);
-extern bool BKE_undo_save_file(const char *filename);
-extern struct Main *BKE_undo_get_main(struct Scene **scene);
+extern void          BKE_undo_write(struct bContext *C, const char *name);
+extern void          BKE_undo_step(struct bContext *C, int step);
+extern void          BKE_undo_name(struct bContext *C, const char *name);
+extern bool          BKE_undo_is_valid(const char *name);
+extern void          BKE_undo_reset(void);
+extern void          BKE_undo_number(struct bContext *C, int nr);
+extern const char   *BKE_undo_get_name(int nr, bool *r_active);
+extern bool          BKE_undo_save_file(const char *filename);
+extern struct Main  *BKE_undo_get_main(struct Scene **r_scene);
 
 /* copybuffer */
 void BKE_copybuffer_begin(struct Main *bmain);

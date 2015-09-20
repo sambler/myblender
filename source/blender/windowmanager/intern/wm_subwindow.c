@@ -45,21 +45,19 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_context.h"
-
 #include "BIF_gl.h"
 
 #include "GPU_extensions.h"
 
 #include "WM_api.h"
 #include "wm_subwindow.h"
-#include "wm_window.h"
 
-/* wmSubWindow stored in wmWindow... but not exposed outside this C file */
-/* it seems a bit redundant (area regions can store it too, but we keep it
- * because we can store all kind of future opengl fanciness here */
-
-/* we use indices and array because:
+/**
+ * \note #wmSubWindow stored in #wmWindow but not exposed outside this C file,
+ * it seems a bit redundant (area regions can store it too, but we keep it
+ * because we can store all kind of future opengl fanciness here.
+ *
+ * We use indices and array because:
  * - index has safety, no pointers from this C file hanging around
  * - fast lookups of indices with array, list would give overhead
  * - old code used it this way...
@@ -215,7 +213,7 @@ int wm_subwindow_open(wmWindow *win, const rcti *winrct)
 	
 	/* extra service */
 	wm_swin_size_get(swin, &width, &height);
-	wmOrtho2(-GLA_PIXEL_OFS, (float)width - GLA_PIXEL_OFS, -GLA_PIXEL_OFS, (float)height - GLA_PIXEL_OFS);
+	wmOrtho2_pixelspace(width, height);
 	glLoadIdentity();
 
 	return swin->swinid;
@@ -272,7 +270,7 @@ void wm_subwindow_position(wmWindow *win, int swinid, const rcti *winrct)
 		/* extra service */
 		wmSubWindowSet(win, swinid);
 		wm_swin_size_get(swin, &width, &height);
-		wmOrtho2(-GLA_PIXEL_OFS, (float)width - GLA_PIXEL_OFS, -GLA_PIXEL_OFS, (float)height - GLA_PIXEL_OFS);
+		wmOrtho2_pixelspace(width, height);
 	}
 	else {
 		printf("%s: Internal error, bad winid: %d\n", __func__, swinid);
@@ -308,7 +306,7 @@ void wmSubWindowScissorSet(wmWindow *win, int swinid, const rcti *srct, bool src
 		int scissor_height = BLI_rcti_size_y(srct);
 
 		/* typically a single pixel doesn't matter,
-		 * but one pixel offset is noticable with viewport border render */
+		 * but one pixel offset is noticeable with viewport border render */
 		if (srct_pad) {
 			scissor_width  += 1;
 			scissor_height += 1;
@@ -319,7 +317,7 @@ void wmSubWindowScissorSet(wmWindow *win, int swinid, const rcti *srct, bool src
 	else
 		glScissor(_curswin->winrct.xmin, _curswin->winrct.ymin, width, height);
 	
-	wmOrtho2(-GLA_PIXEL_OFS, (float)width - GLA_PIXEL_OFS, -GLA_PIXEL_OFS, (float)height - GLA_PIXEL_OFS);
+	wmOrtho2_pixelspace(width, height);
 	glLoadIdentity();
 	
 	glFlush();
@@ -356,6 +354,35 @@ void wmOrtho2(float x1, float x2, float y1, float y2)
 	if (y1 == y2) y2 += 1.0f;
 
 	wmOrtho(x1, x2, y1, y2, -100, 100);
+}
+
+static void wmOrtho2_offset(const float x, const float y, const float ofs)
+{
+	wmOrtho2(ofs, x + ofs, ofs, y + ofs);
+}
+
+/**
+ * default pixel alignment.
+ */
+void wmOrtho2_region_pixelspace(const struct ARegion *ar)
+{
+	wmOrtho2_offset(ar->winx, ar->winy, -0.01f);
+}
+
+void wmOrtho2_pixelspace(const float x, const float y)
+{
+	wmOrtho2_offset(x, y, -GLA_PIXEL_OFS);
+}
+
+/**
+ * use for drawing uiBlock, any UI elements and text.
+ * \note prevents blurry text with multi-sample (FSAA), see T41749
+ */
+void wmOrtho2_region_ui(const ARegion *ar)
+{
+	/* note, intentionally no '+ 1',
+	 * as with wmOrtho2_region_pixelspace */
+	wmOrtho2_offset(ar->winx, ar->winy, -0.01f);
 }
 
 /* *************************** Framebuffer color depth, for selection codes ********************** */
@@ -432,23 +459,73 @@ void WM_framebuffer_index_set(int index)
 	cpack(col);
 }
 
+void WM_framebuffer_index_get(int index, int *r_col)
+{
+	const int col = index_to_framebuffer(index);
+	char *c_col = (char *)r_col;
+	c_col[0] = (col & 0xFF); /* red */
+	c_col[1] = ((col >>  8) & 0xFF); /* green */
+	c_col[2] = ((col >> 16) & 0xFF); /* blue */
+	c_col[3] = 0xFF; /* alpha */
+}
+
+
+
+#define INDEX_FROM_BUF_8(col)     (((col & 0xC00000) >> 18) + ((col & 0xC000) >> 12) + ((col & 0xC0) >> 6))
+#define INDEX_FROM_BUF_12(col)    (((col & 0xF00000) >> 12) + ((col & 0xF000) >> 8)  + ((col & 0xF0) >> 4))
+#define INDEX_FROM_BUF_15_16(col) (((col & 0xF80000) >> 9)  + ((col & 0xF800) >> 6)  + ((col & 0xF8) >> 3))
+#define INDEX_FROM_BUF_18(col)    (((col & 0xFC0000) >> 6)  + ((col & 0xFC00) >> 4)  + ((col & 0xFC) >> 2))
+#define INDEX_FROM_BUF_24(col)      (col & 0xFFFFFF)
+
 int WM_framebuffer_to_index(unsigned int col)
 {
-	if (col == 0) return 0;
+	if (col == 0) {
+		return 0;
+	}
 
 	switch (GPU_color_depth()) {
-		case 8:
-			return ((col & 0xC00000) >> 18) + ((col & 0xC000) >> 12) + ((col & 0xC0) >> 6);
-		case 12:
-			return ((col & 0xF00000) >> 12) + ((col & 0xF000) >> 8) + ((col & 0xF0) >> 4);
+		case  8: return INDEX_FROM_BUF_8(col);
+		case 12: return INDEX_FROM_BUF_12(col);
 		case 15:
-		case 16:
-			return ((col & 0xF80000) >> 9) + ((col & 0xF800) >> 6) + ((col & 0xF8) >> 3);
-		case 24:
-			return col & 0xFFFFFF;
-		default: // 18 bits...
-			return ((col & 0xFC0000) >> 6) + ((col & 0xFC00) >> 4) + ((col & 0xFC) >> 2);
+		case 16: return INDEX_FROM_BUF_15_16(col);
+		case 24: return INDEX_FROM_BUF_24(col);
+		default: return INDEX_FROM_BUF_18(col);
 	}
+}
+
+void WM_framebuffer_to_index_array(unsigned int *col, const unsigned int size)
+{
+#define INDEX_BUF_ARRAY(INDEX_FROM_BUF_BITS) \
+	for (i = size; i--; col++) { \
+		if ((c = *col)) { \
+			*col = INDEX_FROM_BUF_BITS(c); \
+		} \
+	} ((void)0)
+
+	if (size > 0) {
+		unsigned int i, c;
+
+		switch (GPU_color_depth()) {
+			case  8:
+				INDEX_BUF_ARRAY(INDEX_FROM_BUF_8);
+				break;
+			case 12:
+				INDEX_BUF_ARRAY(INDEX_FROM_BUF_12);
+				break;
+			case 15:
+			case 16:
+				INDEX_BUF_ARRAY(INDEX_FROM_BUF_15_16);
+				break;
+			case 24:
+				INDEX_BUF_ARRAY(INDEX_FROM_BUF_24);
+				break;
+			default:
+				INDEX_BUF_ARRAY(INDEX_FROM_BUF_18);
+				break;
+		}
+	}
+
+#undef INDEX_BUF_ARRAY
 }
 
 

@@ -20,7 +20,7 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/bmesh/operators/bmesh_wireframe.c
+/** \file blender/bmesh/tools/bmesh_wireframe.c
  *  \ingroup bmesh
  *
  * Creates a solid wireframe from connected faces.
@@ -55,8 +55,9 @@ static BMLoop *bm_edge_tag_faceloop(BMEdge *e)
 	return NULL;
 }
 
-static void bm_vert_boundary_tangent(BMVert *v, float r_no[3], float r_no_face[3],
-                                     BMVert **r_va_other, BMVert **r_vb_other)
+static void bm_vert_boundary_tangent(
+        BMVert *v, float r_no[3], float r_no_face[3],
+        BMVert **r_va_other, BMVert **r_vb_other)
 {
 	BMIter iter;
 	BMEdge *e_iter;
@@ -159,7 +160,7 @@ static bool bm_loop_is_radial_boundary(BMLoop *l_first)
 }
 
 /**
- * \param def_nr  -1 for no vertex groups.
+ * \param defgrp_index: Vertex group index, -1 for no vertex groups.
  *
  * \note All edge tags must be cleared.
  * \note Behavior matches MOD_solidify.c
@@ -334,7 +335,7 @@ void BM_mesh_wireframe(
 		}
 
 		BM_ITER_ELEM (l, &itersub, f_src, BM_LOOPS_OF_FACE) {
-			BM_elem_index_set(l, verts_loop_tot); /* set_loop */
+			BM_elem_index_set(l, verts_loop_tot); /* set_dirty */  /* Because some faces might be skipped! */
 
 			BM_loop_calc_face_tangent(l, tvec);
 
@@ -407,6 +408,7 @@ void BM_mesh_wireframe(
 			verts_loop_tot++;
 		}
 	}
+	bm->elem_index_dirty |= BM_LOOP;
 
 	BM_ITER_MESH (f_src, &iter, bm, BM_FACES_OF_MESH) {
 
@@ -440,7 +442,7 @@ void BM_mesh_wireframe(
 			BMVert *v_pos1 = verts_pos[i_1];
 			BMVert *v_pos2 = verts_pos[i_2];
 
-			f_new = BM_face_create_quad_tri(bm, v_l1, v_l2, v_neg2, v_neg1, f_src, false);
+			f_new = BM_face_create_quad_tri(bm, v_l1, v_l2, v_neg2, v_neg1, f_src, BM_CREATE_NOP);
 			if (mat_offset) f_new->mat_nr = CLAMPIS(f_new->mat_nr + mat_offset, 0, mat_max);
 			BM_elem_flag_enable(f_new, BM_ELEM_TAG);
 			l_new = BM_FACE_FIRST_LOOP(f_new);
@@ -450,7 +452,7 @@ void BM_mesh_wireframe(
 			BM_elem_attrs_copy(bm, bm, l_next, l_new->next);
 			BM_elem_attrs_copy(bm, bm, l_next, l_new->next->next);
 
-			f_new = BM_face_create_quad_tri(bm, v_l2, v_l1, v_pos1, v_pos2, f_src, false);
+			f_new = BM_face_create_quad_tri(bm, v_l2, v_l1, v_pos1, v_pos2, f_src, BM_CREATE_NOP);
 
 			if (mat_offset) f_new->mat_nr = CLAMPIS(f_new->mat_nr + mat_offset, 0, mat_max);
 			BM_elem_flag_enable(f_new, BM_ELEM_TAG);
@@ -468,7 +470,7 @@ void BM_mesh_wireframe(
 					BMVert *v_b1 = verts_boundary[i_1];
 					BMVert *v_b2 = verts_boundary[i_2];
 
-					f_new = BM_face_create_quad_tri(bm, v_b2, v_b1, v_neg1, v_neg2, f_src, false);
+					f_new = BM_face_create_quad_tri(bm, v_b2, v_b1, v_neg1, v_neg2, f_src, BM_CREATE_NOP);
 					if (mat_offset) f_new->mat_nr = CLAMPIS(f_new->mat_nr + mat_offset, 0, mat_max);
 					BM_elem_flag_enable(f_new, BM_ELEM_TAG);
 					l_new = BM_FACE_FIRST_LOOP(f_new);
@@ -478,7 +480,7 @@ void BM_mesh_wireframe(
 					BM_elem_attrs_copy(bm, bm, l,      l_new->next);
 					BM_elem_attrs_copy(bm, bm, l,      l_new->next->next);
 
-					f_new = BM_face_create_quad_tri(bm, v_b1, v_b2, v_pos2, v_pos1, f_src, false);
+					f_new = BM_face_create_quad_tri(bm, v_b1, v_b2, v_pos2, v_pos1, f_src, BM_CREATE_NOP);
 					if (mat_offset) f_new->mat_nr = CLAMPIS(f_new->mat_nr + mat_offset, 0, mat_max);
 					BM_elem_flag_enable(f_new, BM_ELEM_TAG);
 					l_new = BM_FACE_FIRST_LOOP(f_new);

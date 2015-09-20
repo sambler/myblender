@@ -23,7 +23,7 @@ from bpy.types import Menu, Operator
 from bpy.props import StringProperty, BoolProperty
 
 
-class AddPresetBase():
+class AddPresetBase:
     """Base preset class, only for subclassing
     subclasses must define
      - preset_values
@@ -45,11 +45,28 @@ class AddPresetBase():
             options={'HIDDEN', 'SKIP_SAVE'},
             )
 
+    # needed for mix-ins
+    order = [
+        "name",
+        "remove_active",
+        ]
+
     @staticmethod
     def as_filename(name):  # could reuse for other presets
-        for char in " !@#$%^&*(){}:\";'[]<>,.\\/?":
-            name = name.replace(char, '_')
-        return name.lower().strip()
+
+        # lazy init maketrans
+        def maketrans_init():
+            cls = AddPresetBase
+            attr = "_as_filename_trans"
+
+            trans = getattr(cls, attr, None)
+            if trans is None:
+                trans = str.maketrans({char: "_" for char in " !@#$%^&*(){}:\";'[]<>,.\\/?"})
+                setattr(cls, attr, trans)
+            return trans
+
+        trans = maketrans_init()
+        return name.lower().strip().translate(trans)
 
     def execute(self, context):
         import os
@@ -253,7 +270,7 @@ class AddPresetCamera(AddPresetBase, Operator):
     preset_menu = "CAMERA_MT_presets"
 
     preset_defines = [
-        "cam = bpy.context.object.data"
+        "cam = bpy.context.camera"
     ]
 
     preset_subdir = "camera"
@@ -275,6 +292,26 @@ class AddPresetCamera(AddPresetBase, Operator):
             preset_values.append("cam.lens")
             preset_values.append("cam.lens_unit")
         return preset_values
+
+
+class AddPresetSafeAreas(AddPresetBase, Operator):
+    """Add or remove a Safe Areas Preset"""
+    bl_idname = "safe_areas.preset_add"
+    bl_label = "Add Safe Area Preset"
+    preset_menu = "SAFE_AREAS_MT_presets"
+
+    preset_defines = [
+        "safe_areas = bpy.context.scene.safe_areas"
+    ]
+
+    preset_values = [
+        "safe_areas.title",
+        "safe_areas.action",
+        "safe_areas.title_center",
+        "safe_areas.action_center",
+    ]
+
+    preset_subdir = "safe_areas"
 
 
 class AddPresetSSS(AddPresetBase, Operator):
@@ -345,6 +382,36 @@ class AddPresetFluid(AddPresetBase, Operator):
     preset_subdir = "fluid"
 
 
+class AddPresetHairDynamics(AddPresetBase, Operator):
+    """Add or remove a Hair Dynamics Preset"""
+    bl_idname = "particle.hair_dynamics_preset_add"
+    bl_label = "Add Hair Dynamics Preset"
+    preset_menu = "PARTICLE_MT_hair_dynamics_presets"
+
+    preset_defines = [
+        "psys = bpy.context.particle_system",
+        "cloth = bpy.context.particle_system.cloth",
+        "settings = bpy.context.particle_system.cloth.settings",
+        "collision = bpy.context.particle_system.cloth.collision_settings",
+    ]
+
+    preset_subdir = "hair_dynamics"
+
+    preset_values = [
+        "settings.quality",
+        "settings.mass",
+        "settings.bending_stiffness",
+        "psys.settings.bending_random",
+        "settings.bending_damping",
+        "settings.air_damping",
+        "settings.internal_friction",
+        "settings.density_target",
+        "settings.density_strength",
+        "settings.voxel_cell_size",
+        "settings.pin_stiffness",
+        ]
+
+
 class AddPresetSunSky(AddPresetBase, Operator):
     """Add or remove a Sky & Atmosphere Preset"""
     bl_idname = "lamp.sunsky_preset_add"
@@ -352,7 +419,7 @@ class AddPresetSunSky(AddPresetBase, Operator):
     preset_menu = "LAMP_MT_sunsky_presets"
 
     preset_defines = [
-        "sky = bpy.context.object.data.sky"
+        "sky = bpy.context.lamp.sky"
     ]
 
     preset_values = [

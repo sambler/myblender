@@ -36,7 +36,7 @@
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "DNA_armature_types.h"
 #include "DNA_lamp_types.h"
@@ -55,9 +55,11 @@
 #include "BKE_particle.h"
 #include "BKE_screen.h"
 #include "BKE_texture.h"
+#include "BKE_linestyle.h"
 
 #include "RNA_access.h"
 
+#include "ED_buttons.h"
 #include "ED_armature.h"
 #include "ED_screen.h"
 #include "ED_physics.h"
@@ -153,7 +155,7 @@ static int buttons_context_path_linestyle(ButsContextPath *path)
 	/* if we have a scene, use the lineset's linestyle */
 	else if (buttons_context_path_scene(path)) {
 		scene = path->ptr[path->len - 1].data;
-		linestyle = CTX_data_linestyle_from_scene(scene);
+		linestyle = BKE_linestyle_active_from_scene(scene);
 		if (linestyle) {
 			RNA_id_pointer_create(&linestyle->id, &path->ptr[path->len]);
 			path->len++;
@@ -199,7 +201,7 @@ static int buttons_context_path_data(ButsContextPath *path, int type)
 
 	/* if we already have a data, we're done */
 	if (RNA_struct_is_a(ptr->type, &RNA_Mesh) && (type == -1 || type == OB_MESH)) return 1;
-	else if (RNA_struct_is_a(ptr->type, &RNA_Curve) && (type == -1 || ELEM3(type, OB_CURVE, OB_SURF, OB_FONT))) return 1;
+	else if (RNA_struct_is_a(ptr->type, &RNA_Curve) && (type == -1 || ELEM(type, OB_CURVE, OB_SURF, OB_FONT))) return 1;
 	else if (RNA_struct_is_a(ptr->type, &RNA_Armature) && (type == -1 || type == OB_ARMATURE)) return 1;
 	else if (RNA_struct_is_a(ptr->type, &RNA_MetaBall) && (type == -1 || type == OB_MBALL)) return 1;
 	else if (RNA_struct_is_a(ptr->type, &RNA_Lattice) && (type == -1 || type == OB_LATTICE)) return 1;
@@ -229,14 +231,14 @@ static int buttons_context_path_modifier(ButsContextPath *path)
 	if (buttons_context_path_object(path)) {
 		ob = path->ptr[path->len - 1].data;
 
-		if (ob && ELEM5(ob->type, OB_MESH, OB_CURVE, OB_FONT, OB_SURF, OB_LATTICE))
+		if (ob && ELEM(ob->type, OB_MESH, OB_CURVE, OB_FONT, OB_SURF, OB_LATTICE))
 			return 1;
 	}
 
 	return 0;
 }
 
-static int buttons_context_path_material(ButsContextPath *path, int for_texture)
+static int buttons_context_path_material(ButsContextPath *path, bool for_texture, bool new_shading)
 {
 	Object *ob;
 	PointerRNA *ptr = &path->ptr[path->len - 1];
@@ -257,11 +259,14 @@ static int buttons_context_path_material(ButsContextPath *path, int for_texture)
 
 			if (for_texture && give_current_material_texture_node(ma))
 				return 1;
-			
-			ma = give_node_material(ma);
-			if (ma) {
-				RNA_id_pointer_create(&ma->id, &path->ptr[path->len]);
-				path->len++;
+
+			if (!new_shading) {
+				/* Only try to get mat from node in case of old shading system (see T40331). */
+				ma = give_node_material(ma);
+				if (ma) {
+					RNA_id_pointer_create(&ma->id, &path->ptr[path->len]);
+					path->len++;
+				}
 			}
 			return 1;
 		}
@@ -411,7 +416,7 @@ static int buttons_context_path_texture(ButsContextPath *path, ButsContextTextur
 			if (GS(id->name) == ID_BR)
 				buttons_context_path_brush(path);
 			else if (GS(id->name) == ID_MA)
-				buttons_context_path_material(path, 0);
+				buttons_context_path_material(path, false, true);
 			else if (GS(id->name) == ID_WO)
 				buttons_context_path_world(path);
 			else if (GS(id->name) == ID_LA)
@@ -480,7 +485,7 @@ static int buttons_context_path_texture(ButsContextPath *path, ButsContextTextur
 			}
 		}
 		/* try material */
-		else if ((path->tex_ctx == SB_TEXC_MATERIAL) && buttons_context_path_material(path, 1)) {
+		else if ((path->tex_ctx == SB_TEXC_MATERIAL) && buttons_context_path_material(path, true, false)) {
 			ma = path->ptr[path->len - 1].data;
 
 			if (ma) {
@@ -609,7 +614,7 @@ static int buttons_context_path(const bContext *C, ButsContextPath *path, int ma
 			found = buttons_context_path_particle(path);
 			break;
 		case BCONTEXT_MATERIAL:
-			found = buttons_context_path_material(path, 0);
+			found = buttons_context_path_material(path, false, (sbuts->texuser != NULL));
 			break;
 		case BCONTEXT_TEXTURE:
 			found = buttons_context_path_texture(path, sbuts->texuser);
@@ -634,7 +639,7 @@ static int buttons_shading_context(const bContext *C, int mainb)
 {
 	Object *ob = CTX_data_active_object(C);
 
-	if (ELEM3(mainb, BCONTEXT_MATERIAL, BCONTEXT_WORLD, BCONTEXT_TEXTURE))
+	if (ELEM(mainb, BCONTEXT_MATERIAL, BCONTEXT_WORLD, BCONTEXT_TEXTURE))
 		return 1;
 	if (mainb == BCONTEXT_DATA && ob && ELEM(ob->type, OB_LAMP, OB_CAMERA))
 		return 1;
@@ -1099,11 +1104,11 @@ void buttons_context_draw(const bContext *C, uiLayout *layout)
 	uiLayoutSetAlignment(row, UI_LAYOUT_ALIGN_LEFT);
 
 	block = uiLayoutGetBlock(row);
-	uiBlockSetEmboss(block, UI_EMBOSSN);
-	but = uiDefIconButBitC(block, ICONTOG, SB_PIN_CONTEXT, 0, ICON_UNPINNED, 0, 0, UI_UNIT_X, UI_UNIT_Y, &sbuts->flag,
+	UI_block_emboss_set(block, UI_EMBOSS_NONE);
+	but = uiDefIconButBitC(block, UI_BTYPE_ICON_TOGGLE, SB_PIN_CONTEXT, 0, ICON_UNPINNED, 0, 0, UI_UNIT_X, UI_UNIT_Y, &sbuts->flag,
 	                       0, 0, 0, 0, TIP_("Follow context or keep fixed datablock displayed"));
-	uiButClearFlag(but, UI_BUT_UNDO); /* skip undo on screen buttons */
-	uiButSetFunc(but, pin_cb, NULL, NULL);
+	UI_but_flag_disable(but, UI_BUT_UNDO); /* skip undo on screen buttons */
+	UI_but_func_set(but, pin_cb, NULL, NULL);
 
 	for (a = 0; a < path->len; a++) {
 		ptr = &path->ptr[a];
@@ -1116,7 +1121,7 @@ void buttons_context_draw(const bContext *C, uiLayout *layout)
 			name = RNA_struct_name_get_alloc(ptr, namebuf, sizeof(namebuf), NULL);
 
 			if (name) {
-				if (!ELEM3(sbuts->mainb, BCONTEXT_RENDER, BCONTEXT_SCENE, BCONTEXT_RENDER_LAYER) && ptr->type == &RNA_Scene)
+				if (!ELEM(sbuts->mainb, BCONTEXT_RENDER, BCONTEXT_SCENE, BCONTEXT_RENDER_LAYER) && ptr->type == &RNA_Scene)
 					uiItemLDrag(row, ptr, "", icon);  /* save some space */
 				else
 					uiItemLDrag(row, ptr, name, icon);
@@ -1142,7 +1147,7 @@ void buttons_context_register(ARegionType *art)
 	pt = MEM_callocN(sizeof(PanelType), "spacetype buttons panel context");
 	strcpy(pt->idname, "BUTTONS_PT_context");
 	strcpy(pt->label, N_("Context"));  /* XXX C panels are not available through RNA (bpy.types)! */
-	strcpy(pt->translation_context, BLF_I18NCONTEXT_DEFAULT_BPYRNA);
+	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = buttons_panel_context;
 	pt->flag = PNL_NO_HEADER;
 	BLI_addtail(&art->paneltypes, pt);
@@ -1174,4 +1179,34 @@ ID *buttons_context_id_path(const bContext *C)
 	}
 
 	return NULL;
+}
+
+void ED_buttons_id_unref(SpaceButs *sbuts, const ID *id)
+{
+	if (sbuts->pinid == id) {
+		sbuts->pinid = NULL;
+		sbuts->flag &= ~SB_PIN_CONTEXT;
+	}
+
+	if (sbuts->path) {
+		ButsContextPath *path = sbuts->path;
+		int i;
+
+		for (i = 0; i < path->len; i++) {
+			if (path->ptr[i].id.data == id) {
+				break;
+			}
+		}
+
+		if (i == path->len) {
+			/* pass */
+		}
+		else if (i == 0) {
+			MEM_SAFE_FREE(sbuts->path);
+		}
+		else {
+			memset(&path->ptr[i], 0, sizeof(path->ptr[i]) * (path->len - i));
+			path->len = i;
+		}
+	}
 }

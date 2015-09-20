@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #ifndef __INTEGRATOR_H__
@@ -34,18 +34,16 @@ public:
 	int max_glossy_bounce;
 	int max_transmission_bounce;
 	int max_volume_bounce;
-	bool probalistic_termination;
 
 	int transparent_min_bounce;
 	int transparent_max_bounce;
-	bool transparent_probalistic;
 	bool transparent_shadows;
 
-	int volume_homogeneous_sampling;
 	int volume_max_steps;
 	float volume_step_size;
 
-	bool no_caustics;
+	bool caustics_reflective;
+	bool caustics_refractive;
 	float filter_glossy;
 
 	int seed;

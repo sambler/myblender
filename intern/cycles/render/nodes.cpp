@@ -11,12 +11,13 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #include "image.h"
 #include "nodes.h"
 #include "svm.h"
+#include "svm_math_util.h"
 #include "osl.h"
 #include "sky_model.h"
 
@@ -173,8 +174,10 @@ static ShaderEnum image_projection_init()
 {
 	ShaderEnum enm;
 
-	enm.insert("Flat", 0);
-	enm.insert("Box", 1);
+	enm.insert("Flat", NODE_IMAGE_PROJ_FLAT);
+	enm.insert("Box", NODE_IMAGE_PROJ_BOX);
+	enm.insert("Sphere", NODE_IMAGE_PROJ_SPHERE);
+	enm.insert("Tube", NODE_IMAGE_PROJ_TUBE);
 
 	return enm;
 }
@@ -183,7 +186,7 @@ ShaderEnum ImageTextureNode::color_space_enum = color_space_init();
 ShaderEnum ImageTextureNode::projection_enum = image_projection_init();
 
 ImageTextureNode::ImageTextureNode()
-: TextureNode("image_texture")
+: ImageSlotTextureNode("image_texture")
 {
 	image_manager = NULL;
 	slot = -1;
@@ -195,6 +198,7 @@ ImageTextureNode::ImageTextureNode()
 	color_space = ustring("Color");
 	projection = ustring("Flat");
 	interpolation = INTERPOLATION_LINEAR;
+	extension = EXTENSION_REPEAT;
 	projection_blend = 0.0f;
 	animated = false;
 
@@ -205,8 +209,12 @@ ImageTextureNode::ImageTextureNode()
 
 ImageTextureNode::~ImageTextureNode()
 {
-	if(image_manager)
-		image_manager->remove_image(filename, builtin_data, interpolation);
+	if(image_manager) {
+		image_manager->remove_image(filename,
+		                            builtin_data,
+		                            interpolation,
+		                            extension);
+	}
 }
 
 ShaderNode *ImageTextureNode::clone() const
@@ -224,7 +232,7 @@ void ImageTextureNode::attributes(Shader *shader, AttributeRequestSet *attribute
 #ifdef WITH_PTEX
 	/* todo: avoid loading other texture coordinates when using ptex,
 	 * and hide texture coordinate socket in the UI */
-	if (shader->has_surface && string_endswith(filename, ".ptx")) {
+	if(shader->has_surface && string_endswith(filename, ".ptx")) {
 		/* ptex */
 		attributes->add(ATTR_STD_PTEX_FACE_ID);
 		attributes->add(ATTR_STD_PTEX_UV);
@@ -243,7 +251,15 @@ void ImageTextureNode::compile(SVMCompiler& compiler)
 	image_manager = compiler.image_manager;
 	if(is_float == -1) {
 		bool is_float_bool;
-		slot = image_manager->add_image(filename, builtin_data, animated, is_float_bool, is_linear, interpolation, use_alpha);
+		slot = image_manager->add_image(filename,
+		                                builtin_data,
+		                                animated,
+		                                0,
+		                                is_float_bool,
+		                                is_linear,
+		                                interpolation,
+		                                extension,
+		                                use_alpha);
 		is_float = (int)is_float_bool;
 	}
 
@@ -263,14 +279,15 @@ void ImageTextureNode::compile(SVMCompiler& compiler)
 			tex_mapping.compile(compiler, vector_in->stack_offset, vector_offset);
 		}
 
-		if(projection == "Flat") {
+		if(projection != "Box") {
 			compiler.add_node(NODE_TEX_IMAGE,
 				slot,
 				compiler.encode_uchar4(
 					vector_offset,
 					color_out->stack_offset,
 					alpha_out->stack_offset,
-					srgb));
+					srgb),
+				projection_enum[projection]);
 		}
 		else {
 			compiler.add_node(NODE_TEX_IMAGE_BOX,
@@ -282,7 +299,7 @@ void ImageTextureNode::compile(SVMCompiler& compiler)
 					srgb),
 				__float_as_int(projection_blend));
 		}
-	
+
 		if(vector_offset != vector_in->stack_offset)
 			compiler.stack_clear_offset(vector_in->type, vector_offset);
 	}
@@ -305,10 +322,38 @@ void ImageTextureNode::compile(OSLCompiler& compiler)
 
 	tex_mapping.compile(compiler);
 
-	if(is_float == -1)
-		is_float = (int)image_manager->is_float_image(filename, NULL, is_linear);
+	image_manager = compiler.image_manager;
+	if(is_float == -1) {
+		if(builtin_data == NULL) {
+			is_float = (int)image_manager->is_float_image(filename, NULL, is_linear);
+		}
+		else {
+			bool is_float_bool;
+			slot = image_manager->add_image(filename,
+			                                builtin_data,
+			                                animated,
+			                                0,
+			                                is_float_bool,
+			                                is_linear,
+			                                interpolation,
+			                                extension,
+			                                use_alpha);
+			is_float = (int)is_float_bool;
+		}
+	}
 
-	compiler.parameter("filename", filename.c_str());
+	if(slot == -1) {
+		compiler.parameter("filename", filename.c_str());
+	}
+	else {
+		/* TODO(sergey): It's not so simple to pass custom attribute
+		 * to the texture() function in order to make builtin images
+		 * support more clear. So we use special file name which is
+		 * "@<slot_number>" and check whether file name matches this
+		 * mask in the OSLRenderServices::texture().
+		 */
+		compiler.parameter("filename", string_printf("@%d", slot).c_str());
+	}
 	if(is_linear || color_space != "Color")
 		compiler.parameter("color_space", "Linear");
 	else
@@ -333,6 +378,20 @@ void ImageTextureNode::compile(OSLCompiler& compiler)
 			compiler.parameter("interpolation", "linear");
 			break;
 	}
+
+	switch(extension) {
+		case EXTENSION_EXTEND:
+			compiler.parameter("wrap", "clamp");
+			break;
+		case EXTENSION_CLIP:
+			compiler.parameter("wrap", "black");
+			break;
+		case EXTENSION_REPEAT:
+		default:
+			compiler.parameter("wrap", "periodic");
+			break;
+	}
+
 	compiler.add(this, "node_image_texture");
 }
 
@@ -352,7 +411,7 @@ ShaderEnum EnvironmentTextureNode::color_space_enum = color_space_init();
 ShaderEnum EnvironmentTextureNode::projection_enum = env_projection_init();
 
 EnvironmentTextureNode::EnvironmentTextureNode()
-: TextureNode("environment_texture")
+: ImageSlotTextureNode("environment_texture")
 {
 	image_manager = NULL;
 	slot = -1;
@@ -372,8 +431,12 @@ EnvironmentTextureNode::EnvironmentTextureNode()
 
 EnvironmentTextureNode::~EnvironmentTextureNode()
 {
-	if(image_manager)
-		image_manager->remove_image(filename, builtin_data, INTERPOLATION_LINEAR);
+	if(image_manager) {
+		image_manager->remove_image(filename,
+		                            builtin_data,
+		                            INTERPOLATION_LINEAR,
+		                            EXTENSION_REPEAT);
+	}
 }
 
 ShaderNode *EnvironmentTextureNode::clone() const
@@ -389,7 +452,7 @@ ShaderNode *EnvironmentTextureNode::clone() const
 void EnvironmentTextureNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
 #ifdef WITH_PTEX
-	if (shader->has_surface && string_endswith(filename, ".ptx")) {
+	if(shader->has_surface && string_endswith(filename, ".ptx")) {
 		/* ptex */
 		attributes->add(ATTR_STD_PTEX_FACE_ID);
 		attributes->add(ATTR_STD_PTEX_UV);
@@ -408,7 +471,15 @@ void EnvironmentTextureNode::compile(SVMCompiler& compiler)
 	image_manager = compiler.image_manager;
 	if(slot == -1) {
 		bool is_float_bool;
-		slot = image_manager->add_image(filename, builtin_data, animated, is_float_bool, is_linear, INTERPOLATION_LINEAR, use_alpha);
+		slot = image_manager->add_image(filename,
+		                                builtin_data,
+		                                animated,
+		                                0,
+		                                is_float_bool,
+		                                is_linear,
+		                                INTERPOLATION_LINEAR,
+		                                EXTENSION_REPEAT,
+		                                use_alpha);
 		is_float = (int)is_float_bool;
 	}
 
@@ -459,10 +530,35 @@ void EnvironmentTextureNode::compile(OSLCompiler& compiler)
 
 	tex_mapping.compile(compiler);
 
-	if(is_float == -1)
-		is_float = (int)image_manager->is_float_image(filename, NULL, is_linear);
+	/* See comments in ImageTextureNode::compile about support
+	 * of builtin images.
+	 */
+	image_manager = compiler.image_manager;
+	if(is_float == -1) {
+		if(builtin_data == NULL) {
+			is_float = (int)image_manager->is_float_image(filename, NULL, is_linear);
+		}
+		else {
+			bool is_float_bool;
+			slot = image_manager->add_image(filename,
+			                                builtin_data,
+			                                animated,
+			                                0,
+			                                is_float_bool,
+			                                is_linear,
+			                                INTERPOLATION_LINEAR,
+			                                EXTENSION_REPEAT,
+			                                use_alpha);
+			is_float = (int)is_float_bool;
+		}
+	}
 
-	compiler.parameter("filename", filename.c_str());
+	if(slot == -1) {
+		compiler.parameter("filename", filename.c_str());
+	}
+	else {
+		compiler.parameter("filename", string_printf("@%d", slot).c_str());
+	}
 	compiler.parameter("projection", projection);
 	if(is_linear || color_space != "Color")
 		compiler.parameter("color_space", "Linear");
@@ -583,7 +679,7 @@ static void sky_texture_precompute_new(SunSky *sunsky, float3 dir, float turbidi
 	sky_state = arhosek_xyz_skymodelstate_alloc_init(turbidity, ground_albedo, solarElevation);
 
 	/* Copy values from sky_state to SunSky */
-	for (int i = 0; i < 9; ++i) {
+	for(int i = 0; i < 9; ++i) {
 		sunsky->config_x[i] = (float)sky_state->configs[0][i];
 		sunsky->config_y[i] = (float)sky_state->configs[1][i];
 		sunsky->config_z[i] = (float)sky_state->configs[2][i];
@@ -1248,6 +1344,163 @@ void BrickTextureNode::compile(OSLCompiler& compiler)
 	compiler.add(this, "node_brick_texture");
 }
 
+/* Point Density Texture */
+
+static ShaderEnum point_density_space_init()
+{
+	ShaderEnum enm;
+
+	enm.insert("Object", NODE_TEX_VOXEL_SPACE_OBJECT);
+	enm.insert("World", NODE_TEX_VOXEL_SPACE_WORLD);
+
+	return enm;
+}
+
+ShaderEnum PointDensityTextureNode::space_enum = point_density_space_init();
+
+PointDensityTextureNode::PointDensityTextureNode()
+: ShaderNode("point_density")
+{
+	image_manager = NULL;
+	slot = -1;
+	filename = "";
+	space = ustring("Object");
+	builtin_data = NULL;
+	interpolation = INTERPOLATION_LINEAR;
+
+	tfm = transform_identity();
+
+	add_input("Vector", SHADER_SOCKET_POINT, ShaderInput::POSITION);
+	add_output("Density", SHADER_SOCKET_FLOAT);
+	add_output("Color", SHADER_SOCKET_COLOR);
+}
+
+PointDensityTextureNode::~PointDensityTextureNode()
+{
+	if(image_manager) {
+		image_manager->remove_image(filename,
+		                            builtin_data,
+		                            interpolation,
+		                            EXTENSION_REPEAT);
+	}
+}
+
+ShaderNode *PointDensityTextureNode::clone() const
+{
+	PointDensityTextureNode *node = new PointDensityTextureNode(*this);
+	node->image_manager = NULL;
+	node->slot = -1;
+	return node;
+}
+
+void PointDensityTextureNode::attributes(Shader *shader,
+                                         AttributeRequestSet *attributes)
+{
+	if(shader->has_volume)
+		attributes->add(ATTR_STD_GENERATED_TRANSFORM);
+
+	ShaderNode::attributes(shader, attributes);
+}
+
+void PointDensityTextureNode::compile(SVMCompiler& compiler)
+{
+	ShaderInput *vector_in = input("Vector");
+	ShaderOutput *density_out = output("Density");
+	ShaderOutput *color_out = output("Color");
+
+	const bool use_density = !density_out->links.empty();
+	const bool use_color = !color_out->links.empty();
+
+	image_manager = compiler.image_manager;
+
+	if (use_density || use_color) {
+		if (use_density)
+			compiler.stack_assign(density_out);
+		if (use_color)
+			compiler.stack_assign(color_out);
+
+		if(slot == -1) {
+			bool is_float, is_linear;
+			slot = image_manager->add_image(filename, builtin_data,
+			                                false, 0,
+			                                is_float, is_linear,
+			                                interpolation,
+			                                EXTENSION_REPEAT,
+			                                true);
+		}
+
+		if(slot != -1) {
+			compiler.stack_assign(vector_in);
+			compiler.add_node(NODE_TEX_VOXEL,
+			                  slot,
+			                  compiler.encode_uchar4(vector_in->stack_offset,
+			                                         density_out->stack_offset,
+			                                         color_out->stack_offset,
+			                                         space_enum[space]));
+			if(space == "World") {
+				compiler.add_node(tfm.x);
+				compiler.add_node(tfm.y);
+				compiler.add_node(tfm.z);
+				compiler.add_node(tfm.w);
+			}
+		}
+		else {
+			compiler.add_node(NODE_VALUE_F,
+			                  __float_as_int(0.0f),
+			                  density_out->stack_offset);
+			compiler.add_node(NODE_VALUE_V, color_out->stack_offset);
+			compiler.add_node(NODE_VALUE_V, make_float3(TEX_IMAGE_MISSING_R,
+			                                            TEX_IMAGE_MISSING_G,
+			                                            TEX_IMAGE_MISSING_B));
+		}
+	}
+}
+
+void PointDensityTextureNode::compile(OSLCompiler& compiler)
+{
+	ShaderOutput *density_out = output("Density");
+	ShaderOutput *color_out = output("Color");
+
+	const bool use_density = !density_out->links.empty();
+	const bool use_color = !color_out->links.empty();
+
+	image_manager = compiler.image_manager;
+
+	if (use_density || use_color) {
+		if(slot == -1) {
+			bool is_float, is_linear;
+			slot = image_manager->add_image(filename, builtin_data,
+			                                false, 0,
+			                                is_float, is_linear,
+			                                interpolation,
+			                                EXTENSION_REPEAT,
+			                                true);
+		}
+
+		if(slot != -1) {
+			compiler.parameter("filename", string_printf("@%d", slot).c_str());
+		}
+		if(space == "World") {
+			compiler.parameter("mapping", transform_transpose(tfm));
+			compiler.parameter("use_mapping", 1);
+		}
+		switch (interpolation) {
+			case INTERPOLATION_CLOSEST:
+				compiler.parameter("interpolation", "closest");
+				break;
+			case INTERPOLATION_CUBIC:
+				compiler.parameter("interpolation", "cubic");
+				break;
+			case INTERPOLATION_LINEAR:
+			default:
+				compiler.parameter("interpolation", "linear");
+				break;
+		}
+
+		compiler.add(this, "node_voxel_texture");
+	}
+}
+
 /* Normal */
 
 NormalNode::NormalNode()
@@ -1458,11 +1711,11 @@ ProxyNode::ProxyNode(ShaderSocketType type_)
 	add_output("Output", type);
 }
 
-void ProxyNode::compile(SVMCompiler& compiler)
+void ProxyNode::compile(SVMCompiler& /*compiler*/)
 {
 }
 
-void ProxyNode::compile(OSLCompiler& compiler)
+void ProxyNode::compile(OSLCompiler& /*compiler*/)
 {
 }
 
@@ -1471,6 +1724,8 @@ void ProxyNode::compile(OSLCompiler& compiler)
 BsdfNode::BsdfNode(bool scattering_)
 : ShaderNode("bsdf"), scattering(scattering_)
 {
+	special_type = SHADER_SPECIAL_TYPE_CLOSURE;
+
 	add_input("Color", SHADER_SOCKET_COLOR, make_float3(0.8f, 0.8f, 0.8f));
 	add_input("Normal", SHADER_SOCKET_NORMAL, ShaderInput::NORMAL);
 	add_input("SurfaceMixWeight", SHADER_SOCKET_FLOAT, 0.0f, ShaderInput::USE_SVM);
@@ -1538,16 +1793,30 @@ void BsdfNode::compile(SVMCompiler& compiler)
 	compile(compiler, NULL, NULL);
 }
 
-void BsdfNode::compile(OSLCompiler& compiler)
+void BsdfNode::compile(OSLCompiler& /*compiler*/)
 {
 	assert(0);
 }
 
-/* Ward BSDF Closure */
+/* Anisotropic BSDF Closure */
 
-WardBsdfNode::WardBsdfNode()
+static ShaderEnum aniso_distribution_init()
 {
-	closure = CLOSURE_BSDF_WARD_ID;
+	ShaderEnum enm;
+
+	enm.insert("Beckmann", CLOSURE_BSDF_MICROFACET_BECKMANN_ANISO_ID);
+	enm.insert("GGX", CLOSURE_BSDF_MICROFACET_GGX_ANISO_ID);
+	enm.insert("Ashikhmin-Shirley", CLOSURE_BSDF_ASHIKHMIN_SHIRLEY_ANISO_ID);
+
+	return enm;
+}
+
+ShaderEnum AnisotropicBsdfNode::distribution_enum = aniso_distribution_init();
+
+AnisotropicBsdfNode::AnisotropicBsdfNode()
+{
+	closure = CLOSURE_BSDF_MICROFACET_GGX_ANISO_ID;
+	distribution = ustring("GGX");
 
 	add_input("Tangent", SHADER_SOCKET_VECTOR, ShaderInput::TANGENT);
 
@@ -1556,7 +1825,7 @@ WardBsdfNode::WardBsdfNode()
 	add_input("Rotation", SHADER_SOCKET_FLOAT, 0.0f);
 }
 
-void WardBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
+void AnisotropicBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
 	if(shader->has_surface) {
 		ShaderInput *tangent_in = input("Tangent");
@@ -1568,14 +1837,17 @@ void WardBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 	ShaderNode::attributes(shader, attributes);
 }
 
-void WardBsdfNode::compile(SVMCompiler& compiler)
+void AnisotropicBsdfNode::compile(SVMCompiler& compiler)
 {
+	closure = (ClosureType)distribution_enum[distribution];
+
 	BsdfNode::compile(compiler, input("Roughness"), input("Anisotropy"), input("Rotation"));
 }
 
-void WardBsdfNode::compile(OSLCompiler& compiler)
+void AnisotropicBsdfNode::compile(OSLCompiler& compiler)
 {
-	compiler.add(this, "node_ward_bsdf");
+	compiler.parameter("distribution", distribution);
+	compiler.add(this, "node_anisotropic_bsdf");
 }
 
 /* Glossy BSDF Closure */
@@ -1587,6 +1859,7 @@ static ShaderEnum glossy_distribution_init()
 	enm.insert("Sharp", CLOSURE_BSDF_REFLECTION_ID);
 	enm.insert("Beckmann", CLOSURE_BSDF_MICROFACET_BECKMANN_ID);
 	enm.insert("GGX", CLOSURE_BSDF_MICROFACET_GGX_ID);
+	enm.insert("Ashikhmin-Shirley", CLOSURE_BSDF_ASHIKHMIN_SHIRLEY_ID);
 
 	return enm;
 }
@@ -1595,7 +1868,8 @@ ShaderEnum GlossyBsdfNode::distribution_enum = glossy_distribution_init();
 
 GlossyBsdfNode::GlossyBsdfNode()
 {
-	distribution = ustring("Beckmann");
+	closure = CLOSURE_BSDF_MICROFACET_GGX_ID;
+	distribution = ustring("GGX");
 
 	add_input("Roughness", SHADER_SOCKET_FLOAT, 0.2f);
 }
@@ -1633,6 +1907,7 @@ ShaderEnum GlassBsdfNode::distribution_enum = glass_distribution_init();
 
 GlassBsdfNode::GlassBsdfNode()
 {
+	closure = CLOSURE_BSDF_SHARP_GLASS_ID;
 	distribution = ustring("Sharp");
 
 	add_input("Roughness", SHADER_SOCKET_FLOAT, 0.0f);
@@ -1672,6 +1947,7 @@ ShaderEnum RefractionBsdfNode::distribution_enum = refraction_distribution_init(
 
 RefractionBsdfNode::RefractionBsdfNode()
 {
+	closure = CLOSURE_BSDF_REFRACTION_ID;
 	distribution = ustring("Sharp");
 
 	add_input("Roughness", SHADER_SOCKET_FLOAT, 0.0f);
@@ -1710,6 +1986,7 @@ ShaderEnum ToonBsdfNode::component_enum = toon_component_init();
 
 ToonBsdfNode::ToonBsdfNode()
 {
+	closure = CLOSURE_BSDF_DIFFUSE_TOON_ID;
 	component = ustring("Diffuse");
 
 	add_input("Size", SHADER_SOCKET_FLOAT, 0.5f);
@@ -1850,7 +2127,7 @@ bool SubsurfaceScatteringNode::has_bssrdf_bump()
 EmissionNode::EmissionNode()
 : ShaderNode("emission")
 {
-	total_power = false;
+	special_type = SHADER_SPECIAL_TYPE_EMISSION;
 
 	add_input("Color", SHADER_SOCKET_COLOR, make_float3(0.8f, 0.8f, 0.8f));
 	add_input("Strength", SHADER_SOCKET_FLOAT, 10.0f);
@@ -1867,10 +2144,8 @@ void EmissionNode::compile(SVMCompiler& compiler)
 	if(color_in->link || strength_in->link) {
 		compiler.stack_assign(color_in);
 		compiler.stack_assign(strength_in);
-		compiler.add_node(NODE_EMISSION_WEIGHT, color_in->stack_offset, strength_in->stack_offset, total_power? 1: 0);
+		compiler.add_node(NODE_EMISSION_WEIGHT, color_in->stack_offset, strength_in->stack_offset);
 	}
-	else if(total_power)
-		compiler.add_node(NODE_EMISSION_SET_WEIGHT_TOTAL, color_in->value * strength_in->value.x);
 	else
 		compiler.add_node(NODE_CLOSURE_SET_WEIGHT, color_in->value * strength_in->value.x);
 
@@ -1879,7 +2154,6 @@ void EmissionNode::compile(SVMCompiler& compiler)
 
 void EmissionNode::compile(OSLCompiler& compiler)
 {
-	compiler.parameter("TotalPower", (total_power)? 1: 0);
 	compiler.add(this, "node_emission");
 }
 
@@ -1888,6 +2162,8 @@ void EmissionNode::compile(OSLCompiler& compiler)
 BackgroundNode::BackgroundNode()
 : ShaderNode("background")
 {
+	special_type = SHADER_SPECIAL_TYPE_BACKGROUND;
+
 	add_input("Color", SHADER_SOCKET_COLOR, make_float3(0.8f, 0.8f, 0.8f));
 	add_input("Strength", SHADER_SOCKET_FLOAT, 1.0f);
 	add_input("SurfaceMixWeight", SHADER_SOCKET_FLOAT, 0.0f, ShaderInput::USE_SVM);
@@ -2015,7 +2291,7 @@ void VolumeNode::compile(SVMCompiler& compiler)
 	compile(compiler, NULL, NULL);
 }
 
-void VolumeNode::compile(OSLCompiler& compiler)
+void VolumeNode::compile(OSLCompiler& /*compiler*/)
 {
 	assert(0);
 }
@@ -2072,6 +2348,7 @@ ShaderEnum HairBsdfNode::component_enum = hair_component_init();
 
 HairBsdfNode::HairBsdfNode()
 {
+	closure = CLOSURE_BSDF_HAIR_REFLECTION_ID;
 	component = ustring("Reflection");
 
 	add_input("Offset", SHADER_SOCKET_FLOAT);
@@ -2108,13 +2385,18 @@ GeometryNode::GeometryNode()
 	add_output("Incoming", SHADER_SOCKET_VECTOR);
 	add_output("Parametric", SHADER_SOCKET_POINT);
 	add_output("Backfacing", SHADER_SOCKET_FLOAT);
+	add_output("Pointiness", SHADER_SOCKET_FLOAT);
 }
 
 void GeometryNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
 	if(shader->has_surface) {
-		if(!output("Tangent")->links.empty())
+		if(!output("Tangent")->links.empty()) {
 			attributes->add(ATTR_STD_GENERATED);
+		}
+		if(!output("Pointiness")->links.empty()) {
+			attributes->add(ATTR_STD_POINTINESS);
+		}
 	}
 
 	ShaderNode::attributes(shader, attributes);
@@ -2124,11 +2406,16 @@ void GeometryNode::compile(SVMCompiler& compiler)
 {
 	ShaderOutput *out;
 	NodeType geom_node = NODE_GEOMETRY;
+	NodeType attr_node = NODE_ATTR;
 
-	if(bump == SHADER_BUMP_DX)
+	if(bump == SHADER_BUMP_DX) {
 		geom_node = NODE_GEOMETRY_BUMP_DX;
-	else if(bump == SHADER_BUMP_DY)
+		attr_node = NODE_ATTR_BUMP_DX;
+	}
+	else if(bump == SHADER_BUMP_DY) {
 		geom_node = NODE_GEOMETRY_BUMP_DY;
+		attr_node = NODE_ATTR_BUMP_DY;
+	}
 	
 	out = output("Position");
 	if(!out->links.empty()) {
@@ -2171,6 +2458,20 @@ void GeometryNode::compile(SVMCompiler& compiler)
 		compiler.stack_assign(out);
 		compiler.add_node(NODE_LIGHT_PATH, NODE_LP_backfacing, out->stack_offset);
 	}
+
+	out = output("Pointiness");
+	if(!out->links.empty()) {
+		compiler.stack_assign(out);
+		if(compiler.output_type() != SHADER_TYPE_VOLUME) {
+			compiler.add_node(attr_node,
+			                  ATTR_STD_POINTINESS,
+			                  out->stack_offset,
+			                  NODE_ATTR_FLOAT);
+		}
+		else {
+			compiler.add_node(NODE_VALUE_F, __float_as_int(0.0f), out->stack_offset);
+		}
+	}
 }
 
 void GeometryNode::compile(OSLCompiler& compiler)
@@ -2200,6 +2501,8 @@ TextureCoordinateNode::TextureCoordinateNode()
 	add_output("Reflection", SHADER_SOCKET_NORMAL);
 
 	from_dupli = false;
+	use_transform = false;
+	ob_tfm = transform_identity();
 }
 
 void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attributes)
@@ -2287,7 +2590,14 @@ void TextureCoordinateNode::compile(SVMCompiler& compiler)
 	out = output("Object");
 	if(!out->links.empty()) {
 		compiler.stack_assign(out);
-		compiler.add_node(texco_node, NODE_TEXCO_OBJECT, out->stack_offset);
+		compiler.add_node(texco_node, NODE_TEXCO_OBJECT, out->stack_offset, use_transform);
+		if(use_transform) {
+			Transform ob_itfm = transform_inverse(ob_tfm);
+			compiler.add_node(ob_itfm.x);
+			compiler.add_node(ob_itfm.y);
+			compiler.add_node(ob_itfm.z);
+			compiler.add_node(ob_itfm.w);
+		}
 	}
 
 	out = output("Camera");
@@ -2328,7 +2638,10 @@ void TextureCoordinateNode::compile(OSLCompiler& compiler)
 		compiler.parameter("is_background", true);
 	if(compiler.output_type() == SHADER_TYPE_VOLUME)
 		compiler.parameter("is_volume", true);
-	
+	compiler.parameter("use_transform", use_transform);
+	Transform ob_itfm = transform_transpose(transform_inverse(ob_tfm));
+	compiler.parameter("object_itfm", ob_itfm);
+
 	compiler.parameter("from_dupli", from_dupli);
 
 	compiler.add(this, "node_texture_coordinate");
@@ -2348,7 +2661,7 @@ void UVMapNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 	if(shader->has_surface) {
 		if(!from_dupli) {
 			if(!output("UV")->links.empty()) {
-				if (attribute != "")
+				if(attribute != "")
 					attributes->add(attribute);
 				else
 					attributes->add(ATTR_STD_UV);
@@ -2381,7 +2694,7 @@ void UVMapNode::compile(SVMCompiler& compiler)
 			compiler.add_node(texco_node, NODE_TEXCO_DUPLI_UV, out->stack_offset);
 		}
 		else {
-			if (attribute != "")
+			if(attribute != "")
 				attr = compiler.attribute(attribute);
 			else
 				attr = compiler.attribute(ATTR_STD_UV);
@@ -2822,7 +3135,7 @@ AddClosureNode::AddClosureNode()
 	add_output("Closure",  SHADER_SOCKET_CLOSURE);
 }
 
-void AddClosureNode::compile(SVMCompiler& compiler)
+void AddClosureNode::compile(SVMCompiler& /*compiler*/)
 {
 	/* handled in the SVM compiler */
 }
@@ -2845,7 +3158,7 @@ MixClosureNode::MixClosureNode()
 	add_output("Closure",  SHADER_SOCKET_CLOSURE);
 }
 
-void MixClosureNode::compile(SVMCompiler& compiler)
+void MixClosureNode::compile(SVMCompiler& /*compiler*/)
 {
 	/* handled in the SVM compiler */
 }
@@ -2883,7 +3196,7 @@ void MixClosureWeightNode::compile(SVMCompiler& compiler)
 			weight1_out->stack_offset, weight2_out->stack_offset));
 }
 
-void MixClosureWeightNode::compile(OSLCompiler& compiler)
+void MixClosureWeightNode::compile(OSLCompiler& /*compiler*/)
 {
 	assert(0);
 }
@@ -3007,18 +3320,52 @@ void CombineRGBNode::compile(SVMCompiler& compiler)
 	compiler.stack_assign(color_out);
 
 	compiler.stack_assign(red_in);
-	compiler.add_node(NODE_COMBINE_RGB, red_in->stack_offset, 0, color_out->stack_offset);
+	compiler.add_node(NODE_COMBINE_VECTOR, red_in->stack_offset, 0, color_out->stack_offset);
 
 	compiler.stack_assign(green_in);
-	compiler.add_node(NODE_COMBINE_RGB, green_in->stack_offset, 1, color_out->stack_offset);
+	compiler.add_node(NODE_COMBINE_VECTOR, green_in->stack_offset, 1, color_out->stack_offset);
 
 	compiler.stack_assign(blue_in);
-	compiler.add_node(NODE_COMBINE_RGB, blue_in->stack_offset, 2, color_out->stack_offset);
+	compiler.add_node(NODE_COMBINE_VECTOR, blue_in->stack_offset, 2, color_out->stack_offset);
 }
 
 void CombineRGBNode::compile(OSLCompiler& compiler)
 {
 	compiler.add(this, "node_combine_rgb");
+}
+
+/* Combine XYZ */
+CombineXYZNode::CombineXYZNode()
+: ShaderNode("combine_xyz")
+{
+	add_input("X", SHADER_SOCKET_FLOAT);
+	add_input("Y", SHADER_SOCKET_FLOAT);
+	add_input("Z", SHADER_SOCKET_FLOAT);
+	add_output("Vector", SHADER_SOCKET_VECTOR);
+}
+
+void CombineXYZNode::compile(SVMCompiler& compiler)
+{
+	ShaderInput *x_in = input("X");
+	ShaderInput *y_in = input("Y");
+	ShaderInput *z_in = input("Z");
+	ShaderOutput *vector_out = output("Vector");
+
+	compiler.stack_assign(vector_out);
+
+	compiler.stack_assign(x_in);
+	compiler.add_node(NODE_COMBINE_VECTOR, x_in->stack_offset, 0, vector_out->stack_offset);
+
+	compiler.stack_assign(y_in);
+	compiler.add_node(NODE_COMBINE_VECTOR, y_in->stack_offset, 1, vector_out->stack_offset);
+
+	compiler.stack_assign(z_in);
+	compiler.add_node(NODE_COMBINE_VECTOR, z_in->stack_offset, 2, vector_out->stack_offset);
+}
+
+void CombineXYZNode::compile(OSLCompiler& compiler)
+{
+	compiler.add(this, "node_combine_xyz");
 }
 
 /* Combine HSV */
@@ -3131,18 +3478,52 @@ void SeparateRGBNode::compile(SVMCompiler& compiler)
 	compiler.stack_assign(color_in);
 
 	compiler.stack_assign(red_out);
-	compiler.add_node(NODE_SEPARATE_RGB, color_in->stack_offset, 0, red_out->stack_offset);
+	compiler.add_node(NODE_SEPARATE_VECTOR, color_in->stack_offset, 0, red_out->stack_offset);
 
 	compiler.stack_assign(green_out);
-	compiler.add_node(NODE_SEPARATE_RGB, color_in->stack_offset, 1, green_out->stack_offset);
+	compiler.add_node(NODE_SEPARATE_VECTOR, color_in->stack_offset, 1, green_out->stack_offset);
 
 	compiler.stack_assign(blue_out);
-	compiler.add_node(NODE_SEPARATE_RGB, color_in->stack_offset, 2, blue_out->stack_offset);
+	compiler.add_node(NODE_SEPARATE_VECTOR, color_in->stack_offset, 2, blue_out->stack_offset);
 }
 
 void SeparateRGBNode::compile(OSLCompiler& compiler)
 {
 	compiler.add(this, "node_separate_rgb");
+}
+
+/* Separate XYZ */
+SeparateXYZNode::SeparateXYZNode()
+: ShaderNode("separate_xyz")
+{
+	add_input("Vector", SHADER_SOCKET_VECTOR);
+	add_output("X", SHADER_SOCKET_FLOAT);
+	add_output("Y", SHADER_SOCKET_FLOAT);
+	add_output("Z", SHADER_SOCKET_FLOAT);
+}
+
+void SeparateXYZNode::compile(SVMCompiler& compiler)
+{
+	ShaderInput *vector_in = input("Vector");
+	ShaderOutput *x_out = output("X");
+	ShaderOutput *y_out = output("Y");
+	ShaderOutput *z_out = output("Z");
+
+	compiler.stack_assign(vector_in);
+
+	compiler.stack_assign(x_out);
+	compiler.add_node(NODE_SEPARATE_VECTOR, vector_in->stack_offset, 0, x_out->stack_offset);
+
+	compiler.stack_assign(y_out);
+	compiler.add_node(NODE_SEPARATE_VECTOR, vector_in->stack_offset, 1, y_out->stack_offset);
+
+	compiler.stack_assign(z_out);
+	compiler.add_node(NODE_SEPARATE_VECTOR, vector_in->stack_offset, 2, z_out->stack_offset);
+}
+
+void SeparateXYZNode::compile(OSLCompiler& compiler)
+{
+	compiler.add(this, "node_separate_xyz");
 }
 
 /* Separate HSV */
@@ -3415,14 +3796,34 @@ void WireframeNode::compile(SVMCompiler& compiler)
 {
 	ShaderInput *size_in = input("Size");
 	ShaderOutput *fac_out = output("Fac");
-
+	NodeBumpOffset bump_offset = NODE_BUMP_OFFSET_CENTER;
+	if(bump == SHADER_BUMP_DX) {
+		bump_offset = NODE_BUMP_OFFSET_DX;
+	}
+	else if(bump == SHADER_BUMP_DY) {
+		bump_offset = NODE_BUMP_OFFSET_DY;
+	}
 	compiler.stack_assign(size_in);
 	compiler.stack_assign(fac_out);
-	compiler.add_node(NODE_WIREFRAME, size_in->stack_offset, fac_out->stack_offset, use_pixel_size);
+	compiler.add_node(NODE_WIREFRAME,
+	                  size_in->stack_offset,
+	                  fac_out->stack_offset,
+	                  compiler.encode_uchar4(use_pixel_size,
+	                                         bump_offset,
+	                                         0, 0));
 }
 
 void WireframeNode::compile(OSLCompiler& compiler)
 {
+	if(bump == SHADER_BUMP_DX) {
+		compiler.parameter("bump_offset", "dx");
+	}
+	else if(bump == SHADER_BUMP_DY) {
+		compiler.parameter("bump_offset", "dy");
+	}
+	else {
+		compiler.parameter("bump_offset", "center");
+	}
 	compiler.parameter("use_pixel_size", use_pixel_size);
 	compiler.add(this, "node_wireframe");
 }
@@ -3465,9 +3866,17 @@ void BlackbodyNode::compile(SVMCompiler& compiler)
 	ShaderInput *temperature_in = input("Temperature");
 	ShaderOutput *color_out = output("Color");
 
-	compiler.stack_assign(temperature_in);
 	compiler.stack_assign(color_out);
-	compiler.add_node(NODE_BLACKBODY, temperature_in->stack_offset, color_out->stack_offset);
+
+	if(temperature_in->link == NULL) {
+		float3 color = svm_math_blackbody_color(temperature_in->value.x);
+		compiler.add_node(NODE_VALUE_V, color_out->stack_offset);
+		compiler.add_node(NODE_VALUE_V, color);
+	}
+	else {
+		compiler.stack_assign(temperature_in);
+		compiler.add_node(NODE_BLACKBODY, temperature_in->stack_offset, color_out->stack_offset);
+	}
 }
 
 void BlackbodyNode::compile(OSLCompiler& compiler)
@@ -3544,7 +3953,7 @@ static ShaderEnum math_type_init()
 	enm.insert("Less Than", NODE_MATH_LESS_THAN);
 	enm.insert("Greater Than", NODE_MATH_GREATER_THAN);
 	enm.insert("Modulo", NODE_MATH_MODULO);
-    enm.insert("Absolute", NODE_MATH_ABSOLUTE);
+	enm.insert("Absolute", NODE_MATH_ABSOLUTE);
 
 	return enm;
 }
@@ -3557,9 +3966,24 @@ void MathNode::compile(SVMCompiler& compiler)
 	ShaderInput *value2_in = input("Value2");
 	ShaderOutput *value_out = output("Value");
 
+	compiler.stack_assign(value_out);
+
+	/* Optimize math node without links to a single value node. */
+	if(value1_in->link == NULL && value2_in->link == NULL) {
+		float optimized_value = svm_math((NodeMath)type_enum[type],
+		                                 value1_in->value.x,
+		                                 value2_in->value.x);
+		if(use_clamp) {
+			optimized_value = saturate(optimized_value);
+		}
+		compiler.add_node(NODE_VALUE_F,
+		                  __float_as_int(optimized_value),
+		                  value_out->stack_offset);
+		return;
+	}
+
 	compiler.stack_assign(value1_in);
 	compiler.stack_assign(value2_in);
-	compiler.stack_assign(value_out);
 
 	compiler.add_node(NODE_MATH, type_enum[type], value1_in->stack_offset, value2_in->stack_offset);
 	compiler.add_node(NODE_MATH, value_out->stack_offset);
@@ -3613,10 +4037,30 @@ void VectorMathNode::compile(SVMCompiler& compiler)
 	ShaderOutput *value_out = output("Value");
 	ShaderOutput *vector_out = output("Vector");
 
-	compiler.stack_assign(vector1_in);
-	compiler.stack_assign(vector2_in);
 	compiler.stack_assign(value_out);
 	compiler.stack_assign(vector_out);
+
+	/* Optimize vector math node without links to a single value node. */
+	if(vector1_in->link == NULL && vector2_in->link == NULL) {
+		float optimized_value;
+		float3 optimized_vector;
+		svm_vector_math(&optimized_value,
+		                &optimized_vector,
+		                (NodeVectorMath)type_enum[type],
+		                vector1_in->value,
+		                vector2_in->value);
+
+		compiler.add_node(NODE_VALUE_F,
+		                  __float_as_int(optimized_value),
+		                  value_out->stack_offset);
+
+		compiler.add_node(NODE_VALUE_V, vector_out->stack_offset);
+		compiler.add_node(NODE_VALUE_V, optimized_vector);
+		return;
+	}
+
+	compiler.stack_assign(vector1_in);
+	compiler.stack_assign(vector2_in);
 
 	compiler.add_node(NODE_VECTOR_MATH, type_enum[type], vector1_in->stack_offset, vector2_in->stack_offset);
 	compiler.add_node(NODE_VECTOR_MATH, value_out->stack_offset, vector_out->stack_offset);
@@ -3694,6 +4138,8 @@ BumpNode::BumpNode()
 {
 	invert = false;
 
+	special_type = SHADER_SPECIAL_TYPE_BUMP;
+
 	/* this input is used by the user, but after graph transform it is no longer
 	 * used and moved to sampler center/x/y instead */
 	add_input("Height", SHADER_SOCKET_FLOAT);
@@ -3770,7 +4216,7 @@ void RGBCurvesNode::compile(OSLCompiler& compiler)
 {
 	float ramp[RAMP_TABLE_SIZE][3];
 
-	for (int i = 0; i < RAMP_TABLE_SIZE; ++i) {
+	for(int i = 0; i < RAMP_TABLE_SIZE; ++i) {
 		ramp[i][0] = curves[i].x;
 		ramp[i][1] = curves[i].y;
 		ramp[i][2] = curves[i].z;
@@ -3808,7 +4254,7 @@ void VectorCurvesNode::compile(OSLCompiler& compiler)
 {
 	float ramp[RAMP_TABLE_SIZE][3];
 
-	for (int i = 0; i < RAMP_TABLE_SIZE; ++i) {
+	for(int i = 0; i < RAMP_TABLE_SIZE; ++i) {
 		ramp[i][0] = curves[i].x;
 		ramp[i][1] = curves[i].y;
 		ramp[i][2] = curves[i].z;
@@ -3858,7 +4304,7 @@ void RGBRampNode::compile(OSLCompiler& compiler)
 	float ramp_color[RAMP_TABLE_SIZE][3];
 	float ramp_alpha[RAMP_TABLE_SIZE];
 
-	for (int i = 0; i < RAMP_TABLE_SIZE; ++i) {
+	for(int i = 0; i < RAMP_TABLE_SIZE; ++i) {
 		ramp_color[i][0] = ramp[i].x;
 		ramp_color[i][1] = ramp[i].y;
 		ramp_color[i][2] = ramp[i].z;
@@ -3905,7 +4351,7 @@ OSLScriptNode::OSLScriptNode()
 	special_type = SHADER_SPECIAL_TYPE_SCRIPT;
 }
 
-void OSLScriptNode::compile(SVMCompiler& compiler)
+void OSLScriptNode::compile(SVMCompiler& /*compiler*/)
 {
 	/* doesn't work for SVM, obviously ... */
 }
@@ -4126,4 +4572,3 @@ void TangentNode::compile(OSLCompiler& compiler)
 }
 
 CCL_NAMESPACE_END
-

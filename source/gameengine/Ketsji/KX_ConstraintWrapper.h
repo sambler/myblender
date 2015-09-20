@@ -32,7 +32,7 @@
 #ifndef __KX_CONSTRAINTWRAPPER_H__
 #define __KX_CONSTRAINTWRAPPER_H__
 
-#include "Value.h"
+#include "EXP_Value.h"
 #include "PHY_DynamicTypes.h"
 
 class	KX_ConstraintWrapper : public PyObjectPlus
@@ -49,6 +49,7 @@ public:
 	KX_PYMETHOD(KX_ConstraintWrapper,GetParam);
 
 	static PyObject *pyattr_get_constraintId(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_constraintType(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 #endif
 
 private:

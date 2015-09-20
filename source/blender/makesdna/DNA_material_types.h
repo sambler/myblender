@@ -41,6 +41,7 @@
 #endif
 
 struct MTex;
+struct Image;
 struct ColorBand;
 struct Group;
 struct bNodeTree;
@@ -81,6 +82,13 @@ typedef struct GameSettings {
 	int face_orientation;
 	int pad1;
 } GameSettings;
+
+typedef struct TexPaintSlot {
+	struct Image *ima; /* image to be painted on */
+	char *uvname;      /* customdata index for uv layer, MAX_NAME*/
+	int index;         /* index for mtex slot in material for blender internal */
+	int pad;
+} TexPaintSlot;
 
 typedef struct Material {
 	ID id;
@@ -178,9 +186,19 @@ typedef struct Material {
 	short shadowonly_flag;  /* "shadowsonly" type */
 	short index;            /* custom index for render passes */
 
+	/* Freestyle line settings */
+	float line_col[4];
+	short line_priority;
 	short vcol_alpha;
+
+	/* texture painting */
+	short paint_active_slot;
+	short paint_clone_slot;
+	short tot_slots;
 	short pad4[3];
 
+	struct TexPaintSlot *texpaintslot; /* cached slot for painting. Make sure to recalculate before use
+	                                    * with refresh_texpaint_image_cache */
 	ListBase gpumaterial;		/* runtime */
 } Material;
 
@@ -192,6 +210,7 @@ typedef struct Material {
 #define	GEMAT_ALPHA		2 /* GPU_BLEND_ALPHA */
 #define GEMAT_CLIP		4 /* GPU_BLEND_CLIP */
 #define	GEMAT_ALPHA_SORT	8 /* GPU_BLEND_ALPHA_SORT */
+#define	GEMAT_ALPHA_TO_COVERAGE	16 /* GPU_BLEND_ALPHA_TO_COVERAGE */
 
 // Game Options - flag
 #define GEMAT_BACKCULL 		16 /* KX_BACKCULL */
@@ -420,6 +439,7 @@ typedef struct Material {
 #define MAP_PA_CLUMP	128
 #define MAP_PA_KINK		256
 #define MAP_PA_ROUGH	512
+#define MAP_PA_FREQ		1024
 
 /* pr_type */
 #define MA_FLAT			0

@@ -36,21 +36,16 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
+
 #include <stdio.h>
-  
-/**
- * Test presence of OpenEXR file.
- * \param mem pointer to loaded OpenEXR bitstream
- */
 
 void		imb_initopenexr					(void);
 
-int		imb_is_a_openexr			(unsigned char *mem);
+int		imb_is_a_openexr			(const unsigned char *mem);
 	
 int		imb_save_openexr			(struct ImBuf *ibuf, const char *name, int flags);
 
-struct ImBuf *imb_load_openexr		(unsigned char *mem, size_t size, int flags, char *colorspace);
+struct ImBuf *imb_load_openexr		(const unsigned char *mem, size_t size, int flags, char *colorspace);
 
 #ifdef __cplusplus
 }

@@ -52,8 +52,9 @@ typedef struct BMEdgeLoopStore {
 /* -------------------------------------------------------------------- */
 /* BM_mesh_edgeloops_find & Util Functions  */
 
-static int bm_vert_other_tag(BMVert *v, BMVert *v_prev,
-                             BMEdge **r_e)
+static int bm_vert_other_tag(
+        BMVert *v, BMVert *v_prev,
+        BMEdge **r_e)
 {
 	BMIter iter;
 	BMEdge *e, *e_next = NULL;
@@ -125,8 +126,9 @@ static bool bm_loop_build(BMEdgeLoopStore *el_store, BMVert *v_prev, BMVert *v, 
 /**
  * \return listbase of listbases, each linking to a vertex.
  */
-int BM_mesh_edgeloops_find(BMesh *bm, ListBase *r_eloops,
-                           bool (*test_fn)(BMEdge *, void *user_data), void *user_data)
+int BM_mesh_edgeloops_find(
+        BMesh *bm, ListBase *r_eloops,
+        bool (*test_fn)(BMEdge *, void *user_data), void *user_data)
 {
 	BMIter iter;
 	BMEdge *e;
@@ -183,13 +185,14 @@ struct VertStep {
 	BMVert *v;
 };
 
-static void vs_add(BLI_mempool *vs_pool, ListBase *lb,
-                   BMVert *v, BMEdge *e_prev, const int iter_tot)
+static void vs_add(
+        BLI_mempool *vs_pool, ListBase *lb,
+        BMVert *v, BMEdge *e_prev, const int iter_tot)
 {
 	struct VertStep *vs_new = BLI_mempool_alloc(vs_pool);
 	vs_new->v = v;
 
-	BM_elem_index_set(v, iter_tot);
+	BM_elem_index_set(v, iter_tot);  /* set_dirty */
 
 	/* This edge stores a direct path back to the original vertex so we can
 	 * backtrack without having to store an array of previous verts. */
@@ -248,6 +251,7 @@ static bool bm_loop_path_build_step(BLI_mempool *vs_pool, ListBase *lb, const in
 
 		BLI_mempool_free(vs_pool, vs);
 	}
+	/* bm->elem_index_dirty |= BM_VERT; */  /* Commented because used in a loop, and this flag has already been set. */
 
 	/* lb is now full of free'd items, overwrite */
 	*lb = lb_tmp;
@@ -255,9 +259,10 @@ static bool bm_loop_path_build_step(BLI_mempool *vs_pool, ListBase *lb, const in
 	return (BLI_listbase_is_empty(lb) == false);
 }
 
-bool BM_mesh_edgeloops_find_path(BMesh *bm, ListBase *r_eloops,
-                                 bool (*test_fn)(BMEdge *, void *user_data), void *user_data,
-                                 BMVert *v_src, BMVert *v_dst)
+bool BM_mesh_edgeloops_find_path(
+        BMesh *bm, ListBase *r_eloops,
+        bool (*test_fn)(BMEdge *, void *user_data), void *user_data,
+        BMVert *v_src, BMVert *v_dst)
 {
 	BMIter iter;
 	BMEdge *e;
@@ -303,6 +308,7 @@ bool BM_mesh_edgeloops_find_path(BMesh *bm, ListBase *r_eloops,
 		/* edge args are dummy */
 		vs_add(vs_pool, &lb_src, v_src, v_src->e,  1);
 		vs_add(vs_pool, &lb_dst, v_dst, v_dst->e, -1);
+		bm->elem_index_dirty |= BM_VERT;
 
 		do {
 			if ((bm_loop_path_build_step(vs_pool, &lb_src, 1, v_match) == false) || v_match[0]) {
@@ -655,12 +661,12 @@ bool BM_edgeloop_calc_normal_aligned(BMesh *UNUSED(bm), BMEdgeLoopStore *el_stor
 void BM_edgeloop_flip(BMesh *UNUSED(bm), BMEdgeLoopStore *el_store)
 {
 	negate_v3(el_store->no);
-	BLI_reverselist(&el_store->verts);
+	BLI_listbase_reverse(&el_store->verts);
 }
 
 void BM_edgeloop_expand(BMesh *UNUSED(bm), BMEdgeLoopStore *el_store, int el_store_len)
 {
-	/* first double until we are more then half as big */
+	/* first double until we are more than half as big */
 	while ((el_store->len * 2) < el_store_len) {
 		LinkData *node_curr = el_store->verts.first;
 		while (node_curr) {
@@ -680,12 +686,12 @@ void BM_edgeloop_expand(BMesh *UNUSED(bm), BMEdgeLoopStore *el_store, int el_sto
 			LinkData *node_curr_init = node_curr;
 			LinkData *node_curr_copy;
 			int i = 0;
-			LISTBASE_CIRCULAR_FORWARD_BEGIN (&el_store->verts, node_curr, node_curr_init) {
+			BLI_LISTBASE_CIRCULAR_FORWARD_BEGIN (&el_store->verts, node_curr, node_curr_init) {
 				if (i++ < step) {
 					break;
 				}
 			}
-			LISTBASE_CIRCULAR_FORWARD_END (&el_store->verts, node_curr, node_curr_init);
+			BLI_LISTBASE_CIRCULAR_FORWARD_END (&el_store->verts, node_curr, node_curr_init);
 
 			node_curr_copy = MEM_dupallocN(node_curr);
 			BLI_insertlinkafter(&el_store->verts, node_curr, node_curr_copy);

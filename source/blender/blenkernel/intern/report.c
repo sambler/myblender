@@ -38,7 +38,7 @@
 #include "BLI_dynstr.h"
 #include "BLI_utildefines.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_report.h"
 #include "BKE_global.h" /* G.background only */
@@ -284,7 +284,7 @@ Report *BKE_reports_last_displayable(ReportList *reports)
 	Report *report;
 	
 	for (report = reports->list.last; report; report = report->prev) {
-		if (ELEM3(report->type, RPT_ERROR, RPT_WARNING, RPT_INFO))
+		if (ELEM(report->type, RPT_ERROR, RPT_WARNING, RPT_INFO))
 			return report;
 	}
 	

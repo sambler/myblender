@@ -42,8 +42,7 @@
 #include "KX_ConvertActuators.h"
 
 #ifdef WITH_AUDASPACE
-#  include "AUD_C-API.h"
-#  include "AUD_ChannelMapperFactory.h"
+#  include AUD_SOUND_H
 #endif
 
 // Actuators
@@ -70,11 +69,12 @@
 #include "KX_ParentActuator.h"
 #include "KX_SCA_DynamicActuator.h"
 #include "KX_SteeringActuator.h"
+#include "KX_MouseActuator.h"
 
 #include "KX_Scene.h"
 #include "KX_KetsjiEngine.h"
 
-#include "IntValue.h"
+#include "EXP_IntValue.h"
 #include "KX_GameObject.h"
 
 /* This little block needed for linking to Blender... */
@@ -384,7 +384,7 @@ void BL_ConvertActuators(const char* maggiename,
 				{
 					bSound* sound = soundact->sound;
 					bool is3d = soundact->flag & ACT_SND_3D_SOUND ? true : false;
-					boost::shared_ptr<AUD_IFactory> snd_sound;
+					AUD_Sound* snd_sound = NULL;
 					KX_3DSoundSettings settings;
 					settings.cone_inner_angle = RAD2DEGF(soundact->sound3D.cone_inner_angle);
 					settings.cone_outer_angle = RAD2DEGF(soundact->sound3D.cone_outer_angle);
@@ -403,27 +403,12 @@ void BL_ConvertActuators(const char* maggiename,
 					}
 					else
 					{
-						snd_sound = *reinterpret_cast<boost::shared_ptr<AUD_IFactory>*>(sound->playback_handle);
+						snd_sound = sound->playback_handle;
 
 						// if sound shall be 3D but isn't mono, we have to make it mono!
 						if (is3d)
 						{
-							try
-							{
-								boost::shared_ptr<AUD_IReader> reader = snd_sound->createReader();
-								if (reader->getSpecs().channels != AUD_CHANNELS_MONO)
-								{
-									AUD_DeviceSpecs specs;
-									specs.channels = AUD_CHANNELS_MONO;
-									specs.rate = AUD_RATE_INVALID;
-									specs.format = AUD_FORMAT_INVALID;
-									snd_sound = boost::shared_ptr<AUD_IFactory>(new AUD_ChannelMapperFactory(snd_sound, specs));
-								}
-							}
-							catch(AUD_Exception&)
-							{
-								// sound cannot be played... ignore
-							}
+							snd_sound = AUD_Sound_rechannel(snd_sound, AUD_CHANNELS_MONO);
 						}
 					}
 					KX_SoundActuator* tmpsoundact =
@@ -434,6 +419,10 @@ void BL_ConvertActuators(const char* maggiename,
 						is3d,
 						settings,
 						soundActuatorType);
+
+					// if we made it mono, we have to free it
+					if(snd_sound != sound->playback_handle && snd_sound != NULL)
+						AUD_Sound_free(snd_sound);
 
 					tmpsoundact->SetName(bact->name);
 					baseact = tmpsoundact;
@@ -514,15 +503,7 @@ void BL_ConvertActuators(const char* maggiename,
 					break;
 				case ACT_EDOB_REPLACE_MESH:
 					{
-						RAS_MeshObject *tmpmesh = NULL;
-						if (editobact->me)
-							tmpmesh = BL_ConvertMesh(
-							            editobact->me,
-							            blenderobject,
-							            scene,
-							            converter,
-							            false
-							            );
+						RAS_MeshObject *tmpmesh = converter->FindGameMesh(editobact->me);
 
 						KX_SCA_ReplaceMeshActuator* tmpreplaceact = new KX_SCA_ReplaceMeshActuator(
 						            gameobj,
@@ -545,8 +526,8 @@ void BL_ConvertActuators(const char* maggiename,
 						            originalval,
 						            editobact->time,
 						            editobact->flag,
-						            blenderobject->trackflag,
-						            blenderobject->upflag);
+						            editobact->trackflag,
+						            editobact->upflag);
 						baseact = tmptrackact;
 						break;
 					}
@@ -1094,12 +1075,57 @@ void BL_ConvertActuators(const char* maggiename,
 				bool enableVisualization = (stAct->flag & ACT_STEERING_ENABLEVISUALIZATION) !=0;
 				short facingMode = (stAct->flag & ACT_STEERING_AUTOMATICFACING) ? stAct->facingaxis : 0;
 				bool normalup = (stAct->flag & ACT_STEERING_NORMALUP) !=0;
+				bool lockzvel = (stAct->flag & ACT_STEERING_LOCKZVEL) !=0;
 				KX_SteeringActuator *tmpstact
 					= new KX_SteeringActuator(gameobj, mode, targetob, navmeshob,stAct->dist, 
 					stAct->velocity, stAct->acceleration, stAct->turnspeed, 
 					selfTerminated, stAct->updateTime,
-					scene->GetObstacleSimulation(), facingMode, normalup, enableVisualization);
+					scene->GetObstacleSimulation(), facingMode, normalup, enableVisualization, lockzvel);
 				baseact = tmpstact;
+				break;
+			}
+		case ACT_MOUSE:
+			{
+				bMouseActuator* mouAct = (bMouseActuator*) bact->data;
+				int mode = KX_MouseActuator::KX_ACT_MOUSE_NODEF;
+
+				switch (mouAct->type) {
+					case ACT_MOUSE_VISIBILITY:
+					{
+						mode = KX_MouseActuator::KX_ACT_MOUSE_VISIBILITY;
+						break;
+					}
+					case ACT_MOUSE_LOOK:
+					{
+						mode = KX_MouseActuator::KX_ACT_MOUSE_LOOK;
+						break;
+					}
+				}
+
+				bool visible = (mouAct->flag & ACT_MOUSE_VISIBLE) != 0;
+				bool use_axis[2] = {(mouAct->flag & ACT_MOUSE_USE_AXIS_X) != 0, (mouAct->flag & ACT_MOUSE_USE_AXIS_Y) != 0};
+				bool reset[2] = {(mouAct->flag & ACT_MOUSE_RESET_X) != 0, (mouAct->flag & ACT_MOUSE_RESET_Y) != 0};
+				bool local[2] = {(mouAct->flag & ACT_MOUSE_LOCAL_X) != 0, (mouAct->flag & ACT_MOUSE_LOCAL_Y) != 0};
+
+				SCA_MouseManager* eventmgr = (SCA_MouseManager*) logicmgr->FindEventManager(SCA_EventManager::MOUSE_EVENTMGR);
+				if (eventmgr) {
+					KX_MouseActuator* tmpbaseact = new KX_MouseActuator(gameobj,
+																		ketsjiEngine,
+																		eventmgr,
+																		mode,
+																		visible,
+																		use_axis,
+																		mouAct->threshold,
+																		reset,
+																		mouAct->object_axis,
+																		local,
+																		mouAct->sensitivity,
+																		mouAct->limit_x,
+																		mouAct->limit_y);
+					baseact = tmpbaseact;
+				} else {
+					//cout << "\n Couldn't find mouse event manager..."; - should throw an error here...
+				}
 				break;
 			}
 		default:

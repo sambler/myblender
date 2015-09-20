@@ -26,8 +26,6 @@
 
 /* defines VIEW3D_OT_navigate - walk modal operator */
 
-//#define NDOF_WALK_DEBUG
-//#define NDOF_WALK_DRAW_TOOMUCH  /* is this needed for ndof? - commented so redraw doesnt thrash - campbell */
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
@@ -40,10 +38,8 @@
 #include "BKE_context.h"
 #include "BKE_report.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
 
 #include "BIF_gl.h"
 
@@ -56,14 +52,21 @@
 
 #include "PIL_time.h" /* smoothview */
 
+#include "UI_interface.h"
 #include "UI_resources.h"
 
 #include "view3d_intern.h"  /* own include */
 
-#define EARTH_GRAVITY 9.80668f /* m/s2 */
+//#define NDOF_WALK_DEBUG
+//#define NDOF_WALK_DRAW_TOOMUCH  /* is this needed for ndof? - commented so redraw doesnt thrash - campbell */
+
+#define USE_TABLET_SUPPORT
+
+/* ensure the target position is one we can reach, see: T45771 */
+#define USE_PIXELSIZE_NATIVE_SUPPORT
 
 /* prototypes */
-static float getVelocityZeroTime(float velocity);
+static float getVelocityZeroTime(const float gravity, const float velocity);
 
 /* NOTE: these defines are saved in keymap files, do not change values but just add new ones */
 enum {
@@ -154,6 +157,8 @@ void walk_modal_keymap(wmKeyConfig *keyconf)
 		{WALK_MODAL_JUMP, "JUMP", 0, "Jump", "Jump when in walk mode"},
 		{WALK_MODAL_JUMP_STOP, "JUMP_STOP", 0, "Jump Stop", "Stop pushing jump"},
 
+		{WALK_MODAL_TOGGLE, "GRAVITY_TOGGLE", 0, "Toggle Gravity", "Toggle gravity effect"},
+
 		{0, NULL, 0, NULL, NULL}};
 
 	wmKeyMap *keymap = WM_modalkeymap_get(keyconf, "View3D Walk Modal");
@@ -222,8 +227,7 @@ void walk_modal_keymap(wmKeyConfig *keyconf)
 }
 
 
-typedef struct WalkTeleport
-{
+typedef struct WalkTeleport {
 	eWalkTeleportState state;
 	float duration; /* from user preferences */
 	float origin[3];
@@ -279,8 +283,17 @@ typedef struct WalkInfo {
 	/* mouse reverse */
 	bool is_reversed;
 
+#ifdef USE_TABLET_SUPPORT
+	/* check if we had a cursor event before */
+	bool is_cursor_first;
+
+	/* tablet devices (we can't relocate the cursor) */
+	bool is_cursor_absolute;
+#endif
+
 	/* gravity system */
-	eWalkGravityState gravity;
+	eWalkGravityState gravity_state;
+	float gravity;
 
 	/* height to use in walk mode */
 	float view_height;
@@ -336,38 +349,53 @@ static void drawWalkPixel(const struct bContext *UNUSED(C), ARegion *ar, void *a
 	glEnd();
 }
 
-static void walk_update_header(bContext *C, WalkInfo *walk)
+static void walk_update_header(bContext *C, wmOperator *op, WalkInfo *walk)
 {
-	bool gravity = walk->navigation_mode == WALK_MODE_GRAVITY ||
-	(walk->teleport.state == WALK_TELEPORT_STATE_ON &&
-	 walk->teleport.navigation_mode == WALK_MODE_GRAVITY);
+	const bool gravity = (walk->navigation_mode == WALK_MODE_GRAVITY) ||
+	                     ((walk->teleport.state == WALK_TELEPORT_STATE_ON) &&
+	                      (walk->teleport.navigation_mode == WALK_MODE_GRAVITY));
+	char header[UI_MAX_DRAW_STR];
+	char buf[UI_MAX_DRAW_STR];
 
-#define HEADER_LENGTH 256
-	char header[HEADER_LENGTH];
+	char *p = buf;
+	int available_len = sizeof(buf);
 
-	BLI_snprintf(header, HEADER_LENGTH, IFACE_("LMB/Return: confirm, Esc/RMB: cancel, "
-                                               "Tab: gravity (%s), "
-	                                           "WASD: move around, "
-	                                           "Shift: fast, Alt: slow, "
-	                                           "QE: up and down, MMB/Space: teleport, V: jump, "
-	                                           "Pad +/Wheel Up: increase speed, Pad -/Wheel Down: decrease speed"),
-	             WM_bool_as_string(gravity));
+#define WM_MODALKEY(_id) \
+	WM_modalkeymap_operator_items_to_string_buf(op->type, (_id), true, UI_MAX_SHORTCUT_STR, &available_len, &p)
+
+	BLI_snprintf(header, sizeof(header), IFACE_("%s: confirm, %s: cancel, "
+	                                            "%s: gravity (%s), "
+	                                            "%s|%s|%s|%s: move around, "
+	                                            "%s: fast, %s: slow, "
+	                                            "%s|%s: up and down, "
+	                                            "%s: teleport, %s: jump, "
+	                                            "%s: increase speed, %s: decrease speed"),
+	             WM_MODALKEY(WALK_MODAL_CONFIRM), WM_MODALKEY(WALK_MODAL_CANCEL),
+	             WM_MODALKEY(WALK_MODAL_TOGGLE), WM_bool_as_string(gravity),
+	             WM_MODALKEY(WALK_MODAL_DIR_FORWARD), WM_MODALKEY(WALK_MODAL_DIR_LEFT),
+	             WM_MODALKEY(WALK_MODAL_DIR_BACKWARD), WM_MODALKEY(WALK_MODAL_DIR_RIGHT),
+	             WM_MODALKEY(WALK_MODAL_FAST_ENABLE), WM_MODALKEY(WALK_MODAL_SLOW_ENABLE),
+	             WM_MODALKEY(WALK_MODAL_DIR_UP), WM_MODALKEY(WALK_MODAL_DIR_DOWN),
+	             WM_MODALKEY(WALK_MODAL_TELEPORT), WM_MODALKEY(WALK_MODAL_JUMP),
+	             WM_MODALKEY(WALK_MODAL_ACCELERATE), WM_MODALKEY(WALK_MODAL_DECELERATE));
+
+#undef WM_MODALKEY
+
 	ED_area_headerprint(CTX_wm_area(C), header);
-#undef HEADER_LENGTH
 }
 
-static void walk_navigation_mode_set(bContext *C, WalkInfo *walk, eWalkMethod mode)
+static void walk_navigation_mode_set(bContext *C, wmOperator *op, WalkInfo *walk, eWalkMethod mode)
 {
 	if (mode == WALK_MODE_FREE) {
 		walk->navigation_mode = WALK_MODE_FREE;
-		walk->gravity = WALK_GRAVITY_STATE_OFF;
+		walk->gravity_state = WALK_GRAVITY_STATE_OFF;
 	}
 	else { /* WALK_MODE_GRAVITY */
 		walk->navigation_mode = WALK_MODE_GRAVITY;
-		walk->gravity = WALK_GRAVITY_STATE_START;
+		walk->gravity_state = WALK_GRAVITY_STATE_START;
 	}
 
-	walk_update_header(C, walk);
+	walk_update_header(C, op, walk);
 }
 
 /**
@@ -494,25 +522,38 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 	walk->speed = 0.0f;
 	walk->is_fast = false;
 	walk->is_slow = false;
-	walk->grid = 1.f / walk->scene->unit.scale_length;
+	walk->grid = (walk->scene->unit.system == USER_UNIT_NONE) ? 1.f : 1.f / walk->scene->unit.scale_length;
 
 	/* user preference settings */
 	walk->teleport.duration = U.walk_navigation.teleport_time;
 	walk->mouse_speed = U.walk_navigation.mouse_speed;
 
 	if ((U.walk_navigation.flag & USER_WALK_GRAVITY))
-		walk_navigation_mode_set(C, walk, WALK_MODE_GRAVITY);
+		walk_navigation_mode_set(C, op, walk, WALK_MODE_GRAVITY);
 	else
-		walk_navigation_mode_set(C, walk, WALK_MODE_FREE);
+		walk_navigation_mode_set(C, op, walk, WALK_MODE_FREE);
 
 	walk->view_height = U.walk_navigation.view_height;
 	walk->jump_height = U.walk_navigation.jump_height;
 	walk->speed = U.walk_navigation.walk_speed;
 	walk->speed_factor = U.walk_navigation.walk_speed_factor;
 
-	walk->gravity = WALK_GRAVITY_STATE_OFF;
+	walk->gravity_state = WALK_GRAVITY_STATE_OFF;
+
+	if ((walk->scene->physics_settings.flag & PHYS_GLOBAL_GRAVITY)) {
+		walk->gravity = fabsf(walk->scene->physics_settings.gravity[2]);
+	}
+	else {
+		walk->gravity = 9.80668f; /* m/s2 */
+	}
 
 	walk->is_reversed = ((U.walk_navigation.flag & USER_WALK_MOUSE_REVERSE) != 0);
+
+#ifdef USE_TABLET_SUPPORT
+	walk->is_cursor_first = true;
+
+	walk->is_cursor_absolute = false;
+#endif
 
 	walk->active_directions = 0;
 
@@ -532,13 +573,23 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 	walk->rv3d->rflag |= RV3D_NAVIGATING;
 
 
-	walk->v3d_camera_control = ED_view3d_cameracontrol_aquire(
+	walk->v3d_camera_control = ED_view3d_cameracontrol_acquire(
 	        walk->scene, walk->v3d, walk->rv3d,
 	        (U.uiflag & USER_CAM_LOCK_NO_PARENT) == 0);
 
 	/* center the mouse */
 	walk->center_mval[0] = walk->ar->winx * 0.5f;
 	walk->center_mval[1] = walk->ar->winy * 0.5f;
+
+#ifdef USE_PIXELSIZE_NATIVE_SUPPORT
+	walk->center_mval[0] += walk->ar->winrct.xmin;
+	walk->center_mval[1] += walk->ar->winrct.ymin;
+
+	WM_cursor_compatible_xy(win, &walk->center_mval[0], &walk->center_mval[1]);
+
+	walk->center_mval[0] -= walk->ar->winrct.xmin;
+	walk->center_mval[1] -= walk->ar->winrct.ymin;
+#endif
 
 	copy_v2_v2_int(walk->prev_mval, walk->center_mval);
 
@@ -581,10 +632,16 @@ static int walkEnd(bContext *C, WalkInfo *walk)
 	/* restore the cursor */
 	WM_cursor_modal_restore(win);
 
-	/* center the mouse */
-	WM_cursor_warp(win,
-	               walk->ar->winrct.xmin + walk->center_mval[0],
-	               walk->ar->winrct.ymin + walk->center_mval[1]);
+#ifdef USE_TABLET_SUPPORT
+	if (walk->is_cursor_absolute == false)
+#endif
+	{
+		/* center the mouse */
+		WM_cursor_warp(
+		        win,
+		        walk->ar->winrct.xmin + walk->center_mval[0],
+		        walk->ar->winrct.ymin + walk->center_mval[1]);
+	}
 
 	if (walk->state == WALK_CONFIRM) {
 		MEM_freeN(walk);
@@ -605,12 +662,41 @@ static bool wm_event_is_last_mousemove(const wmEvent *event)
 	return true;
 }
 
-static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const wmEvent *event)
+static void walkEvent(bContext *C, wmOperator *op, WalkInfo *walk, const wmEvent *event)
 {
 	if (event->type == TIMER && event->customdata == walk->timer) {
 		walk->redraw = true;
 	}
 	else if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
+
+#ifdef USE_TABLET_SUPPORT
+		if (walk->is_cursor_first) {
+			/* wait until we get the 'warp' event */
+			if ((walk->center_mval[0] == event->mval[0]) &&
+			    (walk->center_mval[1] == event->mval[1]))
+			{
+				walk->is_cursor_first = false;
+			}
+			else {
+				/* note, its possible the system isn't giving us the warp event
+				 * ideally we shouldn't have to worry about this, see: T45361 */
+				wmWindow *win = CTX_wm_window(C);
+				WM_cursor_warp(win,
+				               walk->ar->winrct.xmin + walk->center_mval[0],
+				               walk->ar->winrct.ymin + walk->center_mval[1]);
+			}
+			return;
+		}
+
+		if ((walk->is_cursor_absolute == false) && WM_event_is_absolute(event)) {
+			walk->is_cursor_absolute = true;
+			copy_v2_v2_int(walk->prev_mval, event->mval);
+			copy_v2_v2_int(walk->center_mval, event->mval);
+			/* without this we can't turn 180d */
+			CLAMP_MIN(walk->mouse_speed, 4.0f);
+		}
+#endif  /* USE_TABLET_SUPPORT */
+
 
 		walk->moffset[0] += event->mval[0] - walk->prev_mval[0];
 		walk->moffset[1] += event->mval[1] - walk->prev_mval[1];
@@ -622,6 +708,12 @@ static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const
 		{
 			walk->redraw = true;
 
+#ifdef USE_TABLET_SUPPORT
+			if (walk->is_cursor_absolute) {
+				/* pass */
+			}
+			else
+#endif
 			if (wm_event_is_last_mousemove(event)) {
 				wmWindow *win = CTX_wm_window(C);
 
@@ -755,10 +847,10 @@ static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const
 
 #define JUMP_SPEED_MIN 1.0f
 #define JUMP_TIME_MAX 0.2f /* s */
-#define JUMP_SPEED_MAX sqrtf(2.0f * EARTH_GRAVITY * walk->jump_height)
+#define JUMP_SPEED_MAX sqrtf(2.0f * walk->gravity * walk->jump_height)
 
 			case WALK_MODAL_JUMP_STOP:
-				if (walk->gravity == WALK_GRAVITY_STATE_JUMP) {
+				if (walk->gravity_state == WALK_GRAVITY_STATE_JUMP) {
 					float t;
 
 					/* delta time */
@@ -769,21 +861,21 @@ static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const
 					walk->speed_jump = JUMP_SPEED_MIN + t * (JUMP_SPEED_MAX - JUMP_SPEED_MIN) / JUMP_TIME_MAX;
 
 					/* when jumping, duration is how long it takes before we start going down */
-					walk->teleport.duration = getVelocityZeroTime(walk->speed_jump);
+					walk->teleport.duration = getVelocityZeroTime(walk->gravity, walk->speed_jump);
 
 					/* no more increase of jump speed */
-					walk->gravity = WALK_GRAVITY_STATE_ON;
+					walk->gravity_state = WALK_GRAVITY_STATE_ON;
 				}
 				break;
 			case WALK_MODAL_JUMP:
 				if ((walk->navigation_mode == WALK_MODE_GRAVITY) &&
-				    (walk->gravity == WALK_GRAVITY_STATE_OFF) &&
+				    (walk->gravity_state == WALK_GRAVITY_STATE_OFF) &&
 				    (walk->teleport.state == WALK_TELEPORT_STATE_OFF))
 				{
 					/* no need to check for ground,
 					 * walk->gravity wouldn't be off
 					 * if we were over a hole */
-					walk->gravity = WALK_GRAVITY_STATE_JUMP;
+					walk->gravity_state = WALK_GRAVITY_STATE_JUMP;
 					walk->speed_jump = JUMP_SPEED_MAX;
 
 					walk->teleport.initial_time = PIL_check_seconds_timer();
@@ -793,7 +885,7 @@ static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const
 					copy_v2_v2(walk->teleport.direction, walk->dvec_prev);
 
 					/* when jumping, duration is how long it takes before we start going down */
-					walk->teleport.duration = getVelocityZeroTime(walk->speed_jump);
+					walk->teleport.duration = getVelocityZeroTime(walk->gravity, walk->speed_jump);
 				}
 
 				break;
@@ -814,7 +906,7 @@ static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const
 					teleport->duration = U.walk_navigation.teleport_time;
 
 					teleport->navigation_mode = walk->navigation_mode;
-					walk_navigation_mode_set(C, walk, WALK_MODE_FREE);
+					walk_navigation_mode_set(C, op, walk, WALK_MODE_FREE);
 
 					copy_v3_v3(teleport->origin, walk->rv3d->viewinv[3]);
 
@@ -837,10 +929,10 @@ static void walkEvent(bContext *C, wmOperator *UNUSED(op), WalkInfo *walk, const
 
 			case WALK_MODAL_TOGGLE:
 				if (walk->navigation_mode == WALK_MODE_GRAVITY) {
-					walk_navigation_mode_set(C, walk, WALK_MODE_FREE);
+					walk_navigation_mode_set(C, op, walk, WALK_MODE_FREE);
 				}
 				else { /* WALK_MODE_FREE */
-					walk_navigation_mode_set(C, walk, WALK_MODE_GRAVITY);
+					walk_navigation_mode_set(C, op, walk, WALK_MODE_GRAVITY);
 				}
 				break;
 		}
@@ -853,17 +945,17 @@ static void walkMoveCamera(bContext *C, WalkInfo *walk,
 	ED_view3d_cameracontrol_update(walk->v3d_camera_control, true, C, do_rotate, do_translate);
 }
 
-static float getFreeFallDistance(const float time)
+static float getFreeFallDistance(const float gravity, const float time)
 {
-	return EARTH_GRAVITY * (time * time) * 0.5f;
+	return gravity * (time * time) * 0.5f;
 }
 
-static float getVelocityZeroTime(float velocity)
+static float getVelocityZeroTime(const float gravity, const float velocity)
 {
-	return velocity / EARTH_GRAVITY;
+	return velocity / gravity;
 }
 
-static int walkApply(bContext *C, WalkInfo *walk)
+static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 {
 #define WALK_ROTATE_FAC 2.2f /* more is faster */
 #define WALK_TOP_LIMIT DEG2RADF(85.0f)
@@ -910,7 +1002,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 		if ((walk->active_directions) ||
 		    moffset[0] || moffset[1] ||
 		    walk->teleport.state == WALK_TELEPORT_STATE_ON ||
-		    walk->gravity != WALK_GRAVITY_STATE_OFF)
+		    walk->gravity_state != WALK_GRAVITY_STATE_OFF)
 		{
 			float dvec_tmp[3];
 
@@ -955,7 +1047,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 
 					/* clamp the angle limits */
 					/* it ranges from 90.0f to -90.0f */
-					angle = -asin(rv3d->viewmat[2][2]);
+					angle = -asinf(rv3d->viewmat[2][2]);
 
 					if (angle > WALK_TOP_LIMIT && y > 0.0f)
 						y = 0.0f;
@@ -1000,7 +1092,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 
 			/* WASD - 'move' translation code */
 			if ((walk->active_directions) &&
-			    (walk->gravity == WALK_GRAVITY_STATE_OFF))
+			    (walk->gravity_state == WALK_GRAVITY_STATE_OFF))
 			{
 
 				short direction;
@@ -1076,7 +1168,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 
 			/* stick to the floor */
 			if (walk->navigation_mode == WALK_MODE_GRAVITY &&
-			    ELEM(walk->gravity,
+			    ELEM(walk->gravity_state,
 			         WALK_GRAVITY_STATE_OFF,
 			         WALK_GRAVITY_STATE_START))
 			{
@@ -1101,13 +1193,13 @@ static int walkApply(bContext *C, WalkInfo *walk)
 					dvec[2] -= difference;
 
 					/* in case we switched from FREE to GRAVITY too close to the ground */
-					if (walk->gravity == WALK_GRAVITY_STATE_START)
-						walk->gravity = WALK_GRAVITY_STATE_OFF;
+					if (walk->gravity_state == WALK_GRAVITY_STATE_START)
+						walk->gravity_state = WALK_GRAVITY_STATE_OFF;
 				}
 				else {
 					/* hijack the teleport variables */
 					walk->teleport.initial_time = PIL_check_seconds_timer();
-					walk->gravity = WALK_GRAVITY_STATE_ON;
+					walk->gravity_state = WALK_GRAVITY_STATE_ON;
 					walk->teleport.duration = 0.0f;
 
 					copy_v3_v3(walk->teleport.origin, walk->rv3d->viewinv[3]);
@@ -1117,7 +1209,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 			}
 
 			/* Falling or jumping) */
-			if (ELEM(walk->gravity, WALK_GRAVITY_STATE_ON, WALK_GRAVITY_STATE_JUMP)) {
+			if (ELEM(walk->gravity_state, WALK_GRAVITY_STATE_ON, WALK_GRAVITY_STATE_JUMP)) {
 				float t;
 				float z_cur, z_new;
 				bool ret;
@@ -1130,7 +1222,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 				copy_v2_v2(dvec, walk->teleport.direction);
 
 				z_cur = walk->rv3d->viewinv[3][2];
-				z_new = walk->teleport.origin[2] - getFreeFallDistance(t) * walk->grid;
+				z_new = walk->teleport.origin[2] - getFreeFallDistance(walk->gravity, t) * walk->grid;
 
 				/* jump */
 				z_new += t * walk->speed_jump * walk->grid;
@@ -1148,7 +1240,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 					if (difference > 0.0f) {
 						/* quit falling, lands at "view_height" from the floor */
 						dvec[2] -= difference;
-						walk->gravity = WALK_GRAVITY_STATE_OFF;
+						walk->gravity_state = WALK_GRAVITY_STATE_OFF;
 						walk->speed_jump = 0.0f;
 					}
 					else {
@@ -1176,7 +1268,7 @@ static int walkApply(bContext *C, WalkInfo *walk)
 				if (t >= 1.0f) {
 					t = 1.0f;
 					walk->teleport.state = WALK_TELEPORT_STATE_OFF;
-					walk_navigation_mode_set(C, walk, walk->teleport.navigation_mode);
+					walk_navigation_mode_set(C, op, walk, walk->teleport.navigation_mode);
 				}
 
 				mul_v3_v3fl(new_loc, walk->teleport.direction, t);
@@ -1293,7 +1385,7 @@ static int walk_modal(bContext *C, wmOperator *op, const wmEvent *event)
 		}
 	}
 	else if (event->type == TIMER && event->customdata == walk->timer) {
-		walkApply(C, walk);
+		walkApply(C, op, walk);
 	}
 
 	do_draw |= walk->redraw;
@@ -1334,5 +1426,3 @@ void VIEW3D_OT_walk(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_BLOCKING;
 }
-
-#undef EARTH_GRAVITY

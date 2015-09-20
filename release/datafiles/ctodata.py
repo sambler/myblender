@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3.4
 # -*- coding: utf-8 -*-
 
 # ***** BEGIN GPL LICENSE BLOCK *****

@@ -36,9 +36,9 @@ extern "C" {
 
 class DistortionCache {
 private:
-	float m_k1;
-	float m_k2;
-	float m_k3;
+	short m_distortion_model;
+	float m_k1, m_k2, m_k3;
+	float m_division_k1, m_division_k2;
 	float m_principal_x;
 	float m_principal_y;
 	float m_pixel_aspect;
@@ -50,12 +50,21 @@ private:
 	float *m_buffer;
 	int *m_bufferCalculated;
 	double timeLastUsage;
+	int m_margin[2];
 	
 public:
-	DistortionCache(MovieClip *movieclip, int width, int height, int calibration_width, int calibration_height, bool inverted) {
+	DistortionCache(MovieClip *movieclip,
+	                int width, int height,
+	                int calibration_width, int calibration_height,
+	                bool inverted,
+	                const int margin[2])
+	{
+		this->m_distortion_model = movieclip->tracking.camera.distortion_model;
 		this->m_k1 = movieclip->tracking.camera.k1;
 		this->m_k2 = movieclip->tracking.camera.k2;
 		this->m_k3 = movieclip->tracking.camera.k3;
+		this->m_division_k1 = movieclip->tracking.camera.division_k1;
+		this->m_division_k2 = movieclip->tracking.camera.division_k2;
 		this->m_principal_x = movieclip->tracking.camera.principal[0];
 		this->m_principal_y = movieclip->tracking.camera.principal[1];
 		this->m_pixel_aspect = movieclip->tracking.camera.pixel_aspect;
@@ -66,6 +75,7 @@ public:
 		this->m_inverted = inverted;
 		this->m_bufferCalculated = (int *)MEM_callocN(sizeof(int) * this->m_width * this->m_height, __func__);
 		this->m_buffer = (float *)MEM_mallocN(sizeof(float) * this->m_width * this->m_height * 2, __func__);
+		copy_v2_v2_int(this->m_margin, margin);
 		this->updateLastUsage();
 	}
 	
@@ -89,10 +99,17 @@ public:
 		return this->timeLastUsage;
 	}
 
-	bool isCacheFor(MovieClip *movieclip, int width, int height, int calibration_width, int claibration_height, bool inverted) {
-		return this->m_k1 == movieclip->tracking.camera.k1 &&
+	bool isCacheFor(MovieClip *movieclip,
+	                int width, int height,
+	                int calibration_width, int claibration_height,
+	                bool inverted)
+	{
+		return this->m_distortion_model == movieclip->tracking.camera.distortion_model &&
+		       this->m_k1 == movieclip->tracking.camera.k1 &&
 		       this->m_k2 == movieclip->tracking.camera.k2 &&
 		       this->m_k3 == movieclip->tracking.camera.k3 &&
+		       this->m_division_k1 == movieclip->tracking.camera.division_k1 &&
+		       this->m_division_k2 == movieclip->tracking.camera.division_k2 &&
 		       this->m_principal_x == movieclip->tracking.camera.principal[0] &&
 		       this->m_principal_y == movieclip->tracking.camera.principal[1] &&
 		       this->m_pixel_aspect == movieclip->tracking.camera.pixel_aspect &&
@@ -140,6 +157,11 @@ public:
 			*u = this->m_buffer[offset2];
 			*v = this->m_buffer[offset2 + 1];
 		}
+	}
+
+	void getMargin(int margin[2])
+	{
+		copy_v2_v2_int(margin, m_margin);
 	}
 };
 

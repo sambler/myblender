@@ -166,8 +166,8 @@ static BMFace *bm_edgenet_face_from_path(
 {
 	BMFace *f;
 	LinkNode *v_lnk;
-	unsigned int i;
-	unsigned int i_prev;
+	int i;
+	bool ok;
 
 	BMVert **vert_arr = BLI_array_alloca(vert_arr, path_len);
 	BMEdge **edge_arr = BLI_array_alloca(edge_arr, path_len);
@@ -176,11 +176,9 @@ static BMFace *bm_edgenet_face_from_path(
 		vert_arr[i] = v_lnk->link;
 	}
 
-	i_prev = path_len - 1;
-	for (i = 0; i < path_len; i++) {
-		edge_arr[i_prev] = BM_edge_exists(vert_arr[i], vert_arr[i_prev]);
-		i_prev = i;
-	}
+	ok = BM_edges_from_verts(edge_arr, vert_arr, i);
+	BLI_assert(ok);
+	UNUSED_VARS_NDEBUG(ok);
 
 	/* no need for this, we do overlap checks before allowing the path to be used */
 #if 0
@@ -203,12 +201,18 @@ static BMEdge *bm_edgenet_path_step(
         BMVert *v_curr, LinkNode **v_ls,
         VertNetInfo *vnet_info, BLI_mempool *path_pool)
 {
-	const VertNetInfo *vn_curr = &vnet_info[BM_elem_index_get(v_curr)];
+	const VertNetInfo *vn_curr;
 
 	BMEdge *e;
 	BMIter iter;
-	unsigned int tot = 0;
-	unsigned int v_ls_tot = 0;
+	unsigned int tot;
+	unsigned int v_ls_tot;
+
+
+begin:
+	tot = 0;
+	v_ls_tot = 0;
+	vn_curr = &vnet_info[BM_elem_index_get(v_curr)];
 
 	BM_ITER_ELEM (e, &iter, v_curr, BM_EDGES_OF_VERT) {
 		BMVert *v_next = BM_edge_other_vert(e, v_curr);
@@ -256,7 +260,12 @@ static BMEdge *bm_edgenet_path_step(
 	/* trick to walk along wire-edge paths */
 	if (v_ls_tot == 1 && tot == 1) {
 		v_curr = BLI_linklist_pop_pool(v_ls, path_pool);
+		/* avoid recursion, can crash on very large nets */
+#if 0
 		bm_edgenet_path_step(v_curr, v_ls, vnet_info, path_pool);
+#else
+		goto begin;
+#endif
 	}
 
 	return NULL;
@@ -382,8 +391,8 @@ static LinkNode *bm_edgenet_path_calc_best(
 	if (path == NULL) {
 		return NULL;
 	}
-	else if (path_cost <= 1) {
-		/* any face that takes 1-2 iterations to find we consider valid */
+	else if (path_cost < 1) {
+		/* any face that takes 1 iteration to find we consider valid */
 		return path;
 	}
 	else {
@@ -437,10 +446,10 @@ static LinkNode *bm_edgenet_path_calc_best(
  *
  * \param bm  The mesh to operate on.
  * \param use_edge_tag  Only fill tagged edges.
- * \param face_oflag  if nonzero, apply all new faces with this bmo flag.
  */
-void BM_mesh_edgenet(BMesh *bm,
-                     const bool use_edge_tag, const bool use_new_face_tag)
+void BM_mesh_edgenet(
+        BMesh *bm,
+        const bool use_edge_tag, const bool use_new_face_tag)
 {
 	VertNetInfo *vnet_info = MEM_callocN(sizeof(*vnet_info) * (size_t)bm->totvert, __func__);
 	BLI_mempool *edge_queue_pool = BLI_mempool_create(sizeof(LinkNode), 0, 512, BLI_MEMPOOL_NOP);
@@ -454,7 +463,6 @@ void BM_mesh_edgenet(BMesh *bm,
 
 	if (use_edge_tag == false) {
 		BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-			BM_elem_flag_enable(e, BM_ELEM_TAG);
 			BM_elem_flag_set(e, BM_ELEM_TAG, bm_edge_step_ok(e));
 		}
 	}

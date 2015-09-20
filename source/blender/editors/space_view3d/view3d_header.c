@@ -35,16 +35,13 @@
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
-#include "BLI_math.h"
-#include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_main.h"
-#include "BKE_modifier.h"
 #include "BKE_screen.h"
 #include "BKE_editmesh.h"
 
@@ -108,8 +105,8 @@ static void view3d_layers_editmode_ensure(Scene *scene, View3D *v3d)
 	if (scene->obedit && (scene->obedit->lay & v3d->lay) == 0) {
 		int bit;
 		for (bit = 0; bit < 32; bit++) {
-			if (scene->obedit->lay & (1 << bit)) {
-				v3d->lay |= 1 << bit;
+			if (scene->obedit->lay & (1u << bit)) {
+				v3d->lay |= (1u << bit);
 				break;
 			}
 		}
@@ -164,8 +161,8 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 			v3d->layact = 1 << nr;
 		else if ((v3d->lay & v3d->layact) == 0) {
 			for (bit = 0; bit < 32; bit++) {
-				if (v3d->lay & (1 << bit)) {
-					v3d->layact = 1 << bit;
+				if (v3d->lay & (1u << bit)) {
+					v3d->layact = (1u << bit);
 					break;
 				}
 			}
@@ -260,7 +257,7 @@ void uiTemplateEditModeSelection(uiLayout *layout, struct bContext *C)
 	Object *obedit = CTX_data_edit_object(C);
 	uiBlock *block = uiLayoutGetBlock(layout);
 
-	uiBlockSetHandleFunc(block, do_view3d_header_buttons, NULL);
+	UI_block_func_handle_set(block, do_view3d_header_buttons, NULL);
 
 	if (obedit && (obedit->type == OB_MESH)) {
 		BMEditMesh *em = BKE_editmesh_from_object(obedit);
@@ -268,13 +265,13 @@ void uiTemplateEditModeSelection(uiLayout *layout, struct bContext *C)
 
 		row = uiLayoutRow(layout, true);
 		block = uiLayoutGetBlock(row);
-		uiDefIconButBitS(block, TOG, SCE_SELECT_VERTEX, B_SEL_VERT, ICON_VERTEXSEL,
+		uiDefIconButBitS(block, UI_BTYPE_TOGGLE, SCE_SELECT_VERTEX, B_SEL_VERT, ICON_VERTEXSEL,
 		                 0, 0, UI_UNIT_X, UI_UNIT_Y, &em->selectmode, 1.0, 0.0, 0, 0,
 		                 TIP_("Vertex select - Shift-Click for multiple modes, Ctrl-Click contracts selection"));
-		uiDefIconButBitS(block, TOG, SCE_SELECT_EDGE, B_SEL_EDGE, ICON_EDGESEL,
+		uiDefIconButBitS(block, UI_BTYPE_TOGGLE, SCE_SELECT_EDGE, B_SEL_EDGE, ICON_EDGESEL,
 		                 0, 0, UI_UNIT_X, UI_UNIT_Y, &em->selectmode, 1.0, 0.0, 0, 0,
 		                 TIP_("Edge select - Shift-Click for multiple modes, Ctrl-Click expands/contracts selection"));
-		uiDefIconButBitS(block, TOG, SCE_SELECT_FACE, B_SEL_FACE, ICON_FACESEL,
+		uiDefIconButBitS(block, UI_BTYPE_TOGGLE, SCE_SELECT_FACE, B_SEL_FACE, ICON_FACESEL,
 		                 0, 0, UI_UNIT_X, UI_UNIT_Y, &em->selectmode, 1.0, 0.0, 0, 0,
 		                 TIP_("Face select - Shift-Click for multiple modes, Ctrl-Click expands selection"));
 	}
@@ -300,15 +297,15 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	RNA_pointer_create(&scene->id, &RNA_Scene, scene, &sceneptr);
 
 	block = uiLayoutGetBlock(layout);
-	uiBlockSetHandleFunc(block, do_view3d_header_buttons, NULL);
+	UI_block_func_handle_set(block, do_view3d_header_buttons, NULL);
 
 	/* other buttons: */
-	uiBlockSetEmboss(block, UI_EMBOSS);
+	UI_block_emboss_set(block, UI_EMBOSS);
 	
 	/* mode */
 	if (ob) {
 		modeselect = ob->mode;
-		is_paint = ELEM4(ob->mode, OB_MODE_SCULPT, OB_MODE_VERTEX_PAINT, OB_MODE_WEIGHT_PAINT, OB_MODE_TEXTURE_PAINT);
+		is_paint = ELEM(ob->mode, OB_MODE_SCULPT, OB_MODE_VERTEX_PAINT, OB_MODE_WEIGHT_PAINT, OB_MODE_TEXTURE_PAINT);
 	}
 	else {
 		modeselect = OB_MODE_OBJECT;
@@ -336,8 +333,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	uiItemR(layout, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 
 	if (obedit == NULL && is_paint) {
-
-		if (ob->mode & OB_MODE_WEIGHT_PAINT) {
+		if (ob->mode & OB_MODE_ALL_PAINT) {
 			/* Only for Weight Paint. makes no sense in other paint modes. */
 			row = uiLayoutRow(layout, true);
 			uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);

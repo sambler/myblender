@@ -92,12 +92,19 @@ void RegisterBlendExtension(void)
 	const char *ThumbHandlerDLL;
 	char RegCmd[MAX_PATH * 2];
 	char MBox[256];
-#ifndef WIN64
+	char *blender_app;
+#ifndef _WIN64
 	BOOL IsWOW64;
 #endif
 
 	printf("Registering file extension...");
 	GetModuleFileName(0, BlPath, MAX_PATH);
+
+	/* Replace the actual app name with the wrapper. */
+	blender_app = strstr(BlPath, "blender-app.exe");
+	if (blender_app != NULL) {
+		strcpy(blender_app, "blender.exe");
+	}
 
 	/* root is HKLM by default */
 	lresult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Classes", 0, KEY_ALL_ACCESS, &root);
@@ -151,7 +158,7 @@ void RegisterBlendExtension(void)
 	
 	BLI_getInstallationDir(InstallDir);
 	GetSystemDirectory(SysDir, FILE_MAXDIR);
-#ifdef WIN64
+#ifdef _WIN64
 	ThumbHandlerDLL = "BlendThumb64.dll";
 #elif defined(__MINGW32__)
 	ThumbHandlerDLL = "BlendThumb.dll";

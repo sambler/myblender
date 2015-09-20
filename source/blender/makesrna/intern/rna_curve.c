@@ -34,7 +34,7 @@
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_font.h"
 
@@ -45,9 +45,6 @@
 #include "rna_internal.h"
 
 #include "WM_types.h"
-
-#include "BKE_curve.h"
-#include "ED_curve.h"
 
 #ifndef RNA_RUNTIME
 static EnumPropertyItem beztriple_handle_type_items[] = {
@@ -123,8 +120,6 @@ static const EnumPropertyItem curve2d_fill_mode_items[] = {
 #endif
 
 #ifdef RNA_RUNTIME
-
-#include "BLI_math.h"
 
 #include "DNA_object_types.h"
 
@@ -323,8 +318,15 @@ static int rna_Nurb_length(PointerRNA *ptr)
 
 static void rna_Nurb_type_set(PointerRNA *ptr, int value)
 {
+	Curve *cu = (Curve *)ptr->id.data;
 	Nurb *nu = (Nurb *)ptr->data;
-	BKE_nurb_type_convert(nu, value, true);
+	const int pntsu_prev = nu->pntsu;
+
+	if (BKE_nurb_type_convert(nu, value, true)) {
+		if (nu->pntsu != pntsu_prev) {
+			cu->actvert = CU_ACT_NONE;
+		}
+	}
 }
 
 static void rna_BPoint_array_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
@@ -1021,7 +1023,7 @@ static void rna_def_font(BlenderRNA *UNUSED(brna), StructRNA *srna)
 	
 	prop = RNA_def_property(srna, "underline_height", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "ulheight");
-	RNA_def_property_range(prop, -0.2f, 0.8f);
+	RNA_def_property_range(prop, 0.0f, 0.8f);
 	RNA_def_property_ui_text(prop, "Underline Thickness", "");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 	
@@ -1293,16 +1295,13 @@ static void rna_def_curve_splines(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
 
 	func = RNA_def_function(srna, "clear", "rna_Curve_spline_clear");
-	RNA_def_function_ui_description(func, "Remove all spline from a curve");
+	RNA_def_function_ui_description(func, "Remove all splines from a curve");
 
 	prop = RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
-	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_struct_type(prop, "Spline");
 	RNA_def_property_pointer_funcs(prop, "rna_Curve_active_spline_get", "rna_Curve_active_spline_set", NULL, NULL);
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Active Spline", "Active curve spline");
-	/* Could call: ED_base_object_activate(C, scene->basact);
-	 * but would be a bad level call and it seems the notifier is enough */
-	RNA_def_property_update(prop, NC_SCENE | ND_OB_ACTIVE, NULL);
 }
 
 
@@ -1416,14 +1415,14 @@ static void rna_def_curve(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0, 1024);
 	RNA_def_property_ui_range(prop, 0, 64, 1, -1);
 	RNA_def_property_ui_text(prop, "Render Resolution U",
-	                         "Surface resolution in U direction used while rendering (zero skips this property)");
+	                         "Surface resolution in U direction used while rendering (zero uses preview resolution)");
 	
 	prop = RNA_def_property(srna, "render_resolution_v", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "resolv_ren");
 	RNA_def_property_ui_range(prop, 0, 64, 1, -1);
 	RNA_def_property_range(prop, 0, 1024);
 	RNA_def_property_ui_text(prop, "Render Resolution V",
-	                         "Surface resolution in V direction used while rendering (zero skips this property)");
+	                         "Surface resolution in V direction used while rendering (zero uses preview resolution)");
 	
 	
 	prop = RNA_def_property(srna, "eval_time", PROP_FLOAT, PROP_NONE);

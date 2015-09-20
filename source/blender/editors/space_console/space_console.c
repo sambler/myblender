@@ -158,6 +158,18 @@ static void console_main_area_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_dropbox_handler(&ar->handlers, lb);
 }
 
+/* same as 'text_cursor' */
+static void console_cursor(wmWindow *win, ScrArea *sa, ARegion *ar)
+{
+	SpaceText *st = sa->spacedata.first;
+	int wmcursor = BC_TEXTEDITCURSOR;
+
+	if (st->text && BLI_rcti_isect_pt(&st->txtbar, win->eventstate->x - ar->winrct.xmin, st->txtbar.ymin)) {
+		wmcursor = CURSOR_STD;
+	}
+
+	WM_cursor_set(win, wmcursor);
+}
 
 /* ************* dropboxes ************* */
 
@@ -258,6 +270,7 @@ static void console_operatortypes(void)
 	WM_operatortype_append(CONSOLE_OT_copy);
 	WM_operatortype_append(CONSOLE_OT_paste);
 	WM_operatortype_append(CONSOLE_OT_select_set);
+	WM_operatortype_append(CONSOLE_OT_select_word);
 }
 
 static void console_keymap(struct wmKeyConfig *keyconf)
@@ -336,6 +349,7 @@ static void console_keymap(struct wmKeyConfig *keyconf)
 #endif
 	
 	WM_keymap_add_item(keymap, "CONSOLE_OT_select_set", LEFTMOUSE, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "CONSOLE_OT_select_word", LEFTMOUSE, KM_DBL_CLICK, 0, 0);
 
 	RNA_string_set(WM_keymap_add_item(keymap, "CONSOLE_OT_insert", TABKEY, KM_PRESS, KM_CTRL, 0)->ptr, "text", "\t"); /* fake tabs */
 
@@ -396,6 +410,7 @@ void ED_spacetype_console(void)
 
 	art->init = console_main_area_init;
 	art->draw = console_main_area_draw;
+	art->cursor = console_cursor;
 	art->listener = console_main_area_listener;
 	
 	

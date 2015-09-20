@@ -42,7 +42,6 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_deform.h"
-#include "BKE_shrinkwrap.h"
 
 
 #include "depsgraph_private.h"
@@ -166,7 +165,7 @@ static void SimpleDeformModifier_do(SimpleDeformModifierData *smd, struct Object
 	/* Calculate matrixs do convert between coordinate spaces */
 	if (smd->origin) {
 		transf = &tmp_transf;
-		space_transform_from_matrixs(transf, ob->obmat, smd->origin->obmat);
+		BLI_SPACE_TRANSFORM_SETUP(transf, ob, smd->origin);
 	}
 
 	/* Setup vars,
@@ -182,7 +181,9 @@ static void SimpleDeformModifier_do(SimpleDeformModifierData *smd, struct Object
 			float tmp[3];
 			copy_v3_v3(tmp, vertexCos[i]);
 
-			if (transf) space_transform_apply(transf, tmp);
+			if (transf) {
+				BLI_space_transform_apply(transf, tmp);
+			}
 
 			lower = min_ff(lower, tmp[limit_axis]);
 			upper = max_ff(upper, tmp[limit_axis]);
@@ -220,7 +221,7 @@ static void SimpleDeformModifier_do(SimpleDeformModifierData *smd, struct Object
 			float co[3], dcut[3] = {0.0f, 0.0f, 0.0f};
 
 			if (transf) {
-				space_transform_apply(transf, vertexCos[i]);
+				BLI_space_transform_apply(transf, vertexCos[i]);
 			}
 
 			copy_v3_v3(co, vertexCos[i]);
@@ -236,13 +237,11 @@ static void SimpleDeformModifier_do(SimpleDeformModifierData *smd, struct Object
 			interp_v3_v3v3(vertexCos[i], vertexCos[i], co, weight);  /* Use vertex weight has coef of linear interpolation */
 
 			if (transf) {
-				space_transform_invert(transf, vertexCos[i]);
+				BLI_space_transform_invert(transf, vertexCos[i]);
 			}
 		}
 	}
 }
-
-
 
 
 /* SimpleDeform */
@@ -288,6 +287,7 @@ static void foreachObjectLink(ModifierData *md, Object *ob,
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *UNUSED(bmain),
                            struct Scene *UNUSED(scene),
                            Object *UNUSED(ob),
                            DagNode *obNode)
@@ -296,6 +296,18 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 
 	if (smd->origin)
 		dag_add_relation(forest, dag_get_node(forest, smd->origin), obNode, DAG_RL_OB_DATA, "SimpleDeform Modifier");
+}
+
+static void updateDepsgraph(ModifierData *md,
+                            struct Main *UNUSED(bmain),
+                            struct Scene *UNUSED(scene),
+                            Object *UNUSED(ob),
+                            struct DepsNodeHandle *node)
+{
+	SimpleDeformModifierData *smd  = (SimpleDeformModifierData *)md;
+	if (smd->origin != NULL) {
+		DEG_add_object_relation(node, smd->origin, DEG_OB_COMP_TRANSFORM, "SimpleDeform Modifier");
+	}
 }
 
 static void deformVerts(ModifierData *md, Object *ob,
@@ -362,6 +374,7 @@ ModifierTypeInfo modifierType_SimpleDeform = {
 	/* freeData */          NULL,
 	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
+	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     NULL,
 	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,

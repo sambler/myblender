@@ -54,7 +54,6 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -217,7 +216,7 @@ static MFace *get_dface(DerivedMesh *dm, DerivedMesh *split, int cur, int i, MFa
 	} (void)0
 
 #define GET_ES(v1, v2) edgecut_get(eh, v1, v2)
-#define INT_UV(uvf, c0, c1) interp_v2_v2v2(uvf, mf->uv[c0], mf->uv[c1], 0.5f)
+#define INT_UV(uvf, c0, c1) mid_v2_v2v2(uvf, mf->uv[c0], mf->uv[c1])
 
 static void remap_faces_3_6_9_12(DerivedMesh *dm, DerivedMesh *split, MFace *mf, int *facepa, int *vertpa, int i, EdgeHash *eh, int cur, int v1, int v2, int v3, int v4)
 {
@@ -772,7 +771,7 @@ static DerivedMesh *cutEdges(ExplodeModifierData *emd, DerivedMesh *dm)
 
 	for (i = 0; i < curdupface; i++) {
 		mf = CDDM_get_tessface(splitdm, i);
-		test_index_face(mf, &splitdm->faceData, i, (mf->flag & ME_FACE_SEL ? 4 : 3));
+		test_index_face(mf, &splitdm->faceData, i, ((mf->flag & ME_FACE_SEL) ? 4 : 3));
 	}
 
 	BLI_edgehash_free(edgehash, NULL);
@@ -892,7 +891,7 @@ static DerivedMesh *explodeMesh(ExplodeModifierData *emd,
 			/* get particle */
 			pa = pars + ed_v2;
 
-			psys_get_birth_coordinates(&sim, pa, &birth, 0, 0);
+			psys_get_birth_coords(&sim, pa, &birth, 0, 0);
 
 			state.time = cfra;
 			psys_get_particle_state(&sim, ed_v2, &state, 1);
@@ -1059,6 +1058,7 @@ ModifierTypeInfo modifierType_Explode = {
 	/* freeData */          freeData,
 	/* isDisabled */        NULL,
 	/* updateDepgraph */    NULL,
+	/* updateDepsgraph */   NULL,
 	/* dependsOnTime */     dependsOnTime,
 	/* dependsOnNormals */  NULL,
 	/* foreachObjectLink */ NULL,

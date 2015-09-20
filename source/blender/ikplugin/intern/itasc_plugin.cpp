@@ -68,7 +68,7 @@ extern "C" {
 #include "itasc_plugin.h"
 
 // default parameters
-bItasc DefIKParam;
+static bItasc DefIKParam;
 
 // in case of animation mode, feedback and timestep is fixed
 // #define ANIM_TIMESTEP   1.0
@@ -89,8 +89,7 @@ struct IK_Target;
 typedef void (*ErrorCallback)(const iTaSC::ConstraintValues *values, unsigned int nvalues, IK_Target *iktarget);
 
 // one structure for each target in the scene
-struct IK_Target
-{
+struct IK_Target {
 	struct Scene			*blscene;
 	iTaSC::MovingFrame*		target;
 	iTaSC::ConstraintSet*	constraint;
@@ -566,7 +565,7 @@ static bool target_callback(const iTaSC::Timestamp& timestamp, const iTaSC::Fram
 			float chanmat[4][4];
 			copy_m4_m4(chanmat, pchan->pose_mat);
 			copy_v3_v3(chanmat[3], pchan->pose_tail);
-			mul_serie_m4(restmat, target->owner->obmat, chanmat, target->eeRest, NULL, NULL, NULL, NULL, NULL);
+			mul_m4_series(restmat, target->owner->obmat, chanmat, target->eeRest);
 		}
 		else {
 			mul_m4_m4m4(restmat, target->owner->obmat, target->eeRest);

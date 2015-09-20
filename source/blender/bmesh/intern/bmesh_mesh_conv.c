@@ -200,8 +200,9 @@ char BM_mesh_cd_flag_from_bmesh(BMesh *bm)
 }
 
 /* Static function for alloc (duplicate in modifiers_bmesh.c) */
-static BMFace *bm_face_create_from_mpoly(MPoly *mp, MLoop *ml,
-                                         BMesh *bm, BMVert **vtable, BMEdge **etable)
+static BMFace *bm_face_create_from_mpoly(
+        MPoly *mp, MLoop *ml,
+        BMesh *bm, BMVert **vtable, BMEdge **etable)
 {
 	BMVert **verts = BLI_array_alloca(verts, mp->totloop);
 	BMEdge **edges = BLI_array_alloca(edges, mp->totloop);
@@ -221,8 +222,9 @@ static BMFace *bm_face_create_from_mpoly(MPoly *mp, MLoop *ml,
  *
  * \warning This function doesn't calculate face normals.
  */
-void BM_mesh_bm_from_me(BMesh *bm, Mesh *me,
-                        const bool calc_face_normal, const bool set_key, int act_key_nr)
+void BM_mesh_bm_from_me(
+        BMesh *bm, Mesh *me,
+        const bool calc_face_normal, const bool set_key, int act_key_nr)
 {
 	MVert *mvert;
 	MEdge *medge;
@@ -233,7 +235,7 @@ void BM_mesh_bm_from_me(BMesh *bm, Mesh *me,
 	BMEdge *e, **etable = NULL;
 	BMFace *f;
 	float (*keyco)[3] = NULL;
-	int totuv, i, j;
+	int totuv, totloops, i, j;
 
 	int cd_vert_bweight_offset;
 	int cd_edge_bweight_offset;
@@ -395,7 +397,7 @@ void BM_mesh_bm_from_me(BMesh *bm, Mesh *me,
 
 	mloop = me->mloop;
 	mp = me->mpoly;
-	for (i = 0; i < me->totpoly; i++, mp++) {
+	for (i = 0, totloops = 0; i < me->totpoly; i++, mp++) {
 		BMLoop *l_iter;
 		BMLoop *l_first;
 
@@ -426,6 +428,9 @@ void BM_mesh_bm_from_me(BMesh *bm, Mesh *me,
 		j = mp->loopstart;
 		l_iter = l_first = BM_FACE_FIRST_LOOP(f);
 		do {
+			/* don't use 'j' since we may have skipped some faces, hence some loops. */
+			BM_elem_index_set(l_iter, totloops++); /* set_ok */
+
 			/* Save index of correspsonding MLoop */
 			CustomData_to_bmesh_block(&me->ldata, &bm->ldata, j++, &l_iter->head.data, true);
 		} while ((l_iter = l_iter->next) != l_first);
@@ -438,8 +443,7 @@ void BM_mesh_bm_from_me(BMesh *bm, Mesh *me,
 		}
 	}
 
-	bm->elem_index_dirty &= ~BM_FACE; /* added in order, clear dirty flag */
-	bm->elem_index_dirty |= BM_LOOP; /* did not set the loop indices */
+	bm->elem_index_dirty &= ~(BM_FACE | BM_LOOP); /* added in order, clear dirty flag */
 
 	if (me->mselect && me->totselect != 0) {
 
@@ -786,7 +790,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 
 	{
 		BMEditSelection *selected;
-		me->totselect = BLI_countlist(&(bm->selected));
+		me->totselect = BLI_listbase_count(&(bm->selected));
 
 		if (me->mselect) MEM_freeN(me->mselect);
 
@@ -848,15 +852,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		                                        * bmesh and the mesh are out of sync */
 		    (oldverts != NULL))                /* not used here, but 'oldverts' is used later for applying 'ofs' */
 		{
-			bool act_is_basis = false;
-
-			/* find if this key is a basis for any others */
-			for (currkey = me->key->block.first; currkey; currkey = currkey->next) {
-				if (bm->shapenr - 1 == currkey->relative) {
-					act_is_basis = true;
-					break;
-				}
-			}
+			const bool act_is_basis = BKE_keyblock_is_basis(me->key, bm->shapenr - 1);
 
 			/* active key is a base */
 			if (act_is_basis && (cd_shape_keyindex_offset != -1)) {

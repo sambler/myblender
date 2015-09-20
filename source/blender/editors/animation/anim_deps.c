@@ -45,6 +45,7 @@
 
 #include "BKE_animsys.h"
 #include "BKE_action.h"
+#include "BKE_fcurve.h"
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
@@ -72,8 +73,10 @@ void ANIM_list_elem_update(Scene *scene, bAnimListElem *ale)
 	
 	/* tag AnimData for refresh so that other views will update in realtime with these changes */
 	adt = BKE_animdata_from_id(id);
-	if (adt)
+	if (adt) {
 		adt->recalc |= ADT_RECALC_ANIM;
+		DAG_id_tag_update(id, OB_RECALC_TIME);
+	}
 
 	/* update data */
 	fcu = (ale->datatype == ALE_FCURVE) ? ale->key_data : NULL;
@@ -91,7 +94,7 @@ void ANIM_list_elem_update(Scene *scene, bAnimListElem *ale)
 			RNA_property_update_main(G.main, scene, &ptr, prop);
 	}
 	else {
-		/* in other case we do standard depsgaph update, ideally
+		/* in other case we do standard depsgraph update, ideally
 		 * we'd be calling property update functions here too ... */
 		DAG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME); // XXX or do we want something more restrictive?
 	}
@@ -192,7 +195,7 @@ static void animchan_sync_fcurve(bAnimContext *ac, bAnimListElem *ale, FCurve **
 	/* major priority is selection status, so refer to the checks done in anim_filter.c 
 	 * skip_fcurve_selected_data() for reference about what's going on here...
 	 */
-	if (ELEM3(NULL, fcu, fcu->rna_path, owner_id))
+	if (ELEM(NULL, fcu, fcu->rna_path, owner_id))
 		return;
 	
 	if (GS(owner_id->name) == ID_OB) {
@@ -341,5 +344,58 @@ void ANIM_sync_animchannels_to_data(const bContext *C)
 		}
 	}
 	
-	BLI_freelistN(&anim_data);
+	ANIM_animdata_freelist(&anim_data);
+}
+
+void ANIM_animdata_update(bAnimContext *ac, ListBase *anim_data)
+{
+	bAnimListElem *ale;
+
+	if (ELEM(ac->datatype, ANIMCONT_GPENCIL, ANIMCONT_MASK)) {
+#ifdef DEBUG
+		/* quiet assert */
+		for (ale = anim_data->first; ale; ale = ale->next) {
+			ale->update = 0;
+		}
+#endif
+		return;
+	}
+
+	for (ale = anim_data->first; ale; ale = ale->next) {
+		FCurve *fcu = ale->key_data;
+
+		if (ale->update & ANIM_UPDATE_ORDER) {
+			ale->update &= ~ANIM_UPDATE_ORDER;
+			if (fcu)
+				sort_time_fcurve(fcu);
+		}
+
+		if (ale->update & ANIM_UPDATE_HANDLES) {
+			ale->update &= ~ANIM_UPDATE_HANDLES;
+			if (fcu)
+				calchandles_fcurve(fcu);
+		}
+
+		if (ale->update & ANIM_UPDATE_DEPS) {
+			ale->update &= ~ANIM_UPDATE_DEPS;
+			ANIM_list_elem_update(ac->scene, ale);
+		}
+
+		BLI_assert(ale->update == 0);
+	}
+}
+
+void ANIM_animdata_freelist(ListBase *anim_data)
+{
+#ifndef NDEBUG
+	bAnimListElem *ale, *ale_next;
+	for (ale = anim_data->first; ale; ale = ale_next) {
+		ale_next = ale->next;
+		BLI_assert(ale->update == 0);
+		MEM_freeN(ale);
+	}
+	BLI_listbase_clear(anim_data);
+#else
+	BLI_freelistN(anim_data);
+#endif
 }

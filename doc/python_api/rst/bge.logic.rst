@@ -72,6 +72,7 @@ See the actuator's reference for available methods
    * :class:`~bge.types.KX_CameraActuator`
    * :class:`~bge.types.KX_ConstraintActuator`
    * :class:`~bge.types.KX_GameActuator`
+   * :class:`~bge.types.KX_MouseActuator`
    * :class:`~bge.types.KX_NetworkMessageActuator`
    * :class:`~bge.types.KX_ObjectActuator`
    * :class:`~bge.types.KX_ParentActuator`
@@ -336,6 +337,28 @@ General functions
 
    .. warning: Not implimented yet
 
+.. function:: getAnimRecordFrame()
+
+    Gets the current frame number used for recording animations. This
+    number is incremented automatically by Blender when the "Record
+    animation" feature is turned on.
+
+    :rtype: int
+
+.. function:: setAnimRecordFrame(framenr)
+
+    Sets the current frame number used for recording animations. This
+    number is automatically incremented by Blender when the "Record
+    animation" feature is turned on.
+
+    The frame number Must be non-negative, unless Blender has
+    :attr:`bpy.types.UserPreferencesEdit.use_negative_frames` enabled
+    in its user preferences. Only use non-negative numbers to be on
+    the safe side, unless you know what you are doing.
+
+    :arg framenr: The new frame number.
+    :type framenr: int
+
 .. function:: getExitKey()
 
    Gets the key used to exit the game engine
@@ -506,6 +529,18 @@ Property Sensor
    Activate when the expression matches
    
    :value: 5
+
+.. data:: KX_PROPSENSOR_LESSTHAN
+
+   Activate when the property is less than the sensor value
+
+   :value: 6
+
+.. data:: KX_PROPSENSOR_GREATERTHAN
+
+   Activate when the property is greater than the sensor value
+
+   :value: 7
 
 ------------
 Radar Sensor
@@ -752,6 +787,16 @@ See :class:`bge.types.KX_GameActuator`
 .. data:: KX_GAME_SAVECFG
 .. data:: KX_GAME_LOADCFG
 
+.. _mouse-actuator:
+
+---------------
+Mouse Actuator
+---------------
+
+.. data:: KX_ACT_MOUSE_OBJECT_AXIS_X
+.. data:: KX_ACT_MOUSE_OBJECT_AXIS_Y
+.. data:: KX_ACT_MOUSE_OBJECT_AXIS_Z
+
 ---------------
 Parent Actuator
 ---------------
@@ -845,6 +890,23 @@ See :class:`bge.types.KX_SteeringActuator.behavior`
 
    :value: 3
 
+.. _logic-trackto-actuator:
+
+-----------------
+TrackTo Actuator
+-----------------
+
+See :class:`bge.types.KX_TrackToActuator`
+
+.. data:: KX_TRACK_UPAXIS_POS_X
+.. data:: KX_TRACK_UPAXIS_POS_Y
+.. data:: KX_TRACK_UPAXIS_POS_Z
+.. data:: KX_TRACK_TRAXIS_POS_X
+.. data:: KX_TRACK_TRAXIS_POS_Y
+.. data:: KX_TRACK_TRAXIS_POS_Z
+.. data:: KX_TRACK_TRAXIS_NEG_X
+.. data:: KX_TRACK_TRAXIS_NEG_Y
+.. data:: KX_TRACK_TRAXIS_NEG_Z
 
 =======
 Various
@@ -853,6 +915,8 @@ Various
 ---------
 2D Filter
 ---------
+
+.. _Two-D-FilterActuator-mode:
 
 .. data:: RAS_2DFILTER_BLUR
 
@@ -1248,5 +1312,3 @@ See :class:`bge.types.KX_StateActuator.operation`
    Add bits to state mask
 
    :value: 3
-
-.. _Two-D-FilterActuator-mode:

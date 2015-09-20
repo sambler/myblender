@@ -54,14 +54,15 @@
 #include "DNA_scene_types.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_depsgraph.h"
 #include "BKE_effect.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
+#include "BKE_mesh.h"
 #include "BKE_object.h"
 #include "BKE_pointcache.h"
 #include "BKE_rigidbody.h"
-
-#include "RNA_access.h"
+#include "BKE_scene.h"
 
 #ifdef WITH_BULLET
 
@@ -273,57 +274,55 @@ static rbCollisionShape *rigidbody_get_shape_trimesh_from_mesh(Object *ob)
 	if (ob->type == OB_MESH) {
 		DerivedMesh *dm = NULL;
 		MVert *mvert;
-		MFace *mface;
+		const MLoopTri *looptri;
 		int totvert;
-		int totface;
-		int tottris = 0;
-		int triangle_index = 0;
-
+		int tottri;
+		const MLoop *mloop;
+		
 		dm = rigidbody_get_mesh(ob);
 
 		/* ensure mesh validity, then grab data */
 		if (dm == NULL)
 			return NULL;
 
-		DM_ensure_tessface(dm);
+		DM_ensure_looptri(dm);
 
-		mvert   = (dm) ? dm->getVertArray(dm) : NULL;
-		totvert = (dm) ? dm->getNumVerts(dm) : 0;
-		mface   = (dm) ? dm->getTessFaceArray(dm) : NULL;
-		totface = (dm) ? dm->getNumTessFaces(dm) : 0;
+		mvert   = dm->getVertArray(dm);
+		totvert = dm->getNumVerts(dm);
+		looptri = dm->getLoopTriArray(dm);
+		tottri = dm->getNumLoopTri(dm);
+		mloop = dm->getLoopArray(dm);
 
 		/* sanity checking - potential case when no data will be present */
-		if ((totvert == 0) || (totface == 0)) {
+		if ((totvert == 0) || (tottri == 0)) {
 			printf("WARNING: no geometry data converted for Mesh Collision Shape (ob = %s)\n", ob->id.name + 2);
 		}
 		else {
 			rbMeshData *mdata;
 			int i;
-			
-			/* count triangles */
-			for (i = 0; i < totface; i++) {
-				(mface[i].v4) ? (tottris += 2) : (tottris += 1);
-			}
 
 			/* init mesh data for collision shape */
-			mdata = RB_trimesh_data_new(tottris, totvert);
+			mdata = RB_trimesh_data_new(tottri, totvert);
 			
 			RB_trimesh_add_vertices(mdata, (float *)mvert, totvert, sizeof(MVert));
 
 			/* loop over all faces, adding them as triangles to the collision shape
 			 * (so for some faces, more than triangle will get added)
 			 */
-			for (i = 0; (i < totface) && (mface) && (mvert); i++, mface++) {
-				/* add first triangle - verts 1,2,3 */
-				RB_trimesh_add_triangle_indices(mdata, triangle_index, mface->v1, mface->v2, mface->v3);
-				triangle_index++;
+			if (mvert && looptri) {
+				for (i = 0; i < tottri; i++) {
+					/* add first triangle - verts 1,2,3 */
+					const MLoopTri *lt = &looptri[i];
+					int vtri[3];
 
-				/* add second triangle if needed - verts 1,3,4 */
-				if (mface->v4) {
-					RB_trimesh_add_triangle_indices(mdata, triangle_index, mface->v1, mface->v3, mface->v4);
-					triangle_index++;
+					vtri[0] = mloop[lt->tri[0]].v;
+					vtri[1] = mloop[lt->tri[1]].v;
+					vtri[2] = mloop[lt->tri[2]].v;
+
+					RB_trimesh_add_triangle_indices(mdata, i, UNPACK3(vtri));
 				}
 			}
+			
 			RB_trimesh_finish(mdata);
 
 			/* construct collision shape
@@ -344,7 +343,7 @@ static rbCollisionShape *rigidbody_get_shape_trimesh_from_mesh(Object *ob)
 		}
 
 		/* cleanup temp data */
-		if (dm && ob->rigidbody_object->mesh_source == RBO_MESH_BASE) {
+		if (ob->rigidbody_object->mesh_source == RBO_MESH_BASE) {
 			dm->release(dm);
 		}
 	}
@@ -394,13 +393,13 @@ static void rigidbody_validate_sim_shape(Object *ob, bool rebuild)
 	}
 	mul_v3_fl(size, 0.5f);
 
-	if (ELEM3(rbo->shape, RB_SHAPE_CAPSULE, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
+	if (ELEM(rbo->shape, RB_SHAPE_CAPSULE, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
 		/* take radius as largest x/y dimension, and height as z-dimension */
 		radius = MAX2(size[0], size[1]);
 		height = size[2];
 	}
 	else if (rbo->shape == RB_SHAPE_SPHERE) {
-		/* take radius to the the largest dimension to try and encompass everything */
+		/* take radius to the largest dimension to try and encompass everything */
 		radius = MAX3(size[0], size[1], size[2]);
 	}
 
@@ -439,6 +438,10 @@ static void rigidbody_validate_sim_shape(Object *ob, bool rebuild)
 			new_shape = rigidbody_get_shape_trimesh_from_mesh(ob);
 			break;
 	}
+	/* use box shape if we can't fall back to old shape */
+	if (new_shape == NULL && rbo->physics_shape == NULL) {
+		new_shape = RB_shape_new_box(size[0], size[1], size[2]);
+	}
 	/* assign new collision shape if creation was successful */
 	if (new_shape) {
 		if (rbo->physics_shape)
@@ -446,17 +449,194 @@ static void rigidbody_validate_sim_shape(Object *ob, bool rebuild)
 		rbo->physics_shape = new_shape;
 		RB_shape_set_margin(rbo->physics_shape, RBO_GET_MARGIN(rbo));
 	}
-	/* use box shape if we can't fall back to old shape */
-	else if (rbo->physics_shape == NULL) {
-		rbo->shape = RB_SHAPE_BOX;
-		rigidbody_validate_sim_shape(ob, true);
+}
+
+/* --------------------- */
+
+/* helper function to calculate volume of rigidbody object */
+// TODO: allow a parameter to specify method used to calculate this?
+void BKE_rigidbody_calc_volume(Object *ob, float *r_vol)
+{
+	RigidBodyOb *rbo = ob->rigidbody_object;
+
+	float size[3]  = {1.0f, 1.0f, 1.0f};
+	float radius = 1.0f;
+	float height = 1.0f;
+
+	float volume = 0.0f;
+
+	/* if automatically determining dimensions, use the Object's boundbox
+	 *	- assume that all quadrics are standing upright on local z-axis
+	 *	- assume even distribution of mass around the Object's pivot
+	 *	  (i.e. Object pivot is centralized in boundbox)
+	 *	- boundbox gives full width
+	 */
+	// XXX: all dimensions are auto-determined now... later can add stored settings for this
+	BKE_object_dimensions_get(ob, size);
+
+	if (ELEM(rbo->shape, RB_SHAPE_CAPSULE, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
+		/* take radius as largest x/y dimension, and height as z-dimension */
+		radius = MAX2(size[0], size[1]) * 0.5f;
+		height = size[2];
+	}
+	else if (rbo->shape == RB_SHAPE_SPHERE) {
+		/* take radius to the largest dimension to try and encompass everything */
+		radius = max_fff(size[0], size[1], size[2]) * 0.5f;
+	}
+
+	/* calculate volume as appropriate  */
+	switch (rbo->shape) {
+		case RB_SHAPE_BOX:
+			volume = size[0] * size[1] * size[2];
+			break;
+
+		case RB_SHAPE_SPHERE:
+			volume = 4.0f / 3.0f * (float)M_PI * radius * radius * radius;
+			break;
+
+		/* for now, assume that capsule is close enough to a cylinder... */
+		case RB_SHAPE_CAPSULE:
+		case RB_SHAPE_CYLINDER:
+			volume = (float)M_PI * radius * radius * height;
+			break;
+
+		case RB_SHAPE_CONE:
+			volume = (float)M_PI / 3.0f * radius * radius * height;
+			break;
+
+		case RB_SHAPE_CONVEXH:
+		case RB_SHAPE_TRIMESH:
+		{
+			if (ob->type == OB_MESH) {
+				DerivedMesh *dm = rigidbody_get_mesh(ob);
+				MVert *mvert;
+				const MLoopTri *lt = NULL;
+				int totvert, tottri = 0;
+				const MLoop *mloop = NULL;
+				
+				/* ensure mesh validity, then grab data */
+				if (dm == NULL)
+					return;
+			
+				DM_ensure_looptri(dm);
+			
+				mvert   = dm->getVertArray(dm);
+				totvert = dm->getNumVerts(dm);
+				lt = dm->getLoopTriArray(dm);
+				tottri = dm->getNumLoopTri(dm);
+				mloop = dm->getLoopArray(dm);
+				
+				if (totvert > 0 && tottri > 0) {
+					BKE_mesh_calc_volume(mvert, totvert, lt, tottri, mloop, &volume, NULL);
+				}
+				
+				/* cleanup temp data */
+				if (ob->rigidbody_object->mesh_source == RBO_MESH_BASE) {
+					dm->release(dm);
+				}
+			}
+			else {
+				/* rough estimate from boundbox as fallback */
+				/* XXX could implement other types of geometry here (curves, etc.) */
+				volume = size[0] * size[1] * size[2];
+			}
+			break;
+		}
+
+#if 0 // XXX: not defined yet
+		case RB_SHAPE_COMPOUND:
+			volume = 0.0f;
+			break;
+#endif
+	}
+
+	/* return the volume calculated */
+	if (r_vol) *r_vol = volume;
+}
+
+void BKE_rigidbody_calc_center_of_mass(Object *ob, float r_center[3])
+{
+	RigidBodyOb *rbo = ob->rigidbody_object;
+
+	float size[3]  = {1.0f, 1.0f, 1.0f};
+	float height = 1.0f;
+
+	zero_v3(r_center);
+
+	/* if automatically determining dimensions, use the Object's boundbox
+	 *	- assume that all quadrics are standing upright on local z-axis
+	 *	- assume even distribution of mass around the Object's pivot
+	 *	  (i.e. Object pivot is centralized in boundbox)
+	 *	- boundbox gives full width
+	 */
+	// XXX: all dimensions are auto-determined now... later can add stored settings for this
+	BKE_object_dimensions_get(ob, size);
+
+	/* calculate volume as appropriate  */
+	switch (rbo->shape) {
+		case RB_SHAPE_BOX:
+		case RB_SHAPE_SPHERE:
+		case RB_SHAPE_CAPSULE:
+		case RB_SHAPE_CYLINDER:
+			break;
+
+		case RB_SHAPE_CONE:
+			/* take radius as largest x/y dimension, and height as z-dimension */
+			height = size[2];
+			/* cone is geometrically centered on the median,
+			 * center of mass is 1/4 up from the base
+			 */
+			r_center[2] = -0.25f * height;
+			break;
+
+		case RB_SHAPE_CONVEXH:
+		case RB_SHAPE_TRIMESH:
+		{
+			if (ob->type == OB_MESH) {
+				DerivedMesh *dm = rigidbody_get_mesh(ob);
+				MVert *mvert;
+				const MLoopTri *looptri;
+				int totvert, tottri;
+				const MLoop *mloop;
+				
+				/* ensure mesh validity, then grab data */
+				if (dm == NULL)
+					return;
+			
+				DM_ensure_looptri(dm);
+			
+				mvert   = dm->getVertArray(dm);
+				totvert = dm->getNumVerts(dm);
+				looptri = dm->getLoopTriArray(dm);
+				tottri = dm->getNumLoopTri(dm);
+				mloop = dm->getLoopArray(dm);
+				
+				if (totvert > 0 && tottri > 0) {
+					BKE_mesh_calc_volume(mvert, totvert, looptri, tottri, mloop, NULL, r_center);
+				}
+				
+				/* cleanup temp data */
+				if (ob->rigidbody_object->mesh_source == RBO_MESH_BASE) {
+					dm->release(dm);
+				}
+			}
+			break;
+		}
+
+#if 0 // XXX: not defined yet
+		case RB_SHAPE_COMPOUND:
+			volume = 0.0f;
+			break;
+#endif
 	}
 }
 
 /* --------------------- */
 
-/* Create physics sim representation of object given RigidBody settings
- * < rebuild: even if an instance already exists, replace it
+/**
+ * Create physics sim representation of object given RigidBody settings
+ *
+ * \param rebuild Even if an instance already exists, replace it
  */
 static void rigidbody_validate_sim_object(RigidBodyWorld *rbw, Object *ob, bool rebuild)
 {
@@ -518,8 +698,10 @@ static void rigidbody_validate_sim_object(RigidBodyWorld *rbw, Object *ob, bool 
 
 /* --------------------- */
 
-/* Create physics sim representation of constraint given rigid body constraint settings
- * < rebuild: even if an instance already exists, replace it
+/**
+ * Create physics sim representation of constraint given rigid body constraint settings
+ *
+ * \param rebuild Even if an instance already exists, replace it
  */
 static void rigidbody_validate_sim_constraint(RigidBodyWorld *rbw, Object *ob, bool rebuild)
 {
@@ -539,7 +721,7 @@ static void rigidbody_validate_sim_constraint(RigidBodyWorld *rbw, Object *ob, b
 		return;
 	}
 
-	if (ELEM4(NULL, rbc->ob1, rbc->ob1->rigidbody_object, rbc->ob2, rbc->ob2->rigidbody_object)) {
+	if (ELEM(NULL, rbc->ob1, rbc->ob1->rigidbody_object, rbc->ob2, rbc->ob2->rigidbody_object)) {
 		if (rbc->physics_constraint) {
 			RB_dworld_remove_constraint(rbw->physics_world, rbc->physics_constraint);
 			RB_constraint_delete(rbc->physics_constraint);
@@ -895,7 +1077,8 @@ RigidBodyCon *BKE_rigidbody_create_constraint(Scene *scene, Object *ob, short ty
 /* Utilities API */
 
 /* Get RigidBody world for the given scene, creating one if needed
- * < scene: Scene to find active Rigid Body world for
+ *
+ * \param scene Scene to find active Rigid Body world for
  */
 RigidBodyWorld *BKE_rigidbody_get_world(Scene *scene)
 {
@@ -935,10 +1118,7 @@ void BKE_rigidbody_remove_object(Scene *scene, Object *ob)
 				Object *obt = go->ob;
 				if (obt && obt->rigidbody_constraint) {
 					rbc = obt->rigidbody_constraint;
-					if (rbc->ob1 == ob) {
-						BKE_rigidbody_remove_constraint(scene, obt);
-					}
-					if (rbc->ob2 == ob) {
+					if (ELEM(ob, rbc->ob1, rbc->ob2)) {
 						BKE_rigidbody_remove_constraint(scene, obt);
 					}
 				}
@@ -979,7 +1159,7 @@ static void rigidbody_update_ob_array(RigidBodyWorld *rbw)
 	GroupObject *go;
 	int i, n;
 
-	n = BLI_countlist(&rbw->group->gobject);
+	n = BLI_listbase_count(&rbw->group->gobject);
 
 	if (rbw->numbodies != n) {
 		rbw->numbodies = n;
@@ -1096,8 +1276,10 @@ static void rigidbody_update_sim_ob(Scene *scene, RigidBodyWorld *rbw, Object *o
 	 */
 }
 
-/* Updates and validates world, bodies and shapes.
- * < rebuild: rebuild entire simulation
+/**
+ * Updates and validates world, bodies and shapes.
+ *
+ * \param rebuild Rebuild entire simulation
  */
 static void rigidbody_update_simulation(Scene *scene, RigidBodyWorld *rbw, bool rebuild)
 {
@@ -1107,6 +1289,26 @@ static void rigidbody_update_simulation(Scene *scene, RigidBodyWorld *rbw, bool 
 	if (rebuild)
 		BKE_rigidbody_validate_sim_world(scene, rbw, true);
 	rigidbody_update_sim_world(scene, rbw);
+
+	/* XXX TODO For rebuild: remove all constraints first.
+	 * Otherwise we can end up deleting objects that are still
+	 * referenced by constraints, corrupting bullet's internal list.
+	 * 
+	 * Memory management needs redesign here, this is just a dirty workaround.
+	 */
+	if (rebuild && rbw->constraints) {
+		for (go = rbw->constraints->gobject.first; go; go = go->next) {
+			Object *ob = go->ob;
+			if (ob) {
+				RigidBodyCon *rbc = ob->rigidbody_constraint;
+				if (rbc && rbc->physics_constraint) {
+					RB_dworld_remove_constraint(rbw->physics_world, rbc->physics_constraint);
+					RB_constraint_delete(rbc->physics_constraint);
+					rbc->physics_constraint = NULL;
+				}
+			}
+		}
+	}
 
 	/* update objects */
 	for (go = rbw->group->gobject.first; go; go = go->next) {
@@ -1153,6 +1355,7 @@ static void rigidbody_update_simulation(Scene *scene, RigidBodyWorld *rbw, bool 
 			rigidbody_update_sim_ob(scene, rbw, ob, rbo);
 		}
 	}
+	
 	/* update constraints */
 	if (rbw->constraints == NULL) /* no constraints, move on */
 		return;
@@ -1297,7 +1500,7 @@ void BKE_rigidbody_rebuild_world(Scene *scene, float ctime)
 	cache = rbw->pointcache;
 
 	/* flag cache as outdated if we don't have a world or number of objects in the simulation has changed */
-	if (rbw->physics_world == NULL || rbw->numbodies != BLI_countlist(&rbw->group->gobject)) {
+	if (rbw->physics_world == NULL || rbw->numbodies != BLI_listbase_count(&rbw->group->gobject)) {
 		cache->flag |= PTCACHE_OUTDATED;
 	}
 
@@ -1389,6 +1592,8 @@ struct RigidBodyOb *BKE_rigidbody_copy_object(Object *ob) { return NULL; }
 struct RigidBodyCon *BKE_rigidbody_copy_constraint(Object *ob) { return NULL; }
 void BKE_rigidbody_relink_constraint(RigidBodyCon *rbc) {}
 void BKE_rigidbody_validate_sim_world(Scene *scene, RigidBodyWorld *rbw, bool rebuild) {}
+void BKE_rigidbody_calc_volume(Object *ob, float *r_vol) { if (r_vol) *r_vol = 0.0f; }
+void BKE_rigidbody_calc_center_of_mass(Object *ob, float r_center[3]) { zero_v3(r_center); }
 struct RigidBodyWorld *BKE_rigidbody_create_world(Scene *scene) { return NULL; }
 struct RigidBodyWorld *BKE_rigidbody_world_copy(RigidBodyWorld *rbw) { return NULL; }
 void BKE_rigidbody_world_groups_relink(struct RigidBodyWorld *rbw) {}
@@ -1409,3 +1614,51 @@ void BKE_rigidbody_do_simulation(Scene *scene, float ctime) {}
 #endif
 
 #endif  /* WITH_BULLET */
+
+/* -------------------- */
+/* Depsgraph evaluation */
+
+void BKE_rigidbody_rebuild_sim(EvaluationContext *UNUSED(eval_ctx),
+                               Scene *scene)
+{
+	float ctime = BKE_scene_frame_get(scene);
+
+	if (G.debug & G_DEBUG_DEPSGRAPH) {
+		printf("%s at %f\n", __func__, ctime);
+	}
+
+	/* rebuild sim data (i.e. after resetting to start of timeline) */
+	if (BKE_scene_check_rigidbody_active(scene)) {
+		BKE_rigidbody_rebuild_world(scene, ctime);
+	}
+}
+
+void BKE_rigidbody_eval_simulation(EvaluationContext *UNUSED(eval_ctx),
+                                   Scene *scene)
+{
+	float ctime = BKE_scene_frame_get(scene);
+
+	if (G.debug & G_DEBUG_DEPSGRAPH) {
+		printf("%s at %f\n", __func__, ctime);
+	}
+
+	/* evaluate rigidbody sim */
+	if (BKE_scene_check_rigidbody_active(scene)) {
+		BKE_rigidbody_do_simulation(scene, ctime);
+	}
+}
+
+void BKE_rigidbody_object_sync_transforms(EvaluationContext *UNUSED(eval_ctx),
+                                          Scene *scene,
+                                          Object *ob)
+{
+	RigidBodyWorld *rbw = scene->rigidbody_world;
+	float ctime = BKE_scene_frame_get(scene);
+
+	if (G.debug & G_DEBUG_DEPSGRAPH) {
+		printf("%s on %s\n", __func__, ob->id.name);
+	}
+
+	/* read values pushed into RBO from sim/cache... */
+	BKE_rigidbody_sync_transforms(rbw, ob, ctime);
+}

@@ -72,6 +72,8 @@
 /* local module include */
 #include "transform.h"
 
+#include "GPU_select.h"
+
 /* return codes for select, and drawing flags */
 
 #define MAN_TRANS_X		(1 << 0)
@@ -175,7 +177,7 @@ static void axis_angle_to_gimbal_axis(float gmat[3][3], const float axis[3], con
 	mul_qt_v3(quat, gmat[0]);
 
 	/* Y-axis */
-	axis_angle_to_quat(quat, axis, M_PI / 2.0);
+	axis_angle_to_quat(quat, axis, M_PI_2);
 	copy_v3_v3(gmat[1], gmat[0]);
 	mul_qt_v3(quat, gmat[1]);
 
@@ -260,13 +262,12 @@ bool gimbal_axis(Object *ob, float gmat[3][3])
 
 /* centroid, boundbox, of selection */
 /* returns total items selected */
-int calc_manipulator_stats(const bContext *C)
+static int calc_manipulator_stats(const bContext *C)
 {
 	ScrArea *sa = CTX_wm_area(C);
 	ARegion *ar = CTX_wm_region(C);
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
-	ToolSettings *ts = CTX_data_tool_settings(C);
 	View3D *v3d = sa->spacedata.first;
 	RegionView3D *rv3d = ar->regiondata;
 	Base *base;
@@ -303,48 +304,11 @@ int calc_manipulator_stats(const bContext *C)
 
 				BMIter iter;
 
-				/* do vertices/edges/faces for center depending on selection
-				 * mode. note we can't use just vertex selection flag because
-				 * it is not flush down on changes */
-				if (ts->selectmode & SCE_SELECT_VERTEX) {
-					BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-						if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
-							if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-								totsel++;
-								calc_tw_center(scene, eve->co);
-							}
-						}
-					}
-				}
-				else if (ts->selectmode & SCE_SELECT_EDGE) {
-					BMIter itersub;
-					BMEdge *eed;
-					BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-						if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
-							/* check the vertex has a selected edge, only add it once */
-							BM_ITER_ELEM (eed, &itersub, eve, BM_EDGES_OF_VERT) {
-								if (BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
-									totsel++;
-									calc_tw_center(scene, eve->co);
-									break;
-								}
-							}
-						}
-					}
-				}
-				else {
-					BMIter itersub;
-					BMFace *efa;
-					BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-						if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
-							/* check the vertex has a selected face, only add it once */
-							BM_ITER_ELEM (efa, &itersub, eve, BM_FACES_OF_VERT) {
-								if (BM_elem_flag_test(efa, BM_ELEM_SELECT)) {
-									totsel++;
-									calc_tw_center(scene, eve->co);
-									break;
-								}
-							}
+				BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+					if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
+						if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+							totsel++;
+							calc_tw_center(scene, eve->co);
 						}
 					}
 				}
@@ -548,7 +512,7 @@ int calc_manipulator_stats(const bContext *C)
 
 				for (k = 0, ek = point->keys; k < point->totkey; k++, ek++) {
 					if (ek->flag & PEK_SELECT) {
-						calc_tw_center(scene, ek->flag & PEK_USE_WCO ? ek->world_co : ek->co);
+						calc_tw_center(scene, (ek->flag & PEK_USE_WCO) ? ek->world_co : ek->co);
 						totsel++;
 					}
 				}
@@ -604,7 +568,7 @@ int calc_manipulator_stats(const bContext *C)
 			{
 				if (obedit || ob->mode & OB_MODE_POSE) {
 					float mat[3][3];
-					ED_getTransformOrientationMatrix(C, mat, (v3d->around == V3D_ACTIVE));
+					ED_getTransformOrientationMatrix(C, mat, v3d->around);
 					copy_m4_m3(rv3d->twmat, mat);
 					break;
 				}
@@ -619,7 +583,7 @@ int calc_manipulator_stats(const bContext *C)
 					 * and users who select many bones will understand whats going on and what local means
 					 * when they start transforming */
 					float mat[3][3];
-					ED_getTransformOrientationMatrix(C, mat, (v3d->around == V3D_ACTIVE));
+					ED_getTransformOrientationMatrix(C, mat, v3d->around);
 					copy_m4_m3(rv3d->twmat, mat);
 					break;
 				}
@@ -638,7 +602,7 @@ int calc_manipulator_stats(const bContext *C)
 			default: /* V3D_MANIP_CUSTOM */
 			{
 				float mat[3][3];
-				if (applyTransformOrientation(C, mat, NULL)) {
+				if (applyTransformOrientation(C, mat, NULL, v3d->twmode - V3D_MANIP_CUSTOM)) {
 					copy_m4_m3(rv3d->twmat, mat);
 				}
 				break;
@@ -858,8 +822,8 @@ static void draw_manipulator_axes_single(View3D *v3d, RegionView3D *rv3d, int co
 			/* axes */
 			if (flagx) {
 				if (is_picksel) {
-					if      (flagx & MAN_SCALE_X) glLoadName(MAN_SCALE_X);
-					else if (flagx & MAN_TRANS_X) glLoadName(MAN_TRANS_X);
+					if      (flagx & MAN_SCALE_X) GPU_select_load_id(MAN_SCALE_X);
+					else if (flagx & MAN_TRANS_X) GPU_select_load_id(MAN_TRANS_X);
 				}
 				else {
 					manipulator_setcolor(v3d, 'X', colcode, axisBlendAngle(rv3d->tw_idot[0]));
@@ -873,8 +837,8 @@ static void draw_manipulator_axes_single(View3D *v3d, RegionView3D *rv3d, int co
 		case 1:
 			if (flagy) {
 				if (is_picksel) {
-					if      (flagy & MAN_SCALE_Y) glLoadName(MAN_SCALE_Y);
-					else if (flagy & MAN_TRANS_Y) glLoadName(MAN_TRANS_Y);
+					if      (flagy & MAN_SCALE_Y) GPU_select_load_id(MAN_SCALE_Y);
+					else if (flagy & MAN_TRANS_Y) GPU_select_load_id(MAN_TRANS_Y);
 				}
 				else {
 					manipulator_setcolor(v3d, 'Y', colcode, axisBlendAngle(rv3d->tw_idot[1]));
@@ -888,8 +852,8 @@ static void draw_manipulator_axes_single(View3D *v3d, RegionView3D *rv3d, int co
 		case 2:
 			if (flagz) {
 				if (is_picksel) {
-					if      (flagz & MAN_SCALE_Z) glLoadName(MAN_SCALE_Z);
-					else if (flagz & MAN_TRANS_Z) glLoadName(MAN_TRANS_Z);
+					if      (flagz & MAN_SCALE_Z) GPU_select_load_id(MAN_SCALE_Z);
+					else if (flagz & MAN_TRANS_Z) GPU_select_load_id(MAN_TRANS_Z);
 				}
 				else {
 					manipulator_setcolor(v3d, 'Z', colcode, axisBlendAngle(rv3d->tw_idot[2]));
@@ -931,6 +895,11 @@ static void postOrtho(const bool ortho)
 	}
 }
 
+BLI_INLINE bool manipulator_rotate_is_visible(const int drawflags)
+{
+	return (drawflags & (MAN_ROT_X | MAN_ROT_Y | MAN_ROT_Z));
+}
+
 static void draw_manipulator_rotate(
         View3D *v3d, RegionView3D *rv3d, const int drawflags, const int combo,
         const bool is_moving, const bool is_picksel)
@@ -944,8 +913,8 @@ static void draw_manipulator_rotate(
 	const int colcode = (is_moving) ? MAN_MOVECOL : MAN_RGB;
 	bool ortho;
 
-	/* when called while moving in mixed mode, do not draw when... */
-	if ((drawflags & MAN_ROT_C) == 0) return;
+	/* skip drawing if all axes are locked */
+	if (manipulator_rotate_is_visible(drawflags) == false) return;
 
 	/* Init stuff */
 	glDisable(GL_DEPTH_TEST);
@@ -975,7 +944,7 @@ static void draw_manipulator_rotate(
 
 	/* Screen aligned trackball rot circle */
 	if (drawflags & MAN_ROT_T) {
-		if (is_picksel) glLoadName(MAN_ROT_T);
+		if (is_picksel) GPU_select_load_id(MAN_ROT_T);
 		else UI_ThemeColor(TH_TRANSFORM);
 
 		drawcircball(GL_LINE_LOOP, unitmat[3], 0.2f * size, unitmat);
@@ -983,7 +952,7 @@ static void draw_manipulator_rotate(
 
 	/* Screen aligned view rot circle */
 	if (drawflags & MAN_ROT_V) {
-		if (is_picksel) glLoadName(MAN_ROT_V);
+		if (is_picksel) GPU_select_load_id(MAN_ROT_V);
 		else UI_ThemeColor(TH_TRANSFORM);
 		drawcircball(GL_LINE_LOOP, unitmat[3], 1.2f * size, unitmat);
 
@@ -1062,7 +1031,7 @@ static void draw_manipulator_rotate(
 		/* Z circle */
 		if (drawflags & MAN_ROT_Z) {
 			preOrthoFront(ortho, matt, 2);
-			if (is_picksel) glLoadName(MAN_ROT_Z);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 			else manipulator_setcolor(v3d, 'Z', colcode, 255);
 			drawcircball(GL_LINE_LOOP, unitmat[3], 1.0, unitmat);
 			postOrtho(ortho);
@@ -1070,7 +1039,7 @@ static void draw_manipulator_rotate(
 		/* X circle */
 		if (drawflags & MAN_ROT_X) {
 			preOrthoFront(ortho, matt, 0);
-			if (is_picksel) glLoadName(MAN_ROT_X);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_X);
 			else manipulator_setcolor(v3d, 'X', colcode, 255);
 			glRotatef(90.0, 0.0, 1.0, 0.0);
 			drawcircball(GL_LINE_LOOP, unitmat[3], 1.0, unitmat);
@@ -1080,15 +1049,13 @@ static void draw_manipulator_rotate(
 		/* Y circle */
 		if (drawflags & MAN_ROT_Y) {
 			preOrthoFront(ortho, matt, 1);
-			if (is_picksel) glLoadName(MAN_ROT_Y);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_Y);
 			else manipulator_setcolor(v3d, 'Y', colcode, 255);
 			glRotatef(-90.0, 1.0, 0.0, 0.0);
 			drawcircball(GL_LINE_LOOP, unitmat[3], 1.0, unitmat);
 			glRotatef(90.0, 1.0, 0.0, 0.0);
 			postOrtho(ortho);
 		}
-
-		if (arcs) glDisable(GL_CLIP_PLANE0);
 	}
 	// donut arcs
 	if (arcs) {
@@ -1097,7 +1064,7 @@ static void draw_manipulator_rotate(
 		/* Z circle */
 		if (drawflags & MAN_ROT_Z) {
 			preOrthoFront(ortho, rv3d->twmat, 2);
-			if (is_picksel) glLoadName(MAN_ROT_Z);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 			else manipulator_setcolor(v3d, 'Z', colcode, 255);
 			partial_doughnut(cusize / 4.0f, 1.0f, 0, 48, 8, 48);
 			postOrtho(ortho);
@@ -1105,7 +1072,7 @@ static void draw_manipulator_rotate(
 		/* X circle */
 		if (drawflags & MAN_ROT_X) {
 			preOrthoFront(ortho, rv3d->twmat, 0);
-			if (is_picksel) glLoadName(MAN_ROT_X);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_X);
 			else manipulator_setcolor(v3d, 'X', colcode, 255);
 			glRotatef(90.0, 0.0, 1.0, 0.0);
 			partial_doughnut(cusize / 4.0f, 1.0f, 0, 48, 8, 48);
@@ -1115,7 +1082,7 @@ static void draw_manipulator_rotate(
 		/* Y circle */
 		if (drawflags & MAN_ROT_Y) {
 			preOrthoFront(ortho, rv3d->twmat, 1);
-			if (is_picksel) glLoadName(MAN_ROT_Y);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_Y);
 			else manipulator_setcolor(v3d, 'Y', colcode, 255);
 			glRotatef(-90.0, 1.0, 0.0, 0.0);
 			partial_doughnut(cusize / 4.0f, 1.0f, 0, 48, 8, 48);
@@ -1132,7 +1099,7 @@ static void draw_manipulator_rotate(
 		if (drawflags & MAN_ROT_Z) {
 			preOrthoFront(ortho, rv3d->twmat, 2);
 			glPushMatrix();
-			if (is_picksel) glLoadName(MAN_ROT_Z);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 			else manipulator_setcolor(v3d, 'Z', colcode, 255);
 
 			partial_doughnut(0.7f * cusize, 1.0f, 31, 33, 8, 64);
@@ -1145,7 +1112,7 @@ static void draw_manipulator_rotate(
 		if (drawflags & MAN_ROT_Y) {
 			preOrthoFront(ortho, rv3d->twmat, 1);
 			glPushMatrix();
-			if (is_picksel) glLoadName(MAN_ROT_Y);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_Y);
 			else manipulator_setcolor(v3d, 'Y', colcode, 255);
 
 			glRotatef(90.0, 1.0, 0.0, 0.0);
@@ -1160,7 +1127,7 @@ static void draw_manipulator_rotate(
 		if (drawflags & MAN_ROT_X) {
 			preOrthoFront(ortho, rv3d->twmat, 0);
 			glPushMatrix();
-			if (is_picksel) glLoadName(MAN_ROT_X);
+			if (is_picksel) GPU_select_load_id(MAN_ROT_X);
 			else manipulator_setcolor(v3d, 'X', colcode, 255);
 
 			glRotatef(-90.0, 0.0, 1.0, 0.0);
@@ -1263,7 +1230,7 @@ static void draw_manipulator_scale(
 		int shift = 0; // XXX
 
 		/* center circle, do not add to selection when shift is pressed (planar constraint)  */
-		if (is_picksel && shift == 0) glLoadName(MAN_SCALE_C);
+		if (is_picksel && shift == 0) GPU_select_load_id(MAN_SCALE_C);
 		else manipulator_setcolor(v3d, 'C', colcode, 255);
 
 		glPushMatrix();
@@ -1304,7 +1271,7 @@ static void draw_manipulator_scale(
 			case 0: /* X cube */
 				if (drawflags & MAN_SCALE_X) {
 					glTranslatef(dz, 0.0, 0.0);
-					if (is_picksel) glLoadName(MAN_SCALE_X);
+					if (is_picksel) GPU_select_load_id(MAN_SCALE_X);
 					else manipulator_setcolor(v3d, 'X', colcode, axisBlendAngle(rv3d->tw_idot[0]));
 					drawsolidcube(cusize);
 					glTranslatef(-dz, 0.0, 0.0);
@@ -1313,7 +1280,7 @@ static void draw_manipulator_scale(
 			case 1: /* Y cube */
 				if (drawflags & MAN_SCALE_Y) {
 					glTranslatef(0.0, dz, 0.0);
-					if (is_picksel) glLoadName(MAN_SCALE_Y);
+					if (is_picksel) GPU_select_load_id(MAN_SCALE_Y);
 					else manipulator_setcolor(v3d, 'Y', colcode, axisBlendAngle(rv3d->tw_idot[1]));
 					drawsolidcube(cusize);
 					glTranslatef(0.0, -dz, 0.0);
@@ -1322,7 +1289,7 @@ static void draw_manipulator_scale(
 			case 2: /* Z cube */
 				if (drawflags & MAN_SCALE_Z) {
 					glTranslatef(0.0, 0.0, dz);
-					if (is_picksel) glLoadName(MAN_SCALE_Z);
+					if (is_picksel) GPU_select_load_id(MAN_SCALE_Z);
 					else manipulator_setcolor(v3d, 'Z', colcode, axisBlendAngle(rv3d->tw_idot[2]));
 					drawsolidcube(cusize);
 					glTranslatef(0.0, 0.0, -dz);
@@ -1337,7 +1304,7 @@ static void draw_manipulator_scale(
 
 		if (shift) {
 			glTranslatef(0.0, -dz, 0.0);
-			glLoadName(MAN_SCALE_C);
+			GPU_select_load_id(MAN_SCALE_C);
 			glBegin(GL_POINTS);
 			glVertex3f(0.0, 0.0, 0.0);
 			glEnd();
@@ -1399,7 +1366,7 @@ static void draw_manipulator_translate(
 	glDisable(GL_DEPTH_TEST);
 
 	/* center circle, do not add to selection when shift is pressed (planar constraint) */
-	if (is_picksel && shift == 0) glLoadName(MAN_TRANS_C);
+	if (is_picksel && shift == 0) GPU_select_load_id(MAN_TRANS_C);
 	else manipulator_setcolor(v3d, 'C', colcode, 255);
 
 	glPushMatrix();
@@ -1412,7 +1379,7 @@ static void draw_manipulator_translate(
 	glMultMatrixf(rv3d->twmat);
 
 	/* axis */
-	glLoadName(-1);
+	GPU_select_load_id(-1);
 
 	// translate drawn as last, only axis when no combo with scale, or for ghosting
 	if ((combo & V3D_MANIP_SCALE) == 0 || colcode == MAN_GHOST) {
@@ -1435,7 +1402,7 @@ static void draw_manipulator_translate(
 			case 0: /* Z Cone */
 				if (drawflags & MAN_TRANS_Z) {
 					glTranslatef(0.0, 0.0, dz);
-					if (is_picksel) glLoadName(MAN_TRANS_Z);
+					if (is_picksel) GPU_select_load_id(MAN_TRANS_Z);
 					else manipulator_setcolor(v3d, 'Z', colcode, axisBlendAngle(rv3d->tw_idot[2]));
 					draw_cone(qobj, cylen, cywid);
 					glTranslatef(0.0, 0.0, -dz);
@@ -1444,7 +1411,7 @@ static void draw_manipulator_translate(
 			case 1: /* X Cone */
 				if (drawflags & MAN_TRANS_X) {
 					glTranslatef(dz, 0.0, 0.0);
-					if (is_picksel) glLoadName(MAN_TRANS_X);
+					if (is_picksel) GPU_select_load_id(MAN_TRANS_X);
 					else manipulator_setcolor(v3d, 'X', colcode, axisBlendAngle(rv3d->tw_idot[0]));
 					glRotatef(90.0, 0.0, 1.0, 0.0);
 					draw_cone(qobj, cylen, cywid);
@@ -1455,7 +1422,7 @@ static void draw_manipulator_translate(
 			case 2: /* Y Cone */
 				if (drawflags & MAN_TRANS_Y) {
 					glTranslatef(0.0, dz, 0.0);
-					if (is_picksel) glLoadName(MAN_TRANS_Y);
+					if (is_picksel) GPU_select_load_id(MAN_TRANS_Y);
 					else manipulator_setcolor(v3d, 'Y', colcode, axisBlendAngle(rv3d->tw_idot[1]));
 					glRotatef(-90.0, 1.0, 0.0, 0.0);
 					draw_cone(qobj, cylen, cywid);
@@ -1484,8 +1451,8 @@ static void draw_manipulator_rotate_cyl(
 	int axis_order[3] = {2, 0, 1};
 	int i;
 
-	/* when called while moving in mixed mode, do not draw when... */
-	if ((drawflags & MAN_ROT_C) == 0) return;
+	/* skip drawing if all axes are locked */
+	if (manipulator_rotate_is_visible(drawflags) == false) return;
 
 	manipulator_axis_order(rv3d, axis_order);
 
@@ -1503,7 +1470,7 @@ static void draw_manipulator_rotate_cyl(
 
 		unit_m4(unitmat);
 
-		if (is_picksel) glLoadName(MAN_ROT_V);
+		if (is_picksel) GPU_select_load_id(MAN_ROT_V);
 		UI_ThemeColor(TH_TRANSFORM);
 		drawcircball(GL_LINE_LOOP, unitmat[3], 1.2f * size, unitmat);
 
@@ -1556,7 +1523,7 @@ static void draw_manipulator_rotate_cyl(
 			case 0: /* X cylinder */
 				if (drawflags & MAN_ROT_X) {
 					glTranslatef(1.0, 0.0, 0.0);
-					if (is_picksel) glLoadName(MAN_ROT_X);
+					if (is_picksel) GPU_select_load_id(MAN_ROT_X);
 					glRotatef(90.0, 0.0, 1.0, 0.0);
 					manipulator_setcolor(v3d, 'X', colcode, 255);
 					draw_cylinder(qobj, cylen, cywid);
@@ -1567,7 +1534,7 @@ static void draw_manipulator_rotate_cyl(
 			case 1: /* Y cylinder */
 				if (drawflags & MAN_ROT_Y) {
 					glTranslatef(0.0, 1.0, 0.0);
-					if (is_picksel) glLoadName(MAN_ROT_Y);
+					if (is_picksel) GPU_select_load_id(MAN_ROT_Y);
 					glRotatef(-90.0, 1.0, 0.0, 0.0);
 					manipulator_setcolor(v3d, 'Y', colcode, 255);
 					draw_cylinder(qobj, cylen, cywid);
@@ -1578,7 +1545,7 @@ static void draw_manipulator_rotate_cyl(
 			case 2: /* Z cylinder */
 				if (drawflags & MAN_ROT_Z) {
 					glTranslatef(0.0, 0.0, 1.0);
-					if (is_picksel) glLoadName(MAN_ROT_Z);
+					if (is_picksel) GPU_select_load_id(MAN_ROT_Z);
 					manipulator_setcolor(v3d, 'Z', colcode, 255);
 					draw_cylinder(qobj, cylen, cywid);
 					glTranslatef(0.0, 0.0, -1.0);
@@ -1690,10 +1657,11 @@ static int manipulator_selectbuf(ScrArea *sa, ARegion *ar, const int mval[2], fl
 {
 	View3D *v3d = sa->spacedata.first;
 	RegionView3D *rv3d = ar->regiondata;
-	rctf rect;
+	rctf rect, selrect;
 	GLuint buffer[64];      // max 4 items per select, so large enuf
 	short hits;
 	const bool is_picksel = true;
+	const bool do_passes = GPU_select_query_check_active();
 
 	/* XXX check a bit later on this... (ton) */
 	extern void view3d_winmatrix_set(ARegion *ar, View3D *v3d, rctf *rect);
@@ -1708,13 +1676,15 @@ static int manipulator_selectbuf(ScrArea *sa, ARegion *ar, const int mval[2], fl
 	rect.ymin = mval[1] - hotspot;
 	rect.ymax = mval[1] + hotspot;
 
+	selrect = rect;
+
 	view3d_winmatrix_set(ar, v3d, &rect);
 	mul_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
 
-	glSelectBuffer(64, buffer);
-	glRenderMode(GL_SELECT);
-	glInitNames();  /* these two calls whatfor? It doesn't work otherwise */
-	glPushName(-2);
+	if (do_passes)
+		GPU_select_begin(buffer, 64, &selrect, GPU_SELECT_NEAREST_FIRST_PASS, 0);
+	else
+		GPU_select_begin(buffer, 64, &selrect, GPU_SELECT_ALL, 0);
 
 	/* do the drawing */
 	if (v3d->twtype & V3D_MANIP_ROTATE) {
@@ -1726,8 +1696,23 @@ static int manipulator_selectbuf(ScrArea *sa, ARegion *ar, const int mval[2], fl
 	if (v3d->twtype & V3D_MANIP_TRANSLATE)
 		draw_manipulator_translate(v3d, rv3d, MAN_TRANS_C & rv3d->twdrawflag, v3d->twtype, MAN_RGB, false, is_picksel);
 
-	glPopName();
-	hits = glRenderMode(GL_RENDER);
+	hits = GPU_select_end();
+
+	if (do_passes) {
+		GPU_select_begin(buffer, 64, &selrect, GPU_SELECT_NEAREST_SECOND_PASS, hits);
+
+		/* do the drawing */
+		if (v3d->twtype & V3D_MANIP_ROTATE) {
+			if (G.debug_value == 3) draw_manipulator_rotate_cyl(v3d, rv3d, MAN_ROT_C & rv3d->twdrawflag, v3d->twtype, MAN_RGB, false, is_picksel);
+			else draw_manipulator_rotate(v3d, rv3d, MAN_ROT_C & rv3d->twdrawflag, v3d->twtype, false, is_picksel);
+		}
+		if (v3d->twtype & V3D_MANIP_SCALE)
+			draw_manipulator_scale(v3d, rv3d, MAN_SCALE_C & rv3d->twdrawflag, v3d->twtype, MAN_RGB, false, is_picksel);
+		if (v3d->twtype & V3D_MANIP_TRANSLATE)
+			draw_manipulator_translate(v3d, rv3d, MAN_TRANS_C & rv3d->twdrawflag, v3d->twtype, MAN_RGB, false, is_picksel);
+
+		GPU_select_end();
+	}
 
 	view3d_winmatrix_set(ar, v3d, NULL);
 	mul_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
@@ -1830,7 +1815,6 @@ int BIF_do_manipulator(bContext *C, const struct wmEvent *event, wmOperator *op)
 			}
 			RNA_boolean_set_array(op->ptr, "constraint_axis", constraint_axis);
 			WM_operator_name_call(C, "TRANSFORM_OT_translate", WM_OP_INVOKE_DEFAULT, op->ptr);
-			//wm_operator_invoke(C, WM_operatortype_find("TRANSFORM_OT_translate", 0), event, op->ptr, NULL, false);
 		}
 		else if (drawflags & MAN_SCALE_C) {
 			switch (drawflags) {
@@ -1861,18 +1845,19 @@ int BIF_do_manipulator(bContext *C, const struct wmEvent *event, wmOperator *op)
 			}
 			RNA_boolean_set_array(op->ptr, "constraint_axis", constraint_axis);
 			WM_operator_name_call(C, "TRANSFORM_OT_resize", WM_OP_INVOKE_DEFAULT, op->ptr);
-			//wm_operator_invoke(C, WM_operatortype_find("TRANSFORM_OT_resize", 0), event, op->ptr, NULL, false);
 		}
 		else if (drawflags == MAN_ROT_T) { /* trackball need special case, init is different */
 			/* Do not pass op->ptr!!! trackball has no "constraint" properties!
 			 * See [#34621], it's a miracle it did not cause more problems!!! */
-			/* However, we need to copy the "release_confirm" property... */
+			/* However, we need to copy the "release_confirm" property, but only if defined, see T41112. */
 			PointerRNA props_ptr;
+			PropertyRNA *prop;
 			wmOperatorType *ot = WM_operatortype_find("TRANSFORM_OT_trackball", true);
 			WM_operator_properties_create_ptr(&props_ptr, ot);
-			RNA_boolean_set(&props_ptr, "release_confirm", RNA_boolean_get(op->ptr, "release_confirm"));
-			WM_operator_name_call(C, ot->idname, WM_OP_INVOKE_DEFAULT, &props_ptr);
-			//wm_operator_invoke(C, WM_operatortype_find(ot->idname, 0), event, NULL, NULL, false);
+			if ((prop = RNA_struct_find_property(op->ptr, "release_confirm")) && RNA_property_is_set(op->ptr, prop)) {
+				RNA_property_boolean_set(&props_ptr, prop, RNA_property_boolean_get(op->ptr, prop));
+			}
+			WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, &props_ptr);
 			WM_operator_properties_free(&props_ptr);
 		}
 		else if (drawflags & MAN_ROT_C) {
@@ -1889,7 +1874,6 @@ int BIF_do_manipulator(bContext *C, const struct wmEvent *event, wmOperator *op)
 			}
 			RNA_boolean_set_array(op->ptr, "constraint_axis", constraint_axis);
 			WM_operator_name_call(C, "TRANSFORM_OT_rotate", WM_OP_INVOKE_DEFAULT, op->ptr);
-			//wm_operator_invoke(C, WM_operatortype_find("TRANSFORM_OT_rotate", 0), event, op->ptr, NULL, false);
 		}
 	}
 	/* after transform, restore drawflags */

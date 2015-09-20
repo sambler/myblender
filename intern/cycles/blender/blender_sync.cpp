@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #include "background.h"
@@ -30,11 +30,13 @@
 #include "device.h"
 
 #include "blender_sync.h"
+#include "blender_session.h"
 #include "blender_util.h"
 
 #include "util_debug.h"
 #include "util_foreach.h"
 #include "util_opengl.h"
+#include "util_hash.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -70,10 +72,18 @@ bool BlenderSync::sync_recalc()
 	 * so we can do it later on if doing it immediate is not suitable */
 
 	BL::BlendData::materials_iterator b_mat;
-
-	for(b_data.materials.begin(b_mat); b_mat != b_data.materials.end(); ++b_mat)
-		if(b_mat->is_updated() || (b_mat->node_tree() && b_mat->node_tree().is_updated()))
+	bool has_updated_objects = b_data.objects.is_updated();
+	for(b_data.materials.begin(b_mat); b_mat != b_data.materials.end(); ++b_mat) {
+		if(b_mat->is_updated() || (b_mat->node_tree() && b_mat->node_tree().is_updated())) {
 			shader_map.set_recalc(*b_mat);
+		}
+		else {
+			Shader *shader = shader_map.find(*b_mat);
+			if(has_updated_objects && shader != NULL && shader->has_object_dependency) {
+				shader_map.set_recalc(*b_mat);
+			}
+		}
+	}
 
 	BL::BlendData::lamps_iterator b_lamp;
 
@@ -102,7 +112,7 @@ bool BlenderSync::sync_recalc()
 		
 		if(b_ob->is_updated_data()) {
 			BL::Object::particle_systems_iterator b_psys;
-			for (b_ob->particle_systems.begin(b_psys); b_psys != b_ob->particle_systems.end(); ++b_psys)
+			for(b_ob->particle_systems.begin(b_psys); b_psys != b_ob->particle_systems.end(); ++b_psys)
 				particle_system_map.set_recalc(*b_ob);
 		}
 	}
@@ -135,15 +145,30 @@ bool BlenderSync::sync_recalc()
 	return recalc;
 }
 
-void BlenderSync::sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, void **python_thread_state, const char *layer)
+void BlenderSync::sync_data(BL::RenderSettings b_render,
+                            BL::SpaceView3D b_v3d,
+                            BL::Object b_override,
+                            int width, int height,
+                            void **python_thread_state,
+                            const char *layer)
 {
 	sync_render_layers(b_v3d, layer);
 	sync_integrator();
 	sync_film();
 	sync_shaders();
+	sync_images();
 	sync_curve_settings();
+
+	mesh_synced.clear(); /* use for objects and motion sync */
+
 	sync_objects(b_v3d);
-	sync_motion(b_v3d, b_override, python_thread_state);
+	sync_motion(b_render,
+	            b_v3d,
+	            b_override,
+	            width, height,
+	            python_thread_state);
+
+	mesh_synced.clear();
 }
 
 /* Integrator */
@@ -172,14 +197,18 @@ void BlenderSync::sync_integrator()
 	integrator->transparent_min_bounce = get_int(cscene, "transparent_min_bounces");
 	integrator->transparent_shadows = get_boolean(cscene, "use_transparent_shadows");
 
-	integrator->volume_homogeneous_sampling = RNA_enum_get(&cscene, "volume_homogeneous_sampling");
 	integrator->volume_max_steps = get_int(cscene, "volume_max_steps");
 	integrator->volume_step_size = get_float(cscene, "volume_step_size");
 
-	integrator->no_caustics = get_boolean(cscene, "no_caustics");
+	integrator->caustics_reflective = get_boolean(cscene, "caustics_reflective");
+	integrator->caustics_refractive = get_boolean(cscene, "caustics_refractive");
 	integrator->filter_glossy = get_float(cscene, "blur_glossy");
 
 	integrator->seed = get_int(cscene, "seed");
+	if(get_boolean(cscene, "use_animated_seed"))
+		integrator->seed = hash_int_2d(b_scene.frame_current(), get_int(cscene, "seed"));
+
+	integrator->sampling_pattern = (SamplingPattern)RNA_enum_get(&cscene, "sampling_pattern");
 
 	integrator->layer_flag = render_layer.layer;
 
@@ -227,10 +256,6 @@ void BlenderSync::sync_integrator()
 		integrator->subsurface_samples = subsurface_samples;
 		integrator->volume_samples = volume_samples;
 	}
-	
-
-	if(experimental)
-		integrator->sampling_pattern = (SamplingPattern)RNA_enum_get(&cscene, "sampling_pattern");
 
 	if(integrator->modified(previntegrator))
 		integrator->tag_update(scene);
@@ -312,6 +337,8 @@ void BlenderSync::sync_render_layers(BL::SpaceView3D b_v3d, const char *layer)
 	BL::RenderSettings::layers_iterator b_rlay;
 	int use_layer_samples = RNA_enum_get(&cscene, "use_layer_samples");
 	bool first_layer = true;
+	uint layer_override = get_layer(b_engine.layer_override());
+	uint scene_layers = layer_override ? layer_override : get_layer(b_scene.layers());
 
 	for(r.layers.begin(b_rlay); b_rlay != r.layers.end(); ++b_rlay) {
 		if((!layer && first_layer) || (layer && b_rlay->name() == layer)) {
@@ -320,7 +347,7 @@ void BlenderSync::sync_render_layers(BL::SpaceView3D b_v3d, const char *layer)
 			render_layer.holdout_layer = get_layer(b_rlay->layers_zmask());
 			render_layer.exclude_layer = get_layer(b_rlay->layers_exclude());
 
-			render_layer.scene_layer = get_layer(b_scene.layers()) & ~render_layer.exclude_layer;
+			render_layer.scene_layer = scene_layers & ~render_layer.exclude_layer;
 			render_layer.scene_layer |= render_layer.exclude_layer & render_layer.holdout_layer;
 
 			render_layer.layer = get_layer(b_rlay->layers());
@@ -347,9 +374,42 @@ void BlenderSync::sync_render_layers(BL::SpaceView3D b_v3d, const char *layer)
 	}
 }
 
+/* Images */
+void BlenderSync::sync_images()
+{
+	/* Sync is a convention for this API, but currently it frees unused buffers. */
+
+	const bool is_interface_locked = b_engine.render() &&
+	                                 b_engine.render().use_lock_interface();
+	if(is_interface_locked == false && BlenderSession::headless == false) {
+		/* If interface is not locked, it's possible image is needed for
+		 * the display.
+		 */
+		return;
+	}
+	/* Free buffers used by images which are not needed for render. */
+	BL::BlendData::images_iterator b_image;
+	for(b_data.images.begin(b_image);
+	    b_image != b_data.images.end();
+	    ++b_image)
+	{
+		/* TODO(sergey): Consider making it an utility function to check
+		 * whether image is considered builtin.
+		 */
+		const bool is_builtin = b_image->packed_file() ||
+		                        b_image->source() == BL::Image::source_GENERATED ||
+		                        b_image->source() == BL::Image::source_MOVIE ||
+		                        b_engine.is_preview();
+		if(is_builtin == false) {
+			b_image->buffers_free();
+		}
+		/* TODO(sergey): Free builtin images not used by any shader. */
+	}
+}
+
 /* Scene Parameters */
 
-SceneParams BlenderSync::get_scene_params(BL::Scene b_scene, bool background)
+SceneParams BlenderSync::get_scene_params(BL::Scene b_scene, bool background, bool is_cpu)
 {
 	BL::RenderSettings r = b_scene.render();
 	SceneParams params;
@@ -357,9 +417,9 @@ SceneParams BlenderSync::get_scene_params(BL::Scene b_scene, bool background)
 	const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
 	if(shadingsystem == 0)
-		params.shadingsystem = SceneParams::SVM;
+		params.shadingsystem = SHADINGSYSTEM_SVM;
 	else if(shadingsystem == 1)
-		params.shadingsystem = SceneParams::OSL;
+		params.shadingsystem = SHADINGSYSTEM_OSL;
 	
 	if(background)
 		params.bvh_type = SceneParams::BVH_STATIC;
@@ -369,10 +429,20 @@ SceneParams BlenderSync::get_scene_params(BL::Scene b_scene, bool background)
 	params.use_bvh_spatial_split = RNA_boolean_get(&cscene, "debug_use_spatial_splits");
 	params.use_bvh_cache = (background)? RNA_boolean_get(&cscene, "use_cache"): false;
 
-	if(background && params.shadingsystem != SceneParams::OSL)
+	if(background && params.shadingsystem != SHADINGSYSTEM_OSL)
 		params.persistent_data = r.use_persistent_data();
 	else
 		params.persistent_data = false;
+
+#if !(defined(__GNUC__) && (defined(i386) || defined(_M_IX86)))
+	if(is_cpu) {
+		params.use_qbvh = system_cpu_support_sse2();
+	}
+	else
+#endif
+	{
+		params.use_qbvh = false;
+	}
 
 	return params;
 }
@@ -385,7 +455,10 @@ bool BlenderSync::get_session_pause(BL::Scene b_scene, bool background)
 	return (background)? false: get_boolean(cscene, "preview_pause");
 }
 
-SessionParams BlenderSync::get_session_params(BL::RenderEngine b_engine, BL::UserPreferences b_userpref, BL::Scene b_scene, bool background)
+SessionParams BlenderSync::get_session_params(BL::RenderEngine b_engine,
+                                              BL::UserPreferences b_userpref,
+                                              BL::Scene b_scene,
+                                              bool background)
 {
 	SessionParams params;
 	PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
@@ -474,8 +547,13 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine b_engine, BL::Use
 
 		params.tile_size = make_int2(tile_x, tile_y);
 	}
-	
-	params.tile_order = (TileOrder)RNA_enum_get(&cscene, "tile_order");
+
+	if(BlenderSession::headless == false) {
+		params.tile_order = (TileOrder)RNA_enum_get(&cscene, "tile_order");
+	}
+	else {
+		params.tile_order = TILE_BOTTOM_TO_TOP;
+	}
 
 	params.start_resolution = get_int(cscene, "preview_start_resolution");
 
@@ -506,12 +584,29 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine b_engine, BL::Use
 	const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
 	if(shadingsystem == 0)
-		params.shadingsystem = SessionParams::SVM;
+		params.shadingsystem = SHADINGSYSTEM_SVM;
 	else if(shadingsystem == 1)
-		params.shadingsystem = SessionParams::OSL;
+		params.shadingsystem = SHADINGSYSTEM_OSL;
 	
 	/* color managagement */
-	params.display_buffer_linear = GLEW_ARB_half_float_pixel && b_engine.support_display_space_shader(b_scene);
+#ifdef GLEW_MX
+	/* When using GLEW MX we need to check whether we've got an OpenGL
+	 * context for current window. This is because command line rendering
+	 * doesn't have OpenGL context actually.
+	 */
+	if(glewGetContext() != NULL)
+#endif
+	{
+		params.display_buffer_linear = GLEW_ARB_half_float_pixel &&
+		                               b_engine.support_display_space_shader(b_scene);
+	}
+
+	if(b_engine.is_preview()) {
+		/* For preview rendering we're using same timeout as
+		 * blender's job update.
+		 */
+		params.progressive_update_timeout = 0.1;
+	}
 
 	return params;
 }

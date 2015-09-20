@@ -254,7 +254,7 @@ static int return_editcurve_indexar(
 	}
 	if (totvert == 0) return 0;
 	
-	*r_indexar = index = MEM_mallocN(4 * totvert, "hook indexar");
+	*r_indexar = index = MEM_mallocN(sizeof(*index) * totvert, "hook indexar");
 	*r_tot = totvert;
 	nr = 0;
 	zero_v3(r_cent);
@@ -331,6 +331,8 @@ static bool object_hook_index_array(Scene *scene, Object *obedit,
 		}
 		case OB_CURVE:
 		case OB_SURF:
+			load_editNurb(obedit);
+			make_editNurb(obedit);
 			return return_editcurve_indexar(obedit, r_tot, r_indexar, r_cent);
 		case OB_LATTICE:
 		{
@@ -446,11 +448,12 @@ static Object *add_hook_object_new(Main *bmain, Scene *scene, Object *obedit)
 	Base *base, *basedit;
 	Object *ob;
 
-	ob = BKE_object_add(bmain, scene, OB_EMPTY);
+	ob = BKE_object_add(bmain, scene, OB_EMPTY, NULL);
 	
 	basedit = BKE_scene_base_find(scene, obedit);
-	base = BKE_scene_base_find(scene, ob);
+	base = scene->basact;
 	base->lay = ob->lay = obedit->lay;
+	BLI_assert(scene->basact->object == ob);
 	
 	/* icky, BKE_object_add sets new base as active.
 	 * so set it back to the original edit object */
@@ -501,6 +504,15 @@ static int add_hook_object(Main *bmain, Scene *scene, Object *obedit, Object *ob
 	
 	unit_m4(pose_mat);
 
+	invert_m4_m4(obedit->imat, obedit->obmat);
+	if (mode == OBJECT_ADDHOOK_NEWOB) {
+		/* pass */
+	}
+	else {
+		/* may overwrite with pose-bone location, below */
+		mul_v3_m4v3(cent, obedit->imat, ob->obmat[3]);
+	}
+
 	if (mode == OBJECT_ADDHOOK_SELOB_BONE) {
 		bArmature *arm = ob->data;
 		BLI_assert(ob->type == OB_ARMATURE);
@@ -512,12 +524,17 @@ static int add_hook_object(Main *bmain, Scene *scene, Object *obedit, Object *ob
 			pchan_act = BKE_pose_channel_active(ob);
 			if (LIKELY(pchan_act)) {
 				invert_m4_m4(pose_mat, pchan_act->pose_mat);
+				mul_v3_m4v3(cent, ob->obmat, pchan_act->pose_mat[3]);
+				mul_v3_m4v3(cent, obedit->imat, cent);
 			}
 		}
 		else {
 			BKE_report(reports, RPT_WARNING, "Armature has no active object bone");
 		}
 	}
+
+	copy_v3_v3(hmd->cent, cent);
+
 
 	/* matrix calculus */
 	/* vert x (obmat x hook->imat) x hook->obmat x ob->imat */
@@ -526,8 +543,7 @@ static int add_hook_object(Main *bmain, Scene *scene, Object *obedit, Object *ob
 	
 	invert_m4_m4(ob->imat, ob->obmat);
 	/* apparently this call goes from right to left... */
-	mul_serie_m4(hmd->parentinv, pose_mat, ob->imat, obedit->obmat,
-	             NULL, NULL, NULL, NULL, NULL);
+	mul_m4_series(hmd->parentinv, pose_mat, ob->imat, obedit->obmat);
 	
 	DAG_relations_tag_update(bmain);
 

@@ -36,6 +36,10 @@
 
 #ifdef RNA_RUNTIME
 
+#ifdef ARRAY_SIZE
+#  undef ARRAY_SIZE
+#endif
+
 #define ARRAY_SIZE 3
 #define DYNAMIC_ARRAY_SIZE 64
 #define MARRAY_DIM [3][4][5]
@@ -57,7 +61,7 @@
     (void)0
 
 #define DEF_GET_SET(type, arr)                                          \
-    void rna_Test_ ## arr ## _get(PointerRNA *ptr, type * values)       \
+	void rna_Test_ ## arr ## _get(PointerRNA *ptr, type * values)       \
 	{                                                                   \
 		memcpy(values, arr, sizeof(arr));                               \
 	}                                                                   \
@@ -66,10 +70,10 @@
 	{                                                                   \
 		memcpy(arr, values, sizeof(arr));                               \
 	}                                                                   \
-    (void)0
+	((void)0)
 
 #define DEF_GET_SET_LEN(arr, max)                                       \
-    static int rna_Test_ ## arr ## _get_length(PointerRNA * ptr)        \
+	static int rna_Test_ ## arr ## _get_length(PointerRNA * ptr)        \
 	{                                                                   \
 		return arr ## _len;                                             \
 	}                                                                   \
@@ -83,7 +87,7 @@
 		                                                                \
 		return 1;                                                       \
 	}                                                                   \
-    (void)0
+	((void)0)
 
 DEF_VARS(float, f);
 DEF_VARS(int, i);

@@ -33,18 +33,7 @@
 #ifndef __BIF_GL_H__
 #define __BIF_GL_H__
 
-#include "GL/glew.h"
-
-#ifdef __APPLE__
-
-/* hacking pointsize and linewidth */
-#  define glPointSize(f)	glPointSize(U.pixelsize * (f))
-#  define glLineWidth(f)	glLineWidth(U.pixelsize * (f))
-#else
-   /* avoid include mismatch by referencing 'U' from both */
-#  define glPointSize(f)	glPointSize(((void)U.pixelsize, (f)))
-#  define glLineWidth(f)	glLineWidth(((void)U.pixelsize, (f)))
-#endif
+#include "GPU_glew.h"
 
 /*
  * these should be phased out. cpack should be replaced in
@@ -58,8 +47,41 @@
  * */
 void cpack(unsigned int x);
 
-#define glMultMatrixf(x)  glMultMatrixf( (float *)(x))
-#define glLoadMatrixf(x)  glLoadMatrixf( (float *)(x))
+#ifdef WITH_GL_PROFILE_COMPAT
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#  define glMultMatrixf(x)  \
+	glMultMatrixf(_Generic((x), \
+	        float *:      (float *)(x), \
+	        float [16]:   (float *)(x), \
+	        float (*)[4]: (float *)(x), \
+	        float [4][4]: (float *)(x), \
+	        const float *:      (float *)(x), \
+	        const float [16]:   (float *)(x), \
+	        const float (*)[4]: (float *)(x), \
+	        const float [4][4]: (float *)(x)) \
+)
+#  define glLoadMatrixf(x)  \
+	glLoadMatrixf(_Generic((x), \
+	        float *:      (float *)(x), \
+	        float [16]:   (float *)(x), \
+	        float (*)[4]: (float *)(x), \
+	        float [4][4]: (float *)(x)) \
+)
+#else
+#  define glMultMatrixf(x)  glMultMatrixf((float *)(x))
+#  define glLoadMatrixf(x)  glLoadMatrixf((float *)(x))
+#endif  /* C11 */
+#endif  /* WITH_GL_PROFILE_COMPAT */
+
+
+/* hacking pointsize and linewidth */
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#  define glPointSize(f)  glPointSize(U.pixelsize * _Generic((f), double: (float)(f), default: (f)))
+#  define glLineWidth(f)  glLineWidth(U.pixelsize * _Generic((f), double: (float)(f), default: (f)))
+#else
+#  define glPointSize(f)  glPointSize(U.pixelsize * (f))
+#  define glLineWidth(f)  glLineWidth(U.pixelsize * (f))
+#endif  /* C11 */
 
 #define GLA_PIXEL_OFS 0.375f
 

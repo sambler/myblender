@@ -38,12 +38,14 @@ extern "C" {
 #include "COM_SocketProxyOperation.h"
 #include "COM_ReadBufferOperation.h"
 #include "COM_WriteBufferOperation.h"
+#include "COM_ViewerOperation.h"
 
 #include "COM_NodeOperationBuilder.h" /* own include */
 
 NodeOperationBuilder::NodeOperationBuilder(const CompositorContext *context, bNodeTree *b_nodetree) :
     m_context(context),
-    m_current_node(NULL)
+    m_current_node(NULL),
+    m_active_viewer(NULL)
 {
 	m_graph.from_bNodeTree(*context, b_nodetree);
 }
@@ -99,11 +101,11 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
 		}
 	}
 	
-	add_datatype_conversions();
-	
 	add_operation_input_constants();
 	
 	resolve_proxies();
+	
+	add_datatype_conversions();
 	
 	determineResolutions();
 	
@@ -239,6 +241,25 @@ void NodeOperationBuilder::addNodeInputPreview(NodeInput *input)
 	}
 }
 
+void NodeOperationBuilder::registerViewer(ViewerOperation *viewer)
+{
+	if (m_active_viewer) {
+		if (m_current_node->isInActiveGroup()) {
+			/* deactivate previous viewer */
+			m_active_viewer->setActive(false);
+			
+			m_active_viewer = viewer;
+			viewer->setActive(true);
+		}
+	}
+	else {
+		if (m_current_node->getbNodeTree() == m_context->getbNodeTree()) {
+			m_active_viewer = viewer;
+			viewer->setActive(true);
+		}
+	}
+}
+
 /****************************
  **** Optimization Steps ****
  ****************************/
@@ -248,6 +269,13 @@ void NodeOperationBuilder::add_datatype_conversions()
 	Links convert_links;
 	for (Links::const_iterator it = m_links.begin(); it != m_links.end(); ++it) {
 		const Link &link = *it;
+		
+		/* proxy operations can skip data type conversion */
+		NodeOperation *from_op = &link.from()->getOperation();
+		NodeOperation *to_op = &link.to()->getOperation();
+		if (!(from_op->useDatatypeConversion() || to_op->useDatatypeConversion()))
+			continue;
+		
 		if (link.from()->getDataType() != link.to()->getDataType())
 			convert_links.push_back(link);
 	}
@@ -431,7 +459,8 @@ WriteBufferOperation *NodeOperationBuilder::find_attached_write_buffer_operation
 	return NULL;
 }
 
-void NodeOperationBuilder::add_input_buffers(NodeOperation *operation, NodeOperationInput *input)
+void NodeOperationBuilder::add_input_buffers(NodeOperation * /*operation*/,
+                                             NodeOperationInput *input)
 {
 	if (!input->isConnected())
 		return;
@@ -448,7 +477,7 @@ void NodeOperationBuilder::add_input_buffers(NodeOperation *operation, NodeOpera
 	/* check of other end already has write operation, otherwise add a new one */
 	WriteBufferOperation *writeoperation = find_attached_write_buffer_operation(output);
 	if (!writeoperation) {
-		writeoperation = new WriteBufferOperation();
+		writeoperation = new WriteBufferOperation(output->getDataType());
 		writeoperation->setbNodeTree(m_context->getbNodeTree());
 		addOperation(writeoperation);
 		
@@ -458,7 +487,7 @@ void NodeOperationBuilder::add_input_buffers(NodeOperation *operation, NodeOpera
 	}
 	
 	/* add readbuffer op for the input */
-	ReadBufferOperation *readoperation = new ReadBufferOperation();
+	ReadBufferOperation *readoperation = new ReadBufferOperation(output->getDataType());
 	readoperation->setMemoryProxy(writeoperation->getMemoryProxy());
 	this->addOperation(readoperation);
 	
@@ -491,7 +520,7 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation, NodeOper
 	
 	/* if no write buffer operation exists yet, create a new one */
 	if (!writeOperation) {
-		writeOperation = new WriteBufferOperation();
+		writeOperation = new WriteBufferOperation(operation->getOutputSocket()->getDataType());
 		writeOperation->setbNodeTree(m_context->getbNodeTree());
 		addOperation(writeOperation);
 		
@@ -506,7 +535,7 @@ void NodeOperationBuilder::add_output_buffers(NodeOperation *operation, NodeOper
 		if (&target->getOperation() == writeOperation)
 			continue; /* skip existing write op links */
 		
-		ReadBufferOperation *readoperation = new ReadBufferOperation();
+		ReadBufferOperation *readoperation = new ReadBufferOperation(operation->getOutputSocket()->getDataType());
 		readoperation->setMemoryProxy(writeOperation->getMemoryProxy());
 		addOperation(readoperation);
 		

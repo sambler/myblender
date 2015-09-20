@@ -41,14 +41,8 @@
 #include "BKE_pbvh.h"
 
 struct bContext;
-struct Brush;
 struct KeyBlock;
-struct Mesh;
-struct MultiresModifierData;
 struct Object;
-struct Scene;
-struct Sculpt;
-struct SculptStroke;
 struct SculptUndoNode;
 
 int sculpt_mode_poll(struct bContext *C);
@@ -129,5 +123,12 @@ void sculpt_undo_push_end(void);
 void sculpt_vertcos_to_key(Object *ob, KeyBlock *kb, float (*vertCos)[3]);
 
 void sculpt_update_object_bounding_box(struct Object *ob);
+
+/* Setting zero so we can catch bugs in OpenMP/sculpt. */
+#ifdef DEBUG
+#  define SCULPT_OMP_LIMIT 0
+#else
+#  define SCULPT_OMP_LIMIT 4
+#endif
 
 #endif

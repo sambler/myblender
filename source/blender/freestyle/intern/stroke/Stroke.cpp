@@ -31,6 +31,7 @@
 #include "StrokeRenderer.h"
 
 #include "BKE_global.h"
+#include "BKE_node.h"
 
 namespace Freestyle {
 
@@ -397,6 +398,7 @@ Stroke::Stroke()
 	for (int a = 0; a < MAX_MTEX; a++) {
 		_mtex[a] = NULL;
 	}
+	_nodeTree = NULL;
 	_tips = false;
 	_rep = NULL;
 }
@@ -424,6 +426,7 @@ Stroke::Stroke(const Stroke& iBrother)
 			_mtex[a] = NULL;
 		}
 	}
+	_nodeTree = iBrother._nodeTree;
 	_tips = iBrother._tips;
 	if (iBrother._rep)
 		_rep = new StrokeRep(*(iBrother._rep));
@@ -466,6 +469,8 @@ Stroke& Stroke::operator=(const Stroke& iBrother)
 		delete _rep;
 	if (iBrother._rep)
 		_rep = new StrokeRep(*(iBrother._rep));
+	else
+		_rep = NULL;
 	return *this;
 }
 
@@ -508,11 +513,11 @@ public:
 	}
 };
 
-void Stroke::Resample(int iNPoints)
+int Stroke::Resample(int iNPoints)
 {
-	int vertsize = strokeVerticesSize();
-	if (iNPoints <= vertsize)
-		return;
+	int NPointsToAdd = iNPoints - strokeVerticesSize();
+	if (NPointsToAdd <= 0)
+		return 0;
 
 	StrokeInternal::StrokeVertexIterator it = strokeVerticesBegin();
 	StrokeInternal::StrokeVertexIterator next = it;
@@ -531,7 +536,7 @@ void Stroke::Resample(int iNPoints)
 		Vec2r b((next)->getPoint());
 		Vec2r vec_tmp(b - a);
 		real norm_var = vec_tmp.norm();
-		int numberOfPointsToAdd = (int)floor((iNPoints - strokeVerticesSize()) * norm_var / _Length);
+		int numberOfPointsToAdd = (int)floor(NPointsToAdd * norm_var / _Length);
 		float csampling = norm_var / (float)(numberOfPointsToAdd + 1);
 		strokeSegments.push_back(StrokeSegment(it, next, norm_var, numberOfPointsToAdd, csampling));
 		N += numberOfPointsToAdd;
@@ -543,9 +548,10 @@ void Stroke::Resample(int iNPoints)
 	meanlength /= (float)nsegments;
 
 	// if we don't have enough points let's resample finer some segments
-	int NPointsToAdd = iNPoints - vertsize;
 	bool checkEveryone = false;
+	bool resampled;
 	while (N < NPointsToAdd) {
+		resampled = false;
 		for (vector<StrokeSegment>::iterator s = strokeSegments.begin(), send = strokeSegments.end(); s != send; ++s) {
 			if (s->_sampling == 0.0f)
 				continue;
@@ -556,13 +562,19 @@ void Stroke::Resample(int iNPoints)
 				//resample
 				s->_n = s->_n + 1;
 				s->_sampling = s->_length / (float)(s->_n + 1);
-				s->_resampled = true;
+				s->_resampled = resampled = true;
 				N++;
 				if (N == NPointsToAdd)
 					break;
 			}
 		}
+		if (checkEveryone && !resampled)
+			break;
 		checkEveryone = true;
+	}
+	if (N < NPointsToAdd) {
+		// fatal error, likely because _Length is inconsistent with the stroke length computed with the vertices
+		return -1;
 	}
 	//actually resample:
 	for (vector<StrokeSegment>::iterator s = strokeSegments.begin(), send = strokeSegments.end(); s != send; ++s) {
@@ -594,19 +606,16 @@ void Stroke::Resample(int iNPoints)
 	_Vertices = newVertices;
 	newVertices.clear();
 
-	if (_rep) {
-		delete _rep;
-		_rep = new StrokeRep(this);
-	}
+	return 0;
 }
 
-void Stroke::Resample(float iSampling)
+int Stroke::Resample(float iSampling)
 {
 	//cerr << "old size :" << strokeVerticesSize() << endl;
 	if (iSampling == 0)
-		return;
+		return 0;
 	if (iSampling >= _sampling)
-		return;
+		return 0;
 
 	_sampling = iSampling;
 	// Resample...
@@ -651,10 +660,7 @@ void Stroke::Resample(float iSampling)
 	_Vertices = newVertices;
 	newVertices.clear();
 
-	if (_rep) {
-		delete _rep;
-		_rep = new StrokeRep(this);
-	}
+	return 0;
 }
 
 void Stroke::RemoveAllVertices()
@@ -746,12 +752,12 @@ Interface0DIterator Stroke::verticesEnd()
 	return ret;
 }
 
-Interface0DIterator Stroke::pointsBegin(float t)
+Interface0DIterator Stroke::pointsBegin(float /*t*/)
 {
 	return verticesBegin(); // FIXME
 }
 
-Interface0DIterator Stroke::pointsEnd(float t)
+Interface0DIterator Stroke::pointsEnd(float /*t*/)
 {
 	return verticesEnd();
 }
@@ -775,7 +781,7 @@ void Stroke::RenderBasic(const StrokeRenderer *iRenderer)
 {
 	if (!_rep)
 		_rep = new StrokeRep(this);
-	iRenderer->RenderStrokeRepBasic(_rep);
+	iRenderer->RenderStrokeRep(_rep);
 }
 
 Stroke::vertex_iterator Stroke::vertices_begin(float sampling)

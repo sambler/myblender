@@ -43,12 +43,12 @@
 #include "BKE_deform.h"
 #include "BKE_library.h"
 #include "BKE_modifier.h"
-#include "BKE_shrinkwrap.h"       /* For SpaceTransform stuff. */
 #include "BKE_texture.h"          /* Texture masking. */
 
 #include "depsgraph_private.h"
+#include "DEG_depsgraph_build.h"
+
 #include "MEM_guardedalloc.h"
-#include "MOD_util.h"
 #include "MOD_weightvg_util.h"
 
 // #define USE_TIMEIT
@@ -73,12 +73,12 @@ static void get_vert2geom_distance(int numVerts, float (*v_cos)[3],
                                    DerivedMesh *target, const SpaceTransform *loc2trgt)
 {
 	int i;
-	BVHTreeFromMesh treeData_v = NULL_BVHTreeFromMesh;
-	BVHTreeFromMesh treeData_e = NULL_BVHTreeFromMesh;
-	BVHTreeFromMesh treeData_f = NULL_BVHTreeFromMesh;
-	BVHTreeNearest nearest_v   = NULL_BVHTreeNearest;
-	BVHTreeNearest nearest_e   = NULL_BVHTreeNearest;
-	BVHTreeNearest nearest_f   = NULL_BVHTreeNearest;
+	BVHTreeFromMesh treeData_v = {NULL};
+	BVHTreeFromMesh treeData_e = {NULL};
+	BVHTreeFromMesh treeData_f = {NULL};
+	BVHTreeNearest nearest_v   = {0};
+	BVHTreeNearest nearest_e   = {0};
+	BVHTreeNearest nearest_f   = {0};
 
 	if (dist_v) {
 		/* Create a bvh-tree of the given target's verts. */
@@ -98,7 +98,7 @@ static void get_vert2geom_distance(int numVerts, float (*v_cos)[3],
 	}
 	if (dist_f) {
 		/* Create a bvh-tree of the given target's faces. */
-		bvhtree_from_mesh_faces(&treeData_f, target, 0.0, 2, 6);
+		bvhtree_from_mesh_looptri(&treeData_f, target, 0.0, 2, 6);
 		if (treeData_f.tree == NULL) {
 			OUT_OF_MEMORY();
 			return;
@@ -109,18 +109,14 @@ static void get_vert2geom_distance(int numVerts, float (*v_cos)[3],
 	nearest_v.index = nearest_e.index = nearest_f.index = -1;
 	/*nearest_v.dist  = nearest_e.dist  = nearest_f.dist  = FLT_MAX;*/
 	/* Find the nearest vert/edge/face. */
-#ifndef __APPLE__
-#pragma omp parallel for default(none) private(i) firstprivate(nearest_v, nearest_e, nearest_f) \
-                         shared(treeData_v, treeData_e, treeData_f, numVerts, v_cos, dist_v, dist_e, \
-                                dist_f, loc2trgt) \
-                         schedule(static)
-#endif
+#pragma omp parallel for default(shared) private(i) firstprivate(nearest_v, nearest_e, nearest_f) \
+                         schedule(static) if (numVerts > 10000)
 	for (i = 0; i < numVerts; i++) {
 		float tmp_co[3];
 
 		/* Convert the vertex to tree coordinates. */
 		copy_v3_v3(tmp_co, v_cos[i]);
-		space_transform_apply(loc2trgt, tmp_co);
+		BLI_space_transform_apply(loc2trgt, tmp_co);
 
 		/* Use local proximity heuristics (to reduce the nearest search).
 		 *
@@ -314,7 +310,9 @@ static void foreachTexLink(ModifierData *md, Object *ob, TexWalkFunc walk, void 
 	walk(userData, ob, md, "mask_texture");
 }
 
-static void updateDepgraph(ModifierData *md, DagForest *forest, struct Scene *UNUSED(scene),
+static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *UNUSED(bmain),
+                           struct Scene *UNUSED(scene),
                            Object *UNUSED(ob), DagNode *obNode)
 {
 	WeightVGProximityModifierData *wmd = (WeightVGProximityModifierData *) md;
@@ -336,6 +334,24 @@ static void updateDepgraph(ModifierData *md, DagForest *forest, struct Scene *UN
 	if (wmd->mask_tex_mapping == MOD_DISP_MAP_GLOBAL)
 		dag_add_relation(forest, obNode, obNode, DAG_RL_DATA_DATA | DAG_RL_OB_DATA,
 		                 "WeightVGProximity Modifier");
+}
+
+static void updateDepsgraph(ModifierData *md,
+                            struct Main *UNUSED(bmain),
+                            struct Scene *UNUSED(scene),
+                            Object *ob,
+                            struct DepsNodeHandle *node)
+{
+	WeightVGProximityModifierData *wmd = (WeightVGProximityModifierData *)md;
+	if (wmd->proximity_ob_target != NULL) {
+		DEG_add_object_relation(node, wmd->proximity_ob_target, DEG_OB_COMP_TRANSFORM, "WeightVGProximity Modifier");
+	}
+	if (wmd->mask_tex_map_obj != NULL && wmd->mask_tex_mapping == MOD_DISP_MAP_OBJECT) {
+		DEG_add_object_relation(node, wmd->mask_tex_map_obj, DEG_OB_COMP_TRANSFORM, "WeightVGProximity Modifier");
+	}
+	if (wmd->mask_tex_mapping == MOD_DISP_MAP_GLOBAL) {
+		DEG_add_object_relation(node, ob, DEG_OB_COMP_TRANSFORM, "WeightVGProximity Modifier");
+	}
 }
 
 static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
@@ -366,7 +382,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 	int i;
 	/* Flags. */
 #if 0
-	int do_prev = (wmd->modifier.mode & eModifierMode_DoWeightPreview);
+	const bool do_prev = (wmd->modifier.mode & eModifierMode_DoWeightPreview) != 0;
 #endif
 
 #ifdef USE_TIMEIT
@@ -465,7 +481,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 			DerivedMesh *target_dm = obr->derivedFinal;
 			bool free_target_dm = false;
 			if (!target_dm) {
-				if (ELEM3(obr->type, OB_CURVE, OB_SURF, OB_FONT))
+				if (ELEM(obr->type, OB_CURVE, OB_SURF, OB_FONT))
 					target_dm = CDDM_from_curve(obr);
 				else if (obr->type == OB_MESH) {
 					Mesh *me = (Mesh *)obr->data;
@@ -484,7 +500,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 				float *dists_e = use_trgt_edges ? MEM_mallocN(sizeof(float) * numIdx, "dists_e") : NULL;
 				float *dists_f = use_trgt_faces ? MEM_mallocN(sizeof(float) * numIdx, "dists_f") : NULL;
 
-				SPACE_TRANSFORM_SETUP(&loc2trgt, ob, obr);
+				BLI_SPACE_TRANSFORM_SETUP(&loc2trgt, ob, obr);
 				get_vert2geom_distance(numIdx, v_cos, dists_v, dists_e, dists_f,
 				                       target_dm, &loc2trgt);
 				for (i = 0; i < numIdx; i++) {
@@ -566,6 +582,7 @@ ModifierTypeInfo modifierType_WeightVGProximity = {
 	/* freeData */          freeData,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
+	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     dependsOnTime,
 	/* dependsOnNormals */  NULL,
 	/* foreachObjectLink */ foreachObjectLink,

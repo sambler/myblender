@@ -35,7 +35,7 @@
 
 #include "BLI_utildefines.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -48,7 +48,6 @@
 #include <stddef.h>
 
 #include "DNA_object_types.h"
-#include "DNA_scene_types.h"
 
 #include "BKE_animsys.h"
 #include "BKE_depsgraph.h"
@@ -84,12 +83,18 @@ static void rna_ShapeKey_name_set(PointerRNA *ptr, const char *value)
 	/* make sure the name is truly unique */
 	if (ptr->id.data) {
 		Key *key = rna_ShapeKey_find_key(ptr->id.data);
-		BLI_uniquename(&key->block, kb, CTX_DATA_(BLF_I18NCONTEXT_ID_SHAPEKEY, "Key"), '.',
+		BLI_uniquename(&key->block, kb, CTX_DATA_(BLT_I18NCONTEXT_ID_SHAPEKEY, "Key"), '.',
 		               offsetof(KeyBlock, name), sizeof(kb->name));
 	}
 	
 	/* fix all the animation data which may link to this */
-	BKE_all_animdata_fix_paths_rename(NULL, "key_blocks", oldname, kb->name);
+	BKE_animdata_fix_paths_rename_all(NULL, "key_blocks", oldname, kb->name);
+}
+
+static float rna_ShapeKey_frame_get(PointerRNA *ptr)
+{
+	KeyBlock *kb = (KeyBlock *)ptr->data;
+	return kb->pos * 100.0f;  /* Because pos is ctime/100... */
 }
 
 static void rna_ShapeKey_value_set(PointerRNA *ptr, float value)
@@ -564,12 +569,14 @@ static void rna_def_keyblock(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "Name of Shape Key");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_ShapeKey_name_set");
+	RNA_def_property_update(prop, 0, "rna_Key_update_data");
 	RNA_def_struct_name_property(srna, prop);
 
 	/* keys need to be sorted to edit this */
 	prop = RNA_def_property(srna, "frame", PROP_FLOAT, PROP_TIME);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_float_sdna(prop, NULL, "pos");
+	RNA_def_property_float_funcs(prop, "rna_ShapeKey_frame_get", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Frame", "Frame for absolute keys");
 	RNA_def_property_update(prop, 0, "rna_Key_update_data");
 	
@@ -666,13 +673,6 @@ static void rna_def_key(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "ctime");
 	RNA_def_property_range(prop, MINFRAME, MAXFRAME);
 	RNA_def_property_ui_text(prop, "Evaluation Time", "Evaluation time for absolute shape keys");
-	RNA_def_property_update(prop, 0, "rna_Key_update_data");
-
-	prop = RNA_def_property(srna, "slurph", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_int_sdna(prop, NULL, "slurph");
-	RNA_def_property_range(prop, -500, 500);
-	RNA_def_property_ui_text(prop, "Slurph",
-	                         "Create a delay (in frames) in applying key positions, first vertex goes first");
 	RNA_def_property_update(prop, 0, "rna_Key_update_data");
 }
 

@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #ifndef __UTIL_HALF_H__
@@ -56,7 +56,7 @@ ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
 		 * assumes no negative, no nan, no inf, and sets denormal to 0 */
 		union { uint i; float f; } in;
 		float fscale = f[i] * scale;
-		in.f = (fscale > 0.0f)? ((fscale < 65500.0f)? fscale: 65500.0f): 0.0f;
+		in.f = (fscale > 0.0f)? ((fscale < 65504.0f)? fscale: 65504.0f): 0.0f;
 		int x = in.i;
 
 		int absolute = x & 0x7FFFFFFF;
@@ -68,20 +68,20 @@ ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
 	}
 #else
 	/* same as above with SSE */
-	const __m128 mm_scale = _mm_set_ps1(scale);
-	const __m128i mm_38800000 = _mm_set1_epi32(0x38800000);
-	const __m128i mm_7FFF = _mm_set1_epi32(0x7FFF);
-	const __m128i mm_7FFFFFFF = _mm_set1_epi32(0x7FFFFFFF);
-	const __m128i mm_C8000000 = _mm_set1_epi32(0xC8000000);
+	ssef fscale = load4f(f) * scale;
+	ssef x = min(max(fscale, 0.0f), 65504.0f);
 
-	__m128 mm_fscale = _mm_mul_ps(load_m128(f), mm_scale);
-	__m128i x = _mm_castps_si128(_mm_min_ps(_mm_max_ps(mm_fscale, _mm_set_ps1(0.0f)), _mm_set_ps1(65500.0f)));
-	__m128i absolute = _mm_and_si128(x, mm_7FFFFFFF);
-	__m128i Z = _mm_add_epi32(absolute, mm_C8000000);
-	__m128i result = _mm_andnot_si128(_mm_cmplt_epi32(absolute, mm_38800000), Z); 
-	__m128i rh = _mm_and_si128(_mm_srai_epi32(result, 13), mm_7FFF);
+#ifdef __KERNEL_AVX2__
+	ssei rpack = _mm_cvtps_ph(x, 0);
+#else
+	ssei absolute = cast(x) & 0x7FFFFFFF;
+	ssei Z = absolute + 0xC8000000;
+	ssei result = andnot(absolute < 0x38800000, Z);
+	ssei rshift = (result >> 13) & 0x7FFF;
+	ssei rpack = _mm_packs_epi32(rshift, rshift);
+#endif
 
-	_mm_storel_pi((__m64*)h, _mm_castsi128_ps(_mm_packs_epi32(rh, rh)));
+	_mm_storel_pi((__m64*)h, _mm_castsi128_ps(rpack));
 #endif
 }
 

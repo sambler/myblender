@@ -53,6 +53,7 @@
 #include "BKE_anim.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_curve.h"
+#include "BKE_depsgraph.h"
 #include "BKE_displist.h"
 #include "BKE_global.h"
 #include "BKE_key.h"
@@ -60,6 +61,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
+#include "BKE_object.h"
 
 #include "BKE_deform.h"
 
@@ -120,11 +122,11 @@ void BKE_lattice_bitmap_from_flag(Lattice *lt, BLI_bitmap *bitmap, const short f
 	bp = lt->def;
 	for (i = 0; i < tot; i++, bp++) {
 		if ((bp->f1 & flag) && (!respecthide || !bp->hide)) {
-			BLI_BITMAP_SET(bitmap, i);
+			BLI_BITMAP_ENABLE(bitmap, i);
 		}
 		else {
 			if (clear) {
-				BLI_BITMAP_CLEAR(bitmap, i);
+				BLI_BITMAP_DISABLE(bitmap, i);
 			}
 		}
 	}
@@ -284,6 +286,10 @@ Lattice *BKE_lattice_copy(Lattice *lt)
 
 	ltn->editlatt = NULL;
 
+	if (lt->id.lib) {
+		BKE_id_lib_local_paths(G.main, lt->id.lib, &ltn->id);
+	}
+
 	return ltn;
 }
 
@@ -303,7 +309,7 @@ void BKE_lattice_free(Lattice *lt)
 	
 	/* free animation data */
 	if (lt->adt) {
-		BKE_free_animdata(&lt->id);
+		BKE_animdata_free(&lt->id);
 		lt->adt = NULL;
 	}
 }
@@ -575,7 +581,7 @@ static bool where_on_path_deform(Object *ob, float ctime, float vec[4], float di
 	
 	/* test for cyclic */
 	bl = ob->curve_cache->bev.first;
-	if (!bl->nr) return 0;
+	if (!bl->nr) return false;
 	if (bl->poly > -1) cycl = 1;
 
 	if (cycl == 0) {
@@ -608,9 +614,9 @@ static bool where_on_path_deform(Object *ob, float ctime, float vec[4], float di
 				/* weight - not used but could be added */
 			}
 		}
-		return 1;
+		return true;
 	}
-	return 0;
+	return false;
 }
 
 /* for each point, rotate & translate to curve */
@@ -626,16 +632,17 @@ static bool calc_curve_deform(Scene *scene, Object *par, float co[3],
 	short index;
 	const bool is_neg_axis = (axis > 2);
 
-	/* to be sure, mostly after file load */
-	if (ELEM(NULL, par->curve_cache, par->curve_cache->path)) {
+	/* to be sure, mostly after file load, also cyclic dependencies */
 #ifdef CYCLIC_DEPENDENCY_WORKAROUND
+	if (par->curve_cache == NULL) {
 		BKE_displist_make_curveTypes(scene, par, false);
-#endif
-		if (par->curve_cache->path == NULL) {
-			return 0;  // happens on append and cyclic dependencies...
-		}
 	}
-	
+#endif
+
+	if (par->curve_cache->path == NULL) {
+		return false;  /* happens on append, cyclic dependencies and empty curves */
+	}
+
 	/* options */
 	if (is_neg_axis) {
 		index = axis - 3;
@@ -715,18 +722,20 @@ static bool calc_curve_deform(Scene *scene, Object *par, float co[3],
 		if (r_quat)
 			copy_qt_qt(r_quat, quat);
 
-		return 1;
+		return true;
 	}
-	return 0;
+	return false;
 }
 
-void curve_deform_verts(Scene *scene, Object *cuOb, Object *target, DerivedMesh *dm, float (*vertexCos)[3],
-                        int numVerts, const char *vgroup, short defaxis)
+void curve_deform_verts(
+        Scene *scene, Object *cuOb, Object *target, DerivedMesh *dm, float (*vertexCos)[3],
+        int numVerts, const char *vgroup, short defaxis)
 {
 	Curve *cu;
 	int a;
 	CurveDeform cd;
-	int use_vgroups;
+	MDeformVert *dvert = NULL;
+	int defgrp_index = -1;
 	const bool is_neg_axis = (defaxis > 2);
 
 	if (cuOb->type != OB_CURVE)
@@ -747,75 +756,63 @@ void curve_deform_verts(Scene *scene, Object *cuOb, Object *target, DerivedMesh 
 		cd.dmax[0] = cd.dmax[1] = cd.dmax[2] =  0.0f;
 	}
 	
-	/* check whether to use vertex groups (only possible if target is a Mesh)
-	 * we want either a Mesh with no derived data, or derived data with
-	 * deformverts
+	/* Check whether to use vertex groups (only possible if target is a Mesh or Lattice).
+	 * We want either a Mesh/Lattice with no derived data, or derived data with deformverts.
 	 */
-	if (target->type == OB_MESH) {
-		/* if there's derived data without deformverts, don't use vgroups */
-		if (dm) {
-			use_vgroups = (dm->getVertData(dm, 0, CD_MDEFORMVERT) != NULL);
-		}
-		else {
-			Mesh *me = target->data;
-			use_vgroups = (me->dvert != NULL);
-		}
-	}
-	else {
-		use_vgroups = false;
-	}
-	
-	if (vgroup && vgroup[0] && use_vgroups) {
-		Mesh *me = target->data;
-		const int defgrp_index = defgroup_name_index(target, vgroup);
+	if (vgroup && vgroup[0] && ELEM(target->type, OB_MESH, OB_LATTICE)) {
+		defgrp_index = defgroup_name_index(target, vgroup);
 
-		if (defgrp_index != -1 && (me->dvert || dm)) {
-			MDeformVert *dvert = me->dvert;
-			float vec[3];
-			float weight;
-	
-
-			if (cu->flag & CU_DEFORM_BOUNDS_OFF) {
-				dvert = me->dvert;
-				for (a = 0; a < numVerts; a++, dvert++) {
-					if (dm) dvert = dm->getVertData(dm, a, CD_MDEFORMVERT);
-					weight = defvert_find_weight(dvert, defgrp_index);
-	
-					if (weight > 0.0f) {
-						mul_m4_v3(cd.curvespace, vertexCos[a]);
-						copy_v3_v3(vec, vertexCos[a]);
-						calc_curve_deform(scene, cuOb, vec, defaxis, &cd, NULL);
-						interp_v3_v3v3(vertexCos[a], vertexCos[a], vec, weight);
-						mul_m4_v3(cd.objectspace, vertexCos[a]);
-					}
-				}
+		if (defgrp_index != -1) {
+			/* if there's derived data without deformverts, don't use vgroups */
+			if (dm) {
+				dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
+			}
+			else if (target->type == OB_LATTICE) {
+				dvert = ((Lattice *)target->data)->dvert;
 			}
 			else {
-				/* set mesh min/max bounds */
-				INIT_MINMAX(cd.dmin, cd.dmax);
-	
-				for (a = 0; a < numVerts; a++, dvert++) {
-					if (dm) dvert = dm->getVertData(dm, a, CD_MDEFORMVERT);
-					
-					if (defvert_find_weight(dvert, defgrp_index) > 0.0f) {
-						mul_m4_v3(cd.curvespace, vertexCos[a]);
-						minmax_v3v3_v3(cd.dmin, cd.dmax, vertexCos[a]);
-					}
+				dvert = ((Mesh *)target->data)->dvert;
+			}
+		}
+	}
+
+	if (dvert) {
+		MDeformVert *dvert_iter;
+		float vec[3];
+
+		if (cu->flag & CU_DEFORM_BOUNDS_OFF) {
+			for (a = 0, dvert_iter = dvert; a < numVerts; a++, dvert_iter++) {
+				const float weight = defvert_find_weight(dvert_iter, defgrp_index);
+
+				if (weight > 0.0f) {
+					mul_m4_v3(cd.curvespace, vertexCos[a]);
+					copy_v3_v3(vec, vertexCos[a]);
+					calc_curve_deform(scene, cuOb, vec, defaxis, &cd, NULL);
+					interp_v3_v3v3(vertexCos[a], vertexCos[a], vec, weight);
+					mul_m4_v3(cd.objectspace, vertexCos[a]);
 				}
-	
-				dvert = me->dvert;
-				for (a = 0; a < numVerts; a++, dvert++) {
-					if (dm) dvert = dm->getVertData(dm, a, CD_MDEFORMVERT);
-					
-					weight = defvert_find_weight(dvert, defgrp_index);
-	
-					if (weight > 0.0f) {
-						/* already in 'cd.curvespace', prev for loop */
-						copy_v3_v3(vec, vertexCos[a]);
-						calc_curve_deform(scene, cuOb, vec, defaxis, &cd, NULL);
-						interp_v3_v3v3(vertexCos[a], vertexCos[a], vec, weight);
-						mul_m4_v3(cd.objectspace, vertexCos[a]);
-					}
+			}
+		}
+		else {
+			/* set mesh min/max bounds */
+			INIT_MINMAX(cd.dmin, cd.dmax);
+
+			for (a = 0, dvert_iter = dvert; a < numVerts; a++, dvert_iter++) {
+				if (defvert_find_weight(dvert_iter, defgrp_index) > 0.0f) {
+					mul_m4_v3(cd.curvespace, vertexCos[a]);
+					minmax_v3v3_v3(cd.dmin, cd.dmax, vertexCos[a]);
+				}
+			}
+
+			for (a = 0, dvert_iter = dvert; a < numVerts; a++, dvert_iter++) {
+				const float weight = defvert_find_weight(dvert_iter, defgrp_index);
+
+				if (weight > 0.0f) {
+					/* already in 'cd.curvespace', prev for loop */
+					copy_v3_v3(vec, vertexCos[a]);
+					calc_curve_deform(scene, cuOb, vec, defaxis, &cd, NULL);
+					interp_v3_v3v3(vertexCos[a], vertexCos[a], vec, weight);
+					mul_m4_v3(cd.objectspace, vertexCos[a]);
 				}
 			}
 		}
@@ -947,10 +944,10 @@ bool object_deform_mball(Object *ob, ListBase *dispbase)
 			                     (float(*)[3])dl->verts, dl->nr, NULL, 1.0f);
 		}
 
-		return 1;
+		return true;
 	}
 	else {
-		return 0;
+		return false;
 	}
 }
 
@@ -1074,7 +1071,7 @@ void BKE_lattice_modifiers_calc(Scene *scene, Object *ob)
 	}
 
 	for (; md; md = md->next) {
-		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+		const ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 
 		md->scene = scene;
 		
@@ -1142,6 +1139,48 @@ void BKE_lattice_center_median(Lattice *lt, float cent[3])
 	mul_v3_fl(cent, 1.0f / (float)numVerts);
 }
 
+static void boundbox_lattice(Object *ob)
+{
+	BoundBox *bb;
+	Lattice *lt;
+	float min[3], max[3];
+
+	if (ob->bb == NULL)
+		ob->bb = MEM_mallocN(sizeof(BoundBox), "Lattice boundbox");
+
+	bb = ob->bb;
+	lt = ob->data;
+
+	INIT_MINMAX(min, max);
+	BKE_lattice_minmax_dl(ob, lt, min, max);
+	BKE_boundbox_init_from_minmax(bb, min, max);
+}
+
+BoundBox *BKE_lattice_boundbox_get(Object *ob)
+{
+	boundbox_lattice(ob);
+
+	return ob->bb;
+}
+
+void BKE_lattice_minmax_dl(Object *ob, Lattice *lt, float min[3], float max[3])
+{
+	DispList *dl = ob->curve_cache ? BKE_displist_find(&ob->curve_cache->disp, DL_VERTS) : NULL;
+
+	if (!dl) {
+		BKE_lattice_minmax(lt, min, max);
+	}
+	else {
+		int i, numVerts;
+		
+		if (lt->editlatt) lt = lt->editlatt->latt;
+		numVerts = lt->pntsu * lt->pntsv * lt->pntsw;
+
+		for (i = 0; i < numVerts; i++)
+			minmax_v3v3_v3(min, max, &dl->verts[i * 3]);
+	}
+}
+
 void BKE_lattice_minmax(Lattice *lt, float min[3], float max[3])
 {
 	int i, numVerts;
@@ -1161,6 +1200,28 @@ void BKE_lattice_center_bounds(Lattice *lt, float cent[3])
 
 	BKE_lattice_minmax(lt, min, max);
 	mid_v3_v3v3(cent, min, max);
+}
+
+void BKE_lattice_transform(Lattice *lt, float mat[4][4], bool do_keys)
+{
+	BPoint *bp = lt->def;
+	int i = lt->pntsu * lt->pntsv * lt->pntsw;
+
+	while (i--) {
+		mul_m4_v3(mat, bp->vec);
+		bp++;
+	}
+
+	if (do_keys && lt->key) {
+		KeyBlock *kb;
+
+		for (kb = lt->key->block.first; kb; kb = kb->next) {
+			float *fp = kb->data;
+			for (i = kb->totelem; i--; fp += 3) {
+				mul_m4_v3(mat, fp);
+			}
+		}
+	}
 }
 
 void BKE_lattice_translate(Lattice *lt, float offset[3], bool do_keys)
@@ -1187,5 +1248,12 @@ void BKE_lattice_translate(Lattice *lt, float offset[3], bool do_keys)
 			}
 		}
 	}
+}
+
+/* **** Depsgraph evaluation **** */
+
+void BKE_lattice_eval_geometry(EvaluationContext *UNUSED(eval_ctx),
+                               Lattice *UNUSED(latt))
+{
 }
 

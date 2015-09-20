@@ -39,11 +39,13 @@
 #define BM_elem_flag_merge(    ele_a, ele_b)    _bm_elem_flag_merge    (&(ele_a)->head, &(ele_b)->head)
 #define BM_elem_flag_merge_into(ele, ele_a, ele_b)_bm_elem_flag_merge_into (&(ele)->head, &(ele_a)->head, &(ele_b)->head)
 
+ATTR_WARN_UNUSED_RESULT
 BLI_INLINE char _bm_elem_flag_test(const BMHeader *head, const char hflag)
 {
 	return head->hflag & hflag;
 }
 
+ATTR_WARN_UNUSED_RESULT
 BLI_INLINE bool _bm_elem_flag_test_bool(const BMHeader *head, const char hflag)
 {
 	return (head->hflag & hflag) != 0;
@@ -106,9 +108,6 @@ BLI_INLINE void _bm_elem_flag_merge_into(BMHeader *head, const BMHeader *head_a,
  *                    adding new vert/edge/faces since they may be added at
  *                    the end of the array.
  *
- * - 'set_loop'    -- currently loop index values are not used used much so
- *                    assume each case they are dirty.
- *
  * - campbell */
 
 #define BM_elem_index_get(ele)           _bm_elem_index_get(&(ele)->head)
@@ -119,6 +118,7 @@ BLI_INLINE void _bm_elem_index_set(BMHeader *head, const int index)
 	head->index = index;
 }
 
+ATTR_WARN_UNUSED_RESULT
 BLI_INLINE int _bm_elem_index_get(const BMHeader *head)
 {
 	return head->index;

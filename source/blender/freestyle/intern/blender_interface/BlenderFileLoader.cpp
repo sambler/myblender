@@ -28,6 +28,8 @@
 
 #include "BKE_global.h"
 
+#include <sstream>
+
 namespace Freestyle {
 
 BlenderFileLoader::BlenderFileLoader(Render *re, SceneRenderLayer *srl)
@@ -38,6 +40,7 @@ BlenderFileLoader::BlenderFileLoader(Render *re, SceneRenderLayer *srl)
 	_numFacesRead = 0;
 	_minEdgeSize = DBL_MAX;
 	_smooth = (srl->freestyleConfig.flags & FREESTYLE_FACE_SMOOTHNESS_FLAG) != 0;
+	_pRenderMonitor = NULL;
 }
 
 BlenderFileLoader::~BlenderFileLoader()
@@ -61,12 +64,11 @@ NodeGroup *BlenderFileLoader::Load()
 	_viewplane_bottom = _re->viewplane.ymin;
 	_viewplane_top =    _re->viewplane.ymax;
 
-	if ((_re->r.scemode & R_VIEWPORT_PREVIEW) && (_re->r.mode & R_ORTHO)) {
+	if (_re->clipsta < 0.f) {
 		// Adjust clipping start/end and set up a Z offset when the viewport preview
 		// is used with the orthographic view.  In this case, _re->clipsta is negative,
 		// while Freestyle assumes that imported mesh data are in the camera coordinate
 		// system with the view point located at origin [bug #36009].
-		BLI_assert(_re->clipsta < 0.f);
 		_z_near = -0.001f;
 		_z_offset = _re->clipsta + _z_near;
 		_z_far = -_re->clipend + _z_offset;
@@ -86,9 +88,21 @@ NodeGroup *BlenderFileLoader::Load()
 #endif
 
 	int id = 0;
+	unsigned cnt = 1;
+	unsigned cntStep = (unsigned)ceil(0.01f * _re->totinstance);
 	for (obi = (ObjectInstanceRen *)_re->instancetable.first; obi; obi = obi->next) {
-		if (_pRenderMonitor && _pRenderMonitor->testBreak())
-			break;
+		if (_pRenderMonitor) {
+			if (_pRenderMonitor->testBreak())
+				break;
+			if (cnt % cntStep == 0) {
+				stringstream ss;
+				ss << "Freestyle: Mesh loading " << (100 * cnt / _re->totinstance) << "%";
+				_pRenderMonitor->setInfo(ss.str());
+				_pRenderMonitor->progress((float)cnt / _re->totinstance);
+			}
+			cnt++;
+		}
+
 		if (!(obi->lay & _srl->lay))
 			continue;
 		char *name = obi->ob->id.name;
@@ -241,6 +255,7 @@ void BlenderFileLoader::clipTriangle(int numTris, float triCoords[][3], float v1
 		}
 	}
 	BLI_assert(k == 2 + numTris);
+	(void)numTris;  /* Ignored in release builds. */
 }
 
 void BlenderFileLoader::addTriangle(struct LoaderState *ls, float v1[3], float v2[3], float v3[3],
@@ -380,6 +395,8 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 			vlr = obr->vlaknodes[a>>8].vlak;
 		else
 			vlr++;
+		if (vlr->mat->mode & MA_ONLYCAST)
+			continue;
 		if (vlr->mat->material_type == MA_TYPE_WIRE) {
 			wire_material = 1;
 			continue;
@@ -432,7 +449,7 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 		return;
 
 	// We allocate memory for the meshes to be imported
-	NodeTransform *currentMesh = new NodeTransform;
+	NodeGroup *currentMesh = new NodeGroup;
 	NodeShape *shape = new NodeShape;
 
 	unsigned vSize = 3 * 3 * numFaces;
@@ -440,6 +457,7 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 	unsigned nSize = vSize;
 	float *normals = new float[nSize];
 	unsigned *numVertexPerFaces = new unsigned[numFaces];
+	vector<Material *> meshMaterials;
 	vector<FrsMaterial> meshFrsMaterials;
 
 	IndexedFaceSet::TRIANGLES_STYLE *faceStyle = new IndexedFaceSet::TRIANGLES_STYLE[numFaces];
@@ -473,15 +491,11 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 	// by the near and far view planes.
 	int p;
 	for (p = 0; p < obr->totvlak; ++p) { // we parse the faces of the mesh
-#if 0
-		Lib3dsFace *f = &mesh->faceL[p];
-		Lib3dsMaterial *mat = NULL;
-#endif
 		if ((p & 255) == 0)
 			vlr = obr->vlaknodes[p>>8].vlak;
 		else
 			vlr++;
-		if (vlr->mat->material_type == MA_TYPE_WIRE)
+		if ((vlr->mat->mode & MA_ONLYCAST) || vlr->mat->material_type == MA_TYPE_WIRE)
 			continue;
 		copy_v3_v3(v1, vlr->v1->co);
 		copy_v3_v3(v2, vlr->v2->co);
@@ -521,6 +535,15 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 		}
 		else {
 			RE_vlakren_get_normal(_re, obi, vlr, facenormal);
+#ifndef NDEBUG
+			/* test if normals are inverted in rendering [T39669] */
+			float tnor[3];
+			if (vlr->v4)
+				normal_quad_v3(tnor, v4, v3, v2, v1);
+			else
+				normal_tri_v3(tnor, v3, v2, v1);
+			BLI_assert(dot_v3v3(tnor, facenormal) > 0.0f);
+#endif
 			copy_v3_v3(n1, facenormal);
 			copy_v3_v3(n2, facenormal);
 			copy_v3_v3(n3, facenormal);
@@ -560,28 +583,31 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 
 		Material *mat = vlr->mat;
 		if (mat) {
+			tmpMat.setLine(mat->line_col[0], mat->line_col[1], mat->line_col[2], mat->line_col[3]);
 			tmpMat.setDiffuse(mat->r, mat->g, mat->b, mat->alpha);
 			tmpMat.setSpecular(mat->specr, mat->specg, mat->specb, mat->spectra);
 			float s = 1.0 * (mat->har + 1) / 4 ; // in Blender: [1;511] => in OpenGL: [0;128]
 			if (s > 128.f)
 				s = 128.f;
 			tmpMat.setShininess(s);
+			tmpMat.setPriority(mat->line_priority);
 		}
 
-		if (meshFrsMaterials.empty()) {
+		if (meshMaterials.empty()) {
+			meshMaterials.push_back(mat);
 			meshFrsMaterials.push_back(tmpMat);
 			shape->setFrsMaterial(tmpMat);
 		}
 		else {
-			// find if the material is already in the list
+			// find if the Blender material is already in the list
 			unsigned int i = 0;
 			bool found = false;
 
-			for (vector<FrsMaterial>::iterator it = meshFrsMaterials.begin(), itend = meshFrsMaterials.end();
+			for (vector<Material *>::iterator it = meshMaterials.begin(), itend = meshMaterials.end();
 			     it != itend;
 			     it++, i++)
 			{
-				if (*it == tmpMat) {
+				if (*it == mat) {
 					ls.currentMIndex = i;
 					found = true;
 					break;
@@ -589,6 +615,7 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 			}
 
 			if (!found) {
+				meshMaterials.push_back(mat);
 				meshFrsMaterials.push_back(tmpMat);
 				ls.currentMIndex = meshFrsMaterials.size() - 1;
 			}
@@ -636,13 +663,13 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 
 	// We might have several times the same vertex. We want a clean 
 	// shape with no real-vertex. Here, we are making a cleaning pass.
-	real *cleanVertices = NULL;
+	float *cleanVertices = NULL;
 	unsigned int cvSize;
 	unsigned int *cleanVIndices = NULL;
 
 	GeomCleaner::CleanIndexedVertexArray(vertices, vSize, VIndices, viSize, &cleanVertices, &cvSize, &cleanVIndices);
 
-	real *cleanNormals = NULL;
+	float *cleanNormals = NULL;
 	unsigned int cnSize;
 	unsigned int *cleanNIndices = NULL;
 
@@ -749,12 +776,12 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 		for (v = detriList.begin(); v != detriList.end(); v++) {
 			detri_t detri = (*v);
 			if (detri.n == 0) {
-				cleanVertices[detri.viP]   = cleanVertices[detri.viA];
+				cleanVertices[detri.viP]     = cleanVertices[detri.viA];
 				cleanVertices[detri.viP + 1] = cleanVertices[detri.viA + 1];
 				cleanVertices[detri.viP + 2] = cleanVertices[detri.viA + 2];
 			}
 			else if (detri.v.norm() > 0.0) {
-				cleanVertices[detri.viP]   += 1.0e-5 * detri.v.x();
+				cleanVertices[detri.viP]     += 1.0e-5 * detri.v.x();
 				cleanVertices[detri.viP + 1] += 1.0e-5 * detri.v.y();
 				cleanVertices[detri.viP + 2] += 1.0e-5 * detri.v.z();
 			}
@@ -778,10 +805,6 @@ void BlenderFileLoader::insertShapeNode(ObjectInstanceRen *obi, int id)
 	                                     Vec3r(ls.maxBBox[0], ls.maxBBox[1], ls.maxBBox[2]));
 	rep->setBBox(bbox);
 	shape->AddRep(rep);
-
-	Matrix44r meshMat = Matrix44r::identity();
-	currentMesh->setMatrix(meshMat);
-	currentMesh->Translate(0, 0, 0);
 
 	currentMesh->AddChild(shape);
 	_Scene->AddChild(currentMesh);

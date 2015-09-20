@@ -28,7 +28,7 @@ class BVHParams
 {
 public:
 	/* spatial split area threshold */
-	int use_spatial_split;
+	bool use_spatial_split;
 	float spatial_split_alpha;
 
 	/* SAH costs */
@@ -41,15 +41,13 @@ public:
 	int max_curve_leaf_size;
 
 	/* object or mesh level bvh */
-	int top_level;
+	bool top_level;
 
 	/* disk cache */
-	int use_cache;
+	bool use_cache;
 
 	/* QBVH */
-	int use_qbvh;
-
-	int pad;
+	bool use_qbvh;
 
 	/* fixed parameters */
 	enum {
@@ -75,7 +73,6 @@ public:
 		top_level = false;
 		use_cache = false;
 		use_qbvh = false;
-		pad = false;
 	}
 
 	/* SAH costs */
@@ -115,6 +112,13 @@ public:
 	__forceinline int prim_object() const { return __float_as_int(rbounds.max.w); }
 	__forceinline int prim_type() const { return type; }
 
+	BVHReference& operator=(const BVHReference &arg) {
+		if(&arg != this) {
+			memcpy(this, &arg, sizeof(BVHReference));
+		}
+		return *this;
+	}
+
 protected:
 	BoundBox rbounds;
 	uint type;
@@ -123,7 +127,7 @@ protected:
 /* BVH Range
  *
  * Build range used during construction, to indicate the bounds and place in
- * the reference array of a subset of pirmitives Again uses trickery to pack
+ * the reference array of a subset of primitives Again uses trickery to pack
  * integers into BoundBox for alignment purposes. */
 
 class BVHRange

@@ -27,8 +27,15 @@
 
 /** \file blender/blenlib/intern/BLI_mempool.c
  *  \ingroup bli
+ *  \author Geoffrey Bantle
  *
  * Simple, fast memory allocator for allocating many elements of the same size.
+ *
+ * Supports:
+ *
+ * - Freeing chunks.
+ * - Iterating over allocated chunks
+ *   (optionally when using the #BLI_MEMPOOL_ALLOW_ITER flag).
  */
 
 #include <string.h>
@@ -409,7 +416,9 @@ void BLI_mempool_free(BLI_mempool *pool, void *addr)
 #endif
 
 	/* nothing is in use; free all the chunks except the first */
-	if (UNLIKELY(pool->totused == 0)) {
+	if (UNLIKELY(pool->totused == 0) &&
+	    (pool->chunks->next))
+	{
 		const unsigned int esize = pool->esize;
 		BLI_freenode *curnode;
 		unsigned int j;

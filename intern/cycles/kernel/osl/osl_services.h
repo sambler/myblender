@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #ifndef __OSL_SERVICES_H__
@@ -49,27 +49,29 @@ public:
 	
 	void thread_init(KernelGlobals *kernel_globals, OSL::TextureSystem *ts);
 
-	bool get_matrix(OSL::Matrix44 &result, OSL::TransformationPtr xform, float time);
-	bool get_inverse_matrix(OSL::Matrix44 &result, OSL::TransformationPtr xform, float time);
+	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform, float time);
+	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform, float time);
 	
-	bool get_matrix(OSL::Matrix44 &result, ustring from, float time);
-	bool get_inverse_matrix(OSL::Matrix44 &result, ustring to, float time);
+	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring from, float time);
+	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring to, float time);
 	
-	bool get_matrix(OSL::Matrix44 &result, OSL::TransformationPtr xform);
-	bool get_inverse_matrix(OSL::Matrix44 &result, OSL::TransformationPtr xform);
+	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform);
+	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform);
 	
-	bool get_matrix(OSL::Matrix44 &result, ustring from);
-	bool get_inverse_matrix(OSL::Matrix44 &result, ustring from);
+	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring from);
+	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring from);
 
-	bool get_array_attribute(void *renderstate, bool derivatives,
+	bool get_array_attribute(OSL::ShaderGlobals *sg, bool derivatives,
 	                         ustring object, TypeDesc type, ustring name,
 	                         int index, void *val);
-	bool get_attribute(void *renderstate, bool derivatives, ustring object,
+	bool get_attribute(OSL::ShaderGlobals *sg, bool derivatives, ustring object,
+	                   TypeDesc type, ustring name, void *val);
+	bool get_attribute(ShaderData *sd, bool derivatives, ustring object_name,
 	                   TypeDesc type, ustring name, void *val);
 
 	bool get_userdata(bool derivatives, ustring name, TypeDesc type,
-	                  void *renderstate, void *val);
-	bool has_userdata(ustring name, TypeDesc type, void *renderstate);
+	                  OSL::ShaderGlobals *sg, void *val);
+	bool has_userdata(ustring name, TypeDesc type, OSL::ShaderGlobals *sg);
 
 	int pointcloud_search(OSL::ShaderGlobals *sg, ustring filename, const OSL::Vec3 &center,
 	                      float radius, int max_points, bool sort, size_t *out_indices,
@@ -95,18 +97,66 @@ public:
 	bool texture(ustring filename, TextureOpt &options,
 	             OSL::ShaderGlobals *sg,
 	             float s, float t, float dsdx, float dtdx,
-	             float dsdy, float dtdy, float *result);
+	             float dsdy, float dtdy, int nchannels, float *result);
 
 	bool texture3d(ustring filename, TextureOpt &options,
 	               OSL::ShaderGlobals *sg, const OSL::Vec3 &P,
 	               const OSL::Vec3 &dPdx, const OSL::Vec3 &dPdy,
-	               const OSL::Vec3 &dPdz, float *result);
+	               const OSL::Vec3 &dPdz, int nchannels, float *result);
+
+#if OSL_LIBRARY_VERSION_CODE >= 10700
+	bool texture(ustring filename,
+	             TextureHandle * /*texture_handle*/,
+	             TexturePerthread * /*texture_thread_info*/,
+	             TextureOpt &options,
+	             OSL::ShaderGlobals *sg,
+	             float s, float t,
+	             float dsdx, float dtdx, float dsdy, float dtdy,
+	             int nchannels,
+	             float *result,
+	             float * /*dresultds*/,
+	             float * /*dresultdt*/)
+	{
+		return texture(filename,
+		               options,
+		               sg,
+		               s, t,
+		               dsdx, dtdx, dsdy, dtdy,
+		               nchannels,
+		               result);
+	}
+
+	bool texture3d(ustring filename,
+	               TextureHandle * /*texture_handle*/,
+	               TexturePerthread * /*texture_thread_info*/,
+	               TextureOpt &options,
+	               OSL::ShaderGlobals *sg,
+	               const OSL::Vec3 &P,
+	               const OSL::Vec3 &dPdx,
+	               const OSL::Vec3 &dPdy,
+	               const OSL::Vec3 &dPdz,
+	               int nchannels,
+	               float *result,
+	               float * /*dresultds*/,
+	               float * /*dresultdt*/,
+	               float * /*dresultdr*/)
+	{
+		return texture3d(filename,
+		                 options,
+		                 sg,
+		                 P,
+		                 dPdx, dPdy, dPdz,
+		                 nchannels,
+		                 result);
+	}
+#endif
 
 	bool environment(ustring filename, TextureOpt &options,
 	                 OSL::ShaderGlobals *sg, const OSL::Vec3 &R,
-	                 const OSL::Vec3 &dRdx, const OSL::Vec3 &dRdy, float *result);
+	                 const OSL::Vec3 &dRdx, const OSL::Vec3 &dRdy,
+	                 int nchannels, float *result);
 
-	bool get_texture_info(ustring filename, int subimage,
+	bool get_texture_info(OSL::ShaderGlobals *sg, ustring filename, int subimage,
 	                      ustring dataname, TypeDesc datatype, void *data);
 
 	static bool get_background_attribute(KernelGlobals *kg, ShaderData *sd, ustring name,
@@ -156,6 +206,37 @@ public:
 	static ustring u_u;
 	static ustring u_v;
 	static ustring u_empty;
+
+	/* Code to make OSL versions transition smooth. */
+
+#if OSL_LIBRARY_VERSION_CODE < 10600
+	inline bool texture(ustring filename, TextureOpt &options,
+	                    OSL::ShaderGlobals *sg,
+	                    float s, float t, float dsdx, float dtdx,
+	                    float dsdy, float dtdy, float *result)
+	{
+		return texture(filename, options, sg, s, t, dsdx, dtdx, dsdy, dtdy,
+		               options.nchannels, result);
+	}
+
+	inline bool texture3d(ustring filename, TextureOpt &options,
+	                      OSL::ShaderGlobals *sg, const OSL::Vec3 &P,
+	                      const OSL::Vec3 &dPdx, const OSL::Vec3 &dPdy,
+	                      const OSL::Vec3 &dPdz, float *result)
+	{
+		return texture3d(filename, options, sg, P, dPdx, dPdy, dPdz,
+		                 options.nchannels, result);
+	}
+
+	inline bool environment(ustring filename, TextureOpt &options,
+	                        OSL::ShaderGlobals *sg, const OSL::Vec3 &R,
+	                        const OSL::Vec3 &dRdx, const OSL::Vec3 &dRdy,
+	                        float *result)
+	{
+		return environment(filename, options, sg, R, dRdx, dRdy,
+		                   options.nchannels, result);
+	}
+#endif
 
 private:
 	KernelGlobals *kernel_globals;

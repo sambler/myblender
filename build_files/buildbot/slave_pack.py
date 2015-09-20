@@ -33,13 +33,15 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 builder = sys.argv[1]
-branch = ''
-
-if len(sys.argv) >= 3:
-    branch = sys.argv[2]
+# Never write branch if it is master.
+branch = sys.argv[2] if (len(sys.argv) >= 3 and sys.argv[2] != 'master') else ''
 
 # scons does own packaging
 if builder.find('scons') != -1:
+    python_bin = 'python'
+    if builder.find('linux') != -1:
+        python_bin = '/opt/lib/python-2.7/bin/python2.7'
+
     os.chdir('../blender.git')
     scons_options = ['BF_QUICK=slnt', 'BUILDBOT_BRANCH=' + branch, 'buildslave', 'BF_FANCY=False']
 
@@ -82,7 +84,7 @@ if builder.find('scons') != -1:
         os.system('cp %s %s' % (software_gl, install_dir))
         os.system('chmod 755 %s' % (os.path.join(install_dir, 'blender-softwaregl')))
 
-        retcode = subprocess.call(['schroot', '-c', chroot_name, '--', 'python', 'scons/scons.py'] + scons_options)
+        retcode = subprocess.call(['schroot', '-c', chroot_name, '--', python_bin, 'scons/scons.py'] + scons_options)
 
         sys.exit(retcode)
     else:
@@ -99,8 +101,6 @@ if builder.find('scons') != -1:
             scons_options.append('BF_CYCLES_CUDA_NVCC=nvcc.exe')
             if builder.find('mingw') != -1:
                 scons_options.append('BF_TOOLSET=mingw')
-            if builder.endswith('vc2012'):
-                scons_options.append('MSVS_VERSION=11.0')
             if builder.endswith('vc2013'):
                 scons_options.append('MSVS_VERSION=12.0')
                 scons_options.append('MSVC_VERSION=12.0')
@@ -113,8 +113,42 @@ if builder.find('scons') != -1:
 
             scons_options.append('BF_CONFIG=' + os.path.join(config_dir, config))
 
-        retcode = subprocess.call(['python', 'scons/scons.py'] + scons_options)
+        retcode = subprocess.call([python_bin, 'scons/scons.py'] + scons_options)
         sys.exit(retcode)
+else:
+    # CMake
+    if 'win' in builder:
+        files = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.zip')]
+        for f in files:
+            os.remove(f)
+        retcode = subprocess.call(['cpack', '-G', 'ZIP'])
+        result_file = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.zip')][0]
+
+        # TODO(sergey): Such magic usually happens in SCon's packaging bu we don't have it
+        # in the CMake yet. For until then we do some magic here.
+        tokens = result_file.split('-')
+        blender_version = tokens[1].split('.')
+        blender_full_version = '.'.join(blender_version[0:2])
+        git_hash = tokens[2].split('.')[1]
+        platform = builder.split('_')[0]
+        builderified_name = 'blender-{}-{}-{}'.format(blender_full_version, git_hash, platform)
+        if branch != '':
+            builderified_name = branch + "-" + builderified_name
+
+        os.rename(result_file, "{}.zip".format(builderified_name))
+        # create zip file
+        try:
+            upload_zip = "buildbot_upload.zip"
+            if os.path.exists(upload_zip):
+                os.remove(upload_zip)
+            z = zipfile.ZipFile(upload_zip, "w", compression=zipfile.ZIP_STORED)
+            z.write("{}.zip".format(builderified_name))
+            z.close()
+            sys.exit(retcode)
+        except Exception as ex:
+            sys.stderr.write('Create buildbot_upload.zip failed' + str(ex) + '\n')
+            sys.exit(1)
+
 
 # clean release directory if it already exists
 release_dir = 'release'
@@ -127,7 +161,7 @@ if os.path.exists(release_dir):
 # create release package
 try:
     subprocess.call(['make', 'package_archive'])
-except Exception, ex:
+except Exception as ex:
     sys.stderr.write('Make package release failed' + str(ex) + '\n')
     sys.exit(1)
 
@@ -158,6 +192,6 @@ try:
     z = zipfile.ZipFile(upload_zip, "w", compression=zipfile.ZIP_STORED)
     z.write(filepath, arcname=file)
     z.close()
-except Exception, ex:
+except Exception as ex:
     sys.stderr.write('Create buildbot_upload.zip failed' + str(ex) + '\n')
     sys.exit(1)

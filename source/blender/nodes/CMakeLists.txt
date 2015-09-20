@@ -29,15 +29,16 @@ set(INC
 	intern
 	shader
 	texture
-	../blenfont
 	../blenkernel
 	../blenlib
+	../blentranslation
 	../gpu
 	../imbuf
 	../makesdna
 	../makesrna
 	../render/extern/include
 	../../../intern/guardedalloc
+	../../../intern/glew-mx
 )
 
 set(INC_SYS
@@ -105,6 +106,7 @@ set(SRC
 	composite/nodes/node_composite_setalpha.c
 	composite/nodes/node_composite_splitViewer.c
 	composite/nodes/node_composite_stabilize2d.c
+	composite/nodes/node_composite_sunbeams.c
 	composite/nodes/node_composite_texture.c
 	composite/nodes/node_composite_tonemap.c
 	composite/nodes/node_composite_trackpos.c
@@ -120,6 +122,7 @@ set(SRC
 	composite/nodes/node_composite_boxmask.c
 	composite/nodes/node_composite_ellipsemask.c
 	composite/nodes/node_composite_switch.c
+	composite/nodes/node_composite_switchview.c
 	composite/nodes/node_composite_colorcorrection.c
 	composite/nodes/node_composite_pixelate.c
 
@@ -144,6 +147,7 @@ set(SRC
 	shader/nodes/node_shader_rgb.c
 	shader/nodes/node_shader_sepcombRGB.c
 	shader/nodes/node_shader_sepcombHSV.c
+	shader/nodes/node_shader_sepcombXYZ.c
 	shader/nodes/node_shader_squeeze.c
 	shader/nodes/node_shader_texture.c
 	shader/nodes/node_shader_valToRgb.c
@@ -182,6 +186,7 @@ set(SRC
 	shader/nodes/node_shader_output_lamp.c
 	shader/nodes/node_shader_output_material.c
 	shader/nodes/node_shader_output_world.c
+	shader/nodes/node_shader_output_linestyle.c
 	shader/nodes/node_shader_particle_info.c
 	shader/nodes/node_shader_script.c
 	shader/nodes/node_shader_subsurface_scattering.c
@@ -195,11 +200,13 @@ set(SRC
 	shader/nodes/node_shader_tex_magic.c
 	shader/nodes/node_shader_tex_musgrave.c
 	shader/nodes/node_shader_tex_noise.c
+	shader/nodes/node_shader_tex_pointdensity.c
 	shader/nodes/node_shader_tex_sky.c
 	shader/nodes/node_shader_tex_voronoi.c
 	shader/nodes/node_shader_tex_wave.c
 	shader/nodes/node_shader_volume_scatter.c
 	shader/nodes/node_shader_volume_absorption.c
+	shader/nodes/node_shader_uvAlongStroke.c
 	shader/nodes/node_shader_uvmap.c
 	shader/node_shader_tree.c
 	shader/node_shader_util.c
@@ -273,6 +280,16 @@ if(WITH_COMPOSITOR)
 		../compositor
 	)
 	add_definitions(-DWITH_COMPOSITOR)
+endif()
+
+add_definitions(${GL_DEFINITIONS})
+
+if(WITH_FREESTYLE)
+	add_definitions(-DWITH_FREESTYLE)
+endif()
+
+if(WITH_CYCLES AND WITH_CYCLES_DEBUG)
+	add_definitions(-DWITH_CYCLES_DEBUG)
 endif()
 
 blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}")

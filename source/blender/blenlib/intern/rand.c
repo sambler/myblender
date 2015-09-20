@@ -33,10 +33,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 #include "MEM_guardedalloc.h"
-
-#include "PIL_time.h"
 
 #include "BLI_threads.h"
 #include "BLI_rand.h"
@@ -69,6 +68,9 @@ RNG *BLI_rng_new(unsigned int seed)
 	return rng;
 }
 
+/**
+ * A version of #BLI_rng_new that hashes the seed.
+ */
 RNG *BLI_rng_new_srandom(unsigned int seed)
 {
 	RNG *rng = MEM_mallocN(sizeof(*rng), "rng");
@@ -88,6 +90,9 @@ void BLI_rng_seed(RNG *rng, unsigned int seed)
 	rng->X = (((uint64_t) seed) << 16) | LOWSEED;
 }
 
+/**
+ * Use a hash table to create better seed.
+ */
 void BLI_rng_srandom(RNG *rng, unsigned int seed)
 {
 	BLI_rng_seed(rng, seed + hash[seed & 255]);
@@ -97,26 +102,44 @@ void BLI_rng_srandom(RNG *rng, unsigned int seed)
 	BLI_rng_seed(rng, seed + hash[seed & 255]);
 }
 
-int BLI_rng_get_int(RNG *rng)
+BLI_INLINE void rng_step(RNG *rng)
 {
 	rng->X = (MULTIPLIER * rng->X + ADDEND) & MASK;
+}
+
+int BLI_rng_get_int(RNG *rng)
+{
+	rng_step(rng);
 	return (int) (rng->X >> 17);
 }
 
 unsigned int BLI_rng_get_uint(RNG *rng)
 {
-	rng->X = (MULTIPLIER * rng->X + ADDEND) & MASK;
+	rng_step(rng);
 	return (unsigned int) (rng->X >> 17);
 }
 
+/**
+ * \return Random value (0..1), but never 1.0.
+ */
 double BLI_rng_get_double(RNG *rng)
 {
 	return (double) BLI_rng_get_int(rng) / 0x80000000;
 }
 
+/**
+ * \return Random value (0..1), but never 1.0.
+ */
 float BLI_rng_get_float(RNG *rng)
 {
 	return (float) BLI_rng_get_int(rng) / 0x80000000;
+}
+
+void BLI_rng_get_float_unit_v2(RNG *rng, float v[2])
+{
+	float a = (float)(M_PI * 2.0) * BLI_rng_get_float(rng);
+	v[0] = cosf(a);
+	v[1] = sinf(a);
 }
 
 void BLI_rng_get_float_unit_v3(RNG *rng, float v[3])
@@ -134,9 +157,34 @@ void BLI_rng_get_float_unit_v3(RNG *rng, float v[3])
 	}
 }
 
+/**
+ * Generate a random point inside given tri.
+ */
+void BLI_rng_get_tri_sample_float_v2(
+        RNG *rng, const float v1[2], const float v2[2], const float v3[2],
+        float r_pt[2])
+{
+	float u = BLI_rng_get_float(rng);
+	float v = BLI_rng_get_float(rng);
+
+	float side_u[2], side_v[2];
+
+	if ((u + v) > 1.0f) {
+		u = 1.0f - u;
+		v = 1.0f - v;
+	}
+
+	sub_v2_v2v2(side_u, v2, v1);
+	sub_v2_v2v2(side_v, v3, v1);
+
+	copy_v2_v2(r_pt, v1);
+	madd_v2_v2fl(r_pt, side_u, u);
+	madd_v2_v2fl(r_pt, side_v, v);
+}
+
 void BLI_rng_shuffle_array(RNG *rng, void *data, unsigned int elem_size_i, unsigned int elem_tot)
 {
-	const size_t elem_size = (unsigned int)elem_size_i;
+	const size_t elem_size = (size_t)elem_size_i;
 	unsigned int i = elem_tot;
 	void *temp;
 
@@ -160,12 +208,16 @@ void BLI_rng_shuffle_array(RNG *rng, void *data, unsigned int elem_size_i, unsig
 	free(temp);
 }
 
+/**
+ * Simulate getting \a n random values.
+ *
+ * \note Useful when threaded code needs consistent values, independent of task division.
+ */
 void BLI_rng_skip(RNG *rng, int n)
 {
-	int i;
-
-	for (i = 0; i < n; i++)
-		BLI_rng_get_int(rng);
+	while (n--) {
+		rng_step(rng);
+	}
 }
 
 /***/
@@ -173,7 +225,6 @@ void BLI_rng_skip(RNG *rng, int n)
 /* initialize with some non-zero seed */
 static RNG theBLI_rng = {611330372042337130};
 
-/* using hash table to create better seed */
 void BLI_srandom(unsigned int seed)
 {
 	BLI_rng_srandom(&theBLI_rng, seed);
@@ -234,5 +285,31 @@ int BLI_thread_rand(int thread)
 float BLI_thread_frand(int thread)
 {
 	return BLI_rng_get_float(&rng_tab[thread]);
+}
+
+struct RNG_THREAD_ARRAY {
+	RNG rng_tab[BLENDER_MAX_THREADS];
+};
+
+RNG_THREAD_ARRAY *BLI_rng_threaded_new(void)
+{
+	unsigned int i;
+	RNG_THREAD_ARRAY *rngarr = MEM_mallocN(sizeof(RNG_THREAD_ARRAY), "random_array");
+	
+	for (i = 0; i < BLENDER_MAX_THREADS; i++) {
+		BLI_rng_srandom(&rngarr->rng_tab[i], (unsigned int)clock());
+	}
+	
+	return rngarr;
+}
+
+void BLI_rng_threaded_free(struct RNG_THREAD_ARRAY *rngarr)
+{
+	MEM_freeN(rngarr);
+}
+
+int BLI_rng_thread_rand(RNG_THREAD_ARRAY *rngarr, int thread)
+{
+	return BLI_rng_get_int(&rngarr->rng_tab[thread]);
 }
 

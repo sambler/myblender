@@ -51,6 +51,9 @@ void BM_log_mesh_elems_reorder(BMesh *bm, BMLog *log);
 /* Start a new log entry and update the log entry list */
 BMLogEntry *BM_log_entry_add(BMLog *log);
 
+/* Mark all used ids as unused for this node */
+void BM_log_cleanup_entry(BMLogEntry *entry);
+
 /* Remove an entry from the log */
 void BM_log_entry_drop(BMLogEntry *entry);
 
@@ -92,6 +95,11 @@ const short *BM_log_original_vert_no(BMLog *log, BMVert *v);
 
 /* Get the logged mask of a vertex */
 float BM_log_original_mask(BMLog *log, BMVert *v);
+
+/* Get the logged data of a vertex (avoid multiple lookups) */
+void BM_log_original_vert_data(
+        BMLog *log, BMVert *v,
+        const float **r_co, const short **r_no);
 
 /* For internal use only (unit testing) */
 BMLogEntry *BM_log_current_entry(BMLog *log);

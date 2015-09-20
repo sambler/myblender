@@ -24,7 +24,7 @@ import pickle
 import re
 
 
-class SpellChecker():
+class SpellChecker:
     """
     A basic spell checker.
     """
@@ -43,6 +43,7 @@ class SpellChecker():
         "fader",
         "globbing",
         "hasn",  # hasn't
+        "hetero",
         "hoc",  # ad-hoc
         "indices",
         "iridas",
@@ -52,6 +53,7 @@ class SpellChecker():
         "latin",
         "merchantability",
         "mplayer",
+        "pong",  # ping pong
         "teleport", "teleporting",
         "vertices",
 
@@ -89,9 +91,13 @@ class SpellChecker():
         "customdata",
         "dataset", "datasets",
         "de",
+        "deadzone",
+        "deconstruct",
         "defocus",
         "denoise",
+        "deselect", "deselecting", "deselection",
         "despill", "despilling",
+        "dirtree",
         "editcurve",
         "editmesh",
         "filebrowser",
@@ -108,6 +114,7 @@ class SpellChecker():
         "libdata",
         "lightless",
         "lineset",
+        "linestyle", "linestyles",
         "localview",
         "lookup", "lookups",
         "mathutils",
@@ -120,10 +127,12 @@ class SpellChecker():
         "multisampling",
         "multitexture",
         "multiuser",
+        "multiview",
         "namespace",
+        "nodetree", "nodetrees",
         "keyconfig",
+        "online",
         "playhead",
-        "polyline",
         "popup", "popups",
         "pre",
         "precache", "precaching",
@@ -134,6 +143,8 @@ class SpellChecker():
         "prepend",
         "preprocess", "preprocessing",
         "preseek",
+        "promillage",
+        "pushdown",
         "raytree",
         "readonly",
         "realtime",
@@ -179,6 +190,7 @@ class SpellChecker():
         "unhide",
         "unindent",
         "unkeyed",
+        "unmute",
         "unpremultiply",
         "unprojected",
         "unreacted",
@@ -210,15 +222,19 @@ class SpellChecker():
         "passepartout",
         "perspectively",
         "pixelate",
+        "pointiness",
+        "polycount",
         "polygonization", "polygonalization",  # yuck!
         "selectability",
-        "slurph",
         "stitchable",
         "symmetrize",
         "trackability",
         "transmissivity",
         "rasterized", "rasterization", "rasterizer",
         "renderer", "renderable", "renderability",
+
+        # Really bad!!!
+        "convertor",
 
         # Abbreviations
         "aero",
@@ -230,6 +246,7 @@ class SpellChecker():
         "const",
         "coord", "coords",
         "degr",
+        "diff",
         "dof",
         "dupli", "duplis",
         "eg",
@@ -248,12 +265,14 @@ class SpellChecker():
         "loc", "rot", "pos",
         "lorem",
         "luma",
+        "mbs",  # mouse button 'select'.
         "mem",
         "multicam",
         "num",
         "ok",
         "orco",
         "ortho",
+        "pano",
         "persp",
         "pref", "prefs",
         "prev",
@@ -269,6 +288,7 @@ class SpellChecker():
         "struct", "structs",
         "sys",
         "tex",
+        "tmr",  # timer
         "tri", "tris",
         "uv", "uvs", "uvw", "uw", "uvmap",
         "ve",
@@ -276,6 +296,7 @@ class SpellChecker():
         "vel",  # velocity!
         "vert", "verts",
         "vis",
+        "xor",
         "xyz", "xzy", "yxz", "yzx", "zxy", "zyx",
         "xy", "xz", "yx", "yz", "zx", "zy",
 
@@ -287,6 +308,7 @@ class SpellChecker():
         "fribidi",
         "gettext",
         "hashable",
+        "hotspot",
         "intrinsics",
         "isosurface",
         "jitter", "jittering", "jittered",
@@ -299,8 +321,11 @@ class SpellChecker():
         "normals",
         "numpad",
         "octree",
+        "omnidirectional",
         "opengl",
         "openmp",
+        "photoreceptor",
+        "poly",
         "polyline", "polylines",
         "pulldown", "pulldowns",
         "quantized",
@@ -346,6 +371,7 @@ class SpellChecker():
         "icosphere",
         "inpaint",
         "lightmap",
+        "linearlight",
         "lossless", "lossy",
         "matcap",
         "midtones",
@@ -355,6 +381,7 @@ class SpellChecker():
         "nurb", "nurbs",
         "perlin",
         "phong",
+        "pinlight",
         "qi",
         "radiosity",
         "raycasting",
@@ -362,6 +389,7 @@ class SpellChecker():
         "renderfarm",
         "scanfill",
         "shader", "shaders",
+        "softlight",
         "specular", "specularity",
         "spillmap",
         "sobel",
@@ -369,6 +397,7 @@ class SpellChecker():
         "tonemap",
         "toon",
         "timecode",
+        "vividlight",
         "voronoi",
         "voxel", "voxels",
         "vsync",
@@ -433,12 +462,14 @@ class SpellChecker():
         "vcol", "vcols",
         "vgroup", "vgroups",
         "vinterlace",
+        "vse",
         "wasd", "wasdqe",  # keys...
         "wetmap", "wetmaps",
         "wpaint",
         "uvwarp",
 
         # Algorithm names
+        "ashikhmin",  # Ashikhmin-Shirley
         "beckmann",
         "catmull",
         "catrom",
@@ -487,6 +518,7 @@ class SpellChecker():
         "fov",
         "fft",
         "futura",
+        "fx",
         "gfx",
         "gl",
         "glsl",
@@ -517,6 +549,7 @@ class SpellChecker():
         "sdl",
         "sl",
         "smpte",
+        "ssao",
         "svn",
         "ui",
         "unix",
@@ -550,6 +583,8 @@ class SpellChecker():
         "btx",
         "cineon",
         "dpx",
+        "dwaa",
+        "dwab",
         "dxf",
         "eps",
         "exr",

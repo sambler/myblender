@@ -20,7 +20,7 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
+
 #ifndef __GHOST_NDOFMANAGER_H__
 #define __GHOST_NDOFMANAGER_H__
 
@@ -38,6 +38,8 @@ typedef enum {
 	NDOF_SpaceExplorer,
 	NDOF_SpacePilotPro,
 	NDOF_SpaceMousePro,
+	NDOF_SpaceMouseWireless,
+	NDOF_SpaceMouseProWireless,
 
 	// older devices
 	NDOF_SpacePilot,
@@ -105,7 +107,7 @@ typedef enum {
 class GHOST_NDOFManager
 {
 public:
-	GHOST_NDOFManager(GHOST_System&);
+	GHOST_NDOFManager(GHOST_System &);
 
 	virtual ~GHOST_NDOFManager() {}
 

@@ -126,6 +126,54 @@ char *BLI_strncpy(char *__restrict dst, const char *__restrict src, const size_t
 }
 
 /**
+ * Like BLI_strncpy but ensures dst is always padded by given char, on both sides (unless src is empty).
+ *
+ * \param dst Destination for copy
+ * \param src Source string to copy
+ * \param pad the char to use for padding
+ * \param maxncpy Maximum number of characters to copy (generally the size of dst)
+ * \retval Returns dst
+ */
+char *BLI_strncpy_ensure_pad(char *__restrict dst, const char *__restrict src, const char pad, size_t maxncpy)
+{
+	BLI_assert(maxncpy != 0);
+
+#ifdef DEBUG_STRSIZE
+	memset(dst, 0xff, sizeof(*dst) * maxncpy);
+#endif
+
+	if (src[0] == '\0') {
+		dst[0] = '\0';
+	}
+	else {
+		/* Add heading/trailing wildcards if needed. */
+		size_t idx = 0;
+		size_t srclen;
+
+		if (src[idx] != pad) {
+			dst[idx++] = pad;
+			maxncpy--;
+		}
+		maxncpy--;  /* trailing '\0' */
+
+		srclen = BLI_strnlen(src, maxncpy);
+		if ((src[srclen - 1] != pad) && (srclen == maxncpy)) {
+			srclen--;
+		}
+
+		memcpy(&dst[idx], src, srclen);
+		idx += srclen;
+
+		if (dst[idx - 1] != pad) {
+			dst[idx++] = pad;
+		}
+		dst[idx] = '\0';
+	}
+
+	return dst;
+}
+
+/**
  * Like strncpy but ensures dst is always
  * '\0' terminated.
  *
@@ -183,6 +231,30 @@ size_t BLI_vsnprintf(char *__restrict buffer, size_t maxncpy, const char *__rest
 }
 
 /**
+ * A version of #BLI_vsnprintf that returns ``strlen(buffer)``
+ */
+size_t BLI_vsnprintf_rlen(char *__restrict buffer, size_t maxncpy, const char *__restrict format, va_list arg)
+{
+	size_t n;
+
+	BLI_assert(buffer != NULL);
+	BLI_assert(maxncpy > 0);
+	BLI_assert(format != NULL);
+
+	n = (size_t)vsnprintf(buffer, maxncpy, format, arg);
+
+	if (n != -1 && n < maxncpy) {
+		/* pass */
+	}
+	else {
+		n = maxncpy - 1;
+	}
+	buffer[n] = '\0';
+
+	return n;
+}
+
+/**
  * Portable replacement for #snprintf
  */
 size_t BLI_snprintf(char *__restrict dst, size_t maxncpy, const char *__restrict format, ...)
@@ -196,6 +268,25 @@ size_t BLI_snprintf(char *__restrict dst, size_t maxncpy, const char *__restrict
 
 	va_start(arg, format);
 	n = BLI_vsnprintf(dst, maxncpy, format, arg);
+	va_end(arg);
+
+	return n;
+}
+
+/**
+ * A version of #BLI_snprintf that returns ``strlen(dst)``
+ */
+size_t BLI_snprintf_rlen(char *__restrict dst, size_t maxncpy, const char *__restrict format, ...)
+{
+	size_t n;
+	va_list arg;
+
+#ifdef DEBUG_STRSIZE
+	memset(dst, 0xff, sizeof(*dst) * maxncpy);
+#endif
+
+	va_start(arg, format);
+	n = BLI_vsnprintf_rlen(dst, maxncpy, format, arg);
 	va_end(arg);
 
 	return n;
@@ -288,18 +379,29 @@ escape_finish:
  */
 char *BLI_str_quoted_substrN(const char *__restrict str, const char *__restrict prefix)
 {
-	size_t prefixLen = strlen(prefix);
 	const char *startMatch, *endMatch;
-	
+
 	/* get the starting point (i.e. where prefix starts, and add prefixLen+1 to it to get be after the first " */
-	startMatch = strstr(str, prefix) + prefixLen + 1;
+	startMatch = strstr(str, prefix);
 	if (startMatch) {
+		const size_t prefixLen = strlen(prefix);
+		startMatch += prefixLen + 1;
 		/* get the end point (i.e. where the next occurance of " is after the starting point) */
-		endMatch = strchr(startMatch, '"'); /* "  NOTE: this comment here is just so that my text editor still shows the functions ok... */
-		
-		if (endMatch)
+
+		endMatch = startMatch;
+		while ((endMatch = strchr(endMatch, '"'))) {
+			if (LIKELY(*(endMatch - 1) != '\\')) {
+				break;
+			}
+			else {
+				endMatch++;
+			}
+		}
+
+		if (endMatch) {
 			/* return the slice indicated */
 			return BLI_strdupn(startMatch, (size_t)(endMatch - startMatch));
+		}
 	}
 	return BLI_strdupn("", 0);
 }
@@ -317,7 +419,7 @@ char *BLI_str_quoted_substrN(const char *__restrict str, const char *__restrict 
  * \param substr_new The text in the string to find and replace
  * \retval Returns the duplicated string
  */
-char *BLI_replacestrN(const char *__restrict str, const char *__restrict substr_old, const char *__restrict substr_new)
+char *BLI_str_replaceN(const char *__restrict str, const char *__restrict substr_old, const char *__restrict substr_new)
 {
 	DynStr *ds = NULL;
 	size_t len_old = strlen(substr_old);
@@ -374,6 +476,23 @@ char *BLI_replacestrN(const char *__restrict str, const char *__restrict substr_
 		return BLI_strdup(str);
 	}
 } 
+
+/**
+ * In-place replace every \a src to \a dst in \a str.
+ *
+ * \param str: The string to operate on.
+ * \param src: The character to replace.
+ * \param dst: The character to replace with.
+ */
+void BLI_str_replace_char(char *str, char src, char dst)
+{
+	while (*str) {
+		if (*str == src) {
+			*str = dst;
+		}
+		str++;
+	}
+}
 
 /**
  * Compare two strings without regard to case.
@@ -556,19 +675,47 @@ int BLI_natstrcmp(const char *s1, const char *s2)
 	return strcmp(s1, s2);
 }
 
-void BLI_timestr(double _time, char *str, size_t maxlen)
+/**
+ * Like strcmp, but will ignore any heading/trailing pad char for comparison.
+ * So e.g. if pad is '*', '*world' and 'world*' will compare equal.
+ */
+int BLI_strcmp_ignore_pad(const char *str1, const char *str2, const char pad)
 {
-	/* format 00:00:00.00 (hr:min:sec) string has to be 12 long */
-	int  hr = ( (int)  _time) / (60 * 60);
-	int min = (((int)  _time) / 60 ) % 60;
-	int sec = ( (int)  _time) % 60;
-	int hun = ( (int) (_time   * 100.0)) % 100;
+	size_t str1_len, str2_len;
 
-	if (hr) {
-		BLI_snprintf(str, maxlen, "%.2d:%.2d:%.2d.%.2d", hr, min, sec, hun);
+	while (*str1 == pad) {
+		str1++;
+	}
+	while (*str2 == pad) {
+		str2++;
+	}
+
+	str1_len = strlen(str1);
+	str2_len = strlen(str2);
+
+	while (str1_len && (str1[str1_len - 1] == pad)) {
+		str1_len--;
+	}
+	while (str2_len && (str2[str2_len - 1] == pad)) {
+		str2_len--;
+	}
+
+	if (str1_len == str2_len) {
+		return strncmp(str1, str2, str2_len);
+	}
+	else if (str1_len > str2_len) {
+		int ret = strncmp(str1, str2, str2_len);
+		if (ret == 0) {
+			ret = 1;
+		}
+		return ret;
 	}
 	else {
-		BLI_snprintf(str, maxlen, "%.2d:%.2d.%.2d", min, sec, hun);
+		int ret = strncmp(str1, str2, str1_len);
+		if (ret == 0) {
+			ret = -1;
+		}
+		return ret;
 	}
 }
 
@@ -584,7 +731,7 @@ size_t BLI_strnlen(const char *s, const size_t maxlen)
 	return len;
 }
 
-void BLI_ascii_strtolower(char *str, const size_t len)
+void BLI_str_tolower_ascii(char *str, const size_t len)
 {
 	size_t i;
 
@@ -593,7 +740,7 @@ void BLI_ascii_strtolower(char *str, const size_t len)
 			str[i] += 'a' - 'A';
 }
 
-void BLI_ascii_strtoupper(char *str, const size_t len)
+void BLI_str_toupper_ascii(char *str, const size_t len)
 {
 	size_t i;
 
@@ -609,7 +756,7 @@ void BLI_ascii_strtoupper(char *str, const size_t len)
  *
  * \param str
  * \param pad
- * \return The number of zeto's stripped.
+ * \return The number of zeros stripped.
  */
 int BLI_str_rstrip_float_zero(char *str, const char pad)
 {
@@ -628,4 +775,192 @@ int BLI_str_rstrip_float_zero(char *str, const char pad)
 	}
 
 	return totstrip;
+}
+
+/**
+ * Return index of a string in a string array.
+ *
+ * \param str The string to find.
+ * \param str_array Array of strings.
+ * \param str_array_len The length of the array, or -1 for a NULL-terminated array.
+ * \return The index of str in str_array or -1.
+ */
+int BLI_str_index_in_array_n(const char *__restrict str, const char **__restrict str_array, const int str_array_len)
+{
+	int index;
+	const char **str_iter = str_array;
+
+	for (index = 0; index < str_array_len; str_iter++, index++) {
+		if (STREQ(str, *str_iter)) {
+			return index;
+		}
+	}
+	return -1;
+}
+
+/**
+ * Return index of a string in a string array.
+ *
+ * \param str The string to find.
+ * \param str_array Array of strings, (must be NULL-terminated).
+ * \return The index of str in str_array or -1.
+ */
+int BLI_str_index_in_array(const char *__restrict str, const char **__restrict str_array)
+{
+	int index;
+	const char **str_iter = str_array;
+
+	for (index = 0; *str_iter; str_iter++, index++) {
+		if (STREQ(str, *str_iter)) {
+			return index;
+		}
+	}
+	return -1;
+}
+
+bool BLI_strn_endswith(const char *__restrict str, const char *__restrict end, size_t slength)
+{
+	size_t elength = strlen(end);
+	
+	if (elength < slength) {
+		const char *iter = &str[slength - elength];
+		while (*iter) {
+			if (*iter++ != *end++) {
+				return false;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Find if a string ends with another string.
+ *
+ * \param str The string to search within.
+ * \param end The string we look for at the end.
+ * \return If str ends with end.
+ */
+bool BLI_str_endswith(const char *__restrict str, const char *end)
+{
+	const size_t slength = strlen(str);
+	return BLI_strn_endswith(str, end, slength);
+}
+
+/**
+ * Find the first char matching one of the chars in \a delim, from left.
+ *
+ * \param str The string to search within.
+ * \param delim The set of delimiters to search for, as unicode values.
+ * \param sep Return value, set to the first delimiter found (or NULL if none found).
+ * \param suf Return value, set to next char after the first delimiter found (or NULL if none found).
+ * \return The length of the prefix (i.e. *sep - str).
+ */
+size_t BLI_str_partition(const char *str, const char delim[], const char **sep, const char **suf)
+{
+	return BLI_str_partition_ex(str, NULL, delim, sep, suf, false);
+}
+
+/**
+ * Find the first char matching one of the chars in \a delim, from right.
+ *
+ * \param str The string to search within.
+ * \param delim The set of delimiters to search for, as unicode values.
+ * \param sep Return value, set to the first delimiter found (or NULL if none found).
+ * \param suf Return value, set to next char after the first delimiter found (or NULL if none found).
+ * \return The length of the prefix (i.e. *sep - str).
+ */
+size_t BLI_str_rpartition(const char *str, const char delim[], const char **sep, const char **suf)
+{
+	return BLI_str_partition_ex(str, NULL, delim, sep, suf, true);
+}
+
+/**
+ * Find the first char matching one of the chars in \a delim, either from left or right.
+ *
+ * \param str The string to search within.
+ * \param end If non-NULL, the right delimiter of the string.
+ * \param delim The set of delimiters to search for, as unicode values.
+ * \param sep Return value, set to the first delimiter found (or NULL if none found).
+ * \param suf Return value, set to next char after the first delimiter found (or NULL if none found).
+ * \param from_right If %true, search from the right of \a str, else, search from its left.
+ * \return The length of the prefix (i.e. *sep - str).
+ */
+size_t BLI_str_partition_ex(
+        const char *str, const char *end, const char delim[], const char **sep, const char **suf, const bool from_right)
+{
+	const char *d;
+	char *(*func)(const char *str, int c) = from_right ? strrchr : strchr;
+
+	BLI_assert(end == NULL || end > str);
+
+	*sep = *suf = NULL;
+
+	for (d = delim; *d != '\0'; ++d) {
+		const char *tmp;
+
+		if (end) {
+			if (from_right) {
+				for (tmp = end - 1; (tmp >= str) && (*tmp != *d); tmp--);
+				if (tmp	< str) {
+					tmp = NULL;
+				}
+			}
+			else {
+				tmp = func(str, *d);
+				if (tmp	>= end) {
+					tmp = NULL;
+				}
+			}
+		}
+		else {
+			tmp = func(str, *d);
+		}
+
+		if (tmp && (from_right ? (*sep < tmp) : (!*sep || *sep > tmp))) {
+			*sep = tmp;
+		}
+	}
+
+	if (*sep) {
+		*suf = *sep + 1;
+		return (size_t)(*sep - str);
+	}
+
+	return end ? (size_t)(end - str) : strlen(str);
+}
+
+/**
+ * Format ints with decimal grouping.
+ * 1000 -> 1,000
+ *
+ * \param dst  The resulting string
+ * \param num  Number to format
+ * \return The length of \a dst
+ */
+size_t BLI_str_format_int_grouped(char dst[16], int num)
+{
+	char src[16];
+	char *p_src = src;
+	char *p_dst = dst;
+
+	const char separator = ',';
+	int num_len, commas;
+
+	num_len = sprintf(src, "%d", num);
+
+	if (*p_src == '-') {
+		*p_dst++ = *p_src++;
+		num_len--;
+	}
+
+	for (commas = 2 - num_len % 3; *p_src; commas = (commas + 1) % 3) {
+		*p_dst++ = *p_src++;
+		if (commas == 1) {
+			*p_dst++ = separator;
+		}
+	}
+	*--p_dst = '\0';
+
+	return (size_t)(p_dst - dst);
 }

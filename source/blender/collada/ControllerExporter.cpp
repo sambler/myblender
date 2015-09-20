@@ -284,7 +284,8 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
 		}
 
 		if (oob_counter > 0) {
-			fprintf(stderr, "Ignored %d Vertex weigths which use index to non existing VGroup %ld.\n", oob_counter, joint_index_by_def_index.size());
+			fprintf(stderr, "Ignored %d Vertex weights which use index to non existing VGroup %lu.\n",
+			        oob_counter, joint_index_by_def_index.size());
 		}
 	}
 
@@ -473,7 +474,7 @@ static float get_property(Bone *bone, const char *key, float def)
 	if (bone->prop) {
 		IDProperty *property = IDP_GetPropertyFromGroup(bone->prop, key);
 		if (property) {
-			switch(property->type) {
+			switch (property->type) {
 				case IDP_INT:
 					result = (float)(IDP_Int(property));
 					break;
@@ -522,8 +523,6 @@ static float get_property(Bone *bone, const char *key, float def)
  */
 static void create_restpose_mat(Bone *bone, float mat[4][4])
 {
-	const double PI = 3.1415926535897932384626433832795;
-
 	float loc[3] = {
 		get_property(bone, "restpose_loc_x", 0.0),
 		get_property(bone, "restpose_loc_y", 0.0),
@@ -531,9 +530,9 @@ static void create_restpose_mat(Bone *bone, float mat[4][4])
 	};
 
 	float rot[3] = {
-		PI * get_property(bone, "restpose_rot_x", 0.0) / 180.0,
-		PI * get_property(bone, "restpose_rot_y", 0.0) / 180.0,
-		PI * get_property(bone, "restpose_rot_z", 0.0) / 180.0
+		DEG2RADF(get_property(bone, "restpose_rot_x", 0.0)),
+		DEG2RADF(get_property(bone, "restpose_rot_y", 0.0)),
+		DEG2RADF(get_property(bone, "restpose_rot_z", 0.0))
 	};
 
 	float scale[3] = {
@@ -558,7 +557,7 @@ std::string ControllerExporter::add_inv_bind_mats_source(Object *ob_arm, ListBas
 	COLLADASW::FloatSourceF source(mSW);
 	source.setId(source_id);
 	source.setArrayId(source_id + ARRAY_ID_SUFFIX);
-	source.setAccessorCount(totjoint); //BLI_countlist(defbase));
+	source.setAccessorCount(totjoint); //BLI_listbase_count(defbase));
 	source.setAccessorStride(16);
 	
 	source.setParameterTypeName(&COLLADASW::CSWC::CSW_VALUE_TYPE_FLOAT4x4);

@@ -1,13 +1,13 @@
 // Begin License:
-// Copyright (C) 2006-2011 Tobias Sargeant (tobias.sargeant@gmail.com).
+// Copyright (C) 2006-2014 Tobias Sargeant (tobias.sargeant@gmail.com).
 // All rights reserved.
 //
 // This file is part of the Carve CSG Library (http://carve-csg.com/)
 //
-// This file may be used under the terms of the GNU General Public
-// License version 2.0 as published by the Free Software Foundation
-// and appearing in the file LICENSE.GPL2 included in the packaging of
-// this file.
+// This file may be used under the terms of either the GNU General
+// Public License version 2 or 3 (at your option) as published by the
+// Free Software Foundation and appearing in the files LICENSE.GPL2
+// and LICENSE.GPL3 included in the packaging of this file.
 //
 // This file is provided "AS IS" with NO WARRANTY OF ANY KIND,
 // INCLUDING THE WARRANTIES OF DESIGN, MERCHANTABILITY AND FITNESS FOR
@@ -23,26 +23,6 @@
 
 #include <iostream>
 #include <fstream>
-
-// Support for latest Clang/LLVM on FreeBSD which does have different libcxx.
-//
-// copied from lib/triangulator.cpp
-//
-// TODO(sergey): Move it some some more generic header with platform-specific
-//               declarations.
-
-// Indicates whether __is_heap is available
-#undef HAVE_IS_HEAP
-
-#ifdef __GNUC__
-// NeyBSD doesn't have __is_heap
-#  ifndef __NetBSD__
-#    define HAVE_IS_HEAP
-#    ifdef _LIBCPP_VERSION
-#      define __is_heap is_heap
-#    endif  // _LIBCPP_VERSION
-#  endif  // !__NetBSD__
-#endif  // __GNUC__
 
 namespace carve {
   namespace mesh {
@@ -75,7 +55,7 @@ namespace carve {
       }
 
 
-
+      
       template<unsigned ndim, typename proj_t>
       struct TriangulationData {
         typedef Edge<ndim> edge_t;
@@ -168,7 +148,7 @@ namespace carve {
                 if (v_test->next->p == prev->p && v_test->prev->p == next->p) {
                   return false;
                 }
-
+              
                 if (v_test->next->p == prev->p || v_test->prev->p == next->p) {
                   continue;
                 }
@@ -223,7 +203,7 @@ namespace carve {
           geom2d::P2 v_p = P(vert);
           do {
             geom2d::P2 n_p = P(v->next);
-
+            
             if (v_p.y <= point.y) {
               if (n_p.y > point.y && carve::geom2d::orient2d(v_p, n_p, point) > 0.0) {
                 ++wn;
@@ -562,7 +542,7 @@ namespace carve {
 
           return r1 && r2;
         }
-
+        
         template<typename out_iter_t>
         bool doTriangulate(VertexInfo *begin, out_iter_t out);
 

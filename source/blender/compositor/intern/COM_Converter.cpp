@@ -99,7 +99,9 @@ extern "C" {
 #include "COM_SetValueOperation.h"
 #include "COM_SplitViewerNode.h"
 #include "COM_Stabilize2dNode.h"
+#include "COM_SunBeamsNode.h"
 #include "COM_SwitchNode.h"
+#include "COM_SwitchViewNode.h"
 #include "COM_TextureNode.h"
 #include "COM_TimeNode.h"
 #include "COM_TonemapNode.h"
@@ -134,6 +136,10 @@ bool Converter::is_fast_node(bNode *b_node)
 Node *Converter::convert(bNode *b_node)
 {
 	Node *node = NULL;
+
+	/* ignore undefined nodes with missing or invalid node data */
+	if (!nodeIsRegistered(b_node))
+		return NULL;
 
 	switch (b_node->type) {
 		case CMP_NODE_COMPOSITE:
@@ -327,6 +333,9 @@ Node *Converter::convert(bNode *b_node)
 		case CMP_NODE_SWITCH:
 			node = new SwitchNode(b_node);
 			break;
+		case CMP_NODE_SWITCH_VIEW:
+			node = new SwitchViewNode(b_node);
+			break;
 		case CMP_NODE_GLARE:
 			node = new GlareNode(b_node);
 			break;
@@ -393,6 +402,9 @@ Node *Converter::convert(bNode *b_node)
 			break;
 		case CMP_NODE_CORNERPIN:
 			node = new CornerPinNode(b_node);
+			break;
+		case CMP_NODE_SUNBEAMS:
+			node = new SunBeamsNode(b_node);
 			break;
 	}
 	return node;

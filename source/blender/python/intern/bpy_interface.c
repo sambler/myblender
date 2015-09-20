@@ -61,8 +61,11 @@
 #include "bpy_traceback.h"
 #include "bpy_intern_string.h"
 
+#include "bpy_app_translations.h"
+
 #include "DNA_text_types.h"
 
+#include "BKE_appdir.h"
 #include "BKE_context.h"
 #include "BKE_text.h"
 #include "BKE_main.h"
@@ -212,25 +215,29 @@ static PyObject *CCL_initPython(void)
 #endif
 
 static struct _inittab bpy_internal_modules[] = {
-	{(char *)"mathutils", PyInit_mathutils},
-//	{(char *)"mathutils.geometry", PyInit_mathutils_geometry},
-//	{(char *)"mathutils.noise", PyInit_mathutils_noise},
-//	{(char *)"mathutils.kdtree", PyInit_mathutils_kdtree},
-	{(char *)"_bpy_path", BPyInit__bpy_path},
-	{(char *)"bgl", BPyInit_bgl},
-	{(char *)"blf", BPyInit_blf},
-	{(char *)"bmesh", BPyInit_bmesh},
-	// {(char *)"bmesh.types", BPyInit_bmesh_types},
-	// {(char *)"bmesh.utils", BPyInit_bmesh_utils},
-	// {(char *)"bmesh.utils", BPyInit_bmesh_geometry},
+	{"mathutils", PyInit_mathutils},
+#if 0
+	{"mathutils.geometry", PyInit_mathutils_geometry},
+	{"mathutils.noise", PyInit_mathutils_noise},
+	{"mathutils.kdtree", PyInit_mathutils_kdtree},
+#endif
+	{"_bpy_path", BPyInit__bpy_path},
+	{"bgl", BPyInit_bgl},
+	{"blf", BPyInit_blf},
+	{"bmesh", BPyInit_bmesh},
+#if 0
+	{"bmesh.types", BPyInit_bmesh_types},
+	{"bmesh.utils", BPyInit_bmesh_utils},
+	{"bmesh.utils", BPyInit_bmesh_geometry},
+#endif
 #ifdef WITH_AUDASPACE
-	{(char *)"aud", AUD_initPython},
+	{"aud", AUD_initPython},
 #endif
 #ifdef WITH_CYCLES
-	{(char *)"_cycles", CCL_initPython},
+	{"_cycles", CCL_initPython},
 #endif
-	{(char *)"gpu", GPU_initPython},
-	{(char *)"idprop", BPyInit_idprop},
+	{"gpu", GPU_initPython},
+	{"idprop", BPyInit_idprop},
 	{NULL, NULL}
 };
 
@@ -239,11 +246,11 @@ void BPY_python_start(int argc, const char **argv)
 {
 #ifndef WITH_PYTHON_MODULE
 	PyThreadState *py_tstate = NULL;
-	const char *py_path_bundle = BLI_get_folder(BLENDER_SYSTEM_PYTHON, NULL);
+	const char *py_path_bundle = BKE_appdir_folder_id(BLENDER_SYSTEM_PYTHON, NULL);
 
 	/* not essential but nice to set our name */
 	static wchar_t program_path_wchar[FILE_MAX]; /* python holds a reference */
-	BLI_strncpy_wchar_from_utf8(program_path_wchar, BLI_program_path(), sizeof(program_path_wchar) / sizeof(wchar_t));
+	BLI_strncpy_wchar_from_utf8(program_path_wchar, BKE_appdir_program_path(), ARRAY_SIZE(program_path_wchar));
 	Py_SetProgramName(program_path_wchar);
 
 	/* must run before python initializes */
@@ -353,6 +360,9 @@ void BPY_python_end(void)
 
 	bpy_intern_string_exit();
 
+	/* bpy.app modules that need cleanup */
+	BPY_app_translations_end();
+
 #ifndef WITH_PYTHON_MODULE
 	BPY_atexit_unregister(); /* without this we get recursive calls to WM_exit */
 
@@ -416,7 +426,7 @@ static void python_script_error_jump_text(struct Text *text)
 typedef struct {
 	PyObject_HEAD
 	PyObject *md_dict;
-	/* ommit other values, we only want the dict. */
+	/* omit other values, we only want the dict. */
 } PyModuleObject;
 #endif
 
@@ -481,7 +491,9 @@ static int python_script_exec(bContext *C, const char *fn, struct Text *text,
 			 * incompatible'.
 			 * So now we load the script file data to a buffer */
 			{
-				const char *pystring = "with open(__file__, 'r') as f: exec(f.read())";
+				const char *pystring =
+				        "ns = globals().copy()\n"
+				        "with open(__file__, 'rb') as f: exec(compile(f.read(), __file__, 'exec'), ns)";
 
 				fclose(fp);
 
@@ -566,15 +578,12 @@ void BPY_DECREF_RNA_INVALIDATE(void *pyob_ptr)
 	PyGILState_Release(gilstate);
 }
 
-
 /* return -1 on error, else 0 */
 int BPY_button_exec(bContext *C, const char *expr, double *value, const bool verbose)
 {
 	PyGILState_STATE gilstate;
-	PyObject *py_dict, *mod, *retval;
 	int error_ret = 0;
-	PyObject *main_mod = NULL;
-	
+
 	if (!value || !expr) return -1;
 
 	if (expr[0] == '\0') {
@@ -584,76 +593,23 @@ int BPY_button_exec(bContext *C, const char *expr, double *value, const bool ver
 
 	bpy_context_set(C, &gilstate);
 
-	PyC_MainModule_Backup(&main_mod);
+	error_ret = PyC_RunString_AsNumber(expr, value, "<blender button>");
 
-	py_dict = PyC_DefaultNameSpace("<blender button>");
-
-	mod = PyImport_ImportModule("math");
-	if (mod) {
-		PyDict_Merge(py_dict, PyModule_GetDict(mod), 0); /* 0 - don't overwrite existing values */
-		Py_DECREF(mod);
-	}
-	else { /* highly unlikely but possibly */
-		PyErr_Print();
-		PyErr_Clear();
-	}
-	
-	retval = PyRun_String(expr, Py_eval_input, py_dict, py_dict);
-	
-	if (retval == NULL) {
-		error_ret = -1;
-	}
-	else {
-		double val;
-
-		if (PyTuple_Check(retval)) {
-			/* Users my have typed in 10km, 2m
-			 * add up all values */
-			int i;
-			val = 0.0;
-
-			for (i = 0; i < PyTuple_GET_SIZE(retval); i++) {
-				const double val_item = PyFloat_AsDouble(PyTuple_GET_ITEM(retval, i));
-				if (val_item == -1 && PyErr_Occurred()) {
-					val = -1;
-					break;
-				}
-				val += val_item;
-			}
-		}
-		else {
-			val = PyFloat_AsDouble(retval);
-		}
-		Py_DECREF(retval);
-		
-		if (val == -1 && PyErr_Occurred()) {
-			error_ret = -1;
-		}
-		else if (!finite(val)) {
-			*value = 0.0;
-		}
-		else {
-			*value = val;
-		}
-	}
-	
 	if (error_ret) {
 		if (verbose) {
-			BPy_errors_to_report(CTX_wm_reports(C));
+			BPy_errors_to_report_ex(CTX_wm_reports(C), false, false);
 		}
 		else {
 			PyErr_Clear();
 		}
 	}
 
-	PyC_MainModule_Restore(main_mod);
-	
 	bpy_context_clear(C, &gilstate);
-	
+
 	return error_ret;
 }
 
-int BPY_string_exec(bContext *C, const char *expr)
+int BPY_string_exec_ex(bContext *C, const char *expr, bool use_eval)
 {
 	PyGILState_STATE gilstate;
 	PyObject *main_mod = NULL;
@@ -676,7 +632,7 @@ int BPY_string_exec(bContext *C, const char *expr)
 	bmain_back = bpy_import_main_get();
 	bpy_import_main_set(CTX_data_main(C));
 
-	retval = PyRun_String(expr, Py_eval_input, py_dict, py_dict);
+	retval = PyRun_String(expr, use_eval ? Py_eval_input : Py_file_input, py_dict, py_dict);
 
 	bpy_import_main_set(bmain_back);
 
@@ -696,6 +652,10 @@ int BPY_string_exec(bContext *C, const char *expr)
 	return error_ret;
 }
 
+int BPY_string_exec(bContext *C, const char *expr)
+{
+	return BPY_string_exec_ex(C, expr, true);
+}
 
 void BPY_modules_load_user(bContext *C)
 {
@@ -784,9 +744,11 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 		}
 		else {
 			int len = PySequence_Fast_GET_SIZE(seq_fast);
+			PyObject **seq_fast_items = PySequence_Fast_ITEMS(seq_fast);
 			int i;
+
 			for (i = 0; i < len; i++) {
-				PyObject *list_item = PySequence_Fast_GET_ITEM(seq_fast, i);
+				PyObject *list_item = seq_fast_items[i];
 
 				if (BPy_StructRNA_Check(list_item)) {
 #if 0
@@ -830,7 +792,6 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 }
 
 #ifdef WITH_PYTHON_MODULE
-#include "BLI_fileops.h"
 /* TODO, reloading the module isn't functional at the moment. */
 
 static void bpy_module_free(void *mod);
@@ -882,7 +843,7 @@ static void bpy_module_delay_init(PyObject *bpy_proxy)
 
 static void dealloc_obj_dealloc(PyObject *self);
 
-static PyTypeObject dealloc_obj_Type = {{{0}}};
+static PyTypeObject dealloc_obj_Type;
 
 /* use our own dealloc so we can free a property if we use one */
 static void dealloc_obj_dealloc(PyObject *self)

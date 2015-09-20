@@ -29,21 +29,24 @@
  *  \ingroup edobj
  */
 
-
 #include "DNA_object_types.h"
 
 #include "BKE_context.h"
-#include "BKE_object.h"
-
-#include "ED_screen.h"
-#include "ED_object.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
-#include "RNA_enum_types.h"
+
+#include "ED_screen.h"
+#include "ED_object.h"
+
+#ifdef WITH_GAMEENGINE
+#  include "BKE_object.h"
+
+#  include "RNA_enum_types.h"
+#endif
 
 #include "object_intern.h"
 
@@ -69,7 +72,7 @@ void OBJECT_OT_lod_add(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = object_lod_add_exec;
-	ot->poll = ED_operator_objectmode;
+	ot->poll = ED_operator_object_active;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -101,7 +104,7 @@ void OBJECT_OT_lod_remove(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = object_lod_remove_exec;
-	ot->poll = ED_operator_objectmode;
+	ot->poll = ED_operator_object_active;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

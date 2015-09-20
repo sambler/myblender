@@ -49,12 +49,10 @@
 #include "WM_types.h"
 
 #include "wm.h"
-#include "wm_event_system.h"
 #include "wm_subwindow.h"
 #include "wm_draw.h"
 
 
-#include "BIF_gl.h"
 #include "BIF_glutil.h"
 
 
@@ -74,7 +72,7 @@ wmGesture *WM_gesture_new(bContext *C, const wmEvent *event, int type)
 	
 	wm_subwindow_origin_get(window, gesture->swinid, &sx, &sy);
 	
-	if (ELEM5(type, WM_GESTURE_RECT, WM_GESTURE_CROSS_RECT, WM_GESTURE_TWEAK,
+	if (ELEM(type, WM_GESTURE_RECT, WM_GESTURE_CROSS_RECT, WM_GESTURE_TWEAK,
 	          WM_GESTURE_CIRCLE, WM_GESTURE_STRAIGHTLINE))
 	{
 		rcti *rect = MEM_callocN(sizeof(rcti), "gesture rect new");

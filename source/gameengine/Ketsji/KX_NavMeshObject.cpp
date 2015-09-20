@@ -45,7 +45,7 @@ extern "C" {
 
 #include "KX_PythonInit.h"
 #include "KX_PyMath.h"
-#include "Value.h"
+#include "EXP_Value.h"
 #include "Recast.h"
 #include "DetourStatNavMeshBuilder.h"
 #include "KX_ObstacleSimulation.h"
@@ -98,12 +98,14 @@ void KX_NavMeshObject::ProcessReplica()
 {
 	KX_GameObject::ProcessReplica();
 	m_navMesh = NULL;  /* without this, building frees the navmesh we copied from */
-	BuildNavMesh();
+	if (!BuildNavMesh()) {
+		std::cout << "Error in " << __func__ << ": unable to build navigation mesh" << std::endl;
+		return;
+	}
 	KX_Scene* scene = KX_GetActiveScene();
 	KX_ObstacleSimulation* obssimulation = scene->GetObstacleSimulation();
 	if (obssimulation)
 		obssimulation->AddObstaclesForNavMesh(this);
-
 }
 
 bool KX_NavMeshObject::BuildVertIndArrays(float *&vertices, int& nverts,
@@ -111,7 +113,7 @@ bool KX_NavMeshObject::BuildVertIndArrays(float *&vertices, int& nverts,
 									   float *&dvertices, int &ndvertsuniq, unsigned short *&dtris, 
 									   int& ndtris, int &vertsPerPoly)
 {
-	DerivedMesh* dm = mesh_create_derived_no_virtual(KX_GetActiveScene()->GetBlenderScene(), GetBlenderObject(), 
+    DerivedMesh* dm = mesh_create_derived_no_virtual(GetScene()->GetBlenderScene(), GetBlenderObject(),
 													NULL, CD_MASK_MESH);
 	CustomData *pdata = dm->getPolyDataLayout(dm);
 	int* recastData = (int*) CustomData_get_layer(pdata, CD_RECAST);
@@ -304,6 +306,7 @@ bool KX_NavMeshObject::BuildNavMesh()
 			|| vertsPerPoly<3)
 	{
 		printf("Can't build navigation mesh data for object:%s\n", m_name.ReadPtr());
+		if (vertices) delete[] vertices;
 		return false;
 	}
 	
@@ -320,12 +323,19 @@ bool KX_NavMeshObject::BuildNavMesh()
 		}
 	}
 
-	buildMeshAdjacency(polys, npolys, nverts, vertsPerPoly);
+	if (!buildMeshAdjacency(polys, npolys, nverts, vertsPerPoly)) {
+		std::cout << __func__ << ": unable to build mesh adjacency information." << std::endl;
+		delete[] vertices;
+		return false;
+	}
 	
 	float cs = 0.2f;
 
 	if (!nverts || !npolys)
+	{
+		if (vertices) delete[] vertices;
 		return false;
+	}
 
 	float bmin[3], bmax[3];
 	calcMeshBounds(vertices, nverts, bmin, bmax);
@@ -463,9 +473,10 @@ bool KX_NavMeshObject::BuildNavMesh()
 	if (dtris) MEM_freeN(dtris);
 
 	if (dvertices)
-	{
 		delete [] dvertices;
-	}
+
+	if (vertsi)
+		delete [] vertsi;
 
 	return true;
 }
@@ -591,6 +602,8 @@ int KX_NavMeshObject::FindPath(const MT_Point3& from, const MT_Point3& to, float
 				waypoint.getValue(&path[i*3]);
 			}
 		}
+
+		delete[] polys;
 	}
 
 	return pathLen;

@@ -33,24 +33,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "MEM_guardedalloc.h"
 
-#include "DNA_group_types.h"
 #include "DNA_object_types.h"
-#include "DNA_mesh_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 
 #include "BLI_blenlib.h"
-#include "BLI_math.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_group.h"
-#include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_rigidbody.h"
 
@@ -98,10 +93,6 @@ bool ED_rigidbody_object_add(Scene *scene, Object *ob, int type, ReportList *rep
 
 	if (ob->type != OB_MESH) {
 		BKE_report(reports, RPT_ERROR, "Can't add Rigid Body to non mesh object");
-		return false;
-	}
-	if (((Mesh *)ob->data)->totpoly == 0) {
-		BKE_report(reports, RPT_ERROR, "Can't create Rigid Body from mesh with no polygons");
 		return false;
 	}
 
@@ -357,6 +348,7 @@ static int rigidbody_objects_shape_change_exec(bContext *C, wmOperator *op)
 	if (changed) {
 		/* send updates */
 		WM_event_add_notifier(C, NC_OBJECT | ND_POINTCACHE, NULL);
+		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 		/* done */
 		return OPERATOR_FINISHED;
@@ -489,78 +481,6 @@ static EnumPropertyItem *rigidbody_materials_itemf(bContext *UNUSED(C), PointerR
 
 /* ------------------------------------------ */
 
-/* helper function to calculate volume of rigidbody object */
-// TODO: allow a parameter to specify method used to calculate this?
-static float rigidbody_object_calc_volume(Object *ob)
-{
-	RigidBodyOb *rbo = ob->rigidbody_object;
-
-	float size[3]  = {1.0f, 1.0f, 1.0f};
-	float radius = 1.0f;
-	float height = 1.0f;
-
-	float volume = 0.0f;
-
-	/* if automatically determining dimensions, use the Object's boundbox
-	 *	- assume that all quadrics are standing upright on local z-axis
-	 *	- assume even distribution of mass around the Object's pivot
-	 *	  (i.e. Object pivot is centralised in boundbox)
-	 *	- boundbox gives full width
-	 */
-	// XXX: all dimensions are auto-determined now... later can add stored settings for this
-	BKE_object_dimensions_get(ob, size);
-
-	if (ELEM3(rbo->shape, RB_SHAPE_CAPSULE, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
-		/* take radius as largest x/y dimension, and height as z-dimension */
-		radius = MAX2(size[0], size[1]) * 0.5f;
-		height = size[2];
-	}
-	else if (rbo->shape == RB_SHAPE_SPHERE) {
-		/* take radius to the the largest dimension to try and encompass everything */
-		radius = max_fff(size[0], size[1], size[2]) * 0.5f;
-	}
-
-	/* calculate volume as appropriate  */
-	switch (rbo->shape) {
-		case RB_SHAPE_BOX:
-			volume = size[0] * size[1] * size[2];
-			break;
-
-		case RB_SHAPE_SPHERE:
-			volume = 4.0f / 3.0f * (float)M_PI * radius * radius * radius;
-			break;
-
-		/* for now, assume that capsule is close enough to a cylinder... */
-		case RB_SHAPE_CAPSULE:
-		case RB_SHAPE_CYLINDER:
-			volume = (float)M_PI * radius * radius * height;
-			break;
-
-		case RB_SHAPE_CONE:
-			volume = (float)M_PI / 3.0f * radius * radius * height;
-			break;
-
-		/* for now, all mesh shapes are just treated as boxes...
-		 * NOTE: this may overestimate the volume, but other methods are overkill
-		 */
-		case RB_SHAPE_CONVEXH:
-		case RB_SHAPE_TRIMESH:
-			volume = size[0] * size[1] * size[2];
-			break;
-
-#if 0 // XXX: not defined yet
-		case RB_SHAPE_COMPOUND:
-			volume = 0.0f;
-			break;
-#endif
-	}
-
-	/* return the volume calculated */
-	return volume;
-}
-
-/* ------------------------------------------ */
-
 static int rigidbody_objects_calc_mass_exec(bContext *C, wmOperator *op)
 {
 	int material = RNA_enum_get(op->ptr, "material");
@@ -593,7 +513,7 @@ static int rigidbody_objects_calc_mass_exec(bContext *C, wmOperator *op)
 			/* mass is calculated from the approximate volume of the object,
 			 * and the density of the material we're simulating
 			 */
-			volume = rigidbody_object_calc_volume(ob);
+			BKE_rigidbody_calc_volume(ob, &volume);
 			mass = volume * density;
 
 			/* use RNA-system to change the property and perform all necessary changes */

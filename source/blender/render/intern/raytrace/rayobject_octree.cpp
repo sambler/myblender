@@ -119,7 +119,8 @@ static RayObjectAPI octree_api =
 /* within one octree node, a set of 3x15 bits defines a 'boundbox' to OR with */
 
 #define OCVALRES    15
-#define BROW16(min, max)  (((max) >= OCVALRES ? 0xFFFF : (1 << (max + 1)) - 1) - ((min > 0) ? ((1 << (min)) - 1) : 0))
+#define BROW16(min, max) \
+	(((max) >= OCVALRES ? 0xFFFF : (1 << ((max) + 1)) - 1) - (((min) > 0) ? ((1 << (min)) - 1) : 0))
 
 static void calc_ocval_face(float *v1, float *v2, float *v3, float *v4, short x, short y, short z, OcVal *ov)
 {
@@ -657,7 +658,7 @@ static void RE_rayobject_octree_done(RayObject *tree)
 	oc->ocfacy = (oc->ocres - 0.1f) / t01;
 	oc->ocfacz = (oc->ocres - 0.1f) / t02;
 	
-	oc->ocsize = sqrt(t00 * t00 + t01 * t01 + t02 * t02);  /* global, max size octree */
+	oc->ocsize = sqrtf(t00 * t00 + t01 * t01 + t02 * t02);  /* global, max size octree */
 
 	for (c = 0; c < oc->ro_nodes_used; c++) {
 		octree_fill_rayface(oc, oc->ro_nodes[c]);

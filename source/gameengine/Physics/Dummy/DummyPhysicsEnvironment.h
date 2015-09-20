@@ -56,6 +56,8 @@ public:
 	virtual	void		SetFixedTimeStep(bool useFixedTimeStep,float fixedTimeStep);
 	virtual	float		GetFixedTimeStep();
 
+	virtual	int			GetDebugMode() const;
+
 	virtual	void		SetGravity(float x,float y,float z);
 	virtual	void		GetGravity(class MT_Vector3& grav);
 
@@ -66,7 +68,7 @@ public:
 			float axis2X=0,float axis2Y=0,float axis2Z=0,int flag=0
 			);
 
-	virtual void		RemoveConstraint(int	constraintid);
+	virtual void RemoveConstraintById(int constraintid);
 
 		//complex constraint for vehicles
 	virtual PHY_IVehicle*	GetVehicleConstraint(int constraintId)

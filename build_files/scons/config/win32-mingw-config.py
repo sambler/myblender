@@ -23,6 +23,8 @@ BF_FFMPEG_LIBPATH = LIBDIR + '/ffmpeg/lib'
 BF_FFMPEG_INC =  LIBDIR + '/ffmpeg/include'
 BF_FFMPEG_DLL = '${BF_FFMPEG_LIBPATH}/avformat-55.dll ${BF_FFMPEG_LIBPATH}/avcodec-55.dll ${BF_FFMPEG_LIBPATH}/avdevice-55.dll ${BF_FFMPEG_LIBPATH}/avutil-52.dll ${BF_FFMPEG_LIBPATH}/swscale-2.dll'
 
+WITH_BF_AUDASPACE = True
+
 WITH_BF_JACK = False
 BF_JACK = LIBDIR + '/jack'
 BF_JACK_INC = '${BF_JACK}/include'
@@ -145,7 +147,7 @@ BF_OPENCOLLADA_LIBPATH = '${BF_OPENCOLLADA}/lib/opencollada'
 WITH_BF_CYCLES = True
 WITH_BF_CYCLES_CUDA_BINARIES = False
 BF_CYCLES_CUDA_NVCC = "" # Path to the NVIDIA CUDA compiler
-BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_20', 'sm_21', 'sm_30', 'sm_35', 'sm_50']
+BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_20', 'sm_21', 'sm_30', 'sm_35', 'sm_50', 'sm_52']
 
 WITH_BF_OIIO = True
 BF_OIIO = LIBDIR + '/openimageio'
@@ -166,9 +168,17 @@ BF_BOOST_LIB = 'boost_date_time-mgw46-mt-s-1_49 boost_filesystem-mgw46-mt-s-1_49
 BF_BOOST_LIB_INTERNATIONAL = 'boost_locale-mgw46-mt-s-1_49'
 BF_BOOST_LIBPATH = '${BF_BOOST}/lib'
 
+WITH_BF_OPENSUBDIV = False
+BF_OPENSUBDIV = LIBDIR + '/opensubdiv'
+BF_OPENSUBDIV_INC = '${BF_OPENSUBDIV}/include'
+BF_OPENSUBDIV_LIB = 'osdCPU osdGPU'
+BF_OPENSUBDIV_LIBPATH = '${BF_OPENSUBDIV}/lib'
+
 #Ray trace optimization
 WITH_BF_RAYOPTIMIZATION = True
 BF_RAYOPTIMIZATION_SSE_FLAGS = ['-msse']
+
+WITH_BF_IME = True
 
 WITH_BF_OPENMP = True
 
@@ -190,13 +200,16 @@ CXXFLAGS = []
 CPPFLAGS = ['-DWIN32', '-DFREE_WINDOWS', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64', '-D_LARGEFILE64_SOURCE', '-DBOOST_ALL_NO_LIB', '-DBOOST_THREAD_USE_LIB', '-DGLEW_STATIC', '-DOPJ_STATIC']
 REL_CFLAGS = []
 REL_CXXFLAGS = []
-REL_CCFLAGS = ['-DNDEBUG',  '-O2']
+REL_CCFLAGS = ['-O2']
 
 C_WARN = ['-Wno-char-subscripts', '-Wdeclaration-after-statement', '-Wstrict-prototypes']
 
 CC_WARN = [ '-Wall' ]
 
-LLIBS = ['-lshell32', '-lshfolder', '-lgdi32', '-lmsvcrt', '-lwinmm', '-lmingw32', '-lm', '-lws2_32', '-lz', '-lstdc++','-lole32','-luuid', '-lwsock32', '-lpsapi']
+LLIBS = ['-lshell32', '-lshfolder', '-lgdi32', '-lmsvcrt', '-lwinmm', '-lmingw32', '-lm', '-lws2_32', '-lz', '-lstdc++','-lole32','-luuid', '-lwsock32', '-lpsapi', '-ldbghelp']
+
+if WITH_BF_IME:
+    LLIBS.append('-limm32')
 
 PLATFORM_LINKFLAGS = ['-Xlinker', '--stack=2097152']
 
@@ -205,7 +218,7 @@ PLATFORM_LINKFLAGS = ['-Xlinker', '--stack=2097152']
 # PLATFORM_LINKFLAGS += ["-static-libgcc", "-static-libstdc++"]
 
 BF_DEBUG = False
-BF_DEBUG_CCFLAGS= ['-g', '-D_DEBUG']
+BF_DEBUG_CCFLAGS= ['-g']
 
 BF_PROFILE_CCFLAGS = ['-pg', '-g']
 BF_PROFILE_LINKFLAGS = ['-pg']

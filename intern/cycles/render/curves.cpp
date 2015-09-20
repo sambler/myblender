@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #include "device.h"
@@ -46,8 +46,9 @@ void curvebounds(float *lower, float *upper, float3 *p, int dim)
 	float discroot = curve_coef[2] * curve_coef[2] - 3 * curve_coef[3] * curve_coef[1];
 	float ta = -1.0f;
 	float tb = -1.0f;
+
 	if(discroot >= 0) {
-		discroot = sqrt(discroot);
+		discroot = sqrtf(discroot);
 		ta = (-curve_coef[2] - discroot) / (3 * curve_coef[3]);
 		tb = (-curve_coef[2] + discroot) / (3 * curve_coef[3]);
 		ta = (ta > 1.0f || ta < 0.0f) ? -1.0f : ta;
@@ -56,20 +57,21 @@ void curvebounds(float *lower, float *upper, float3 *p, int dim)
 
 	*upper = max(p1[dim],p2[dim]);
 	*lower = min(p1[dim],p2[dim]);
+
 	float exa = p1[dim];
 	float exb = p2[dim];
-	float t2;
-	float t3;
+
 	if(ta >= 0.0f) {
-		t2 = ta * ta;
-		t3 = t2 * ta;
+		float t2 = ta * ta;
+		float t3 = t2 * ta;
 		exa = curve_coef[3] * t3 + curve_coef[2] * t2 + curve_coef[1] * ta + curve_coef[0];
 	}
 	if(tb >= 0.0f) {
-		t2 = tb * tb;
-		t3 = t2 * tb;
+		float t2 = tb * tb;
+		float t3 = t2 * tb;
 		exb = curve_coef[3] * t3 + curve_coef[2] * t2 + curve_coef[1] * tb + curve_coef[0];
 	}
+
 	*upper = max(*upper, max(exa,exb));
 	*lower = min(*lower, min(exa,exb));
 }
@@ -101,7 +103,10 @@ CurveSystemManager::~CurveSystemManager()
 {
 }
 
-void CurveSystemManager::device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress& progress)
+void CurveSystemManager::device_update(Device *device,
+                                       DeviceScene *dscene,
+                                       Scene * /*scene*/,
+                                       Progress& progress)
 {
 	if(!need_update)
 		return;
@@ -142,7 +147,8 @@ void CurveSystemManager::device_update(Device *device, DeviceScene *dscene, Scen
 	need_update = false;
 }
 
-void CurveSystemManager::device_free(Device *device, DeviceScene *dscene)
+void CurveSystemManager::device_free(Device * /*device*/,
+                                     DeviceScene * /*dscene*/)
 {
 
 }
@@ -172,7 +178,7 @@ bool CurveSystemManager::modified_mesh(const CurveSystemManager& CurveSystemMana
 		use_curves == CurveSystemManager.use_curves);
 }
 
-void CurveSystemManager::tag_update(Scene *scene)
+void CurveSystemManager::tag_update(Scene * /*scene*/)
 {
 	need_update = true;
 }

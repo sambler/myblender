@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #ifndef __UTIL_OPTIMIZATION_H__
@@ -65,10 +65,8 @@
 #define WITH_CYCLES_OPTIMIZED_KERNEL_AVX
 #endif
 
-/* MSVC 2008, no SSE41 (broken blendv intrinsic) and no AVX support */
-#if defined(_MSC_VER) && (_MSC_VER < 1700)
-#undef WITH_CYCLES_OPTIMIZED_KERNEL_SSE41
-#undef WITH_CYCLES_OPTIMIZED_KERNEL_AVX
+#ifdef WITH_KERNEL_AVX2
+#define WITH_CYCLES_OPTIMIZED_KERNEL_AVX2
 #endif
 
 #endif
@@ -101,27 +99,19 @@
 /* SSE intrinsics headers */
 #ifndef FREE_WINDOWS64
 
-#ifdef __KERNEL_SSE2__
-#include <xmmintrin.h> /* SSE 1 */
-#include <emmintrin.h> /* SSE 2 */
-#endif
-
-#ifdef __KERNEL_SSE3__
-#include <pmmintrin.h> /* SSE 3 */
-#endif
-
-#ifdef __KERNEL_SSSE3__
-#include <tmmintrin.h> /* SSSE 3 */
-#endif
-
-#ifdef __KERNEL_SSE41__
-#include <smmintrin.h> /* SSE 4.1 */
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
 #endif
 
 #else
 
 /* MinGW64 has conflicting declarations for these SSE headers in <windows.h>.
  * Since we can't avoid including <windows.h>, better only include that */
+#define NOGDI
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #endif

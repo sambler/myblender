@@ -290,13 +290,14 @@ static void set_pose_keys(Object *ob)
 	}
 }
 
-/* perform paste pose, for a single bone 
- * < ob: object where bone to paste to lives
- * < chan: bone that pose to paste comes from
- * < selOnly: only paste on selected bones
- * < flip: flip on x-axis
+/**
+ * Perform paste pose, for a single bone.
  *
- * > returns: whether the bone that we pasted to if we succeeded
+ * \param ob Object where bone to paste to lives
+ * \param chan Bone that pose to paste comes from
+ * \param selOnly Only paste on selected bones
+ * \param flip Flip on x-axis
+ * \return Whether the bone that we pasted to if we succeeded
  */
 static bPoseChannel *pose_bone_do_paste(Object *ob, bPoseChannel *chan, const bool selOnly, const bool flip)
 {
@@ -319,7 +320,7 @@ static bPoseChannel *pose_bone_do_paste(Object *ob, bPoseChannel *chan, const bo
 	if (selOnly)
 		paste_ok = ((pchan) && (pchan->bone->flag & BONE_SELECTED));
 	else
-		paste_ok = ((pchan != NULL));
+		paste_ok = (pchan != NULL);
 	
 	/* continue? */
 	if (paste_ok) {
@@ -810,7 +811,7 @@ void POSE_OT_transforms_clear(wmOperatorType *ot)
 static int pose_clear_user_transforms_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
-	Object *ob = CTX_data_active_object(C);
+	Object *ob = BKE_object_pose_armature_get(CTX_data_active_object(C));
 	float cframe = (float)CFRA;
 	const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
 	

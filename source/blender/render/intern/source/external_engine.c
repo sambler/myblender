@@ -36,18 +36,16 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BLI_listbase.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_camera.h"
 #include "BKE_global.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
-
-#include "IMB_imbuf.h"
-#include "IMB_imbuf_types.h"
 
 #include "RNA_access.h"
 
@@ -60,6 +58,7 @@
 #include "RE_bake.h"
 
 #include "initrender.h"
+#include "renderpipeline.h"
 #include "render_types.h"
 #include "render_result.h"
 
@@ -183,7 +182,7 @@ static RenderPart *get_part_from_result(Render *re, RenderResult *result)
 	return NULL;
 }
 
-RenderResult *RE_engine_begin_result(RenderEngine *engine, int x, int y, int w, int h, const char *layername)
+RenderResult *RE_engine_begin_result(RenderEngine *engine, int x, int y, int w, int h, const char *layername, const char *viewname)
 {
 	Render *re = engine->re;
 	RenderResult *result;
@@ -206,7 +205,7 @@ RenderResult *RE_engine_begin_result(RenderEngine *engine, int x, int y, int w, 
 	disprect.ymin = y;
 	disprect.ymax = y + h;
 
-	result = render_result_new(re, &disprect, 0, RR_USE_MEM, layername);
+	result = render_result_new(re, &disprect, 0, RR_USE_MEM, layername, viewname);
 
 	/* todo: make this thread safe */
 
@@ -271,7 +270,7 @@ void RE_engine_end_result(RenderEngine *engine, RenderResult *result, int cancel
 	if (!cancel || merge_results) {
 		if (re->result->do_exr_tile) {
 			if (!cancel) {
-				render_result_exr_file_merge(re->result, result);
+				render_result_exr_file_merge(re->result, result, re->viewname);
 			}
 		}
 		else if (!(re->test_break(re->tbh) && (re->r.scemode & R_BUTS_PREVIEW)))
@@ -357,28 +356,69 @@ void RE_engine_report(RenderEngine *engine, int type, const char *msg)
 		BKE_report(engine->reports, type, msg);
 }
 
-void RE_engine_get_current_tiles(Render *re, int *total_tiles_r, rcti **tiles_r)
+void RE_engine_set_error_message(RenderEngine *engine, const char *msg)
 {
+	Render *re = engine->re;
+	if (re != NULL) {
+		RenderResult *rr = RE_AcquireResultRead(re);
+		if (rr->error != NULL) {
+			MEM_freeN(rr->error);
+		}
+		rr->error = BLI_strdup(msg);
+		RE_ReleaseResult(re);
+	}
+}
+
+void RE_engine_active_view_set(RenderEngine *engine, const char *viewname)
+{
+	Render *re = engine->re;
+	RE_SetActiveRenderView(re, viewname);
+}
+
+float RE_engine_get_camera_shift_x(RenderEngine *engine, Object *camera)
+{
+	Render *re = engine->re;
+	return BKE_camera_multiview_shift_x(re ? &re->r : NULL, camera, re->viewname);
+}
+
+void RE_engine_get_camera_model_matrix(RenderEngine *engine, Object *camera, float *r_modelmat)
+{
+	Render *re = engine->re;
+	BKE_camera_multiview_model_matrix(re ? &re->r : NULL, camera, re->viewname, (float (*)[4])r_modelmat);
+}
+
+rcti* RE_engine_get_current_tiles(Render *re, int *r_total_tiles, bool *r_needs_free)
+{
+	static rcti tiles_static[BLENDER_MAX_THREADS];
+	const int allocation_step = BLENDER_MAX_THREADS;
 	RenderPart *pa;
 	int total_tiles = 0;
-	rcti *tiles = NULL;
-	int allocation_size = 0, allocation_step = BLENDER_MAX_THREADS;
+	rcti *tiles = tiles_static;
+	int allocation_size = BLENDER_MAX_THREADS;
+
+	BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_READ);
+
+	*r_needs_free = false;
 
 	if (re->engine && (re->engine->flag & RE_ENGINE_HIGHLIGHT_TILES) == 0) {
-		*total_tiles_r = 0;
-		*tiles_r = NULL;
-		return;
+		*r_total_tiles = 0;
+		BLI_rw_mutex_unlock(&re->partsmutex);
+		return NULL;
 	}
 
 	for (pa = re->parts.first; pa; pa = pa->next) {
 		if (pa->status == PART_STATUS_IN_PROGRESS) {
 			if (total_tiles >= allocation_size) {
-				if (tiles == NULL)
+				/* Just in case we're using crazy network rendering with more
+				 * slaves as BLENDER_MAX_THREADS.
+				 */
+				if (tiles == tiles_static)
 					tiles = MEM_mallocN(allocation_step * sizeof(rcti), "current engine tiles");
 				else
 					tiles = MEM_reallocN(tiles, (total_tiles + allocation_step) * sizeof(rcti));
 
 				allocation_size += allocation_step;
+				*r_needs_free = true;
 			}
 
 			tiles[total_tiles] = pa->disprect;
@@ -393,9 +433,9 @@ void RE_engine_get_current_tiles(Render *re, int *total_tiles_r, rcti **tiles_r)
 			total_tiles++;
 		}
 	}
-
-	*total_tiles_r = total_tiles;
-	*tiles_r = tiles;
+	BLI_rw_mutex_unlock(&re->partsmutex);
+	*r_total_tiles = total_tiles;
+	return tiles;
 }
 
 RenderData *RE_engine_get_render_data(Render *re)
@@ -411,25 +451,27 @@ void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Scene *scene)
 	re->r = scene->r;
 
 	/* prevent crash when freeing the scene
-	 but it potentially leaves unfreed memory blocks
-	 not sure how to fix this yet -- dfelinto */
-	re->r.layers.first = re->r.layers.last = NULL;
+	 * but it potentially leaves unfreed memory blocks
+	 * not sure how to fix this yet -- dfelinto */
+	BLI_listbase_clear(&re->r.layers);
+	BLI_listbase_clear(&re->r.views);
 }
 
 bool RE_bake_has_engine(Render *re)
 {
 	RenderEngineType *type = RE_engines_find(re->r.engine);
-	return (bool)(type->bake);
+	return (type->bake != NULL);
 }
 
 bool RE_bake_engine(
-        Render *re, Object *object, const BakePixel pixel_array[],
-        const int num_pixels, const int depth,
+        Render *re, Object *object,
+        const int object_id, const BakePixel pixel_array[],
+        const size_t num_pixels, const int depth,
         const ScenePassType pass_type, float result[])
 {
 	RenderEngineType *type = RE_engines_find(re->r.engine);
 	RenderEngine *engine;
-	int persistent_data = re->r.mode & R_PERSISTENT_DATA;
+	bool persistent_data = (re->r.mode & R_PERSISTENT_DATA) != 0;
 
 	/* set render info */
 	re->i.cfra = re->scene->r.cfra;
@@ -453,19 +495,21 @@ bool RE_bake_engine(
 	engine->resolution_y = re->winy;
 
 	RE_parts_init(re, false);
-	engine->tile_x = re->partx;
-	engine->tile_y = re->party;
+	engine->tile_x = re->r.tilex;
+	engine->tile_y = re->r.tiley;
 
 	/* update is only called so we create the engine.session */
 	if (type->update)
 		type->update(engine, re->main, re->scene);
 
 	if (type->bake)
-		type->bake(engine, re->scene, object, pass_type, pixel_array, num_pixels, depth, result);
+		type->bake(engine, re->scene, object, pass_type, object_id, pixel_array, num_pixels, depth, result);
 
 	engine->tile_x = 0;
 	engine->tile_y = 0;
 	engine->flag &= ~RE_ENGINE_RENDERING;
+
+	BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
 
 	/* re->engine becomes zero if user changed active render engine during render */
 	if (!persistent_data || !re->engine) {
@@ -474,11 +518,35 @@ bool RE_bake_engine(
 	}
 
 	RE_parts_free(re);
+	BLI_rw_mutex_unlock(&re->partsmutex);
 
 	if (BKE_reports_contain(re->reports, RPT_ERROR))
 		G.is_break = true;
 
 	return true;
+}
+
+void RE_engine_frame_set(RenderEngine *engine, int frame, float subframe)
+{
+	Render *re = engine->re;
+	Scene *scene = re->scene;
+	double cfra = (double)frame + (double)subframe;
+
+	CLAMP(cfra, MINAFRAME, MAXFRAME);
+	BKE_scene_frame_set(scene, cfra);
+
+#ifdef WITH_PYTHON
+	BPy_BEGIN_ALLOW_THREADS;
+#endif
+
+	/* It's possible that here we're including layers which were never visible before. */
+	BKE_scene_update_for_newframe_ex(re->eval_ctx, re->main, scene, (1 << 20) - 1, true);
+
+#ifdef WITH_PYTHON
+	BPy_END_ALLOW_THREADS;
+#endif
+
+	BKE_scene_camera_switch_update(scene);
 }
 
 /* Render */
@@ -498,7 +566,7 @@ int RE_engine_render(Render *re, int do_all)
 {
 	RenderEngineType *type = RE_engines_find(re->r.engine);
 	RenderEngine *engine;
-	int persistent_data = re->r.mode & R_PERSISTENT_DATA;
+	bool persistent_data = (re->r.mode & R_PERSISTENT_DATA) != 0;
 
 	/* verify if we can render */
 	if (!type->render)
@@ -551,7 +619,8 @@ int RE_engine_render(Render *re, int do_all)
 			lay &= non_excluded_lay;
 		}
 
-		BKE_scene_update_for_newframe(re->eval_ctx, re->main, re->scene, lay);
+		BKE_scene_update_for_newframe_ex(re->eval_ctx, re->main, re->scene, lay, true);
+		render_update_anim_renderdata(re, &re->scene->r);
 	}
 
 	/* create render result */
@@ -564,7 +633,7 @@ int RE_engine_render(Render *re, int do_all)
 
 		if ((type->flag & RE_USE_SAVE_BUFFERS) && (re->r.scemode & R_EXR_TILE_FILE))
 			savebuffers = RR_USE_EXR;
-		re->result = render_result_new(re, &re->disprect, 0, savebuffers, RR_ALL_LAYERS);
+		re->result = render_result_new(re, &re->disprect, 0, savebuffers, RR_ALL_LAYERS, RR_ALL_VIEWS);
 	}
 	BLI_rw_mutex_unlock(&re->resultmutex);
 
@@ -599,6 +668,7 @@ int RE_engine_render(Render *re, int do_all)
 	if (re->r.scemode & R_BUTS_PREVIEW)
 		engine->flag |= RE_ENGINE_PREVIEW;
 	engine->camera_override = re->camera_override;
+	engine->layer_override = re->layer_override;
 
 	engine->resolution_x = re->winx;
 	engine->resolution_y = re->winy;
@@ -627,6 +697,8 @@ int RE_engine_render(Render *re, int do_all)
 
 	render_result_free_list(&engine->fullresult, engine->fullresult.first);
 
+	BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
+
 	/* re->engine becomes zero if user changed active render engine during render */
 	if (!persistent_data || !re->engine) {
 		RE_engine_free(engine);
@@ -635,15 +707,28 @@ int RE_engine_render(Render *re, int do_all)
 
 	if (re->result->do_exr_tile) {
 		BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
+		render_result_save_empty_result_tiles(re);
 		render_result_exr_file_end(re);
 		BLI_rw_mutex_unlock(&re->resultmutex);
 	}
 
+	if (re->r.scemode & R_EXR_CACHE_FILE) {
+		BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
+		render_result_exr_file_cache_write(re);
+		BLI_rw_mutex_unlock(&re->resultmutex);
+	}
+
 	RE_parts_free(re);
+	BLI_rw_mutex_unlock(&re->partsmutex);
 
 	if (BKE_reports_contain(re->reports, RPT_ERROR))
 		G.is_break = true;
 	
+#ifdef WITH_FREESTYLE
+	if (re->r.mode & R_EDGE_FRS)
+		RE_RenderFreestyleExternal(re);
+#endif
+
 	return 1;
 }
 

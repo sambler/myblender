@@ -49,7 +49,7 @@ PyDoc_STRVAR(ViewVertex_doc,
 "Thus, this class can be specialized into two classes, the\n"
 ":class:`TVertex` class and the :class:`NonTVertex` class.");
 
-static int ViewVertex_init(BPy_ViewVertex *self, PyObject *args, PyObject *kwds)
+static int ViewVertex_init(BPy_ViewVertex * /*self*/, PyObject * /*args*/, PyObject * /*kwds*/)
 {
 	PyErr_SetString(PyExc_TypeError, "cannot instantiate abstract class");
 	return -1;
@@ -70,7 +70,7 @@ PyDoc_STRVAR(ViewVertex_edges_begin_doc,
 static PyObject *ViewVertex_edges_begin(BPy_ViewVertex *self)
 {
 	ViewVertexInternal::orientedViewEdgeIterator ove_it(self->vv->edgesBegin());
-	return BPy_orientedViewEdgeIterator_from_orientedViewEdgeIterator(ove_it, 0);
+	return BPy_orientedViewEdgeIterator_from_orientedViewEdgeIterator(ove_it, false);
 }
 
 PyDoc_STRVAR(ViewVertex_edges_end_doc,
@@ -82,7 +82,7 @@ PyDoc_STRVAR(ViewVertex_edges_end_doc,
 "   :return: An orientedViewEdgeIterator pointing after the last ViewEdge.\n"
 "   :rtype: :class:`orientedViewEdgeIterator`");
 
-static PyObject *ViewVertex_edges_end(BPy_ViewVertex *self)
+static PyObject *ViewVertex_edges_end(BPy_ViewVertex * /*self*/)
 {
 #if 0
 	ViewVertexInternal::orientedViewEdgeIterator ove_it(self->vv->edgesEnd());
@@ -113,7 +113,7 @@ static PyObject *ViewVertex_edges_iterator(BPy_ViewVertex *self, PyObject *args,
 		return NULL;
 	ViewEdge *ve = ((BPy_ViewEdge *)py_ve)->ve;
 	ViewVertexInternal::orientedViewEdgeIterator ove_it(self->vv->edgesIterator(ve));
-	return BPy_orientedViewEdgeIterator_from_orientedViewEdgeIterator(ove_it, 0);
+	return BPy_orientedViewEdgeIterator_from_orientedViewEdgeIterator(ove_it, false);
 }
 
 static PyMethodDef BPy_ViewVertex_methods[] = {

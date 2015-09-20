@@ -37,18 +37,18 @@
 #include "DNA_windowmanager_types.h"
 #include "DNA_object_types.h"
 #include "DNA_linestyle_types.h"
+#include "DNA_gpencil_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_string.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_context.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
-#include "BKE_freestyle.h"
 
 #include "RNA_access.h"
 
@@ -258,7 +258,7 @@ static void *ctx_wm_python_context_get(
 		}
 	}
 #else
-	(void)C, (void)member, (void)member_type;
+	UNUSED_VARS(C, member, member_type);
 #endif
 
 	/* don't allow UI context access from non-main threads */
@@ -290,7 +290,7 @@ static int ctx_data_get(bContext *C, const char *member, bContextDataResult *res
 		return done;
 
 	/* we check recursion to ensure that we do not get infinite
-	 * loops requesting data from ourselfs in a context callback */
+	 * loops requesting data from ourselves in a context callback */
 
 	/* Ok, this looks evil...
 	 * if (ret) done = -(-ret | -done);
@@ -454,7 +454,7 @@ static void data_dir_add(ListBase *lb, const char *member, const bool use_all)
 {
 	LinkData *link;
 	
-	if ((use_all == false) && strcmp(member, "scene") == 0) /* exception */
+	if ((use_all == false) && STREQ(member, "scene")) /* exception */
 		return;
 
 	if (BLI_findstring(lb, member, offsetof(LinkData, data)))
@@ -546,7 +546,7 @@ ListBase CTX_data_dir_get(const bContext *C)
 
 bool CTX_data_equals(const char *member, const char *str)
 {
-	return (strcmp(member, str) == 0);
+	return (STREQ(member, str));
 }
 
 bool CTX_data_dir(const char *member)
@@ -589,7 +589,7 @@ int ctx_data_list_count(const bContext *C, int (*func)(const bContext *, ListBas
 	ListBase list;
 
 	if (func(C, &list)) {
-		int tot = BLI_countlist(&list);
+		int tot = BLI_listbase_count(&list);
 		BLI_freelistN(&list);
 		return tot;
 	}
@@ -1092,15 +1092,33 @@ int CTX_data_visible_pose_bones(const bContext *C, ListBase *list)
 	return ctx_data_collection_get(C, "visible_pose_bones", list);
 }
 
-FreestyleLineStyle *CTX_data_linestyle_from_scene(Scene *scene)
+bGPdata *CTX_data_gpencil_data(const bContext *C)
 {
-	SceneRenderLayer *actsrl = BLI_findlink(&scene->r.layers, scene->r.actlay);
-	FreestyleConfig *config = &actsrl->freestyleConfig;
-	FreestyleLineSet *lineset = BKE_freestyle_lineset_get_active(config);
-
-	if (lineset) {
-		return lineset->linestyle;
-	}
-
-	return NULL;
+	return ctx_data_pointer_get(C, "gpencil_data");
 }
+
+bGPDlayer *CTX_data_active_gpencil_layer(const bContext *C)
+{
+	return ctx_data_pointer_get(C, "active_gpencil_layer");
+}
+
+bGPDframe *CTX_data_active_gpencil_frame(const bContext *C)
+{
+	return ctx_data_pointer_get(C, "active_gpencil_frame");
+}
+
+int CTX_data_visible_gpencil_layers(const bContext *C, ListBase *list)
+{
+	return ctx_data_collection_get(C, "visible_gpencil_layers", list);
+}
+
+int CTX_data_editable_gpencil_layers(const bContext *C, ListBase *list)
+{
+	return ctx_data_collection_get(C, "editable_gpencil_layers", list);
+}
+
+int CTX_data_editable_gpencil_strokes(const bContext *C, ListBase *list)
+{
+	return ctx_data_collection_get(C, "editable_gpencil_strokes", list);
+}
+

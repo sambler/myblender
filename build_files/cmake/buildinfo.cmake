@@ -2,15 +2,15 @@
 # ./source/creator/CMakeLists.txt to write ./source/creator/buildinfo.h
 
 # Extract working copy information for SOURCE_DIR into MY_XXX variables
-# with a default in case anything fails, for examble when using git-svn
+# with a default in case anything fails, for example when using git-svn
 set(MY_WC_HASH "unknown")
 set(MY_WC_BRANCH "unknown")
 set(MY_WC_COMMIT_TIMESTAMP 0)
 
-# Guess if this is a SVN working copy and then look up the revision
+# Guess if this is a git working copy and then look up the revision
 if(EXISTS ${SOURCE_DIR}/.git)
 	# The FindGit.cmake module is part of the standard distribution
-	include(FindGit)
+	find_package(Git)
 	if(GIT_FOUND)
 		message(STATUS "-- Found Git: ${GIT_EXECUTABLE}")
 
@@ -60,7 +60,8 @@ if(EXISTS ${SOURCE_DIR}/.git)
 			execute_process(COMMAND git log HEAD..@{u}
 			                WORKING_DIRECTORY ${SOURCE_DIR}
 			                OUTPUT_VARIABLE _git_below_check
-			                OUTPUT_STRIP_TRAILING_WHITESPACE)
+			                OUTPUT_STRIP_TRAILING_WHITESPACE
+			                ERROR_QUIET)
 			if(NOT _git_below_check STREQUAL "")
 				# If there're commits between HEAD and upstream this means
 				# that we're reset-ed to older revision. Use it's hash then.
@@ -85,6 +86,10 @@ if(EXISTS ${SOURCE_DIR}/.git)
 				endif()
 			endif()
 
+			if(MY_WC_BRANCH MATCHES "^blender-v")
+				set(MY_WC_BRANCH "master")
+			endif()
+
 			unset(_git_below_check)
 		endif()
 
@@ -92,6 +97,10 @@ if(EXISTS ${SOURCE_DIR}/.git)
 		                WORKING_DIRECTORY ${SOURCE_DIR}
 		                OUTPUT_VARIABLE MY_WC_COMMIT_TIMESTAMP
 		                OUTPUT_STRIP_TRAILING_WHITESPACE)
+		# May fail in rare cases
+		if(MY_WC_COMMIT_TIMESTAMP STREQUAL "")
+			set(MY_WC_COMMIT_TIMESTAMP 0)
+		endif()
 
 		# Update GIT index before getting dirty files
 		execute_process(COMMAND git update-index -q --refresh
@@ -106,7 +115,7 @@ if(EXISTS ${SOURCE_DIR}/.git)
 		if(NOT _git_changed_files STREQUAL "")
 			set(MY_WC_BRANCH "${MY_WC_BRANCH} (modified)")
 		else()
-			# Unpushed commits are also considered local odifications
+			# Unpushed commits are also considered local modifications
 			execute_process(COMMAND git log @{u}..
 			                WORKING_DIRECTORY ${SOURCE_DIR}
 			                OUTPUT_VARIABLE _git_unpushed_log
@@ -123,7 +132,7 @@ if(EXISTS ${SOURCE_DIR}/.git)
 endif()
 
 # BUILD_PLATFORM and BUILD_PLATFORM are taken from CMake
-# but BUILD_DATE and BUILD_TIME are plataform dependant
+# but BUILD_DATE and BUILD_TIME are platform dependent
 if(UNIX)
 	execute_process(COMMAND date "+%Y-%m-%d" OUTPUT_VARIABLE BUILD_DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
 	execute_process(COMMAND date "+%H:%M:%S" OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -133,7 +142,7 @@ if(WIN32)
 	execute_process(COMMAND cmd /c time /t OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
-# Write a file with the SVNVERSION define
+# Write a file with the BUILD_HASH define
 file(WRITE buildinfo.h.txt
 	"#define BUILD_HASH \"${MY_WC_HASH}\"\n"
 	"#define BUILD_COMMIT_TIMESTAMP ${MY_WC_COMMIT_TIMESTAMP}\n"
@@ -141,6 +150,14 @@ file(WRITE buildinfo.h.txt
 	"#define BUILD_DATE \"${BUILD_DATE}\"\n"
 	"#define BUILD_TIME \"${BUILD_TIME}\"\n"
 )
+
+# cleanup
+unset(MY_WC_HASH)
+unset(MY_WC_COMMIT_TIMESTAMP)
+unset(MY_WC_BRANCH)
+unset(BUILD_DATE)
+unset(BUILD_TIME)
+
 
 # Copy the file to the final header only if the version changes
 # and avoid needless rebuilds

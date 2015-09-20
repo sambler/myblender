@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #include "image.h"
@@ -52,7 +52,7 @@ void Attribute::set(ustring name_, TypeDesc type_, AttributeElement element_)
 
 void Attribute::reserve(int numverts, int numtris, int numsteps, int numcurves, int numkeys, bool resize)
 {
-	if (resize) {
+	if(resize) {
 		buffer.resize(buffer_size(numverts, numtris, numsteps, numcurves, numkeys), 0);
 	}
 	else {
@@ -61,6 +61,15 @@ void Attribute::reserve(int numverts, int numtris, int numsteps, int numcurves, 
 }
 
 void Attribute::add(const float& f)
+{
+	char *data = (char*)&f;
+	size_t size = sizeof(f);
+
+	for(size_t i = 0; i < size; i++)
+		buffer.push_back(data[i]);
+}
+
+void Attribute::add(const uchar4& f)
 {
 	char *data = (char*)&f;
 	size_t size = sizeof(f);
@@ -136,6 +145,7 @@ size_t Attribute::element_size(int numverts, int numtris, int numsteps, int numc
 			size = numtris;
 			break;
 		case ATTR_ELEMENT_CORNER:
+		case ATTR_ELEMENT_CORNER_BYTE:
 			size = numtris*3;
 			break;
 		case ATTR_ELEMENT_CURVE:
@@ -220,6 +230,8 @@ const char *Attribute::standard_name(AttributeStandard std)
 			return "heat";
 		case ATTR_STD_VOLUME_VELOCITY:
 			return "velocity";
+		case ATTR_STD_POINTINESS:
+			return "pointiness";
 		case ATTR_STD_NOT_FOUND:
 		case ATTR_STD_NONE:
 		case ATTR_STD_NUM:
@@ -263,11 +275,19 @@ Attribute *AttributeSet::add(ustring name, TypeDesc type, AttributeElement eleme
 		remove(name);
 	}
 
-	attributes.push_back(Attribute());
+#if __cplusplus >= 201103L
+	attributes.emplace_back();
 	attr = &attributes.back();
-
 	attr->set(name, type, element);
-	
+#else
+	{
+		Attribute attr_temp;
+		attr_temp.set(name, type, element);
+		attributes.push_back(attr_temp);
+		attr = &attributes.back();
+	}
+#endif
+
 	/* this is weak .. */
 	if(triangle_mesh)
 		attr->reserve(triangle_mesh->verts.size(), triangle_mesh->triangles.size(), triangle_mesh->motion_steps, 0, 0, resize);
@@ -357,6 +377,9 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
 			case ATTR_STD_VOLUME_VELOCITY:
 				attr = add(name, TypeDesc::TypeVector, ATTR_ELEMENT_VOXEL);
 				break;
+			case ATTR_STD_POINTINESS:
+				attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VERTEX);
+				break;
 			default:
 				assert(0);
 				break;
@@ -376,6 +399,9 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
 				break;
 			case ATTR_STD_GENERATED_TRANSFORM:
 				attr = add(name, TypeDesc::TypeMatrix, ATTR_ELEMENT_MESH);
+				break;
+			case ATTR_STD_POINTINESS:
+				attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VERTEX);
 				break;
 			default:
 				assert(0);

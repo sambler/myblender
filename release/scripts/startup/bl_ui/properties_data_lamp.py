@@ -30,7 +30,7 @@ class LAMP_MT_sunsky_presets(Menu):
     draw = Menu.draw_preset
 
 
-class DataButtonsPanel():
+class DataButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "data"
@@ -355,6 +355,7 @@ class DATA_PT_spot(DataButtonsPanel, Panel):
 
         col = split.column()
 
+        col.active = (lamp.shadow_method != 'BUFFER_SHADOW' or lamp.shadow_buffer_type != 'DEEP')
         col.prop(lamp, "use_halo")
         sub = col.column(align=True)
         sub.active = lamp.use_halo
@@ -378,7 +379,7 @@ class DATA_PT_falloff_curve(DataButtonsPanel, Panel):
     def draw(self, context):
         lamp = context.lamp
 
-        self.layout.template_curve_mapping(lamp, "falloff_curve")
+        self.layout.template_curve_mapping(lamp, "falloff_curve", use_negative_slope=True)
 
 
 class DATA_PT_custom_props_lamp(DataButtonsPanel, PropertyPanel, Panel):

@@ -35,7 +35,6 @@
 struct EvaluationContext;
 struct Path;
 struct Object;
-struct PartEff;
 struct Scene;
 struct ListBase;
 struct bAnimVizSettings;
@@ -73,6 +72,7 @@ int count_duplilist(struct Object *ob);
 
 typedef struct DupliExtraData {
 	float obmat[4][4];
+	unsigned int lay;
 } DupliExtraData;
 
 typedef struct DupliApplyData {
@@ -80,8 +80,8 @@ typedef struct DupliApplyData {
 	DupliExtraData *extra;
 } DupliApplyData;
 
-DupliApplyData *duplilist_apply_matrix(struct ListBase *duplilist);
-void duplilist_restore_matrix(struct ListBase *duplilist, DupliApplyData *apply_data);
+DupliApplyData *duplilist_apply(struct Object *ob, struct Scene *scene, struct ListBase *duplilist);
+void duplilist_restore(struct ListBase *duplilist, DupliApplyData *apply_data);
 void duplilist_free_apply_data(DupliApplyData *apply_data);
 
 #endif

@@ -165,6 +165,31 @@ static int rna_SmokeModifier_color_grid_get_length(PointerRNA *ptr, int length[R
 	return length[0];
 }
 
+static int rna_SmokeModifier_velocity_grid_get_length(PointerRNA *ptr, int length[RNA_MAX_ARRAY_DIMENSION])
+{
+#ifdef WITH_SMOKE
+	SmokeDomainSettings *sds = (SmokeDomainSettings *)ptr->data;
+	float *vx = NULL;
+	float *vy = NULL;
+	float *vz = NULL;
+	int size = 0;
+
+	/* Velocity data is always low-resolution. */
+	if (sds->fluid) {
+		size = 3 * sds->res[0] * sds->res[1] * sds->res[2];
+		vx = smoke_get_velocity_x(sds->fluid);
+		vy = smoke_get_velocity_y(sds->fluid);
+		vz = smoke_get_velocity_z(sds->fluid);
+	}
+
+	length[0] = (vx && vy && vz) ? size : 0;
+#else
+	(void)ptr;
+	length[0] = 0;
+#endif
+	return length[0];
+}
+
 static void rna_SmokeModifier_density_grid_get(PointerRNA *ptr, float *values)
 {
 #ifdef WITH_SMOKE
@@ -184,8 +209,34 @@ static void rna_SmokeModifier_density_grid_get(PointerRNA *ptr, float *values)
 
 	BLI_rw_mutex_unlock(sds->fluid_mutex);
 #else
-	(void)ptr;
-	(void)values;
+	UNUSED_VARS(ptr, values);
+#endif
+}
+
+static void rna_SmokeModifier_velocity_grid_get(PointerRNA *ptr, float *values)
+{
+#ifdef WITH_SMOKE
+	SmokeDomainSettings *sds = (SmokeDomainSettings *)ptr->data;
+	int length[RNA_MAX_ARRAY_DIMENSION];
+	int size = rna_SmokeModifier_velocity_grid_get_length(ptr, length);
+	float *vx, *vy, *vz;
+	int i;
+
+	BLI_rw_mutex_lock(sds->fluid_mutex, THREAD_LOCK_READ);
+
+	vx = smoke_get_velocity_x(sds->fluid);
+	vy = smoke_get_velocity_y(sds->fluid);
+	vz = smoke_get_velocity_z(sds->fluid);
+
+	for (i = 0; i < size; i += 3) {
+		*(values++) = *(vx++);
+		*(values++) = *(vy++);
+		*(values++) = *(vz++);
+	}
+
+	BLI_rw_mutex_unlock(sds->fluid_mutex);
+#else
+	UNUSED_VARS(ptr, values);
 #endif
 }
 
@@ -211,8 +262,7 @@ static void rna_SmokeModifier_color_grid_get(PointerRNA *ptr, float *values)
 
 	BLI_rw_mutex_unlock(sds->fluid_mutex);
 #else
-	(void)ptr;
-	memset(values, 0, 4 * sizeof(float));
+	UNUSED_VARS(ptr, values);
 #endif
 }
 
@@ -238,8 +288,7 @@ static void rna_SmokeModifier_flame_grid_get(PointerRNA *ptr, float *values)
 
 	BLI_rw_mutex_unlock(sds->fluid_mutex);
 #else
-	(void)ptr;
-	(void)values;
+	UNUSED_VARS(ptr, values);
 #endif
 }
 
@@ -311,7 +360,7 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "resolution_max", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "maxres");
-	RNA_def_property_range(prop, 24, 512);
+	RNA_def_property_range(prop, 6, 512);
 	RNA_def_property_ui_range(prop, 24, 512, 2, -1);
 	RNA_def_property_ui_text(prop, "Max Res", "Maximal resolution used in the fluid domain");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
@@ -452,6 +501,14 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 	RNA_def_property_dynamic_array_funcs(prop, "rna_SmokeModifier_grid_get_length");
 	RNA_def_property_float_funcs(prop, "rna_SmokeModifier_density_grid_get", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Density Grid", "Smoke density grid");
+
+	prop = RNA_def_property(srna, "velocity_grid", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_array(prop, 32);
+	RNA_def_property_flag(prop, PROP_DYNAMIC);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_dynamic_array_funcs(prop, "rna_SmokeModifier_velocity_grid_get_length");
+	RNA_def_property_float_funcs(prop, "rna_SmokeModifier_velocity_grid_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Velocity Grid", "Smoke velocity grid");
 
 	prop = RNA_def_property(srna, "flame_grid", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_array(prop, 32);
@@ -633,21 +690,21 @@ static void rna_def_smoke_flow_settings(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "velocity_factor", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "vel_multi");
-	RNA_def_property_range(prop, -2.0, 2.0);
+	RNA_def_property_range(prop, -100.0, 100.0);
 	RNA_def_property_ui_range(prop, -2.0, 2.0, 0.05, 5);
 	RNA_def_property_ui_text(prop, "Source", "Multiplier of source velocity passed to smoke");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Smoke_reset");
 
 	prop = RNA_def_property(srna, "velocity_normal", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "vel_normal");
-	RNA_def_property_range(prop, -2.0, 2.0);
+	RNA_def_property_range(prop, -100.0, 100.0);
 	RNA_def_property_ui_range(prop, -2.0, 2.0, 0.05, 5);
 	RNA_def_property_ui_text(prop, "Normal", "Amount of normal directional velocity");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Smoke_reset");
 
 	prop = RNA_def_property(srna, "velocity_random", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "vel_random");
-	RNA_def_property_range(prop, 0.0, 2.0);
+	RNA_def_property_range(prop, 0.0, 10.0);
 	RNA_def_property_ui_range(prop, 0.0, 2.0, 0.05, 5);
 	RNA_def_property_ui_text(prop, "Random", "Amount of random velocity");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Smoke_reset");

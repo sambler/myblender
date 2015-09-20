@@ -62,12 +62,12 @@ static int pose_group_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Object *ob = ED_pose_object_from_context(C);
 
-	/* only continue if there's an object */
-	if (ob == NULL)
+	/* only continue if there's an object and pose */
+	if (ELEM(NULL, ob, ob->pose))
 		return OPERATOR_CANCELLED;
 	
 	/* for now, just call the API function for this */
-	BKE_pose_add_group(ob);
+	BKE_pose_add_group(ob->pose, NULL);
 	
 	/* notifiers for updates */
 	WM_event_add_notifier(C, NC_OBJECT | ND_POSE, ob);
@@ -95,12 +95,12 @@ static int pose_group_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Object *ob = ED_pose_object_from_context(C);
 	
-	/* only continue if there's an object */
-	if (ob == NULL)
+	/* only continue if there's an object and pose */
+	if (ELEM(NULL, ob, ob->pose))
 		return OPERATOR_CANCELLED;
 	
 	/* for now, just call the API function for this */
-	BKE_pose_remove_group(ob);
+	BKE_pose_remove_group_index(ob->pose, ob->pose->active_group);
 	
 	/* notifiers for updates */
 	WM_event_add_notifier(C, NC_OBJECT | ND_POSE, ob);
@@ -130,6 +130,7 @@ static int pose_groups_menu_invoke(bContext *C, wmOperator *op, const wmEvent *U
 {
 	Object *ob = ED_pose_object_from_context(C);
 	bPose *pose;
+	PropertyRNA *prop = RNA_struct_find_property(op->ptr, "type");
 	
 	uiPopupMenu *pup;
 	uiLayout *layout;
@@ -140,12 +141,23 @@ static int pose_groups_menu_invoke(bContext *C, wmOperator *op, const wmEvent *U
 	if (ELEM(NULL, ob, ob->pose)) 
 		return OPERATOR_CANCELLED;
 	pose = ob->pose;
+
+	/* If group index is set, try to use it! */
+	if (RNA_property_is_set(op->ptr, prop)) {
+		const int num_groups = BLI_listbase_count(&pose->agroups);
+		const int group = RNA_property_int_get(op->ptr, prop);
+
+		/* just use the active group index, and call the exec callback for the calling operator */
+		if (group > 0 && group <= num_groups) {
+			return op->type->exec(C, op);
+		}
+	}
 	
 	/* if there's no active group (or active is invalid), create a new menu to find it */
 	if (pose->active_group <= 0) {
 		/* create a new menu, and start populating it with group names */
-		pup = uiPupMenuBegin(C, op->type->name, ICON_NONE);
-		layout = uiPupMenuLayout(pup);
+		pup = UI_popup_menu_begin(C, op->type->name, ICON_NONE);
+		layout = UI_popup_menu_layout(pup);
 		
 		/* special entry - allow to create new group, then use that 
 		 *	(not to be used for removing though)
@@ -160,9 +172,9 @@ static int pose_groups_menu_invoke(bContext *C, wmOperator *op, const wmEvent *U
 			uiItemIntO(layout, grp->name, ICON_NONE, op->idname, "type", i);
 			
 		/* finish building the menu, and process it (should result in calling self again) */
-		uiPupMenuEnd(C, pup);
+		UI_popup_menu_end(C, pup);
 		
-		return OPERATOR_CANCELLED;
+		return OPERATOR_INTERFACE;
 	}
 	else {
 		/* just use the active group index, and call the exec callback for the calling operator */
@@ -189,7 +201,7 @@ static int pose_group_assign_exec(bContext *C, wmOperator *op)
 	 */
 	pose->active_group = RNA_int_get(op->ptr, "type");
 	if (pose->active_group == 0)
-		BKE_pose_add_group(ob);
+		BKE_pose_add_group(ob->pose, NULL);
 	
 	/* add selected bones to group then */
 	CTX_DATA_BEGIN (C, bPoseChannel *, pchan, selected_pose_bones)
@@ -365,8 +377,8 @@ typedef struct tSortActionGroup {
 /* compare bone groups by name */
 static int compare_agroup(const void *sgrp_a_ptr, const void *sgrp_b_ptr)
 {
-	tSortActionGroup *sgrp_a = (tSortActionGroup *)sgrp_a_ptr;
-	tSortActionGroup *sgrp_b = (tSortActionGroup *)sgrp_b_ptr;
+	const tSortActionGroup *sgrp_a = sgrp_a_ptr;
+	const tSortActionGroup *sgrp_b = sgrp_b_ptr;
 
 	return strcmp(sgrp_a->agrp->name, sgrp_b->agrp->name);
 }
@@ -387,7 +399,7 @@ static int group_sort_exec(bContext *C, wmOperator *UNUSED(op))
 		return OPERATOR_CANCELLED;
 
 	/* create temporary array with bone groups and indices */
-	agrp_count = BLI_countlist(&pose->agroups);
+	agrp_count = BLI_listbase_count(&pose->agroups);
 	agrp_array = MEM_mallocN(sizeof(tSortActionGroup) * agrp_count, "sort bone groups");
 	for (agrp = pose->agroups.first, i = 0; agrp; agrp = agrp->next, i++) {
 		BLI_assert(i < agrp_count);

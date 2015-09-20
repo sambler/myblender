@@ -38,7 +38,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 
-#include "ED_sculpt.h"
+#include "ED_paint.h"
 
 #include "paint_intern.h"
 
@@ -51,6 +51,7 @@ typedef struct UndoElem {
 
 	UndoRestoreCb restore;
 	UndoFreeCb free;
+	UndoCleanupCb cleanup;
 } UndoElem;
 
 typedef struct UndoStack {
@@ -78,7 +79,7 @@ static void undo_elem_free(UndoStack *UNUSED(stack), UndoElem *uel)
 	}
 }
 
-static void undo_stack_push_begin(UndoStack *stack, const char *name, UndoRestoreCb restore, UndoFreeCb free)
+static void undo_stack_push_begin(UndoStack *stack, const char *name, UndoRestoreCb restore, UndoFreeCb free, UndoCleanupCb cleanup)
 {
 	UndoElem *uel;
 	int nr;
@@ -98,6 +99,7 @@ static void undo_stack_push_begin(UndoStack *stack, const char *name, UndoRestor
 	stack->current = uel = MEM_callocN(sizeof(UndoElem), "undo file");
 	uel->restore = restore;
 	uel->free = free;
+	uel->cleanup = cleanup;
 	BLI_addtail(&stack->elems, uel);
 
 	/* name can be a dynamic string */
@@ -171,16 +173,44 @@ static void undo_stack_push_end(UndoStack *stack)
 	}
 }
 
+static void undo_stack_cleanup(UndoStack *stack, bContext *C)
+{
+	UndoElem *uel = stack->elems.first;
+	bool stack_reset = false;
+
+	while (uel) {
+		if (uel->cleanup && uel->cleanup(C, &uel->elems)) {
+			UndoElem *uel_tmp = uel->next;
+			if (stack->current == uel) {
+				stack->current = NULL;
+				stack_reset = true;
+			}
+			undo_elem_free(stack, uel);
+			BLI_freelinkN(&stack->elems, uel);
+			uel = uel_tmp;
+		}
+		else
+			uel = uel->next;
+	}
+	if (stack_reset) {
+		stack->current = stack->elems.last;
+	}
+
+}
+
 static int undo_stack_step(bContext *C, UndoStack *stack, int step, const char *name)
 {
 	UndoElem *undo;
+
+	/* first cleanup any old undo steps that may belong to invalid data */
+	undo_stack_cleanup(stack, C);
 
 	if (step == 1) {
 		if (stack->current == NULL) {
 			/* pass */
 		}
 		else {
-			if (!name || strcmp(stack->current->name, name) == 0) {
+			if (!name || STREQ(stack->current->name, name)) {
 				if (G.debug & G_DEBUG_WM) {
 					printf("%s: undo '%s'\n", __func__, stack->current->name);
 				}
@@ -195,7 +225,7 @@ static int undo_stack_step(bContext *C, UndoStack *stack, int step, const char *
 			/* pass */
 		}
 		else {
-			if (!name || strcmp(stack->current->name, name) == 0) {
+			if (!name || STREQ(stack->current->name, name)) {
 				undo = (stack->current && stack->current->next) ? stack->current->next : stack->elems.first;
 				undo_restore(C, stack, undo);
 				stack->current = undo;
@@ -223,23 +253,25 @@ static void undo_stack_free(UndoStack *stack)
 
 /* Exported Functions */
 
-void ED_undo_paint_push_begin(int type, const char *name, UndoRestoreCb restore, UndoFreeCb free)
+void ED_undo_paint_push_begin(int type, const char *name, UndoRestoreCb restore, UndoFreeCb free, UndoCleanupCb cleanup)
 {
 	if (type == UNDO_PAINT_IMAGE)
-		undo_stack_push_begin(&ImageUndoStack, name, restore, free);
+		undo_stack_push_begin(&ImageUndoStack, name, restore, free, cleanup);
 	else if (type == UNDO_PAINT_MESH)
-		undo_stack_push_begin(&MeshUndoStack, name, restore, free);
+		undo_stack_push_begin(&MeshUndoStack, name, restore, free, cleanup);
 }
 
 ListBase *undo_paint_push_get_list(int type)
 {
 	if (type == UNDO_PAINT_IMAGE) {
-		if (ImageUndoStack.current)
+		if (ImageUndoStack.current) {
 			return &ImageUndoStack.current->elems;
+		}
 	}
 	else if (type == UNDO_PAINT_MESH) {
-		if (MeshUndoStack.current)
+		if (MeshUndoStack.current) {
 			return &MeshUndoStack.current->elems;
+		}
 	}
 	
 	return NULL;
@@ -299,28 +331,34 @@ void ED_undo_paint_step_num(bContext *C, int type, int step)
 		undo_step_num(C, &MeshUndoStack, step);
 }
 
-static char *undo_stack_get_name(UndoStack *stack, int nr, int *active)
+static char *undo_stack_get_name(UndoStack *stack, int nr, bool *r_active)
 {
 	UndoElem *uel;
 
-	if (active) *active = 0;
+	if (r_active) *r_active = false;
 
 	uel = BLI_findlink(&stack->elems, nr);
 	if (uel) {
-		if (active && uel == stack->current)
-			*active = 1;
+		if (r_active && (uel == stack->current)) {
+			*r_active = true;
+		}
 		return uel->name;
 	}
 
 	return NULL;
 }
 
-const char *ED_undo_paint_get_name(int type, int nr, int *active)
+const char *ED_undo_paint_get_name(bContext *C, int type, int nr, bool *r_active)
 {
-	if (type == UNDO_PAINT_IMAGE)
-		return undo_stack_get_name(&ImageUndoStack, nr, active);
-	else if (type == UNDO_PAINT_MESH)
-		return undo_stack_get_name(&MeshUndoStack, nr, active);
+
+	if (type == UNDO_PAINT_IMAGE) {
+		undo_stack_cleanup(&ImageUndoStack, C);
+		return undo_stack_get_name(&ImageUndoStack, nr, r_active);
+	}
+	else if (type == UNDO_PAINT_MESH) {
+		undo_stack_cleanup(&MeshUndoStack, C);
+		return undo_stack_get_name(&MeshUndoStack, nr, r_active);
+	}
 	return NULL;
 }
 
@@ -342,7 +380,7 @@ bool ED_undo_paint_empty(int type)
 	return false;
 }
 
-int ED_undo_paint_valid(int type, const char *name)
+bool ED_undo_paint_is_valid(int type, const char *name)
 {
 	UndoStack *stack;
 	
@@ -357,7 +395,7 @@ int ED_undo_paint_valid(int type, const char *name)
 		/* pass */
 	}
 	else {
-		if (name && strcmp(stack->current->name, name) == 0)
+		if (name && STREQ(stack->current->name, name))
 			return 1;
 		else
 			return stack->elems.first != stack->elems.last;

@@ -38,10 +38,13 @@
 
 #include "BLI_math.h" /* windows needs for M_PI */
 #include "BLI_utildefines.h"
+#include "BLI_rect.h"
+#include "BLI_string.h"
 
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
 #include "DNA_anim_types.h"
+#include "DNA_space_types.h"
 
 #include "BKE_fcurve.h"
 #include "BKE_sequencer.h"
@@ -51,6 +54,10 @@
 #include "IMB_colormanagement.h"
 
 #include "RNA_access.h"
+
+#include "RE_pipeline.h"
+
+#include "BLF_api.h"
 
 static void slice_get_byte_buffers(const SeqRenderData *context, const ImBuf *ibuf1, const ImBuf *ibuf2,
                                    const ImBuf *ibuf3, const ImBuf *out, int start_line, unsigned char **rect1,
@@ -305,41 +312,45 @@ static void do_alphaover_effect(const SeqRenderData *context, Sequence *UNUSED(s
 
 static void do_alphaunder_effect_byte(float facf0, float facf1, int x, int y, unsigned char *rect1, unsigned char *rect2, unsigned char *out)
 {
-	int fac2, mfac, fac, fac4;
+	float fac2, fac, fac4;
 	int xo;
-	unsigned char *rt1, *rt2, *rt;
+	unsigned char *cp1, *cp2, *rt;
+	float tempc[4], rt1[4], rt2[4];
 
 	xo = x;
-	rt1 = rect1;
-	rt2 = rect2;
+	cp1 = rect1;
+	cp2 = rect2;
 	rt = out;
 
-	fac2 = (int)(256.0f * facf0);
-	fac4 = (int)(256.0f * facf1);
+	fac2 = facf0;
+	fac4 = facf1;
 
 	while (y--) {
 		x = xo;
 		while (x--) {
 			/* rt = rt1 under rt2  (alpha from rt2) */
+			straight_uchar_to_premul_float(rt1, cp1);
+			straight_uchar_to_premul_float(rt2, cp2);
 
 			/* this complex optimization is because the
 			 * 'skybuf' can be crossed in
 			 */
-			if      (rt2[3] == 0 && fac2 == 256) *((unsigned int *) rt) = *((unsigned int *) rt1);
-			else if (rt2[3] == 255)              *((unsigned int *) rt) = *((unsigned int *) rt2);
+			if      (rt2[3] <= 0.0f && fac2 >= 1.0f) *((unsigned int *) rt) = *((unsigned int *) cp1);
+			else if (rt2[3] >= 1.0f)                 *((unsigned int *) rt) = *((unsigned int *) cp2);
 			else {
-				mfac = rt2[3];
-				fac = (fac2 * (256 - mfac)) >> 8;
+				fac = (fac2 * (1.0f - rt2[3]));
 
-				if (fac == 0) *((unsigned int *) rt) = *((unsigned int *) rt2);
+				if (fac <= 0) *((unsigned int *) rt) = *((unsigned int *) cp2);
 				else {
-					rt[0] = (fac * rt1[0] + mfac * rt2[0]) >> 8;
-					rt[1] = (fac * rt1[1] + mfac * rt2[1]) >> 8;
-					rt[2] = (fac * rt1[2] + mfac * rt2[2]) >> 8;
-					rt[3] = (fac * rt1[3] + mfac * rt2[3]) >> 8;
+					tempc[0] = (fac * rt1[0] + rt2[0]);
+					tempc[1] = (fac * rt1[1] + rt2[1]);
+					tempc[2] = (fac * rt1[2] + rt2[2]);
+					tempc[3] = (fac * rt1[3] + rt2[3]);
+					
+					premul_float_to_straight_uchar(rt, tempc);
 				}
 			}
-			rt1 += 4; rt2 += 4; rt += 4;
+			cp1 += 4; cp2 += 4; rt += 4;
 		}
 
 		if (y == 0)
@@ -348,28 +359,32 @@ static void do_alphaunder_effect_byte(float facf0, float facf1, int x, int y, un
 
 		x = xo;
 		while (x--) {
-			if      (rt2[3] == 0 && fac4 == 256) *((unsigned int *) rt) = *((unsigned int *) rt1);
-			else if (rt2[3] == 255)              *((unsigned int *) rt) = *((unsigned int *) rt2);
-			else {
-				mfac = rt2[3];
-				fac = (fac4 * (256 - mfac)) >> 8;
+			straight_uchar_to_premul_float(rt1, cp1);
+			straight_uchar_to_premul_float(rt2, cp2);
+			
+			if      (rt2[3] <= 0.0f && fac4 >= 1.0f) *((unsigned int *) rt) = *((unsigned int *) cp1);
+			else if (rt2[3] >= 1.0f)                 *((unsigned int *) rt) = *((unsigned int *) cp2);
+			else {				
+				fac = (fac4 * (1.0f - rt2[3]));
 
-				if (fac == 0) *((unsigned int *)rt) = *((unsigned int *)rt2);
+				if (fac <= 0) *((unsigned int *)rt) = *((unsigned int *)cp2);
 				else {
-					rt[0] = (fac * rt1[0] + mfac * rt2[0]) >> 8;
-					rt[1] = (fac * rt1[1] + mfac * rt2[1]) >> 8;
-					rt[2] = (fac * rt1[2] + mfac * rt2[2]) >> 8;
-					rt[3] = (fac * rt1[3] + mfac * rt2[3]) >> 8;
+					tempc[0] = (fac * rt1[0] + rt2[0]);
+					tempc[1] = (fac * rt1[1] + rt2[1]);
+					tempc[2] = (fac * rt1[2] + rt2[2]);
+					tempc[3] = (fac * rt1[3] + rt2[3]);
+					
+					premul_float_to_straight_uchar(rt, tempc);
 				}
 			}
-			rt1 += 4; rt2 += 4; rt += 4;
+			cp1 += 4; cp2 += 4; rt += 4;
 		}
 	}
 }
 
 static void do_alphaunder_effect_float(float facf0, float facf1, int x, int y,  float *rect1, float *rect2, float *out)
 {
-	float fac2, mfac, fac, fac4;
+	float fac2, fac, fac4;
 	int xo;
 	float *rt1, *rt2, *rt;
 
@@ -396,17 +411,16 @@ static void do_alphaunder_effect_float(float facf0, float facf1, int x, int y,  
 				memcpy(rt, rt2, 4 * sizeof(float));
 			}
 			else {
-				mfac = rt2[3];
-				fac = fac2 * (1.0f - mfac);
+				fac = fac2 * (1.0f - rt2[3]);
 
 				if (fac == 0) {
 					memcpy(rt, rt2, 4 * sizeof(float));
 				}
 				else {
-					rt[0] = fac * rt1[0] + mfac * rt2[0];
-					rt[1] = fac * rt1[1] + mfac * rt2[1];
-					rt[2] = fac * rt1[2] + mfac * rt2[2];
-					rt[3] = fac * rt1[3] + mfac * rt2[3];
+					rt[0] = fac * rt1[0] + rt2[0];
+					rt[1] = fac * rt1[1] + rt2[1];
+					rt[2] = fac * rt1[2] + rt2[2];
+					rt[3] = fac * rt1[3] + rt2[3];
 				}
 			}
 			rt1 += 4; rt2 += 4; rt += 4;
@@ -425,17 +439,16 @@ static void do_alphaunder_effect_float(float facf0, float facf1, int x, int y,  
 				memcpy(rt, rt2, 4 * sizeof(float));
 			}
 			else {
-				mfac = rt2[3];
-				fac = fac4 * (1.0f - mfac);
+				fac = fac4 * (1.0f - rt2[3]);
 
 				if (fac == 0) {
 					memcpy(rt, rt2, 4 * sizeof(float));
 				}
 				else {
-					rt[0] = fac * rt1[0] + mfac * rt2[0];
-					rt[1] = fac * rt1[1] + mfac * rt2[1];
-					rt[2] = fac * rt1[2] + mfac * rt2[2];
-					rt[3] = fac * rt1[3] + mfac * rt2[3];
+					rt[0] = fac * rt1[0] + rt2[0];
+					rt[1] = fac * rt1[1] + rt2[1];
+					rt[2] = fac * rt1[2] + rt2[2];
+					rt[3] = fac * rt1[3] + rt2[3];
 				}
 			}
 			rt1 += 4; rt2 += 4; rt += 4;
@@ -1311,7 +1324,7 @@ static float check_zone(WipeZone *wipezone, int x, int y, Sequence *seq, float f
 			if (angle == 0.0f) {
 				b1 = posy;
 				b2 = y;
-				hyp = fabs(y - posy);
+				hyp = fabsf(y - posy);
 			}
 			else {
 				b1 = posy - (-angle) * posx;
@@ -1398,7 +1411,7 @@ static float check_zone(WipeZone *wipezone, int x, int y, Sequence *seq, float f
 			x = x - halfx;
 			y = y - halfy;
 
-			temp2 = asin(abs(y) / sqrt(x * x + y * y));
+			temp2 = asin(abs(y) / hypot(x, y));
 			if (x <= 0 && y >= 0) temp2 = (float)M_PI - temp2;
 			else if (x <= 0 && y <= 0) temp2 += (float)M_PI;
 			else if (x >= 0 && y <= 0) temp2 = 2.0f * (float)M_PI - temp2;
@@ -1441,7 +1454,7 @@ static float check_zone(WipeZone *wipezone, int x, int y, Sequence *seq, float f
 
 			temp1 = xo * (1 - facf0 / 2) - xo * facf0 / 2;
 			temp2 = yo * (1 - facf0 / 2) - yo * facf0 / 2;
-			pointdist = sqrtf(temp1 * temp1 + temp2 * temp2);
+			pointdist = hypot(temp1, temp2);
 
 			if (b2 < b1 && b2 < b3) {
 				if (hwidth < pointdist)
@@ -1498,9 +1511,9 @@ static float check_zone(WipeZone *wipezone, int x, int y, Sequence *seq, float f
 			hwidth = width * 0.5f;
 
 			temp1 = (halfx - (halfx) * facf0);
-			pointdist = sqrtf(temp1 * temp1 + temp1 * temp1);
+			pointdist = hypotf(temp1, temp1);
 
-			temp2 = sqrtf((halfx - x) * (halfx - x) + (halfy - y) * (halfy - y));
+			temp2 = hypotf(halfx - x, halfy - y);
 			if (temp2 > pointdist) output = in_band(hwidth, fabsf(temp2 - pointdist), 0, 1);
 			else output = in_band(hwidth, fabsf(temp2 - pointdist), 1, 1);
 
@@ -1734,8 +1747,8 @@ static void transform_image(int x, int y, ImBuf *ibuf1, ImBuf *out,  float scale
 	yo = y;
 	
 	/* Rotate */
-	s = sin(rotate);
-	c = cos(rotate);
+	s = sinf(rotate);
+	c = cosf(rotate);
 
 	for (yi = 0; yi < yo; yi++) {
 		for (xi = 0; xi < xo; xi++) {
@@ -2579,6 +2592,423 @@ static void do_overdrop_effect(const SeqRenderData *context, Sequence *UNUSED(se
 	}
 }
 
+/*********************** Gaussian Blur *************************/
+
+/* NOTE: This gaussian blur implementation accumulates values in the square
+ * kernel rather that doing X direction and then Y direction because of the
+ * lack of using multiple-staged filters.
+ *
+ * Once we can we'll implement a way to apply filter as multiple stages we
+ * can optimize hell of a lot in here.
+ */
+
+static void init_gaussian_blur_effect(Sequence *seq)
+{
+	if (seq->effectdata)
+		MEM_freeN(seq->effectdata);
+
+	seq->effectdata = MEM_callocN(sizeof(WipeVars), "wipevars");
+}
+
+static int num_inputs_gaussian_blur(void)
+{
+	return 1;
+}
+
+static void free_gaussian_blur_effect(Sequence *seq)
+{
+	if (seq->effectdata)
+		MEM_freeN(seq->effectdata);
+
+	seq->effectdata = NULL;
+}
+
+static void copy_gaussian_blur_effect(Sequence *dst, Sequence *src)
+{
+	dst->effectdata = MEM_dupallocN(src->effectdata);
+}
+
+static int early_out_gaussian_blur(Sequence *seq, float UNUSED(facf0), float UNUSED(facf1))
+{
+	GaussianBlurVars *data = seq->effectdata;
+	if (data->size_x == 0.0f && data->size_y == 0) {
+		return EARLY_USE_INPUT_1;
+	}
+	return EARLY_DO_EFFECT;
+}
+
+/* TODO(sergey): De-duplicate with compositor. */
+static float *make_gaussian_blur_kernel(float rad, int size)
+{
+	float *gausstab, sum, val;
+	float fac;
+	int i, n;
+
+	n = 2 * size + 1;
+
+	gausstab = (float *)MEM_mallocN(sizeof(float) * n, __func__);
+
+	sum = 0.0f;
+	fac = (rad > 0.0f ? 1.0f / rad : 0.0f);
+	for (i = -size; i <= size; i++) {
+		val = RE_filter_value(R_FILTER_GAUSS, (float)i * fac);
+		sum += val;
+		gausstab[i + size] = val;
+	}
+
+	sum = 1.0f / sum;
+	for (i = 0; i < n; i++)
+		gausstab[i] *= sum;
+
+	return gausstab;
+}
+
+static void do_gaussian_blur_effect_byte(Sequence *seq,
+                                         int start_line,
+                                         int x, int y,
+                                         int frame_width, int frame_height,
+                                         unsigned char *rect,
+                                         unsigned char *out)
+{
+#define INDEX(_x, _y) (((_y) * (x) + (_x)) * 4)
+	GaussianBlurVars *data = seq->effectdata;
+	const int size_x = (int) (data->size_x + 0.5f);
+	const int size_y = (int) (data->size_y + 0.5f);
+	int i, j;
+
+	/* Make gaussian weight tabke. */
+	float *gausstab_x, *gausstab_y;
+	gausstab_x = make_gaussian_blur_kernel(data->size_x, size_x);
+	if (data->size_x == data->size_y) {
+		gausstab_y = gausstab_x;
+	}
+	else {
+		gausstab_y = make_gaussian_blur_kernel(data->size_y, size_y);
+	}
+
+	for (i = 0; i < y; ++i) {
+		for (j = 0; j < x; ++j) {
+			int out_index = INDEX(j, i);
+			int current_x, current_y;
+			float accum[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			float accum_weight = 0.0f;
+			for (current_y = i - size_y;
+			     current_y <= i + size_y;
+			     ++current_y)
+			{
+				if (current_y < -start_line ||
+				    current_y + start_line >= frame_height)
+				{
+					/* Out of bounds. */
+					continue;
+				}
+
+				for (current_x = j - size_x;
+				     current_x <= j + size_x;
+				     ++current_x)
+				{
+					float weight;
+					int index = INDEX(current_x, current_y + start_line);
+					if (current_x < 0 || current_x >= frame_width) {
+						/* Out of bounds. */
+						continue;
+					}
+					BLI_assert(index >= 0);
+					BLI_assert(index < frame_width * frame_height * 4);
+
+					if (size_x != 0 && size_y != 0) {
+						weight = gausstab_x[current_x - j + size_x] *
+							gausstab_y[current_y - i + size_y];
+					}
+					else if (size_x == 0) {
+						weight = gausstab_y[current_y - i + size_y];
+					}
+					else {
+						weight = gausstab_x[current_x - j + size_x];
+					}
+					accum[0] += rect[index] * weight;
+					accum[1] += rect[index + 1] * weight;
+					accum[2] += rect[index + 2] * weight;
+					accum[3] += rect[index + 3] * weight;
+					accum_weight += weight;
+				}
+			}
+			out[out_index + 0] = accum[0] / accum_weight;
+			out[out_index + 1] = accum[1] / accum_weight;
+			out[out_index + 2] = accum[2] / accum_weight;
+			out[out_index + 3] = accum[3] / accum_weight;
+		}
+	}
+
+	MEM_freeN(gausstab_x);
+	if (gausstab_x != gausstab_y) {
+		MEM_freeN(gausstab_y);
+	}
+#undef INDEX
+}
+
+static void do_gaussian_blur_effect_float(Sequence *seq,
+                                          int start_line,
+                                          int x, int y,
+                                          int frame_width, int frame_height,
+                                          float *rect,
+                                          float *out)
+{
+#define INDEX(_x, _y) (((_y) * (x) + (_x)) * 4)
+	GaussianBlurVars *data = seq->effectdata;
+	const int size_x = (int) (data->size_x + 0.5f);
+	const int size_y = (int) (data->size_y + 0.5f);
+	int i, j;
+
+	/* Make gaussian weight tabke. */
+	float *gausstab_x, *gausstab_y;
+	gausstab_x = make_gaussian_blur_kernel(data->size_x, size_x);
+	if (data->size_x == data->size_y) {
+		gausstab_y = gausstab_x;
+	}
+	else {
+		gausstab_y = make_gaussian_blur_kernel(data->size_y, size_y);
+	}
+
+	for (i = 0; i < y; ++i) {
+		for (j = 0; j < x; ++j) {
+			int out_index = INDEX(j, i);
+			int current_x, current_y;
+			float accum[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			float accum_weight = 0.0f;
+			for (current_y = i - size_y;
+			     current_y <= i + size_y;
+			     ++current_y)
+			{
+				float weight;
+				if (current_y < -start_line ||
+				    current_y + start_line >= frame_height)
+				{
+					/* Out of bounds. */
+					continue;
+				}
+
+				for (current_x = j - size_x;
+				     current_x <= j + size_x;
+				     ++current_x)
+				{
+					int index = INDEX(current_x, current_y + start_line);
+					if (current_x < 0 || current_x >= frame_width) {
+						/* Out of bounds. */
+						continue;
+					}
+
+					if (size_x != 0 && size_y != 0) {
+						weight = gausstab_x[current_x - j + size_x] *
+							gausstab_y[current_y - i + size_y];
+					}
+					else if (size_x == 0) {
+						weight = gausstab_y[current_y - i + size_y];
+					}
+					else {
+						weight = gausstab_x[current_x - j + size_x];
+					}
+					madd_v4_v4fl(accum, &rect[index], weight);
+					accum_weight += weight;
+				}
+			}
+			mul_v4_v4fl(&out[out_index], accum, 1.0f / accum_weight);
+		}
+	}
+
+	MEM_freeN(gausstab_x);
+	if (gausstab_x != gausstab_y) {
+		MEM_freeN(gausstab_y);
+	}
+#undef INDEX
+}
+
+static void do_gaussian_blur_effect(const SeqRenderData *context,
+                                    Sequence *seq,
+                                    float UNUSED(cfra),
+                                    float UNUSED(facf0),
+                                    float UNUSED(facf1),
+                                    ImBuf *ibuf1,
+                                    ImBuf *ibuf2,
+                                    ImBuf *UNUSED(ibuf3),
+                                    int start_line,
+                                    int total_lines,
+                                    ImBuf *out)
+{
+	if (out->rect_float) {
+		float *rect1 = NULL, *rect2 = NULL, *rect_out = NULL;
+
+		slice_get_float_buffers(context,
+		                        ibuf1, ibuf2,
+		                        NULL,
+		                        out,
+		                        start_line,
+		                        &rect1,
+		                        &rect2,
+		                        NULL,
+		                        &rect_out);
+
+		do_gaussian_blur_effect_float(seq,
+		                              start_line,
+		                              context->rectx,
+		                              total_lines,
+		                              context->rectx,
+		                              context->recty,
+		                              ibuf1->rect_float,
+		                              rect_out);
+	}
+	else {
+		unsigned char *rect1 = NULL, *rect2 = NULL, *rect_out = NULL;
+
+		slice_get_byte_buffers(context,
+		                       ibuf1, ibuf2,
+		                       NULL,
+		                       out,
+		                       start_line,
+		                       &rect1,
+		                       &rect2,
+		                       NULL,
+		                       &rect_out);
+
+		do_gaussian_blur_effect_byte(seq,
+		                             start_line,
+		                             context->rectx,
+		                             total_lines,
+		                             context->rectx,
+		                             context->recty,
+		                             (unsigned char *) ibuf1->rect,
+		                             rect_out);
+	}
+}
+
+/*********************** text *************************/
+static void init_text_effect(Sequence *seq)
+{
+	TextVars *data;
+
+	if (seq->effectdata)
+		MEM_freeN(seq->effectdata);
+
+	data = seq->effectdata = MEM_callocN(sizeof(TextVars), "textvars");
+	data->text_size = 30;
+	BLI_strncpy(data->text, "Text", sizeof(data->text));
+
+	data->loc[0] = 0.5f;
+	data->align   = SEQ_TEXT_ALIGN_X_CENTER;
+	data->align_y = SEQ_TEXT_ALIGN_Y_BOTTOM;
+}
+
+static int num_inputs_text(void)
+{
+	return 0;
+}
+
+static int early_out_text(Sequence *seq, float UNUSED(facf0), float UNUSED(facf1))
+{
+	TextVars *data = seq->effectdata;
+	if (data->text[0] == 0 || data->text_size < 1) {
+		return EARLY_USE_INPUT_1;
+	}
+	return EARLY_NO_INPUT;
+}
+
+static ImBuf *do_text_effect(const SeqRenderData *context, Sequence *seq, float UNUSED(cfra), float UNUSED(facf0), float UNUSED(facf1),
+                          ImBuf *ibuf1, ImBuf *ibuf2, ImBuf *ibuf3)
+{
+	ImBuf *out = prepare_effect_imbufs(context, ibuf1, ibuf2, ibuf3);
+	TextVars *data = seq->effectdata;
+	int width = out->x;
+	int height = out->y;
+	struct ColorManagedDisplay *display;
+	const char *display_device;
+	const int mono = blf_mono_font_render; // XXX
+	int line_height;
+	int y_ofs, x, y;
+	float proxy_size_comp;
+
+	display_device = context->scene->display_settings.display_device;
+	display = IMB_colormanagement_display_get_named(display_device);
+
+	/* Compensate text size for preview render size. */
+	if (ELEM(context->preview_render_size, SEQ_PROXY_RENDER_SIZE_SCENE, SEQ_PROXY_RENDER_SIZE_FULL)) {
+		proxy_size_comp = context->scene->r.size / 100.0f;
+	}
+	else if (context->preview_render_size == SEQ_PROXY_RENDER_SIZE_100) {
+		proxy_size_comp = 1.0f;
+	}
+	else {
+		proxy_size_comp = context->preview_render_size / 100.0f;
+	}
+
+	/* set before return */
+	BLF_size(mono, proxy_size_comp * data->text_size, 72);
+
+	BLF_enable(mono, BLF_WORD_WRAP);
+
+	/* use max width to enable newlines only */
+	BLF_wordwrap(mono, (data->wrap_width != 0.0f) ? data->wrap_width * width : -1);
+
+	BLF_buffer(mono, out->rect_float, (unsigned char *)out->rect, width, height, out->channels, display);
+
+	line_height = BLF_height_max(mono);
+
+	y_ofs = -BLF_descender(mono);
+
+	x = (data->loc[0] * width);
+	y = (data->loc[1] * height) + y_ofs;
+
+	if ((data->align   == SEQ_TEXT_ALIGN_X_LEFT) &&
+	    (data->align_y == SEQ_TEXT_ALIGN_Y_TOP))
+	{
+		y -= line_height;
+	}
+	else {
+		/* vars for calculating wordwrap */
+		struct {
+			struct ResultBLF info;
+			rctf rect;
+		} wrap;
+
+		BLF_boundbox_ex(mono, data->text, sizeof(data->text), &wrap.rect, &wrap.info);
+
+		if (data->align == SEQ_TEXT_ALIGN_X_RIGHT) {
+			x -= BLI_rctf_size_x(&wrap.rect);
+		}
+		else if (data->align == SEQ_TEXT_ALIGN_X_CENTER) {
+			x -= BLI_rctf_size_x(&wrap.rect) / 2;
+		}
+
+		if (data->align_y == SEQ_TEXT_ALIGN_Y_TOP) {
+			y -= line_height;
+		}
+		else if (data->align_y == SEQ_TEXT_ALIGN_Y_BOTTOM) {
+			y += (wrap.info.lines - 1) * line_height;
+		}
+		else if (data->align_y == SEQ_TEXT_ALIGN_Y_CENTER) {
+			y += (((wrap.info.lines - 1) / 2) * line_height) - (line_height / 2);
+		}
+	}
+
+	/* BLF_SHADOW won't work with buffers, instead use cheap shadow trick */
+	if (data->flag & SEQ_TEXT_SHADOW) {
+		int fontx, fonty;
+		fontx = BLF_width_max(mono);
+		fonty = line_height;
+		BLF_position(mono, x + max_ii(fontx / 25, 1), y + max_ii(fonty / 25, 1), 0.0f);
+		BLF_buffer_col(mono, 0.0f, 0.0f, 0.0f, 1.0f);
+		BLF_draw_buffer(mono, data->text, BLF_DRAW_STR_DUMMY_MAX);
+	}
+	BLF_position(mono, x, y, 0.0f);
+	BLF_buffer_col(mono, 1.0f, 1.0f, 1.0f, 1.0f);
+	BLF_draw_buffer(mono, data->text, BLF_DRAW_STR_DUMMY_MAX);
+
+	BLF_buffer(mono, NULL, NULL, 0, 0, 0, NULL);
+
+	BLF_disable(mono, BLF_WORD_WRAP);
+
+	return out;
+}
+
 /*********************** sequence effect factory *************************/
 
 static void init_noop(Sequence *UNUSED(seq))
@@ -2599,6 +3029,19 @@ static void free_noop(Sequence *UNUSED(seq))
 static int num_inputs_default(void)
 {
 	return 2;
+}
+
+static void copy_effect_default(Sequence *dst, Sequence *src)
+{
+	dst->effectdata = MEM_dupallocN(src->effectdata);
+}
+
+static void free_effect_default(Sequence *seq)
+{
+	if (seq->effectdata)
+		MEM_freeN(seq->effectdata);
+
+	seq->effectdata = NULL;
 }
 
 static int early_out_noop(Sequence *UNUSED(seq), float UNUSED(facf0), float UNUSED(facf1))
@@ -2766,6 +3209,23 @@ static struct SeqEffectHandle get_sequence_effect_impl(int seq_type)
 			rval.num_inputs = num_inputs_adjustment;
 			rval.early_out = early_out_adjustment;
 			rval.execute = do_adjustment;
+			break;
+		case SEQ_TYPE_GAUSSIAN_BLUR:
+			rval.multithreaded = true;
+			rval.init = init_gaussian_blur_effect;
+			rval.num_inputs = num_inputs_gaussian_blur;
+			rval.free = free_gaussian_blur_effect;
+			rval.copy = copy_gaussian_blur_effect;
+			rval.early_out = early_out_gaussian_blur;
+			rval.execute_slice = do_gaussian_blur_effect;
+			break;
+		case SEQ_TYPE_TEXT:
+			rval.num_inputs = num_inputs_text;
+			rval.init = init_text_effect;
+			rval.free = free_effect_default;
+			rval.copy = copy_effect_default;
+			rval.early_out = early_out_text;
+			rval.execute = do_text_effect;
 			break;
 	}
 

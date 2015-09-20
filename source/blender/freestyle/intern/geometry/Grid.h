@@ -30,9 +30,7 @@
 
 #include <cstring> // for memset
 #include <float.h>
-#if !defined(_MSC_VER) || _MSC_VER >= 1700
 #include <stdint.h> // For SET_UINT_IN_POINTER, i.e. uintptr_t.
-#endif
 #include <vector>
 
 #include "Geom.h"
@@ -99,11 +97,11 @@ class GridVisitor
 public:
 	virtual ~GridVisitor() {}; //soc
 
-	virtual void discoverCell(Cell *cell) {}
+	virtual void discoverCell(Cell * /*cell*/) {}
 
-	virtual void examineOccluder(Polygon3r *occ) {}
+	virtual void examineOccluder(Polygon3r * /*occ*/) {}
 
-	virtual void finishCell(Cell *cell) {}
+	virtual void finishCell(Cell * /*cell*/) {}
 
 	virtual bool stop() {
 		return false;

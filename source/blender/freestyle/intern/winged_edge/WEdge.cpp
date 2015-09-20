@@ -211,11 +211,6 @@ WOEdge *WOEdge::duplicate()
 	return clone;
 }
 
-Vec3r WOEdge::getVec3r ()
-{
-	return Vec3r(_pbVertex->GetVertex() - _paVertex->GetVertex());
-}
-
 WOEdge *WOEdge::twin ()
 {
 	return GetOwner()->GetOtherOEdge(this);
@@ -302,34 +297,28 @@ WOEdge *WFace::MakeEdge(WVertex *v1, WVertex *v2)
 		WEdge *we = (*it1);
 		WOEdge *woea = we->GetaOEdge();
 
-		//if ((*it1)->GetbVertex() == v2) {
 		if ((woea->GetaVertex() == v1) && (woea->GetbVertex() == v2)) {
 			// The oriented edge already exists
 			cerr << "Warning: edge " << v1->GetId() << " - " << v2->GetId() << " appears twice, correcting" << endl;
 			// Adds the edge to the face
-			//AddEdge((*it1)->GetaOEdge());
 			AddEdge(woea);
 			(*it1)->setNumberOfOEdges((*it1)->GetNumberOfOEdges() + 1);
 			//sets these vertices as border:
 			v1->setBorder(true);
 			v2->setBorder(true);
-			//return (*it1)->GetaOEdge();
 			return woea;
 		}
 
 		WOEdge *woeb = we->GetbOEdge();
-		//if ((*it1)->GetbVertex() == v2)
 		if (woeb && (woeb->GetaVertex() == v1) && (woeb->GetbVertex() == v2)) {
 			// The oriented edge already exists
 			cerr << "Warning: edge " << v1->GetId() << " - " << v2->GetId() << " appears twice, correcting" << endl;
 			// Adds the edge to the face
-			//AddEdge((*it1)->GetaOEdge());
 			AddEdge(woeb);
 			(*it1)->setNumberOfOEdges((*it1)->GetNumberOfOEdges() + 1);
 			//sets these vertices as border:
 			v1->setBorder(true);
 			v2->setBorder(true);
-			//return (*it1)->GetaOEdge();
 			return woeb;
 		}
 	}
@@ -421,16 +410,16 @@ bool WFace::getOppositeEdge(const WVertex *v, WOEdge *&e)
 		return true;
 }
 
-real WFace::getArea ()
+float WFace::getArea()
 {
 	vector<WOEdge *>::iterator it;
-	Vec3r origin = (*(_OEdgeList.begin()))->GetaVertex()->GetVertex();
+	Vec3f origin = (*(_OEdgeList.begin()))->GetaVertex()->GetVertex();
 	it = _OEdgeList.begin();
-	real a = 0;
+	float a = 0;
 	for (it = it++; it != _OEdgeList.end(); it++) {
-		Vec3r v1 = Vec3r((*it)->GetaVertex()->GetVertex() - origin);
-		Vec3r v2 = Vec3r((*it)->GetbVertex()->GetVertex() - origin);
-		a += (v1 ^ v2).norm() / 2.0;
+		Vec3f v1 = Vec3f((*it)->GetaVertex()->GetVertex() - origin);
+		Vec3f v2 = Vec3f((*it)->GetbVertex()->GetVertex() - origin);
+		a += (v1 ^ v2).norm() / 2.0f;
 	}
 	return a;
 }
@@ -483,8 +472,10 @@ WShape::WShape(WShape& iBrother)
 	_Id = iBrother.GetId();
 	_Name = iBrother._Name;
 	_FrsMaterials = iBrother._FrsMaterials;
+#if 0
 	_meanEdgeSize = iBrother._meanEdgeSize;
 	iBrother.bbox(_min, _max);
+#endif
 	vector<WVertex *>& vertexList = iBrother.getVertexList();
 	vector<WVertex *>::iterator v = vertexList.begin(), vend = vertexList.end();
 	for (; v != vend; ++v) {
@@ -608,7 +599,7 @@ WFace *WShape::MakeFace(vector<WVertex *>& iVertexList, vector<bool>& iFaceEdgeM
 	return result;
 }
 
-WFace *WShape::MakeFace(vector<WVertex *>& iVertexList, vector<Vec3r>& iNormalsList, vector<Vec2r>& iTexCoordsList,
+WFace *WShape::MakeFace(vector<WVertex *>& iVertexList, vector<Vec3f>& iNormalsList, vector<Vec2f>& iTexCoordsList,
                         vector<bool>& iFaceEdgeMarksList, unsigned iMaterial)
 {
 	// allocate the new face
@@ -657,10 +648,10 @@ WFace *WShape::MakeFace(vector<WVertex *>& iVertexList, vector<bool>& iFaceEdgeM
 	it++;
 	v3 = *it;
 
-	Vec3r vector1(v2->GetVertex() - v1->GetVertex());
-	Vec3r vector2(v3->GetVertex() - v1->GetVertex());
+	Vec3f vector1(v2->GetVertex() - v1->GetVertex());
+	Vec3f vector2(v3->GetVertex() - v1->GetVertex());
 
-	Vec3r normal(vector1 ^ vector2);
+	Vec3f normal(vector1 ^ vector2);
 	normal.normalize();
 	face->setNormal(normal);
 
@@ -692,8 +683,10 @@ WFace *WShape::MakeFace(vector<WVertex *>& iVertexList, vector<bool>& iFaceEdgeM
 			// means that we just created a new edge and that we must add it to the shape's edges list
 			edge->setId(_EdgeList.size());
 			AddEdge(edge);
+#if 0
 			// compute the mean edge value:
 			_meanEdgeSize += edge->GetaOEdge()->GetVec().norm();
+#endif
 		}
 
 		edge->setMark(*mit);
@@ -705,6 +698,18 @@ WFace *WShape::MakeFace(vector<WVertex *>& iVertexList, vector<bool>& iFaceEdgeM
 	AddFace(face);
 
 	return face;
+}
+
+real WShape::ComputeMeanEdgeSize() const
+{
+	real meanEdgeSize = 0.0;
+	for (vector<WEdge *>::const_iterator it = _EdgeList.begin(), itend = _EdgeList.end();
+	     it != itend;
+	     it++)
+	{
+		meanEdgeSize += (*it)->GetaOEdge()->GetVec().norm();
+	}
+	return meanEdgeSize / (real)_EdgeList.size();
 }
 
 } /* namespace Freestyle */

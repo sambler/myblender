@@ -55,7 +55,7 @@
 #include "ED_screen.h"
 #include "ED_clip.h"
 #include "ED_transform.h"
-#include "ED_uvedit.h"  /* just for draw_image_cursor */
+#include "ED_uvedit.h"  /* just for ED_image_draw_cursor */
 
 #include "IMB_imbuf.h"
 
@@ -206,7 +206,7 @@ static void clip_scopes_tag_refresh(ScrArea *sa)
 	if (sc->mode != SC_MODE_TRACKING)
 		return;
 
-	/* only while proeprties are visible */
+	/* only while properties are visible */
 	for (ar = sa->regionbase.first; ar; ar = ar->next) {
 		if (ar->regiontype == RGN_TYPE_UI && ar->flag & RGN_FLAG_HIDDEN)
 			return;
@@ -418,6 +418,9 @@ static void clip_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *wmn)
 		case NC_GPENCIL:
 			if (wmn->action == NA_EDITED) {
 				clip_scopes_check_gpencil_change(sa);
+				ED_area_tag_redraw(sa);
+			}
+			else if (wmn->data & ND_GPENCIL_EDITMODE) {
 				ED_area_tag_redraw(sa);
 			}
 			break;
@@ -754,6 +757,10 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	RNA_string_set(kmi->ptr, "data_path", "space_data.pivot_point");
 	RNA_string_set(kmi->ptr, "value", "INDIVIDUAL_ORIGINS");
 
+	/* Copy-paste */
+	WM_keymap_add_item(keymap, "CLIP_OT_copy_tracks", CKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "CLIP_OT_paste_tracks", VKEY, KM_PRESS, KM_CTRL, 0);
+
 	/* ******** Hotkeys avalaible for preview region only ******** */
 
 	keymap = WM_keymap_find(keyconf, "Clip Graph Editor", SPACE_CLIP, 0);
@@ -846,7 +853,7 @@ static int clip_context(const bContext *C, const char *member, bContextDataResul
 static int clip_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent *UNUSED(event))
 {
 	if (drag->type == WM_DRAG_PATH)
-		if (ELEM4(drag->icon, 0, ICON_FILE_IMAGE, ICON_FILE_MOVIE, ICON_FILE_BLANK)) /* rule might not work? */
+		if (ELEM(drag->icon, 0, ICON_FILE_IMAGE, ICON_FILE_MOVIE, ICON_FILE_BLANK)) /* rule might not work? */
 			return true;
 
 	return false;
@@ -1155,7 +1162,7 @@ static void clip_main_area_draw(const bContext *C, ARegion *ar)
 	/* if tracking is in progress, we should synchronize framenr from clipuser
 	 * so latest tracked frame would be shown */
 	if (clip && clip->tracking_context)
-		BKE_tracking_context_sync_user(clip->tracking_context, &sc->user);
+		BKE_autotrack_context_sync_user(clip->tracking_context, &sc->user);
 
 	if (sc->flag & SC_LOCK_SELECTION) {
 		ImBuf *tmpibuf = NULL;
@@ -1214,7 +1221,7 @@ static void clip_main_area_draw(const bContext *C, ARegion *ar)
 		glScalef(zoomx, zoomy, 0);
 		glMultMatrixf(sc->stabmat);
 		glScalef(width, height, 0);
-		draw_image_cursor(ar, sc->cursor);
+		ED_image_draw_cursor(ar, sc->cursor);
 		glPopMatrix();
 	}
 
@@ -1240,6 +1247,8 @@ static void clip_main_area_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), AR
 	switch (wmn->category) {
 		case NC_GPENCIL:
 			if (wmn->action == NA_EDITED)
+				ED_region_tag_redraw(ar);
+			else if (wmn->data & ND_GPENCIL_EDITMODE)
 				ED_region_tag_redraw(ar);
 			break;
 	}
@@ -1436,7 +1445,7 @@ static void clip_tools_area_init(wmWindowManager *wm, ARegion *ar)
 
 static void clip_tools_area_draw(const bContext *C, ARegion *ar)
 {
-	ED_region_panels(C, ar, 1, NULL, -1);
+	ED_region_panels(C, ar, NULL, -1, true);
 }
 
 /****************** tool properties region ******************/
@@ -1483,7 +1492,7 @@ static void clip_properties_area_draw(const bContext *C, ARegion *ar)
 
 	BKE_movieclip_update_scopes(sc->clip, &sc->user, &sc->scopes);
 
-	ED_region_panels(C, ar, 1, NULL, -1);
+	ED_region_panels(C, ar, NULL, -1, true);
 }
 
 static void clip_properties_area_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)
@@ -1491,7 +1500,7 @@ static void clip_properties_area_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(s
 	/* context changes */
 	switch (wmn->category) {
 		case NC_GPENCIL:
-			if (wmn->data == ND_DATA)
+			if (ELEM(wmn->data, ND_DATA, ND_GPENCIL_EDITMODE))
 				ED_region_tag_redraw(ar);
 			break;
 		case NC_BRUSH:

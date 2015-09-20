@@ -36,10 +36,13 @@
 #  pragma warning(disable:4786)
 #endif
 
+#include <stdio.h>
+
 #include "MT_Point3.h"
 #include "RAS_FramingManager.h"
 #include "RAS_ICanvas.h"
 #include "RAS_IRasterizer.h"
+#include "RAS_MeshObject.h"
 #include "SCA_IScene.h"
 #include "KX_Scene.h"
 #include "KX_Camera.h"
@@ -60,15 +63,21 @@
 KX_MouseFocusSensor::KX_MouseFocusSensor(SCA_MouseManager* eventmgr, 
                                          int startx,
                                          int starty,
-                                         short int mousemode,
-                                         int focusmode,
-                                         bool bTouchPulse,
-                                         KX_Scene* kxscene,
-                                         KX_KetsjiEngine *kxengine,
-                                         SCA_IObject* gameobj)
+										 short int mousemode,
+										 int focusmode,
+										 bool bTouchPulse,
+										 const STR_String& propname,
+										 bool bFindMaterial,
+										 bool bXRay,
+										 KX_Scene* kxscene,
+										 KX_KetsjiEngine *kxengine,
+										 SCA_IObject* gameobj)
 	: SCA_MouseSensor(eventmgr, startx, starty, mousemode, gameobj),
 	  m_focusmode(focusmode),
 	  m_bTouchPulse(bTouchPulse),
+	  m_bXRay(bXRay),
+	  m_bFindMaterial(bFindMaterial),
+	  m_propertyname(propname),
 	  m_kxscene(kxscene),
 	  m_kxengine(kxengine)
 {
@@ -146,20 +155,84 @@ bool KX_MouseFocusSensor::RayHit(KX_ClientObjectInfo *client_info, KX_RayCast *r
 	 * self-hits are excluded by setting the correct ignore-object.)
 	 * Hitspots now become valid. */
 	KX_GameObject* thisObj = (KX_GameObject*) GetParent();
+
+	bool bFound = false;
+
 	if ((m_focusmode == 2) || hitKXObj == thisObj)
 	{
-		m_hitObject = hitKXObj;
-		m_hitPosition = result->m_hitPoint;
-		m_hitNormal = result->m_hitNormal;
-		m_hitUV = result->m_hitUV;
-		return true;
+		if (m_propertyname.Length() == 0)
+		{
+			bFound = true;
+		}
+		else
+		{
+			if (m_bFindMaterial) {
+				for (unsigned int i = 0; i < hitKXObj->GetMeshCount(); ++i) {
+					RAS_MeshObject *meshObj = hitKXObj->GetMesh(i);
+					for (unsigned int j = 0; j < meshObj->NumMaterials(); ++j) {
+						bFound = strcmp(m_propertyname.ReadPtr(), meshObj->GetMaterialName(j).ReadPtr() + 2) == 0;
+						if (bFound)
+							break;
+					}
+				}
+			}
+			else {
+				bFound = hitKXObj->GetProperty(m_propertyname) != NULL;
+			}
+		}
+
+		if (bFound)
+		{
+			m_hitObject = hitKXObj;
+			m_hitPosition = result->m_hitPoint;
+			m_hitNormal = result->m_hitNormal;
+			m_hitUV = result->m_hitUV;
+			return true;
+		}		
 	}
 	
 	return true;     // object must be visible to trigger
 	//return false;  // occluded objects can trigger
 }
 
+/* this function is used to pre-filter the object before casting the ray on them.
+ * This is useful for "X-Ray" option when we want to see "through" unwanted object.
+ */
+bool KX_MouseFocusSensor::NeedRayCast(KX_ClientObjectInfo* client)
+{
+	KX_GameObject *hitKXObj = client->m_gameobject;
 
+	if (client->m_type > KX_ClientObjectInfo::ACTOR)
+	{
+		// Unknown type of object, skip it.
+		// Should not occur as the sensor objects are filtered in RayTest()
+		printf("Invalid client type %d found ray casting\n", client->m_type);
+		return false;
+	}
+	if (m_bXRay && m_propertyname.Length() != 0)
+	{
+		if (m_bFindMaterial)
+		{
+			bool found = false;
+			for (unsigned int i = 0; i < hitKXObj->GetMeshCount(); ++i) {
+				RAS_MeshObject *meshObj = hitKXObj->GetMesh(i);
+				for (unsigned int j = 0; j < meshObj->NumMaterials(); ++j) {
+					found = strcmp(m_propertyname.ReadPtr(), meshObj->GetMaterialName(j).ReadPtr() + 2) == 0;
+					if (found)
+						break;
+				}
+			}
+			if (!found)
+				return false;
+		}
+		else
+		{
+			if (hitKXObj->GetProperty(m_propertyname) == NULL)
+				return false;
+		}
+	}
+	return true;
+}
 
 bool KX_MouseFocusSensor::ParentObjectHasFocusCamera(KX_Camera *cam)
 {
@@ -210,8 +283,8 @@ bool KX_MouseFocusSensor::ParentObjectHasFocusCamera(KX_Camera *cam)
 	m_kxengine->GetSceneViewport(m_kxscene, cam, area, viewport);
 	
 	/* Check if the mouse is in the viewport */
-	if ((	m_x < viewport.m_x2 &&	// less then right
-			m_x > viewport.m_x1 &&	// more then then left
+	if ((	m_x < viewport.m_x2 &&	// less than right
+			m_x > viewport.m_x1 &&	// more than then left
 			m_y_inv < viewport.m_y2 &&	// below top
 			m_y_inv > viewport.m_y1) == 0)	// above bottom
 	{
@@ -384,7 +457,10 @@ PyAttributeDef KX_MouseFocusSensor::Attributes[] = {
 	KX_PYATTRIBUTE_RO_FUNCTION("hitPosition",	KX_MouseFocusSensor, pyattr_get_hit_position),
 	KX_PYATTRIBUTE_RO_FUNCTION("hitNormal",		KX_MouseFocusSensor, pyattr_get_hit_normal),
 	KX_PYATTRIBUTE_RO_FUNCTION("hitUV",		KX_MouseFocusSensor, pyattr_get_hit_uv),
-	KX_PYATTRIBUTE_BOOL_RW("usePulseFocus",	KX_MouseFocusSensor,m_bTouchPulse),
+	KX_PYATTRIBUTE_BOOL_RW("usePulseFocus",	KX_MouseFocusSensor, m_bTouchPulse),
+	KX_PYATTRIBUTE_BOOL_RW("useXRay",		KX_MouseFocusSensor, m_bXRay),
+	KX_PYATTRIBUTE_BOOL_RW("useMaterial", KX_MouseFocusSensor, m_bFindMaterial),
+	KX_PYATTRIBUTE_STRING_RW("propName", 0, MAX_PROP_NAME, false, KX_MouseFocusSensor, m_propertyname),
 	{ NULL }	//Sentinel
 };
 

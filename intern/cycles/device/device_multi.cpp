@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #include <stdlib.h>
@@ -25,6 +25,7 @@
 
 #include "util_foreach.h"
 #include "util_list.h"
+#include "util_logging.h"
 #include "util_map.h"
 #include "util_time.h"
 
@@ -88,10 +89,10 @@ public:
 		return error_msg;
 	}
 
-	bool load_kernels(bool experimental)
+	bool load_kernels(const DeviceRequestedFeatures& requested_features)
 	{
 		foreach(SubDevice& sub, devices)
-			if(!sub.device->load_kernels(experimental))
+			if(!sub.device->load_kernels(requested_features))
 				return false;
 
 		return true;
@@ -168,11 +169,17 @@ public:
 			sub.device->const_copy_to(name, host, size);
 	}
 
-	void tex_alloc(const char *name, device_memory& mem, InterpolationType interpolation, bool periodic)
+	void tex_alloc(const char *name,
+	               device_memory& mem,
+	               InterpolationType
+	               interpolation,
+	               ExtensionType extension)
 	{
+		VLOG(1) << "Texture allocate: " << name << ", " << mem.memory_size() << " bytes.";
+
 		foreach(SubDevice& sub, devices) {
 			mem.device_pointer = 0;
-			sub.device->tex_alloc(name, mem, interpolation, periodic);
+			sub.device->tex_alloc(name, mem, interpolation, extension);
 			sub.ptr_map[unique_ptr] = mem.device_pointer;
 		}
 
@@ -233,7 +240,7 @@ public:
 		mem.device_pointer = tmp;
 	}
 
-	void draw_pixels(device_memory& rgba, int y, int w, int h, int dy, int width, int height, bool transparent,
+	void draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int dy, int width, int height, bool transparent,
 		const DeviceDrawParams &draw_params)
 	{
 		device_ptr tmp = rgba.device_pointer;
@@ -248,7 +255,7 @@ public:
 			/* adjust math for w/width */
 
 			rgba.device_pointer = sub.ptr_map[tmp];
-			sub.device->draw_pixels(rgba, sy, w, sh, sdy, width, sheight, transparent, draw_params);
+			sub.device->draw_pixels(rgba, sy, w, sh, dx, sdy, width, sheight, transparent, draw_params);
 			i++;
 		}
 
@@ -276,6 +283,22 @@ public:
 		}
 
 		return -1;
+	}
+
+	int get_split_task_count(DeviceTask& task)
+	{
+		int total_tasks = 0;
+		list<DeviceTask> tasks;
+		task.split(tasks, devices.size());
+		foreach(SubDevice& sub, devices) {
+			if(!tasks.empty()) {
+				DeviceTask subtask = tasks.front();
+				tasks.pop_front();
+
+				total_tasks += sub.device->get_split_task_count(subtask);
+			}
+		}
+		return total_tasks;
 	}
 
 	void task_add(DeviceTask& task)
@@ -328,6 +351,7 @@ static bool device_multi_add(vector<DeviceInfo>& devices, DeviceType type, bool 
 
 	info.advanced_shading = with_advanced_shading;
 	info.pack_images = false;
+	info.extended_images = true;
 
 	foreach(DeviceInfo& subinfo, devices) {
 		if(subinfo.type == type) {
@@ -351,6 +375,7 @@ static bool device_multi_add(vector<DeviceInfo>& devices, DeviceType type, bool 
 			if(subinfo.display_device)
 				info.display_device = true;
 			info.pack_images = info.pack_images || subinfo.pack_images;
+			info.extended_images = info.extended_images && subinfo.extended_images;
 			num_added++;
 		}
 	}

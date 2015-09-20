@@ -143,7 +143,7 @@ def setup_staticlibs(lenv):
     libincs += Split(lenv['BF_FREETYPE_LIBPATH'])
     if lenv['WITH_BF_PYTHON']:
         libincs += Split(lenv['BF_PYTHON_LIBPATH'])
-    if lenv['WITH_BF_SDL']:
+    if lenv['WITH_BF_SDL'] and not lenv['WITH_BF_SDL_DYNLOAD']:
         libincs += Split(lenv['BF_SDL_LIBPATH'])
     if lenv['WITH_BF_JACK'] and not lenv['WITH_BF_JACK_DYNLOAD']:
         libincs += Split(lenv['BF_JACK_LIBPATH'])
@@ -216,15 +216,15 @@ def setup_staticlibs(lenv):
         if lenv['WITH_BF_STATICOCIO']:
             statlibs += Split(lenv['BF_OCIO_LIB_STATIC'])
 
-    if lenv['WITH_BF_BOOST']:
-        libincs += Split(lenv['BF_BOOST_LIBPATH'])
-        if lenv['WITH_BF_STATICBOOST']:
-            statlibs += Split(lenv['BF_BOOST_LIB_STATIC'])
-
     if lenv['WITH_BF_CYCLES_OSL']:
         libincs += Split(lenv['BF_OSL_LIBPATH'])
         if lenv['WITH_BF_STATICOSL']:
             statlibs += Split(lenv['BF_OSL_LIB_STATIC'])
+
+    if lenv['WITH_BF_BOOST']:
+        libincs += Split(lenv['BF_BOOST_LIBPATH'])
+        if lenv['WITH_BF_STATICBOOST']:
+            statlibs += Split(lenv['BF_BOOST_LIB_STATIC'])
 
     if lenv['WITH_BF_LLVM']:
         libincs += Split(lenv['BF_LLVM_LIBPATH'])
@@ -242,11 +242,21 @@ def setup_staticlibs(lenv):
             if lenv['WITH_BF_STATIC3DMOUSE']:
                 statlibs += Split(lenv['BF_3DMOUSE_LIB_STATIC'])
 
+    if lenv['WITH_BF_OPENSUBDIV']:
+        libincs += Split(lenv['BF_OPENSUBDIV_LIBPATH'])
+        if lenv['WITH_BF_STATICOPENSUBDIV']:
+            statlibs += Split(lenv['BF_OPENSUBDIV_LIB_STATIC'])
+
     # setting this last so any overriding of manually libs could be handled
     if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'win64-vc', 'linuxcross', 'win64-mingw'):
         # We must remove any previous items defining this path, for same reason stated above!
         libincs = [e for e in libincs if SCons.Subst.scons_subst(e, lenv, gvars=lenv.Dictionary()) != "/usr/lib"]
         libincs.append('/usr/lib')
+
+    # Hack to pass OSD libraries to linker before extern_{clew,cuew}
+    # Here we only store library path, actual library name will be added in setup_syslibs()
+    for syslib in create_blender_liblist(lenv, 'system'):
+        libincs.append(os.path.dirname(syslib))
 
     return statlibs, libincs
 
@@ -298,7 +308,7 @@ def setup_syslibs(lenv):
     if lenv['WITH_BF_ELTOPO']:
         syslibs += Split(lenv['BF_LAPACK_LIB'])
     '''
-    if lenv['WITH_BF_SDL']:
+    if lenv['WITH_BF_SDL'] and not lenv['WITH_BF_SDL_DYNLOAD']:
         syslibs += Split(lenv['BF_SDL_LIB'])
     if not lenv['WITH_BF_STATICOPENGL']:
         syslibs += Split(lenv['BF_OPENGL_LIB'])
@@ -320,15 +330,15 @@ def setup_syslibs(lenv):
         if lenv['WITH_BF_3DMOUSE']:
             if not lenv['WITH_BF_STATIC3DMOUSE']:
                 syslibs += Split(lenv['BF_3DMOUSE_LIB'])
-                
-    if lenv['WITH_BF_BOOST'] and not lenv['WITH_BF_STATICBOOST']:
-        syslibs += Split(lenv['BF_BOOST_LIB'])
-        
-        if lenv['WITH_BF_INTERNATIONAL']:
-            syslibs += Split(lenv['BF_BOOST_LIB_INTERNATIONAL'])
 
     if lenv['WITH_BF_CYCLES_OSL'] and not lenv['WITH_BF_STATICOSL']:
         syslibs += Split(lenv['BF_OSL_LIB'])
+
+    if lenv['WITH_BF_BOOST'] and not lenv['WITH_BF_STATICBOOST']:
+        syslibs += Split(lenv['BF_BOOST_LIB'])
+
+        if lenv['WITH_BF_INTERNATIONAL']:
+            syslibs += Split(lenv['BF_BOOST_LIB_INTERNATIONAL'])
 
     if lenv['WITH_BF_LLVM'] and not lenv['WITH_BF_STATICLLVM']:
         syslibs += Split(lenv['BF_LLVM_LIB'])
@@ -338,6 +348,17 @@ def setup_syslibs(lenv):
 
     if not lenv['WITH_BF_STATICPNG']:
         syslibs += Split(lenv['BF_PNG_LIB'])
+
+    if lenv['WITH_BF_OPENSUBDIV']:
+        if not lenv['WITH_BF_STATICOPENSUBDIV']:
+            if lenv['BF_DEBUG'] and lenv['OURPLATFORM'] in ('win32-vc', 'win64-vc', 'win32-mingw', 'win64-mingw'):
+                syslibs += [osdlib+'_d' for osdlib in Split(lenv['BF_OPENSUBDIV_LIB'])]
+            else:
+                syslibs += Split(lenv['BF_OPENSUBDIV_LIB'])
+
+    # Hack to pass OSD libraries to linker before extern_{clew,cuew}
+    for syslib in create_blender_liblist(lenv, 'system'):
+        syslibs.append(os.path.basename(syslib))
 
     syslibs += lenv['LLIBS']
 
@@ -363,7 +384,7 @@ def propose_priorities():
 def creator(env):
     sources = ['creator.c']# + Blender.buildinfo(env, "dynamic") + Blender.resources
 
-    incs = ['#/intern/guardedalloc', '#/source/blender/blenlib', '#/source/blender/blenkernel', '#/source/blender/editors/include', '#/source/blender/blenloader', '#/source/blender/imbuf', '#/source/blender/renderconverter', '#/source/blender/render/extern/include', '#/source/blender/windowmanager', '#/source/blender/makesdna', '#/source/blender/makesrna', '#/source/gameengine/BlenderRoutines', '#/extern/glew/include', '#/source/blender/gpu', env['BF_OPENGL_INC']]
+    incs = ['#/intern/guardedalloc', '#/source/blender/blenlib', '#/source/blender/blenkernel', '#/source/blender/depsgraph', '#/source/blender/editors/include', '#/source/blender/blenloader', '#/source/blender/imbuf', '#/source/blender/renderconverter', '#/source/blender/render/extern/include', '#/source/blender/windowmanager', '#/source/blender/makesdna', '#/source/blender/makesrna', '#/source/gameengine/BlenderRoutines', '#/extern/glew/include', '#/source/blender/gpu', env['BF_OPENGL_INC']]
 
     defs = []
 
@@ -372,11 +393,18 @@ def creator(env):
         defs.append('WITH_BINRELOC')
 
     if env['WITH_BF_SDL']:
+        if env['WITH_BF_SDL_DYNLOAD']:
+            defs.append('WITH_SDL_DYNLOAD')
+            incs.append('#/extern/sdlew/include')
         defs.append('WITH_SDL')
 
     if env['WITH_BF_LIBMV']:
         incs.append('#/extern/libmv')
         defs.append('WITH_LIBMV')
+
+    if env['WITH_BF_CYCLES'] and env['WITH_BF_CYCLES_LOGGING']:
+        incs.append('#/intern/cycles/blender')
+        defs.append('WITH_CYCLES_LOGGING')
 
     if env['WITH_BF_FFMPEG']:
         defs.append('WITH_FFMPEG')
@@ -406,56 +434,63 @@ def buildinfo(lenv, build_type):
     """
     Generate a buildinfo object
     """
+    import subprocess
+
     build_date = time.strftime ("%Y-%m-%d")
     build_time = time.strftime ("%H:%M:%S")
 
     if os.path.isdir(os.path.abspath('.git')):
-        build_commit_timestamp = os.popen('git log -1 --format=%ct').read().strip()
+        try:
+            build_commit_timestamp = btools.get_command_output(args=['git', 'log', '-1', '--format=%ct']).strip()
+        except OSError:
+            build_commit_timestamp = None
         if not build_commit_timestamp:
             # Git command not found
             build_hash = 'unknown'
             build_commit_timestamp = '0'
             build_branch = 'unknown'
         else:
-            import subprocess
             no_upstream = False
 
-            process = subprocess.Popen(['git', 'rev-parse', '--short', '@{u}'],
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            build_hash, stderr = process.communicate()
-            build_hash = build_hash.strip()
-            build_branch = os.popen('git rev-parse --abbrev-ref HEAD').read().strip()
+            try :
+                build_hash = btools.get_command_output(['git', 'rev-parse', '--short', '@{u}'], stderr=subprocess.STDOUT).strip()
+            except subprocess.CalledProcessError:
+                # assume branch has no upstream configured
+                build_hash = btools.get_command_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
+                no_upstream = True
+
+            build_branch = btools.get_command_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip()
 
             if build_branch == 'HEAD':
-                master_check = os.popen('git branch --list master --contains ' + build_hash).read().strip()
+                master_check = btools.get_command_output(['git', 'branch', '--list', 'master', '--contains', build_hash]).strip()
                 if master_check == 'master':
                     build_branch = 'master'
                 else:
-                    head_hash = os.popen('git rev-parse HEAD').read().strip()
-                    tag_hashes = os.popen('git show-ref --tags -d').read()
+                    head_hash = btools.get_command_output(['git', 'rev-parse', 'HEAD']).strip()
+                    tag_hashes = btools.get_command_output(['git', 'show-ref', '--tags', '-d'])
                     if tag_hashes.find(head_hash) != -1:
                         build_branch = 'master'
 
-            if build_hash == '':
-                build_hash = os.popen('git rev-parse --short HEAD').read().strip()
-                no_upstream = True
-            else:
-                older_commits = os.popen('git log --oneline HEAD..@{u}').read().strip()
+            if not no_upstream:
+                older_commits = btools.get_command_output(['git', 'log', '--oneline', 'HEAD..@{u}']).strip()
                 if older_commits:
-                    build_hash = os.popen('git rev-parse --short HEAD').read().strip()
+                    build_hash = btools.get_command_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
 
             # ## Check for local modifications
             has_local_changes = False
 
             # Update GIT index before getting dirty files
             os.system('git update-index -q --refresh')
-            changed_files = os.popen('git diff-index --name-only HEAD --').read().strip()
+            changed_files = btools.get_command_output(['git', 'diff-index', '--name-only', 'HEAD', '--']).strip()
 
             if changed_files:
                 has_local_changes = True
             elif no_upstream == False:
-                unpushed_log = os.popen('git log --oneline @{u}..').read().strip()
+                unpushed_log = btools.get_command_output(['git', 'log', '--oneline', '@{u}..']).strip()
                 has_local_changes = unpushed_log != ''
+
+            if build_branch.startswith('blender-v'):
+                build_branch = 'master'
 
             if has_local_changes:
                 build_branch += ' (modified)'
@@ -607,7 +642,7 @@ def WinPyBundle(target=None, source=None, env=None):
         py_tar+= '/release/python' + env['BF_PYTHON_VERSION'].replace('.','') + '.tar.gz'
 
     py_target = env.subst(env['BF_INSTALLDIR']).lstrip("#")
-    py_target = os.path.join(py_target, VERSION, 'python', 'lib')
+    py_target = os.path.join(py_target, VERSION, 'python')
     def printexception(func,path,ex):
         if os.path.exists(path): #do not report if path does not exist. eg on a fresh build.
             print str(func) + ' failed on ' + str(path)
@@ -631,7 +666,7 @@ def WinPyBundle(target=None, source=None, env=None):
     # Extract Numpy
     if env['WITH_BF_PYTHON_INSTALL_NUMPY']:
         py_tar = env.subst(env['LCGDIR']).lstrip("#")
-        py_tar += '/release/python' + env['BF_PYTHON_VERSION'].replace('.','') + '_numpy_1.8.tar.gz'
+        py_tar += '/release/python' + env['BF_PYTHON_VERSION'].replace('.','') + '_numpy_1.9.tar.gz'
 
         py_target = env.subst(env['BF_INSTALLDIR']).lstrip("#")
         py_target = os.path.join(py_target, VERSION, 'python', 'lib', 'site-packages')
@@ -647,6 +682,8 @@ def WinPyBundle(target=None, source=None, env=None):
     py_dir += '/release/site-packages'
     # grr, we have to do one by one because the dir exists
     for f in os.listdir(py_dir):
+        if f == '.svn':
+            continue
         fn_src = os.path.join(py_dir, f)
         fn_dst = os.path.join(py_target, f)
 
@@ -695,37 +732,37 @@ def AppIt(target=None, source=None, env=None):
     commands.getoutput(cmd)
     cmd = 'cp %s/%s %s/%s.app/Contents/MacOS/%s'%(builddir, binary,installdir, binary, binary)
     commands.getoutput(cmd)
-    cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/'%(installdir, binary, VERSION)
+    cmd = 'mkdir %s/%s.app/Contents/Resources/%s/'%(installdir, binary, VERSION)
     commands.getoutput(cmd)
     cmd = installdir + '/%s.app/Contents/MacOS/%s'%(binary,VERSION)
 
     # blenderplayer doesn't need all the files
     if binary == 'blender':
-        cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/datafiles'%(installdir, binary, VERSION)
+        cmd = 'mkdir %s/%s.app/Contents/Resources/%s/datafiles'%(installdir, binary, VERSION)
         commands.getoutput(cmd)
-        cmd = 'cp -R %s/release/datafiles/fonts %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
+        cmd = 'cp -R %s/release/datafiles/fonts %s/%s.app/Contents/Resources/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
         commands.getoutput(cmd)
         mo_dir = os.path.join(builddir[:-4], "locale")
         for f in os.listdir(mo_dir):
-            cmd = 'ditto %s/%s %s/%s.app/Contents/MacOS/%s/datafiles/locale/%s/LC_MESSAGES/blender.mo'%(mo_dir, f, installdir, binary, VERSION, f[:-3])
+            cmd = 'ditto %s/%s %s/%s.app/Contents/Resources/%s/datafiles/locale/%s/LC_MESSAGES/blender.mo'%(mo_dir, f, installdir, binary, VERSION, f[:-3])
             commands.getoutput(cmd)
-        cmd = 'cp %s/release/datafiles/locale/languages %s/%s.app/Contents/MacOS/%s/datafiles/locale/'%(bldroot, installdir, binary, VERSION)
+        cmd = 'cp %s/release/datafiles/locale/languages %s/%s.app/Contents/Resources/%s/datafiles/locale/'%(bldroot, installdir, binary, VERSION)
         commands.getoutput(cmd)
 
         if env['WITH_BF_OCIO']:
-            cmd = 'cp -R %s/release/datafiles/colormanagement %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
+            cmd = 'cp -R %s/release/datafiles/colormanagement %s/%s.app/Contents/Resources/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
             commands.getoutput(cmd)
         
-        cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)
+        cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/Resources/%s/'%(bldroot,installdir,binary,VERSION)
         commands.getoutput(cmd)
 
         if VERSION_RELEASE_CYCLE == "release":
-            cmd = 'rm -rf %s/%s.app/Contents/MacOS/%s/scripts/addons_contrib'%(installdir,binary,VERSION)
+            cmd = 'rm -rf %s/%s.app/Contents/Resources/%s/scripts/addons_contrib'%(installdir,binary,VERSION)
             commands.getoutput(cmd)
 
         if env['WITH_BF_CYCLES']:
             croot = '%s/intern/cycles' % (bldroot)
-            cinstalldir = '%s/%s.app/Contents/MacOS/%s/scripts/addons/cycles' % (installdir,binary,VERSION)
+            cinstalldir = '%s/%s.app/Contents/Resources/%s/scripts/addons/cycles' % (installdir,binary,VERSION)
 
             cmd = 'mkdir %s' % (cinstalldir)
             commands.getoutput(cmd)
@@ -739,7 +776,7 @@ def AppIt(target=None, source=None, env=None):
             commands.getoutput(cmd)
             cmd = 'cp -R %s/kernel/*.h %s/kernel/*.cl %s/kernel/*.cu %s/kernel/' % (croot, croot, croot, cinstalldir)
             commands.getoutput(cmd)
-            cmd = 'cp -R %s/kernel/svm %s/kernel/closure %s/kernel/geom %s/util/util_color.h %s/util/util_half.h %s/util/util_math.h %s/util/util_transform.h %s/util/util_types.h %s/kernel/' % (croot, croot, croot, croot, croot, croot, croot, croot, cinstalldir)
+            cmd = 'cp -R %s/kernel/svm %s/kernel/closure %s/kernel/geom %s/kernel/split %s/kernel/kernels %s/util/util_color.h %s/util/util_half.h %s/util/util_math.h %s/util/util_math_fast.h %s/util/util_transform.h %s/util/util_types.h %s/util/util_atomic.h %s/kernel/' % (croot, croot, croot, croot, croot, croot, croot, croot, croot, croot, croot, croot, cinstalldir)
             commands.getoutput(cmd)
             cmd = 'cp -R %s/../intern/cycles/kernel/*.cubin %s/lib/' % (builddir, cinstalldir)
             commands.getoutput(cmd)
@@ -753,11 +790,11 @@ def AppIt(target=None, source=None, env=None):
                 commands.getoutput(cmd)
 
     if env['WITH_OSX_STATICPYTHON']:
-        cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/python/'%(installdir,binary, VERSION)
+        cmd = 'mkdir %s/%s.app/Contents/Resources/%s/python/'%(installdir,binary, VERSION)
         commands.getoutput(cmd)
-        cmd = 'unzip -q %s/release/%s -d %s/%s.app/Contents/MacOS/%s/python/'%(libdir,python_zip,installdir,binary,VERSION)
+        cmd = 'unzip -q %s/release/%s -d %s/%s.app/Contents/Resources/%s/python/'%(libdir,python_zip,installdir,binary,VERSION)
         commands.getoutput(cmd)
-        cmd = 'cp -R %s/release/site-packages/ %s/%s.app/Contents/MacOS/%s/python/lib/python%s/site-packages/'%(libdir,installdir,binary,VERSION,env['BF_PYTHON_VERSION'])
+        cmd = 'cp -R %s/release/site-packages/ %s/%s.app/Contents/Resources/%s/python/lib/python%s/site-packages/'%(libdir,installdir,binary,VERSION,env['BF_PYTHON_VERSION'])
         commands.getoutput(cmd)
 
     cmd = 'chmod +x  %s/%s.app/Contents/MacOS/%s'%(installdir,binary, binary)
@@ -768,32 +805,32 @@ def AppIt(target=None, source=None, env=None):
     commands.getoutput(cmd)
     cmd = 'find %s/%s.app -name __MACOSX -exec rm -rf {} \;'%(installdir, binary)
     commands.getoutput(cmd)
+    cmd = 'SetFile -d "%s)" -m "%s)" %s/%s.app'%(time.strftime("%m/%d/%Y %H:%M"),time.strftime("%m/%d/%Y %H:%M"),installdir,binary) # give the bundles actual creation/modification date
+    commands.getoutput(cmd)
     if env['WITH_BF_OPENMP']:
         if env['C_COMPILER_ID'] == 'gcc' and env['CCVERSION'] >= '4.6.1': # for correct errorhandling with gcc >= 4.6.1 we need the gcc.dylib and gomp.dylib to link, thus distribute in app-bundle
             print "Bundling libgcc and libgomp"
             instname = env['BF_CXX']
-            cmd = 'ditto --arch %s %s/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/lib/'%(osxarch, instname, installdir, binary) # copy libgcc
+            cmd = 'ditto --arch %s %s/lib/libgcc_s.1.dylib %s/%s.app/Contents/Resources/lib/'%(osxarch, instname, installdir, binary) # copy libgcc
             commands.getoutput(cmd)
-            cmd = 'install_name_tool -id @executable_path/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/lib/libgcc_s.1.dylib'%(installdir, binary) # change id of libgcc
+            cmd = 'install_name_tool -id @executable_path/../Resources/lib/libgcc_s.1.dylib %s/%s.app/Contents/Resources/lib/libgcc_s.1.dylib'%(installdir, binary) # change id of libgcc
             commands.getoutput(cmd)
-            cmd = 'ditto --arch %s %s/lib/libgomp.1.dylib %s/%s.app/Contents/MacOS/lib/'%(osxarch, instname, installdir, binary) # copy libgomp
+            cmd = 'ditto --arch %s %s/lib/libgomp.1.dylib %s/%s.app/Contents/Resources/lib/'%(osxarch, instname, installdir, binary) # copy libgomp
             commands.getoutput(cmd)
-            cmd = 'install_name_tool -id @executable_path/lib/libgomp.1.dylib %s/%s.app/Contents/MacOS/lib/libgomp.1.dylib'%(installdir, binary) # change id of libgomp
+            cmd = 'install_name_tool -id @executable_path/../Resources/lib/libgomp.1.dylib %s/%s.app/Contents/Resources/lib/libgomp.1.dylib'%(installdir, binary) # change id of libgomp
             commands.getoutput(cmd)
-            cmd = 'install_name_tool -change %s/lib/libgcc_s.1.dylib  @executable_path/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/lib/libgomp.1.dylib'%(instname, installdir, binary) # change ref to libgcc
+            cmd = 'install_name_tool -change %s/lib/libgcc_s.1.dylib  @executable_path/../Resources/lib/libgcc_s.1.dylib %s/%s.app/Contents/Resources/lib/libgomp.1.dylib'%(instname, installdir, binary) # change ref to libgcc
             commands.getoutput(cmd)
-            cmd = 'install_name_tool -change %s/lib/libgcc_s.1.dylib  @executable_path/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/%s'%(instname, installdir, binary, binary) # change ref to libgcc ( blender )
+            cmd = 'install_name_tool -change %s/lib/libgcc_s.1.dylib  @executable_path/../Resources/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/%s'%(instname, installdir, binary, binary) # change ref to libgcc ( blender )
             commands.getoutput(cmd)
-            cmd = 'install_name_tool -change %s/lib/libgomp.1.dylib  @executable_path/lib/libgomp.1.dylib %s/%s.app/Contents/MacOS/%s'%(instname, installdir, binary, binary) # change ref to libgomp ( blender )
+            cmd = 'install_name_tool -change %s/lib/libgomp.1.dylib  @executable_path/../Resources/lib/libgomp.1.dylib %s/%s.app/Contents/MacOS/%s'%(instname, installdir, binary, binary) # change ref to libgomp ( blender )
             commands.getoutput(cmd)
         if env['C_COMPILER_ID'] == 'clang' and env['CCVERSION'] >= '3.4':
             print "Bundling libiomp5"
             instname = env['LCGDIR'][1:] # made libiomp5 part of blender libs
-            cmd = 'ditto --arch %s %s/openmp/lib/libiomp5.dylib %s/%s.app/Contents/MacOS/lib/'%(osxarch, instname, installdir, binary) # copy libiomp5
+            cmd = 'ditto --arch %s %s/openmp/lib/libiomp5.dylib %s/%s.app/Contents/Resources/lib/'%(osxarch, instname, installdir, binary) # copy libiomp5
             commands.getoutput(cmd)
-            cmd = 'install_name_tool -id @loader_path/lib/libiomp5.dylib %s/%s.app/Contents/MacOS/lib/libiomp5.dylib'%(installdir, binary) # change id of libiomp5
-            commands.getoutput(cmd)
-            cmd = 'install_name_tool -change @loader_path/libiomp5.dylib  @loader_path/lib/libiomp5.dylib %s/%s.app/Contents/MacOS/%s'%(installdir, binary, binary) # change ref to libiomp5 ( blender )
+            cmd = 'cp %s/openmp/LICENSE.txt %s/LICENSE-libiomp5.txt'%(instname, installdir) # copy libiomp5 license
             commands.getoutput(cmd)
 
 # extract copy system python, be sure to update other build systems
@@ -818,6 +855,7 @@ def UnixPyBundle(target=None, source=None, env=None):
 
     py_src =    env.subst( env['BF_PYTHON_LIBPATH'] + '/python'+env['BF_PYTHON_VERSION'] )
     py_target =    env.subst( dir + '/python/' + target_lib + '/python'+env['BF_PYTHON_VERSION'] )
+    py_target_bin = env.subst(dir + '/python/bin')
     
     # This is a bit weak, but dont install if its been installed before, makes rebuilds quite slow.
     if os.path.exists(py_target):
@@ -836,6 +874,11 @@ def UnixPyBundle(target=None, source=None, env=None):
         os.makedirs(os.path.dirname(py_target)) # the final part is copied
     except:
         pass
+
+    # install the executable
+    run("rm -rf '%s'" % py_target_bin)
+    os.makedirs(py_target_bin)
+    run("cp '%s' '%s'" % (env.subst(env['BF_PYTHON_BINARY']), py_target_bin))
 
     run("cp -R '%s' '%s'" % (py_src, os.path.dirname(py_target)))
     run("rm -rf '%s/distutils'" % py_target)

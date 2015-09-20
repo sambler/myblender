@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 #include "device.h"
@@ -119,6 +119,7 @@ bool MeshManager::displace(Device *device, DeviceScene *dscene, Scene *scene, Me
 	task.shader_eval_type = SHADER_EVAL_DISPLACE;
 	task.shader_x = 0;
 	task.shader_w = d_output.size();
+	task.num_samples = 1;
 	task.get_cancel = function_bind(&Progress::get_cancel, &progress);
 
 	device->task_add(task);

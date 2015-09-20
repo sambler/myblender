@@ -125,10 +125,6 @@ typedef long ssize_t;
 #  endif
 #endif
 
-
-#ifdef FREE_WINDOWS
-#include <dirent.h>
-#else
 struct dirent {
 	int d_ino;
 	int d_off;
@@ -136,22 +132,12 @@ struct dirent {
 	char *d_name;
 };
 
-typedef struct _DIR {
-	HANDLE handle;
-	WIN32_FIND_DATAW data;
-	char path[MAX_PATH];
-	long dd_loc;
-	long dd_size;
-	char dd_buf[4096];
-	void *dd_direct;
-	
-	struct dirent direntry;
-} DIR;
+/* intentionally opaque to users */
+typedef struct __dirstream DIR;
 
 DIR *opendir(const char *path);
 struct dirent *readdir(DIR *dp);
 int closedir(DIR *dp);
-#endif
 
 void RegisterBlendExtension(void);
 void get_default_root(char *root);

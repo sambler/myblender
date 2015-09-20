@@ -247,18 +247,10 @@ static void text_update_edited(bContext *C, Object *obedit, int mode)
 	struct Main *bmain = CTX_data_main(C);
 	Curve *cu = obedit->data;
 	EditFont *ef = cu->editfont;
-	cu->curinfo = ef->textbufinfo[ef->pos ? ef->pos - 1 : 0];
-	
-	if (obedit->totcol > 0) {
-		obedit->actcol = ef->textbufinfo[ef->pos ? ef->pos - 1 : 0].mat_nr;
 
-		/* since this array is calloc'd, it can be 0 even though we try ensure
-		 * (mat_nr > 0) almost everywhere */
-		if (obedit->actcol < 1) {
-			obedit->actcol = 1;
-		}
-	}
+	BLI_assert(ef->len >= 0);
 
+	/* run update first since it can move the cursor */
 	if (mode == FO_EDIT) {
 		/* re-tesselllate */
 		DAG_id_tag_update(obedit->data, 0);
@@ -268,58 +260,19 @@ static void text_update_edited(bContext *C, Object *obedit, int mode)
 		BKE_vfont_to_curve(bmain, obedit, mode);
 	}
 
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
-}
+	cu->curinfo = ef->textbufinfo[ef->pos ? ef->pos - 1 : 0];
 
-/********************** insert lorem operator *********************/
+	if (obedit->totcol > 0) {
+		obedit->actcol = cu->curinfo.mat_nr;
 
-static int insert_lorem_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	Object *obedit = CTX_data_edit_object(C);
-	const char *p, *p2;
-	int i;
-	static const char *lastlorem = NULL;
-	
-	if (lastlorem)
-		p = lastlorem;
-	else
-		p = ED_lorem;
-	
-	i = rand() / (RAND_MAX / 6) + 4;
-		
-	for (p2 = p; *p2 && i; p2++) {
-		insert_into_textbuf(obedit, *p2);
-
-		if (*p2 == '.')
-			i--;
+		/* since this array is calloc'd, it can be 0 even though we try ensure
+		 * (mat_nr > 0) almost everywhere */
+		if (obedit->actcol < 1) {
+			obedit->actcol = 1;
+		}
 	}
 
-	lastlorem = p2 + 1;
-	if (strlen(lastlorem) < 5)
-		lastlorem = ED_lorem;
-	
-	insert_into_textbuf(obedit, '\n');
-	insert_into_textbuf(obedit, '\n');
-
-	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
-
-	return OPERATOR_FINISHED;
-}
-
-void FONT_OT_insert_lorem(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Insert Lorem";
-	ot->description = "Insert placeholder text";
-	ot->idname = "FONT_OT_insert_lorem";
-	
-	/* api callbacks */
-	ot->exec = insert_lorem_exec;
-	ot->poll = ED_operator_editfont;
-	
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 /* -------------------------------------------------------------------- */
@@ -496,8 +449,8 @@ void FONT_OT_text_paste_from_file(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE | TEXTFILE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
+	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_TEXT, FILE_SPECIAL, FILE_OPENFILE,
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 
@@ -554,8 +507,8 @@ void FONT_OT_text_paste_from_clipboard(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE | TEXTFILE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
+	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_TEXT, FILE_SPECIAL, FILE_OPENFILE,
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 /******************* text to object operator ********************/
@@ -573,7 +526,7 @@ static void txt_add_object(bContext *C, TextLine *firstline, int totline, const 
 	int a;
 	float rot[3] = {0.f, 0.f, 0.f};
 	
-	obedit = BKE_object_add(bmain, scene, OB_FONT);
+	obedit = BKE_object_add(bmain, scene, OB_FONT, NULL);
 	base = scene->basact;
 
 	/* seems to assume view align ? TODO - look into this, could be an operator option */
@@ -664,7 +617,7 @@ void ED_text_to_object(bContext *C, Text *text, const bool split_lines)
 		offset[1] = 0.0f;
 		offset[2] = 0.0f;
 
-		txt_add_object(C, text->lines.first, BLI_countlist(&text->lines), offset);
+		txt_add_object(C, text->lines.first, BLI_listbase_count(&text->lines), offset);
 	}
 }
 
@@ -973,9 +926,12 @@ static int move_cursor(bContext *C, int type, const bool select)
 	EditFont *ef = cu->editfont;
 	int cursmove = -1;
 
+	if ((select) && (ef->selstart == 0)) {
+		ef->selstart = ef->selend = ef->pos + 1;
+	}
+
 	switch (type) {
 		case LINE_BEGIN:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			while (ef->pos > 0) {
 				if (ef->textbuf[ef->pos - 1] == '\n') break;
 				if (ef->textbufinfo[ef->pos - 1].flag & CU_CHINFO_WRAP) break;
@@ -985,7 +941,6 @@ static int move_cursor(bContext *C, int type, const bool select)
 			break;
 			
 		case LINE_END:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			while (ef->pos < ef->len) {
 				if (ef->textbuf[ef->pos] == 0) break;
 				if (ef->textbuf[ef->pos] == '\n') break;
@@ -998,7 +953,6 @@ static int move_cursor(bContext *C, int type, const bool select)
 		case PREV_WORD:
 		{
 			int pos = ef->pos;
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			BLI_str_cursor_step_wchar(ef->textbuf, ef->len, &pos, STRCUR_DIR_PREV, STRCUR_JUMP_DELIM, true);
 			ef->pos = pos;
 			cursmove = FO_CURS;
@@ -1008,7 +962,6 @@ static int move_cursor(bContext *C, int type, const bool select)
 		case NEXT_WORD:
 		{
 			int pos = ef->pos;
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			BLI_str_cursor_step_wchar(ef->textbuf, ef->len, &pos, STRCUR_DIR_NEXT, STRCUR_JUMP_DELIM, true);
 			ef->pos = pos;
 			cursmove = FO_CURS;
@@ -1016,35 +969,29 @@ static int move_cursor(bContext *C, int type, const bool select)
 		}
 
 		case PREV_CHAR:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			ef->pos--;
 			cursmove = FO_CURS;
 			break;
 
 		case NEXT_CHAR:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			ef->pos++;
 			cursmove = FO_CURS;
 
 			break;
 
 		case PREV_LINE:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			cursmove = FO_CURSUP;
 			break;
 			
 		case NEXT_LINE:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			cursmove = FO_CURSDOWN;
 			break;
 
 		case PREV_PAGE:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			cursmove = FO_PAGEUP;
 			break;
 
 		case NEXT_PAGE:
-			if ((select) && (ef->selstart == 0)) ef->selstart = ef->selend = ef->pos + 1;
 			cursmove = FO_PAGEDOWN;
 			break;
 	}
@@ -1055,6 +1002,14 @@ static int move_cursor(bContext *C, int type, const bool select)
 	if      (ef->pos > ef->len)  ef->pos = ef->len;
 	else if (ef->pos >= MAXTEXT) ef->pos = MAXTEXT;
 	else if (ef->pos < 0)        ef->pos = 0;
+
+	/* apply virtical cursor motion to position immediately
+	 * otherwise the selection will lag behind */
+	if (FO_CURS_IS_MOTION(cursmove)) {
+		struct Main *bmain = CTX_data_main(C);
+		BKE_vfont_to_curve(bmain, obedit, cursmove);
+		cursmove = FO_CURS;
+	}
 
 	if (select == 0) {
 		if (ef->selstart) {
@@ -1411,7 +1366,7 @@ static int insert_text_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 				accentcode = 0;
 			}
 			else if (event->utf8_buf[0]) {
-				BLI_strncpy_wchar_from_utf8(inserted_text, event->utf8_buf, 2);
+				inserted_text[0] = BLI_str_utf8_as_unicode(event->utf8_buf);
 				ascii = inserted_text[0];
 				insert_into_textbuf(obedit, ascii);
 				accentcode = 0;
@@ -1573,6 +1528,7 @@ void make_editText(Object *obedit)
 	len_wchar = BLI_strncpy_wchar_from_utf8(ef->textbuf, cu->str, MAXTEXT + 4);
 	BLI_assert(len_wchar == cu->len_wchar);
 	ef->len = len_wchar;
+	BLI_assert(ef->len >= 0);
 
 	memcpy(ef->textbufinfo, cu->strinfo, ef->len * sizeof(CharInfo));
 
@@ -1584,6 +1540,9 @@ void make_editText(Object *obedit)
 	ef->pos = cu->pos;
 	ef->selstart = cu->selstart;
 	ef->selend = cu->selend;
+
+	/* text may have been modified by Python */
+	BKE_vfont_select_clamp(obedit);
 }
 
 void load_editText(Object *obedit)
@@ -1734,7 +1693,7 @@ static void font_ui_template_init(bContext *C, wmOperator *op)
 	PropertyPointerRNA *pprop;
 	
 	op->customdata = pprop = MEM_callocN(sizeof(PropertyPointerRNA), "OpenPropertyPointerRNA");
-	uiIDContextProperty(C, &pprop->ptr, &pprop->prop);
+	UI_context_active_but_prop_get_templateID(C, &pprop->ptr, &pprop->prop);
 }
 
 static void font_open_cancel(bContext *UNUSED(C), wmOperator *op)
@@ -1825,8 +1784,8 @@ void FONT_OT_open(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE | FTFONTFILE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
+	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_FTFONT, FILE_SPECIAL, FILE_OPENFILE,
+	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 /******************* delete operator *********************/
@@ -1838,7 +1797,7 @@ static int font_unlink_exec(bContext *C, wmOperator *op)
 	PointerRNA idptr;
 	PropertyPointerRNA pprop;
 
-	uiIDContextProperty(C, &pprop.ptr, &pprop.prop);
+	UI_context_active_but_prop_get_templateID(C, &pprop.ptr, &pprop.prop);
 	
 	if (pprop.prop == NULL) {
 		BKE_report(op->reports, RPT_ERROR, "Incorrect context for running font unlink");
@@ -1874,8 +1833,8 @@ static void undoFont_to_editFont(void *strv, void *ecu, void *UNUSED(obdata))
 	EditFont *ef = cu->editfont;
 	const char *str = strv;
 
-	ef->pos = *((short *)str);
-	ef->len = *((short *)(str + 2));
+	ef->pos = *((const short *)str);
+	ef->len = *((const short *)(str + 2));
 
 	memcpy(ef->textbuf, str + 4, (ef->len + 1) * sizeof(wchar_t));
 	memcpy(ef->textbufinfo, str + 4 + (ef->len + 1) * sizeof(wchar_t), ef->len * sizeof(CharInfo));

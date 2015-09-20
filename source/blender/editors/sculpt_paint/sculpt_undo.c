@@ -62,7 +62,8 @@
 
 #include "GPU_buffers.h"
 
-#include "ED_sculpt.h"
+#include "ED_paint.h"
+
 #include "bmesh.h"
 #include "paint_intern.h"
 #include "sculpt_intern.h"
@@ -103,7 +104,7 @@ static int sculpt_undo_restore_coords(bContext *C, DerivedMesh *dm, SculptUndoNo
 	if (unode->maxvert) {
 		/* regular mesh restore */
 
-		if (ss->kb && strcmp(ss->kb->name, unode->shapeName)) {
+		if (ss->kb && !STREQ(ss->kb->name, unode->shapeName)) {
 			/* shape key has been changed before calling undo operator */
 
 			Key *key = BKE_key_from_object(ob);
@@ -126,7 +127,7 @@ static int sculpt_undo_restore_coords(bContext *C, DerivedMesh *dm, SculptUndoNo
 
 		if (ss->kb) {
 			float (*vertCos)[3];
-			vertCos = BKE_key_convert_to_vertcos(ob, ss->kb);
+			vertCos = BKE_keyblock_convert_to_vertcos(ob, ss->kb);
 
 			for (i = 0; i < unode->totvert; i++) {
 				if (ss->modifiers_active) {
@@ -195,9 +196,9 @@ static int sculpt_undo_restore_hidden(bContext *C, DerivedMesh *dm,
 		
 		for (i = 0; i < unode->totvert; i++) {
 			MVert *v = &mvert[unode->index[i]];
-			int uval = BLI_BITMAP_GET(unode->vert_hidden, i);
+			int uval = BLI_BITMAP_TEST(unode->vert_hidden, i);
 
-			BLI_BITMAP_MODIFY(unode->vert_hidden, i,
+			BLI_BITMAP_SET(unode->vert_hidden, i,
 			                  v->flag & ME_HIDE);
 			if (uval)
 				v->flag |= ME_HIDE;
@@ -278,7 +279,7 @@ static void sculpt_undo_bmesh_restore_generic(bContext *C,
 		unode->applied = true;
 	}
 
-	if (ELEM(unode->type, SCULPT_UNDO_MASK, SCULPT_UNDO_MASK)) {
+	if (unode->type == SCULPT_UNDO_MASK) {
 		int i, totnode;
 		PBVHNode **nodes;
 
@@ -290,7 +291,7 @@ static void sculpt_undo_bmesh_restore_generic(bContext *C,
 
 		BKE_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
 
-#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP)
+#pragma omp parallel for schedule(guided) if ((sd->flags & SCULPT_USE_OPENMP) && totnode > SCULPT_OMP_LIMIT)
 		for (i = 0; i < totnode; i++) {
 			BKE_pbvh_node_mark_redraw(nodes[i]);
 		}
@@ -403,7 +404,7 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 	bool need_mask = false;
 
 	for (unode = lb->first; unode; unode = unode->next) {
-		if (strcmp(unode->idname, ob->id.name) == 0) {
+		if (STREQ(unode->idname, ob->id.name)) {
 			if (unode->type == SCULPT_UNDO_MASK) {
 				/* is possible that we can't do the mask undo (below)
 				 * because of the vertex count */
@@ -422,7 +423,7 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 		return;
 
 	for (unode = lb->first; unode; unode = unode->next) {
-		if (!(strcmp(unode->idname, ob->id.name) == 0))
+		if (!STREQ(unode->idname, ob->id.name))
 			continue;
 
 		/* check if undo data matches current data well enough to
@@ -483,7 +484,7 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 			BKE_mesh_calc_normals_tessface(mesh->mvert, mesh->totvert,
 			                               mesh->mface, mesh->totface, NULL);
 
-			BKE_free_sculptsession_deformMats(ss);
+			BKE_sculptsession_free_deformMats(ss);
 			tag_update |= true;
 		}
 
@@ -526,9 +527,11 @@ static void sculpt_undo_free(ListBase *lb)
 		}
 		if (unode->mask)
 			MEM_freeN(unode->mask);
+
 		if (unode->bm_entry) {
 			BM_log_entry_drop(unode->bm_entry);
 		}
+
 		if (unode->bm_enter_totvert)
 			CustomData_free(&unode->bm_enter_vdata, unode->bm_enter_totvert);
 		if (unode->bm_enter_totedge)
@@ -538,6 +541,23 @@ static void sculpt_undo_free(ListBase *lb)
 		if (unode->bm_enter_totpoly)
 			CustomData_free(&unode->bm_enter_pdata, unode->bm_enter_totpoly);
 	}
+}
+
+static bool sculpt_undo_cleanup(bContext *C, ListBase *lb)
+{
+	Object *ob = CTX_data_active_object(C);
+	SculptUndoNode *unode;
+
+	unode = lb->first;
+
+	if (unode && !STREQ(unode->idname, ob->id.name)) {
+		if (unode->bm_entry)
+			BM_log_cleanup_entry(unode->bm_entry);
+
+		return true;
+	}
+
+	return false;
 }
 
 SculptUndoNode *sculpt_undo_get_node(PBVHNode *node)
@@ -561,7 +581,7 @@ static void sculpt_undo_alloc_and_store_hidden(PBVH *pbvh,
 	grid_hidden = BKE_pbvh_grid_hidden(pbvh);
 
 	BKE_pbvh_node_get_grids(pbvh, node, &grid_indices, &totgrid,
-	                        NULL, NULL, NULL, NULL);
+	                        NULL, NULL, NULL);
 			
 	unode->grid_hidden = MEM_mapallocN(sizeof(*unode->grid_hidden) * totgrid,
 	                                   "unode->grid_hidden");
@@ -590,7 +610,7 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node,
 	if (node) {
 		BKE_pbvh_node_num_verts(ss->pbvh, node, &totvert, &allvert);
 		BKE_pbvh_node_get_grids(ss->pbvh, node, &grids, &totgrid,
-		                        &maxgrid, &gridsize, NULL, NULL);
+		                        &maxgrid, &gridsize, NULL);
 
 		unode->totvert = totvert;
 	}
@@ -675,13 +695,14 @@ static void sculpt_undo_store_hidden(Object *ob, SculptUndoNode *unode)
 	}
 	else {
 		MVert *mvert;
-		int *vert_indices, allvert;
+		const int *vert_indices;
+		int allvert;
 		int i;
 		
 		BKE_pbvh_node_num_verts(pbvh, node, NULL, &allvert);
 		BKE_pbvh_node_get_verts(pbvh, node, &vert_indices, &mvert);
 		for (i = 0; i < allvert; i++) {
-			BLI_BITMAP_MODIFY(unode->vert_hidden, i,
+			BLI_BITMAP_SET(unode->vert_hidden, i,
 			                  mvert[vert_indices[i]].flag & ME_HIDE);
 		}
 	}
@@ -822,11 +843,12 @@ SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node,
 	if (unode->grids) {
 		int totgrid, *grids;
 		BKE_pbvh_node_get_grids(ss->pbvh, node, &grids, &totgrid,
-		                        NULL, NULL, NULL, NULL);
+		                        NULL, NULL, NULL);
 		memcpy(unode->grids, grids, sizeof(int) * totgrid);
 	}
 	else {
-		int *vert_indices, allvert;
+		const int *vert_indices;
+		int allvert;
 		BKE_pbvh_node_num_verts(ss->pbvh, node, NULL, &allvert);
 		BKE_pbvh_node_get_verts(ss->pbvh, node, &vert_indices, NULL);
 		memcpy(unode->index, vert_indices, sizeof(int) * unode->totvert);
@@ -859,7 +881,7 @@ SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node,
 void sculpt_undo_push_begin(const char *name)
 {
 	ED_undo_paint_push_begin(UNDO_PAINT_MESH, name,
-	                      sculpt_undo_restore, sculpt_undo_free);
+	                         sculpt_undo_restore, sculpt_undo_free, sculpt_undo_cleanup);
 }
 
 void sculpt_undo_push_end(void)

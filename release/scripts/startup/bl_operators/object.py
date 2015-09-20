@@ -20,11 +20,13 @@
 
 import bpy
 from bpy.types import Operator
-from bpy.props import (StringProperty,
-                       BoolProperty,
-                       EnumProperty,
-                       IntProperty,
-                       FloatProperty)
+from bpy.props import (
+        StringProperty,
+        BoolProperty,
+        EnumProperty,
+        IntProperty,
+        FloatProperty,
+        )
 
 
 class SelectPattern(Operator):
@@ -249,9 +251,9 @@ class SubdivisionSet(Operator):
                 if mod.type == 'MULTIRES':
                     if not relative:
                         if level > mod.total_levels:
-                           sub = level - mod.total_levels
-                           for i in range (0, sub):
-                               bpy.ops.object.multires_subdivide(modifier="Multires")
+                            sub = level - mod.total_levels
+                            for i in range(sub):
+                                bpy.ops.object.multires_subdivide(modifier="Multires")
 
                         if obj.mode == 'SCULPT':
                             if mod.sculpt_levels != level:
@@ -366,6 +368,11 @@ class ShapeTransfer(Operator):
         orig_coords = me_cos(me.shape_keys.key_blocks[0].data)
 
         for ob_other in objects:
+            if ob_other.type != 'MESH':
+                self.report({'WARNING'},
+                            ("Skipping '%s', "
+                             "not a mesh") % ob_other.name)
+                continue
             me_other = ob_other.data
             if len(me_other.vertices) != len(me.vertices):
                 self.report({'WARNING'},
@@ -572,7 +579,8 @@ class MakeDupliFace(Operator):
     bl_label = "Make Dupli-Face"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def _main(self, context):
+    @staticmethod
+    def _main(context):
         from mathutils import Vector
 
         SCALE_FAC = 0.01
@@ -635,6 +643,9 @@ class MakeDupliFace(Operator):
             ob_inst.parent = ob_new
             ob_new.use_dupli_faces_scale = True
             ob_new.dupli_faces_scale = 1.0 / SCALE_FAC
+
+            ob_inst.select = True
+            ob_new.select = True
 
     def execute(self, context):
         self._main(context)
@@ -770,22 +781,15 @@ class DupliOffsetFromCursor(Operator):
     bl_label = "Set Offset From Cursor"
     bl_options = {'REGISTER', 'UNDO'}
 
-    group = IntProperty(
-            name="Group",
-            description="Group index to set offset for",
-            default=0,
-            )
-
     @classmethod
     def poll(cls, context):
         return (context.active_object is not None)
 
     def execute(self, context):
         scene = context.scene
-        ob = context.active_object
-        group = self.group
+        group = context.group
 
-        ob.users_group[group].dupli_offset = scene.cursor_location
+        group.dupli_offset = scene.cursor_location
 
         return {'FINISHED'}
 
@@ -924,7 +928,7 @@ class LodGenerate(Operator):
             lod.location.y = ob.location.y + 3.0 * i
 
             if i == 1:
-                modifier = lod.modifiers.new("lod_decimate", "DECIMATE")
+                modifier = lod.modifiers.new("lod_decimate", 'DECIMATE')
             else:
                 modifier = lod.modifiers[-1]
 

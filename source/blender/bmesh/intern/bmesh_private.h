@@ -54,6 +54,7 @@ int bmesh_elem_check(void *element, const char htype);
 #endif
 
 int bmesh_radial_length(const BMLoop *l);
+int bmesh_disk_count_ex(const BMVert *v, const int count_max);
 int bmesh_disk_count(const BMVert *v);
 
 /**
@@ -64,13 +65,14 @@ enum {
 	_FLAG_JF       = (1 << 0),  /* join faces */
 	_FLAG_MF       = (1 << 1),  /* make face */
 	_FLAG_MV       = (1 << 1),  /* make face, vertex */
-	_FLAG_OVERLAP  = (1 << 2)   /* general overlap flag  */
+	_FLAG_OVERLAP  = (1 << 2),  /* general overlap flag  */
+	_FLAG_WALK     = (1 << 3),  /* general walk flag (keep clean) */
 };
 
-#define BM_ELEM_API_FLAG_ENABLE(element, f)  ((element)->head.api_flag |=  (f))
-#define BM_ELEM_API_FLAG_DISABLE(element, f) ((element)->head.api_flag &= ~(f))
-#define BM_ELEM_API_FLAG_TEST(element, f)    ((element)->head.api_flag &   (f))
-#define BM_ELEM_API_FLAG_CLEAR(element)      ((element)->head.api_flag = 0)
+#define BM_ELEM_API_FLAG_ENABLE(element, f)  { ((element)->head.api_flag |=  (f)); } (void)0
+#define BM_ELEM_API_FLAG_DISABLE(element, f) { ((element)->head.api_flag &= ~(f)); } (void)0
+#define BM_ELEM_API_FLAG_TEST(element, f)      ((element)->head.api_flag &   (f))
+#define BM_ELEM_API_FLAG_CLEAR(element)      { ((element)->head.api_flag = 0); } (void)0
 
 void poly_rotate_plane(const float normal[3], float (*verts)[3], unsigned const int nverts);
 

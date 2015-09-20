@@ -48,6 +48,14 @@ extern "C" {
 
 struct EvaluationContext;
 struct Library;
+struct MainLock;
+
+/* Blender thumbnail, as written on file (width, height, and data as char RGBA). */
+/* We pack pixel data after that struct. */
+typedef struct BlendThumbnail {
+	int width, height;
+	char rect[0];
+} BlendThumbnail;
 
 typedef struct Main {
 	struct Main *next, *prev;
@@ -57,6 +65,8 @@ typedef struct Main {
 	uint64_t build_commit_timestamp; /* commit's timestamp from buildinfo */
 	char build_hash[16];  /* hash from buildinfo */
 	short recovered;	/* indicate the main->name (file) is the recovered one */
+
+	BlendThumbnail *blen_thumb;
 	
 	struct Library *curlib;
 	ListBase scene;
@@ -86,6 +96,8 @@ typedef struct Main {
 	ListBase nodetree;
 	ListBase brush;
 	ListBase particle;
+	ListBase palettes;
+	ListBase paintcurves;
 	ListBase wm;
 	ListBase gpencil;
 	ListBase movieclip;
@@ -96,6 +108,8 @@ typedef struct Main {
 
 	/* Evaluation context used by viewport */
 	struct EvaluationContext *eval_ctx;
+
+	struct MainLock *lock;
 } Main;
 
 #define MAIN_VERSION_ATLEAST(main, ver, subver) \
@@ -104,7 +118,10 @@ typedef struct Main {
 #define MAIN_VERSION_OLDER(main, ver, subver) \
 	((main)->versionfile < (ver) || (main->versionfile == (ver) && (main)->subversionfile < (subver)))
 
-	
+#define BLEN_THUMB_SIZE 128
+
+#define BLEN_THUMB_MEMSIZE(_x, _y) (sizeof(BlendThumbnail) + (size_t)((_x) * (_y)) * sizeof(int))
+
 #ifdef __cplusplus
 }
 #endif

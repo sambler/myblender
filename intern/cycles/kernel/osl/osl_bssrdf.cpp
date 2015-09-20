@@ -34,6 +34,7 @@
 
 #include <OSL/genclosure.h>
 
+#include "kernel_compat_cpu.h"
 #include "osl_bssrdf.h"
 #include "osl_closures.h"
 
@@ -66,18 +67,6 @@ ClosureParam *closure_bssrdf_cubic_params()
 	static ClosureParam params[] = {
 		CLOSURE_FLOAT3_PARAM(CubicBSSRDFClosure, sc.N),
 		CLOSURE_FLOAT3_PARAM(CubicBSSRDFClosure, radius),
-		//CLOSURE_FLOAT_PARAM(CubicBSSRDFClosure, sc.data1),
-	    CLOSURE_STRING_KEYPARAM("label"),
-	    CLOSURE_FINISH_PARAM(CubicBSSRDFClosure)
-	};
-	return params;
-}
-
-ClosureParam *closure_bssrdf_cubic_extended_params()
-{
-	static ClosureParam params[] = {
-		CLOSURE_FLOAT3_PARAM(CubicBSSRDFClosure, sc.N),
-		CLOSURE_FLOAT3_PARAM(CubicBSSRDFClosure, radius),
 		CLOSURE_FLOAT_PARAM(CubicBSSRDFClosure, sc.data1),
 		CLOSURE_FLOAT_PARAM(CubicBSSRDFClosure, sc.T.x),
 	    CLOSURE_STRING_KEYPARAM("label"),
@@ -103,18 +92,6 @@ public:
 };
 
 ClosureParam *closure_bssrdf_gaussian_params()
-{
-	static ClosureParam params[] = {
-		CLOSURE_FLOAT3_PARAM(GaussianBSSRDFClosure, sc.N),
-		CLOSURE_FLOAT3_PARAM(GaussianBSSRDFClosure, radius),
-		//CLOSURE_FLOAT_PARAM(GaussianBSSRDFClosure, sc.data1),
-	    CLOSURE_STRING_KEYPARAM("label"),
-	    CLOSURE_FINISH_PARAM(GaussianBSSRDFClosure)
-	};
-	return params;
-}
-
-ClosureParam *closure_bssrdf_gaussian_extended_params()
 {
 	static ClosureParam params[] = {
 		CLOSURE_FLOAT3_PARAM(GaussianBSSRDFClosure, sc.N),

@@ -37,14 +37,14 @@
 
 #include <iostream>
 #include "SCA_PropertySensor.h"
-#include "Operator2Expr.h"
-#include "ConstExpr.h"
-#include "InputParser.h"
-#include "StringValue.h"
+#include "EXP_Operator2Expr.h"
+#include "EXP_ConstExpr.h"
+#include "EXP_InputParser.h"
+#include "EXP_StringValue.h"
 #include "SCA_EventManager.h"
 #include "SCA_LogicManager.h"
-#include "BoolValue.h"
-#include "FloatValue.h"
+#include "EXP_BoolValue.h"
+#include "EXP_FloatValue.h"
 #include <stdio.h>
 
 SCA_PropertySensor::SCA_PropertySensor(SCA_EventManager* eventmgr,
@@ -133,6 +133,7 @@ bool	SCA_PropertySensor::CheckPropertyCondition()
 	{
 	case KX_PROPSENSOR_NOTEQUAL:
 		reverse = true;
+		/* fall-through */
 	case KX_PROPSENSOR_EQUAL:
 		{
 			CValue* orgprop = GetParent()->FindIdentifier(m_checkpropname);
@@ -150,7 +151,7 @@ bool	SCA_PropertySensor::CheckPropertyCondition()
 				/* Patch: floating point values cant use strings usefully since you can have "0.0" == "0.0000"
 				 * this could be made into a generic Value class function for comparing values with a string.
 				 */
-				if (result==false && dynamic_cast<CFloatValue *>(orgprop) != NULL) {
+				if (result==false && (orgprop->GetValueType() == VALUE_FLOAT_TYPE)) {
 					float f;
 					if (sscanf(m_checkpropval.ReadPtr(), "%f", &f) == 1) {
 						result = (f == ((CFloatValue *)orgprop)->GetFloat());
@@ -198,11 +199,11 @@ bool	SCA_PropertySensor::CheckPropertyCondition()
 				const float max = m_checkpropmaxval.ToFloat();
 				float val;
 
-				if (dynamic_cast<CStringValue *>(orgprop) == NULL) {
-					val = orgprop->GetNumber();
+				if (orgprop->GetValueType() == VALUE_STRING_TYPE){
+					val = orgprop->GetText().ToFloat();
 				}
 				else {
-					val = orgprop->GetText().ToFloat();
+					val = orgprop->GetNumber();
 				}
 
 				result = (min <= val) && (val <= max);
@@ -228,19 +229,44 @@ bool	SCA_PropertySensor::CheckPropertyCondition()
 			//cout << " \nSens:Prop:changed!"; /* need implementation here!!! */
 			break;
 		}
+	case KX_PROPSENSOR_LESSTHAN:
+		reverse = true;
+		/* fall-through */
+	case KX_PROPSENSOR_GREATERTHAN:
+		{
+			CValue* orgprop = GetParent()->FindIdentifier(m_checkpropname);
+			if (!orgprop->IsError())
+			{
+				const float ref = m_checkpropval.ToFloat();
+				float val;
+
+				if (orgprop->GetValueType() == VALUE_STRING_TYPE){
+					val = orgprop->GetText().ToFloat();
+				}
+				else {
+					val = orgprop->GetNumber();
+				}
+
+				if (reverse) {
+					result = val < ref;
+				}
+				else {
+					result = val > ref;
+				}
+
+			}
+			orgprop->Release();
+
+			break;
+		}
 	default:
 		; /* error */
 	}
 
 	//the concept of Edge and Level triggering has unwanted effect for KX_PROPSENSOR_CHANGED
 	//see Game Engine bugtracker [ #3809 ]
-	if (m_checktype != KX_PROPSENSOR_CHANGED)
-	{
-		m_recentresult=result;
-	} else
-	{
-		m_recentresult=result;//true;
-	}
+	m_recentresult = result;
+
 	return result;
 }
 

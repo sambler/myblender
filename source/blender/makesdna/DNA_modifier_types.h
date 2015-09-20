@@ -134,6 +134,7 @@ typedef struct SubsurfModifierData {
 	ModifierData modifier;
 
 	short subdivType, levels, renderLevels, flags;
+	short use_opensubdiv, pad[3];
 
 	void *emCache, *mCache;
 } SubsurfModifierData;
@@ -391,6 +392,7 @@ enum {
 	MOD_DISP_DIR_Z       = 2,
 	MOD_DISP_DIR_NOR     = 3,
 	MOD_DISP_DIR_RGB_XYZ = 4,
+	MOD_DISP_DIR_CLNOR   = 5,
 };
 
 /* DisplaceModifierData->texmapping */
@@ -612,10 +614,10 @@ typedef struct CollisionModifierData {
 	struct MVert *current_x;    /* position at the actual inter-frame step */
 	struct MVert *current_v;    /* (xnew - x) at the actual inter-frame step */
 
-	struct MFace *mfaces;       /* object face data */
+	struct MVertTri *tri;
 
-	unsigned int numverts;
-	unsigned int numfaces;
+	unsigned int mvert_num;
+	unsigned int tri_num;
 	float time_x, time_xnew;    /* cfra time of modifier */
 	struct BVHTree *bvhtree;    /* bounding volume hierarchy for this cloth object */
 } CollisionModifierData;
@@ -875,14 +877,12 @@ enum {
 	MOD_SOLIDIFY_EVEN           = (1 << 1),
 	MOD_SOLIDIFY_NORMAL_CALC    = (1 << 2),
 	MOD_SOLIDIFY_VGROUP_INV     = (1 << 3),
+#ifdef DNA_DEPRECATED
 	MOD_SOLIDIFY_RIM_MATERIAL   = (1 << 4),  /* deprecated, used in do_versions */
+#endif
 	MOD_SOLIDIFY_FLIP           = (1 << 5),
 	MOD_SOLIDIFY_NOSHELL        = (1 << 6),
 };
-
-#if (DNA_DEPRECATED_GCC_POISON == 1)
-#pragma GCC poison MOD_SOLIDIFY_RIM_MATERIAL
-#endif
 
 typedef struct ScrewModifierData {
 	ModifierData modifier;
@@ -1252,12 +1252,10 @@ typedef struct TriangulateModifierData {
 	int pad;
 } TriangulateModifierData;
 
+#ifdef DNA_DEPRECATED
 enum {
 	MOD_TRIANGULATE_BEAUTY = (1 << 0), /* deprecated */
 };
-
-#if (DNA_DEPRECATED_GCC_POISON == 1)
-#pragma GCC poison MOD_TRIANGULATE_BEAUTY
 #endif
 
 /* Triangulate methods - NGons */

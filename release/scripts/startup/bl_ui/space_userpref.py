@@ -313,6 +313,8 @@ class USERPREF_PT_edit(Panel):
         col.separator()
         col.separator()
         col.separator()
+        col.label(text="Node Editor:")
+        col.prop(edit, "node_margin")
         col.label(text="Animation Editors:")
         col.prop(edit, "fcurve_unselected_alpha", text="F-Curve Visibility")
 
@@ -411,9 +413,9 @@ class USERPREF_PT_system(Panel):
         col.separator()
 
         col.label(text="Sound:")
-        col.row().prop(system, "audio_device", expand=True)
+        col.row().prop(system, "audio_device", expand=False)
         sub = col.column()
-        sub.active = system.audio_device != 'NONE'
+        sub.active = system.audio_device != 'NONE' and system.audio_device != 'Null'
         #sub.prop(system, "use_preview_images")
         sub.prop(system, "audio_channels", text="Channels")
         sub.prop(system, "audio_mixing_buffer", text="Mixing Buffer")
@@ -434,6 +436,10 @@ class USERPREF_PT_system(Panel):
             sub = col.row()
             sub.active = system.compute_device_type != 'CPU'
             sub.prop(system, "compute_device", text="")
+
+        if hasattr(system, "opensubdiv_compute_type"):
+            col.label(text="OpenSubdiv compute:")
+            col.row().prop(system, "opensubdiv_compute_type", text="")
 
         # 2. Column
         column = split.column()
@@ -487,7 +493,8 @@ class USERPREF_PT_system(Panel):
         col.separator()
 
         col.label(text="Sequencer / Clip Editor:")
-        col.prop(system, "prefetch_frames")
+        # currently disabled in the code
+        # col.prop(system, "prefetch_frames")
         col.prop(system, "memory_cache_limit")
 
         # 3. Column
@@ -1173,7 +1180,7 @@ class USERPREF_MT_addons_dev_guides(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("wm.url_open", text="API Concepts", icon='URL').url = "http://wiki.blender.org/index.php/Dev:2.5/Py/API/Intro"
+        layout.operator("wm.url_open", text="API Concepts", icon='URL').url = bpy.types.WM_OT_doc_view._prefix + "/info_quickstart.html"
         layout.operator("wm.url_open", text="Addon Guidelines", icon='URL').url = "http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Guidelines/Addons"
         layout.operator("wm.url_open", text="How to share your addon", icon='URL').url = "http://wiki.blender.org/index.php/Dev:Py/Sharing"
 

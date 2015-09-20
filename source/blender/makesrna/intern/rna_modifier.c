@@ -40,7 +40,7 @@
 
 #include "BLI_math.h"
 
-#include "BLF_translation.h"
+#include "BLT_translation.h"
 
 #include "BKE_animsys.h"
 #include "BKE_data_transfer.h"
@@ -92,7 +92,7 @@ EnumPropertyItem modifier_type_items[] = {
 	{0, "", 0, N_("Deform"), ""},
 	{eModifierType_Armature, "ARMATURE", ICON_MOD_ARMATURE, "Armature", ""},
 	{eModifierType_Cast, "CAST", ICON_MOD_CAST, "Cast", ""},
-    {eModifierType_CorrectiveSmooth, "CORRECTIVE_SMOOTH", ICON_MOD_SMOOTH, "Corrective Smooth", ""},
+	{eModifierType_CorrectiveSmooth, "CORRECTIVE_SMOOTH", ICON_MOD_SMOOTH, "Corrective Smooth", ""},
 	{eModifierType_Curve, "CURVE", ICON_MOD_CURVE, "Curve", ""},
 	{eModifierType_Displace, "DISPLACE", ICON_MOD_DISPLACE, "Displace", ""},
 	{eModifierType_Hook, "HOOK", ICON_HOOK, "Hook", ""},
@@ -1119,6 +1119,13 @@ static void rna_def_modifier_subsurf(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", eSubsurfModifierFlag_SubsurfUv);
 	RNA_def_property_ui_text(prop, "Subdivide UVs", "Use subsurf to subdivide UVs");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+#ifdef WITH_OPENSUBDIV
+	prop = RNA_def_property(srna, "use_opensubdiv", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_opensubdiv", 1);
+	RNA_def_property_ui_text(prop, "Use OpenSubdiv", "Use OpenSubdiv for the subdivisions (viewport only)");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+#endif
 }
 
 static void rna_def_modifier_generic_map_info(StructRNA *srna)
@@ -1187,7 +1194,7 @@ static void rna_def_modifier_warp(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, modifier_warp_falloff_items);
 	RNA_def_property_ui_text(prop, "Falloff Type", "");
-	RNA_def_property_translation_context(prop, BLF_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
+	RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "falloff_radius", PROP_FLOAT, PROP_UNSIGNED | PROP_DISTANCE);
@@ -1733,7 +1740,7 @@ static void rna_def_modifier_hook(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, modifier_warp_falloff_items);  /* share the enum */
 	RNA_def_property_ui_text(prop, "Falloff Type", "");
-	RNA_def_property_translation_context(prop, BLF_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
+	RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "falloff_radius", PROP_FLOAT, PROP_DISTANCE);
@@ -1957,7 +1964,7 @@ static void rna_def_modifier_edgesplit(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "split_angle", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_range(prop, 0.0f, DEG2RADF(180.0f));
-	RNA_def_property_ui_range(prop, 0.0f, DEG2RADF(180.0f), 100, 2);
+	RNA_def_property_ui_range(prop, 0.0f, DEG2RADF(180.0f), 10, 2);
 	RNA_def_property_ui_text(prop, "Split Angle", "Angle above which to split edges");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -1977,35 +1984,16 @@ static void rna_def_modifier_displace(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 
-	static EnumPropertyItem prop_displace_mode_items[] = {
-		{MOD_DISP_MODE_TEXTURE, "TEXTURE", 0, "Texture Vertices", "Displacement of vertices based on a texture"},
-		{MOD_DISP_MODE_RAND_VERTEX, "RANDOM_VERTEX", 0, "Noise Vertices",
-									"Displacement of vertices based on random values"},
-		{MOD_DISP_MODE_RAND_LOOSEPARTS, "RANDOM_LOOSE_PARTS", 0, "Loose Parts",
-										"Displacement of loose parts of the mesh based on random values"},
-		{MOD_DISP_MODE_RAND_WHOLEMESH, "RANDOM_WHOLE_MESH", 0, "Whole Mesh",
-									   "Displacement of whole mesh based on random values"},
-		{0, NULL, 0, NULL, NULL}
-	};
-
 	static EnumPropertyItem prop_direction_items[] = {
-		{MOD_DISP_DIR_VAL_XYZ, "VAL_TO_XYZ", 0, "Value to XYZ",
-							   "Use the texture or noise value to displace in the XYZ directions"},
-		{MOD_DISP_DIR_VAL_NOR, "NORMAL", 0, "Normal",
-							   "Use the texture's or noise value to displace along the normal direction"},
+		{MOD_DISP_DIR_X, "X", 0, "X", "Use the texture's intensity value to displace in the X direction"},
+		{MOD_DISP_DIR_Y, "Y", 0, "Y", "Use the texture's intensity value to displace in the Y direction"},
+		{MOD_DISP_DIR_Z, "Z", 0, "Z", "Use the texture's intensity value to displace in the Z direction"},
+		{MOD_DISP_DIR_NOR, "NORMAL", 0, "Normal",
+		 "Use the texture's intensity value to displace along the vertex normal"},
+		{MOD_DISP_DIR_CLNOR, "CUSTOM_NORMAL", 0, "Custom Normal",
+		 "Use the texture's intensity value to displace along the (averaged) custom normal (falls back to vertex)"},
 		{MOD_DISP_DIR_RGB_XYZ, "RGB_TO_XYZ", 0, "RGB to XYZ",
-							   "Use the texture's RGB values to displace the mesh in the XYZ directions"},
-		{0, NULL, 0, NULL, NULL}
-	};
-
-	static EnumPropertyItem prop_noise_mode_items[] = {
-		{MOD_DISP_NOISE_MODE_CONSTANT, "CONSTANT", 0, "Constant",
-									   "Each item, if affected, is offset by maximum value(s)" },
-		{MOD_DISP_NOISE_MODE_LINEAR, "LINEAR", 0, "Linear",
-									 "Each item, if affected, is offset by random amount between +/- maximum value(s)"},
-		{MOD_DISP_NOISE_MODE_GAUSSIAN, "GAUSSIAN", 0, "Gaussian",
-									   "Each item, if affected, is offset by random amount, according to normal "
-									   "distribution, with maximum value as standard deviation"},
+		 "Use the texture's RGB values to displace the mesh in the XYZ direction"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -2014,18 +2002,10 @@ static void rna_def_modifier_displace(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "DisplaceModifierData");
 	RNA_def_struct_ui_icon(srna, ICON_MOD_DISPLACE);
 
-	/* Common properties. */
-	prop = RNA_def_property(srna, "displace_mode", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_items(prop, prop_displace_mode_items);
-	RNA_def_property_ui_text(prop, "Displacement mode", "The way displacement is performed");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
 	prop = RNA_def_property(srna, "vertex_group", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "defgrp_name");
 	RNA_def_property_ui_text(prop, "Vertex Group",
-							 "Name of Vertex Group which determines influence of modifier per point, or pivot point "
-							 "in loose parts/whole mesh modes");
-
+	                         "Name of Vertex Group which determines influence of modifier per point");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_DisplaceModifier_defgrp_name_set");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -2033,86 +2013,20 @@ static void rna_def_modifier_displace(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "midlevel");
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0, 1, 10, 3);
-	RNA_def_property_ui_text(prop, "Midlevel", "Value that gives no displacement");
+	RNA_def_property_ui_text(prop, "Midlevel", "Material value that gives no displacement");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "strength", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_ui_range(prop, -100, 100, 1, 3);
+	RNA_def_property_ui_range(prop, -100, 100, 10, 3);
 	RNA_def_property_ui_text(prop, "Strength", "Amount to displace geometry");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "direction", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, prop_direction_items);
-	RNA_def_property_ui_text(prop, "Direction", "How to displace geometry");
+	RNA_def_property_ui_text(prop, "Direction", "");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	/* Per-axis factors. */
-	prop = RNA_def_property(srna, "translation_factor", PROP_FLOAT, PROP_XYZ);
-	RNA_def_property_float_sdna(prop, NULL, "translation");
-	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_ui_text(prop, "Translation Factors", "Per-axis factors for translation");
-	RNA_def_property_ui_range(prop, -1.0f, 1.0f, 1, 3);
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "rotation_factor", PROP_FLOAT, PROP_XYZ);
-	RNA_def_property_float_sdna(prop, NULL, "rotation");
-	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_ui_range(prop, -1.0f, 1.0f, 1, 3);
-	RNA_def_property_ui_text(prop, "Rotation Factors", "Per-axis factors for rotation");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "scale_factor", PROP_FLOAT, PROP_XYZ);
-	RNA_def_property_float_sdna(prop, NULL, "scale");
-	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_ui_text(prop, "Scale Factors",
-							 "Per-axis factors for scaling (forth one is uniform, gets mixed with each per-axis one)");
-	RNA_def_property_ui_range(prop, -1.0f, 1.0f, 1, 3);
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	/* Offset object */
-	prop = RNA_def_property(srna, "use_object_offset", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flags", MOD_DISP_USE_OBJECT_OFFSET);
-	RNA_def_property_ui_text(prop, "Use object for offset", "Use another object's transformation for maximum offset");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "offset_object", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "offset_ob");
-	RNA_def_property_ui_text(prop, "Offset object",
-							 "Use the location, rotation and scale of this object (overrides loc/rot/scale factors)");
-	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
-	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
-
-	/* Random noise generator. */
-	prop = RNA_def_property(srna, "noise_seed", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 1, INT_MAX);
-	RNA_def_property_ui_range(prop, 1, 1000, 1, -1);
-	RNA_def_property_ui_text(prop, "Noise Seed",  "Seed to initialize random generator");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "use_obj_id", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flags", MOD_DISP_NOISE_SEED_OBJID);
-	RNA_def_property_ui_text(prop, "Name In Seed", "Use object's unique name to alter the seed");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "noise_probability", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 0.0, 1.0);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 3, -1);
-	RNA_def_property_ui_text(prop, "Probability",  "Probability that an item is affected");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "noise_mode", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_items(prop, prop_noise_mode_items);
-	RNA_def_property_ui_text(prop, "Noise Mode", "How noise values are calculated");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop = RNA_def_property(srna, "noise_std_deviation", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 0.0, 10.0);
-	RNA_def_property_ui_range(prop, 0.0, 5.0, 3, -1);
-	RNA_def_property_ui_text(prop, "Standard Deviation",  "Standard deviation for gaussian normal distribution");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	/* Texture settings. */
 	rna_def_modifier_generic_map_info(srna);
 }
 
@@ -3137,7 +3051,7 @@ static void rna_def_modifier_simpledeform(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "factor", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_ui_range(prop, -10, 10, 1, 3);
+	RNA_def_property_ui_range(prop, -10.0, 10.0, 1.0, 3);
 	RNA_def_property_ui_text(prop, "Factor", "Amount to deform object");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -3145,7 +3059,7 @@ static void rna_def_modifier_simpledeform(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "factor");
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
 	RNA_def_property_float_default(prop, DEG2RADF(45.0f));
-	RNA_def_property_ui_range(prop, -M_PI, M_PI, DEG2RAD(1), 3);
+	RNA_def_property_ui_range(prop, DEG2RAD(-360.0), DEG2RAD(360.0), 10.0, 3);
 	RNA_def_property_ui_text(prop, "Angle", "Angle of deformation");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -3558,7 +3472,7 @@ static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, weightvg_edit_falloff_type_items);
 	RNA_def_property_ui_text(prop, "Falloff Type", "How weights are mapped to their new values");
-	RNA_def_property_translation_context(prop, BLF_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
+	RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "use_add", PROP_BOOLEAN, PROP_NONE);
@@ -3764,7 +3678,7 @@ static void rna_def_modifier_weightvgproximity(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, weightvg_proximity_falloff_type_items);
 	RNA_def_property_ui_text(prop, "Falloff Type", "How weights are mapped to their new values");
-	RNA_def_property_translation_context(prop, BLF_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
+	RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	/* Common masking properties. */

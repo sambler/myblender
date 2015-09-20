@@ -35,7 +35,6 @@
 #include "BLI_buffer.h"
 #include "BLI_utildefines.h"
 #include "BLI_bitmap.h"
-#include "BLI_linklist_stack.h"
 #include "BLI_math.h"
 
 #include "BKE_mesh_mapping.h"
@@ -354,131 +353,6 @@ void BKE_mesh_edge_poly_map_create(MeshElemMap **r_map, int **r_mem,
 	*r_mem = indices;
 }
 
-/* Split a mesh into loose parts, providing a map where the key is a loose part index, and the value is the list
- * of vertices that belong to this loose part. The lists are allocated from one memory pool.
- */
-
-enum {
-	PROCESSED_NONE    = 0,
-	PROCESSED_QUEUED  = 1,
-	PROCESSED_ONGOING = 2,
-	PROCESSED_DONE    = 3,
-};
-
-void BKE_mesh_loosepart_vertex_map_create(MeshElemMap **r_map, int **r_mem, int *lp_count,
-										  const MEdge *medge, const int totedge, const int totvert)
-{
-	MeshElemMap *loosepart_vertex_map;
-	MeshElemMap *vert_edge_map;
-	int *loosepart_vertex_mem;
-
-	int *vert_edge_mem;
-	char *vert_processed;
-	int *index_step;
-	BLI_SMALLSTACK_DECLARE(verts_todo, void *);
-
-	int current_loosepart_index = 0;
-	int iv;
-
-	/* Allocate array of loose_parts.   Don't know how many for now, could be as many as vertices   */
-	loosepart_vertex_map = MEM_callocN(sizeof(*loosepart_vertex_map) * (size_t)totvert, "map looseparts vertex");
-	loosepart_vertex_mem = MEM_mallocN(sizeof(*loosepart_vertex_mem) * (size_t)totvert, "map looseparts vertex idx");
-	index_step = loosepart_vertex_mem;
-
-	vert_processed = MEM_callocN(sizeof(*vert_processed) * (size_t)totvert, "vertex processed");
-
-	BKE_mesh_vert_edge_map_create(&vert_edge_map, &vert_edge_mem, medge, totvert, totedge);
-
-	/* Scan verts of mesh.
-	 *    if vert has already been processed
-	 *       continue
-	 *    else
-	 *       start a new loose part
-	 *       initialize a todo list with this vertex
-	 *       process todo list (with connected vertices getting added to todo list)
-	 */
-	for (iv = 0; iv < totvert; iv++) {
-		/* If vertex was processed, as part of an earlier loose part, then skip. */
-		if (vert_processed[iv] == PROCESSED_DONE)
-			continue;
-
-		/* Should not get PROCESSED_QUEUED here, since todo is handled fully below. */
-		BLI_assert(vert_processed[iv] == PROCESSED_NONE);
-
-		/* The vertex has not been encountered through connectivity: it starts a new loosepart. */
-		loosepart_vertex_map[current_loosepart_index].indices = index_step;
-
-		/* Initialize todo list with this first vertex. */
-		BLI_SMALLSTACK_PUSH(verts_todo, SET_UINT_IN_POINTER(iv));
-		vert_processed[iv] = PROCESSED_QUEUED;
-
-		/* Process todo stack (similar to recursive calls).
-		 *   The stack is empty when all connected vertices have been processed; i.e. end of a loose part.
-		 *   For each vertex in todo stack,
-		 *      Scan edges that share this vertex,
-		 *      Add the vertex at the other end of each edge to todo stack.
-		 */
-		while(!BLI_SMALLSTACK_IS_EMPTY(verts_todo)) {
-			/* Current vertex. */
-			void *v = BLI_SMALLSTACK_POP(verts_todo);
-			unsigned int v1 = GET_UINT_FROM_POINTER(v);
-			int k, *ie;
-
-			/* Should not get PROCESSED_DONE here, since todo is handled fully below. */
-			BLI_assert(vert_processed[v1] == PROCESSED_QUEUED);
-
-			/* Vertex is marked as being currently processed. */
-			vert_processed[v1] = PROCESSED_ONGOING;
-
-			/* Vertex is added to current loose part. */
-			loosepart_vertex_map[current_loosepart_index].count++;
-			*index_step++ = (int)v1;
-
-			/* Scan edges attached to this vertex */
-			for (k = 0, ie = vert_edge_map[v1].indices; k < vert_edge_map[v1].count; k++, ie++) {
-				/* v2 is the other end of the edge */
-				unsigned int v2 = (medge[*ie].v1 == v1) ? medge[*ie].v2 : medge[*ie].v1;
-
-				/* Add v2 to todo list, if not already there, nor ongoing, nor processed. */
-				if (vert_processed[v2] == PROCESSED_NONE) {
-					BLI_SMALLSTACK_PUSH(verts_todo, SET_UINT_IN_POINTER(v2));
-					vert_processed[v2] = PROCESSED_QUEUED;
-				}
-			}
-
-			/* Now vertex is fully processed, meaning all directly connected vertices have been queued in todo list. */
-			vert_processed[v1] = PROCESSED_DONE;
-			/* Note: actually, we could do with a simple TRUE/FALSE mark for vert_processed[],
-			 * this four states scheme is just more readable, and not more costly.
-			 */
-		}
-
-		/* When todo stack is fully processed, we are at the end of a loose part, start a new one. */
-		current_loosepart_index++;
-	}
-
-	/* Some clean up: reduce loosepart_vertex_map to the right amount.
-	 * Note: not needed for loose_part_vertex_mem block.
-	 */
-	{
-		MeshElemMap *loosepart_vertex_map_tmp;
-		const size_t size = sizeof(*loosepart_vertex_map_tmp) * (size_t)current_loosepart_index;
-
-		loosepart_vertex_map_tmp = MEM_mallocN(size, "map looseparts vertex 2");
-		memcpy(loosepart_vertex_map_tmp, loosepart_vertex_map, size);
-		MEM_freeN(loosepart_vertex_map);
-		loosepart_vertex_map = loosepart_vertex_map_tmp;
-	}
-
-	MEM_freeN(vert_edge_map);
-	MEM_freeN(vert_edge_mem);
-
-	MEM_freeN(vert_processed);
-
-	*r_map = loosepart_vertex_map;
-	*r_mem = loosepart_vertex_mem;
-	*lp_count = current_loosepart_index;
-}
 
 /**
  * This function creates a map so the source-data (vert/edge/loop/poly)

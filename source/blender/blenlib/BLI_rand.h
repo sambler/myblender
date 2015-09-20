@@ -53,7 +53,6 @@ int         BLI_rng_get_int(struct RNG *rng) ATTR_WARN_UNUSED_RESULT ATTR_NONNUL
 unsigned int BLI_rng_get_uint(struct RNG *rng) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1);
 double      BLI_rng_get_double(struct RNG *rng) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1);
 float       BLI_rng_get_float(struct RNG *rng) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1);
-float       BLI_rng_get_float_normal(struct RNG *rng, const float mean, const float standard_deviation);
 void        BLI_rng_get_float_unit_v2(struct RNG *rng, float v[2]) ATTR_NONNULL(1, 2);
 void        BLI_rng_get_float_unit_v3(struct RNG *rng, float v[3]) ATTR_NONNULL(1, 2);
 void        BLI_rng_get_tri_sample_float_v2(

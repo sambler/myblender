@@ -296,89 +296,36 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout_info.label(text=iface_("Faces: %d") % md.face_count, translate=False)
 
     def DISPLACE(self, layout, ob, md):
-        layout.row().prop(md, "displace_mode", expand=True)
+        has_texture = (md.texture is not None)
 
-        layout.separator()
+        col = layout.column(align=True)
+        col.label(text="Texture:")
+        col.template_ID(md, "texture", new="texture.new")
 
-        if md.displace_mode == 'TEXTURE':
-            has_texture = (md.texture is not None)
-
-            split = layout.split()
-
-            col = split.column()
-            col.label(text="Texture:")
-            col.template_ID(md, "texture", new="texture.new")
-
-            col = split.column()
-            colsub = col.column()
-            colsub.active = has_texture
-            colsub.label(text="Texture Coordinates:")
-            colsub.prop(md, "texture_coords", text="")
-
-            if md.texture_coords == 'OBJECT':
-                row = layout.row()
-                row.active = has_texture
-                row.prop(md, "texture_coords_object", text="Object")
-            elif md.texture_coords == 'UV' and ob.type == 'MESH':
-                row = layout.row()
-                row.active = has_texture
-                row.prop_search(md, "uv_layer", ob.data, "uv_textures")
-
-        else:
-            split = layout.split()
-            col = split.column()
-            row = col.row(align=True)
-            row.prop(md, "noise_seed")
-            row.prop(md, "use_obj_id", toggle=True, icon='OBJECT_DATA', icon_only=True)
-            col.prop(md, "noise_mode")
-
-            col = split.column()
-            col.prop(md, "noise_probability")
-            sub = col.column()
-            sub.active = (md.noise_mode == 'GAUSSIAN')
-            sub.prop(md, "noise_std_deviation" )
-
-        layout.separator()
         split = layout.split()
 
         col = split.column(align=True)
-        col.prop(md, "mid_level")
+        col.label(text="Direction:")
+        col.prop(md, "direction", text="")
         col.label(text="Vertex Group:")
         col.prop_search(md, "vertex_group", ob, "vertex_groups", text="")
 
-        col = split.column()
-        col.prop(md, "strength")
-        sub = col.column()
-        sub.active = md.displace_mode in {'TEXTURE', 'RANDOM_VERTEX'}
-        sub.label(text="Direction:")
-        sub.prop(md, "direction", text="")
+        col = split.column(align=True)
+        col.active = has_texture
+        col.label(text="Texture Coordinates:")
+        col.prop(md, "texture_coords", text="")
+        if md.texture_coords == 'OBJECT':
+            col.label(text="Object:")
+            col.prop(md, "texture_coords_object", text="")
+        elif md.texture_coords == 'UV' and ob.type == 'MESH':
+            col.label(text="UV Map:")
+            col.prop_search(md, "uv_layer", ob.data, "uv_textures", text="")
 
         layout.separator()
-        row = layout.row(align=True)
-        sub = row.row(align=True)
-        sub.active = md.use_object_offset
-        sub.prop(md, "offset_object")
-        row.prop(md, "use_object_offset", toggle=True, icon='OBJECT_DATA', icon_only=True)
 
-        use_custom_axis_factors = not (md.use_object_offset or
-                                       (md.direction == 'NORMAL' and
-                                        md.displace_mode not in {'RANDOM_LOOSE_PARTS', 'RANDOM_WHOLE_MESH'}))
-        split = layout.split(percentage=0.333)
-        col = split.column()
-        col.active = use_custom_axis_factors
-        col.label(text="Translation:")
-        col.prop(md, "translation_factor", text="")
-
-        split = split.split(percentage=0.5)
-        split.active = use_custom_axis_factors and md.displace_mode in {'RANDOM_LOOSE_PARTS', 'RANDOM_WHOLE_MESH'}
-        col = split.column()
-        col.label(text="Rotation:")
-        col.prop(md, "rotation_factor", text="")
-
-        col = split.column()
-        col.label(text="Scale:")
-        col.prop(md, "scale_factor", text="")
-
+        row = layout.row()
+        row.prop(md, "mid_level")
+        row.prop(md, "strength")
 
     def DYNAMIC_PAINT(self, layout, ob, md):
         layout.label(text="Settings are inside the Physics tab")

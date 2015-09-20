@@ -135,24 +135,6 @@ float BLI_rng_get_float(RNG *rng)
 	return (float) BLI_rng_get_int(rng) / 0x80000000;
 }
 
-/* Marsaglia algorithm for normal random number generation.
- * See http://en.wikipedia.org/wiki/Marsaglia_polar_method
- * Note we can't use spare value here (or we'd had to modify RNG, not worth it).
- */
-float BLI_rng_get_float_normal(RNG *rng, const float mean, const float standard_deviation)
-{
-	double u, v, s;
-
-	do {
-		u = 2.0 * BLI_rng_get_double(rng) - 1.0;
-		v = 2.0 * BLI_rng_get_double(rng) - 1.0;
-		s = u * u + v * v;
-	} while (s >= 1.0 || s == 0.0);
-
-	s = sqrt((-2.0 * log(s)) / s);
-	return (float) (u * s * standard_deviation + mean);
-}
-
 void BLI_rng_get_float_unit_v2(RNG *rng, float v[2])
 {
 	float a = (float)(M_PI * 2.0) * BLI_rng_get_float(rng);

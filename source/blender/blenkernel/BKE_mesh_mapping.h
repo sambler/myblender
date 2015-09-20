@@ -124,10 +124,6 @@ void BKE_mesh_edge_poly_map_create(
         const struct MEdge *medge, const int totedge,
         const struct MPoly *mpoly, const int totpoly,
         const struct MLoop *mloop, const int totloop);
-void BKE_mesh_loosepart_vertex_map_create(
-		MeshElemMap **r_map, int **r_mem, int *lp_count,
-		const struct MEdge *medge, const int totedge,
-		const int totvert);
 void BKE_mesh_origindex_map_create(
         MeshElemMap **r_map, int **r_mem,
         const int totorig,

@@ -647,40 +647,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 			}
 		}
 	}
-/* adjustments for custom displace modifier - D320*/
-	if (!MAIN_VERSION_ATLEAST(main, 273, 10)) {
-		Object *ob;
 
-		for (ob = main->object.first; ob; ob = ob->id.next) {
-			ModifierData *md;
-			for (md = ob->modifiers.first; md; md = md->next) {
-				if (md->type == eModifierType_Displace) {
-					DisplaceModifierData *dmd = (DisplaceModifierData *)md;
-					/* We removed those single-axis modes, make valid conversion. */
-					switch (dmd->direction) {
-						case 0:  /* Old X axis. */
-							dmd->direction = MOD_DISP_DIR_VAL_XYZ;
-							dmd->translation[0] = 1.0f;
-							dmd->translation[1] = dmd->translation[2] = 0.0f;
-							break;
-						case 1:  /* Old Y axis. */
-							dmd->direction = MOD_DISP_DIR_VAL_XYZ;
-							dmd->translation[1] = 1.0f;
-							dmd->translation[0] = dmd->translation[2] = 0.0f;
-							break;
-						case 2:  /* Old Z axis. */
-							dmd->direction = MOD_DISP_DIR_VAL_XYZ;
-							dmd->translation[2] = 1.0f;
-							dmd->translation[0] = dmd->translation[1] = 0.0f;
-							break;
-						default:
-							break;  /* No change. */
-					}
-				}
-			}
-		}
-	}
-/* end of D320 adjustments */
 	if (!MAIN_VERSION_ATLEAST(main, 274, 1)) {
 		/* particle systems need to be forced to redistribute for jitter mode fix */
 		{

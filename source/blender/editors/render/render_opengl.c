@@ -105,7 +105,7 @@ typedef struct OGLRender {
 	bMovieHandle *mh;
 	int cfrao, nfra;
 
-	size_t totvideos;
+	int totvideos;
 
 	/* quick lookup */
 	int view_id;
@@ -229,13 +229,8 @@ static void screen_opengl_views_setup(OGLRender *oglrender)
 	}
 
 	BLI_lock_thread(LOCK_DRAW_IMAGE);
-	if (is_multiview && BKE_scene_multiview_is_stereo3d(rd)) {
-		oglrender->ima->flag |= IMA_IS_STEREO;
-	}
-	else {
-		oglrender->ima->flag &= ~IMA_IS_STEREO;
+	if (!(is_multiview && BKE_scene_multiview_is_stereo3d(rd)))
 		oglrender->iuser.flag &= ~IMA_SHOW_STEREO;
-	}
 	BLI_unlock_thread(LOCK_DRAW_IMAGE);
 
 	/* will only work for non multiview correctly */
@@ -627,7 +622,7 @@ static void screen_opengl_render_end(bContext *C, OGLRender *oglrender)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = oglrender->scene;
-	size_t i;
+	int i;
 
 	if (oglrender->mh) {
 		if (BKE_imtype_is_movie(scene->r.im_format.imtype)) {
@@ -685,7 +680,8 @@ static bool screen_opengl_render_anim_initialize(bContext *C, wmOperator *op)
 	oglrender->reports = op->reports;
 
 	if (BKE_imtype_is_movie(scene->r.im_format.imtype)) {
-		size_t i, width, height;
+		size_t width, height;
+		int i;
 
 		BKE_scene_multiview_videos_dimensions_get(&scene->r, oglrender->sizex, oglrender->sizey, &width, &height);
 		oglrender->mh = BKE_movie_handle_get(scene->r.im_format.imtype);

@@ -2162,6 +2162,7 @@ static void lib_link_brush(FileData *fd, Main *main)
 			brush->mtex.tex = newlibadr_us(fd, brush->id.lib, brush->mtex.tex);
 			brush->mask_mtex.tex = newlibadr_us(fd, brush->id.lib, brush->mask_mtex.tex);
 			brush->clone.image = newlibadr_us(fd, brush->id.lib, brush->clone.image);
+			brush->toggle_brush = newlibadr(fd, brush->id.lib, brush->toggle_brush);
 			brush->paint_curve = newlibadr_us(fd, brush->id.lib, brush->paint_curve);
 		}
 	}
@@ -2219,14 +2220,6 @@ static void direct_link_paint_curve(FileData *fd, PaintCurve *pc)
 {
 	pc->points = newdataadr(fd, pc->points);
 }
-
-
-static void direct_link_script(FileData *UNUSED(fd), Script *script)
-{
-	script->id.us = 1;
-	SCRIPT_SET_NULL(script);
-}
-
 
 /* ************ READ PACKEDFILE *************** */
 
@@ -6015,6 +6008,8 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 	}
 
 	sce->preview = direct_link_preview_image(fd, sce->preview);
+
+	direct_link_curvemapping(fd, &sce->r.mblur_shutter_curve);
 }
 
 /* ************ READ WM ***************** */
@@ -6353,20 +6348,14 @@ static void lib_link_screen(FileData *fd, Main *main)
 /* how to handle user count on pointer restore */
 typedef enum ePointerUserMode {
 	USER_IGNORE = 0,  /* ignore user count */
-	USER_ONE    = 1,  /* ensure at least one user (fake also counts) */
-	USER_REAL   = 2,  /* ensure at least one real user (fake user ignored) */
+	USER_REAL   = 1,  /* ensure at least one real user (fake user ignored) */
 } ePointerUserMode;
 
 static bool restore_pointer(ID *id, ID *newid, ePointerUserMode user)
 {
 	if (STREQ(newid->name + 2, id->name + 2)) {
 		if (newid->lib == id->lib) {
-			if (user == USER_ONE) {
-				if (newid->us == 0) {
-					newid->us++;
-				}
-			}
-			else if (user == USER_REAL) {
+			if (user == USER_REAL) {
 				id_us_ensure_real(newid);
 			}
 			return true;
@@ -6380,7 +6369,6 @@ static bool restore_pointer(ID *id, ID *newid, ePointerUserMode user)
  *
  * user
  * - USER_IGNORE: no usercount change
- * - USER_ONE: ensure a user
  * - USER_REAL: ensure a real user (even if a fake one is set)
  */
 static void *restore_pointer_by_name(Main *mainp, ID *id, ePointerUserMode user)
@@ -6406,7 +6394,7 @@ static void lib_link_seq_clipboard_pt_restore(ID *id, Main *newmain)
 	if (id) {
 		/* clipboard must ensure this */
 		BLI_assert(id->newid != NULL);
-		id->newid = restore_pointer_by_name(newmain, (ID *)id->newid, USER_ONE);
+		id->newid = restore_pointer_by_name(newmain, (ID *)id->newid, USER_REAL);
 	}
 }
 static int lib_link_seq_clipboard_cb(Sequence *seq, void *arg_pt)
@@ -6440,7 +6428,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 	/* first windowmanager */
 	for (wm = newmain->wm.first; wm; wm = wm->id.next) {
 		for (win= wm->windows.first; win; win= win->next) {
-			win->screen = restore_pointer_by_name(newmain, (ID *)win->screen, USER_ONE);
+			win->screen = restore_pointer_by_name(newmain, (ID *)win->screen, USER_REAL);
 			
 			if (win->screen == NULL)
 				win->screen = curscreen;
@@ -6453,7 +6441,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 	for (sc = newmain->screen.first; sc; sc = sc->id.next) {
 		Scene *oldscene = sc->scene;
 		
-		sc->scene= restore_pointer_by_name(newmain, (ID *)sc->scene, USER_ONE);
+		sc->scene= restore_pointer_by_name(newmain, (ID *)sc->scene, USER_REAL);
 		if (sc->scene == NULL)
 			sc->scene = curscene;
 		
@@ -6472,10 +6460,10 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					if (v3d->scenelock)
 						v3d->camera = NULL; /* always get from scene */
 					else
-						v3d->camera = restore_pointer_by_name(newmain, (ID *)v3d->camera, USER_ONE);
+						v3d->camera = restore_pointer_by_name(newmain, (ID *)v3d->camera, USER_REAL);
 					if (v3d->camera == NULL)
 						v3d->camera = sc->scene->camera;
-					v3d->ob_centre = restore_pointer_by_name(newmain, (ID *)v3d->ob_centre, USER_ONE);
+					v3d->ob_centre = restore_pointer_by_name(newmain, (ID *)v3d->ob_centre, USER_REAL);
 					
 					for (bgpic= v3d->bgpicbase.first; bgpic; bgpic= bgpic->next) {
 						if ((bgpic->ima = restore_pointer_by_name(newmain, (ID *)bgpic->ima, USER_IGNORE))) {
@@ -6525,7 +6513,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					bDopeSheet *ads = sipo->ads;
 					
 					if (ads) {
-						ads->source = restore_pointer_by_name(newmain, (ID *)ads->source, USER_ONE);
+						ads->source = restore_pointer_by_name(newmain, (ID *)ads->source, USER_REAL);
 						
 						if (ads->filter_grp)
 							ads->filter_grp = restore_pointer_by_name(newmain, (ID *)ads->filter_grp, USER_IGNORE);
@@ -6555,8 +6543,8 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 				else if (sl->spacetype == SPACE_ACTION) {
 					SpaceAction *saction = (SpaceAction *)sl;
 					
-					saction->action = restore_pointer_by_name(newmain, (ID *)saction->action, USER_ONE);
-					saction->ads.source = restore_pointer_by_name(newmain, (ID *)saction->ads.source, USER_ONE);
+					saction->action = restore_pointer_by_name(newmain, (ID *)saction->action, USER_REAL);
+					saction->ads.source = restore_pointer_by_name(newmain, (ID *)saction->ads.source, USER_REAL);
 					
 					if (saction->ads.filter_grp)
 						saction->ads.filter_grp = restore_pointer_by_name(newmain, (ID *)saction->ads.filter_grp, USER_IGNORE);
@@ -6585,7 +6573,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					/* NOTE: pre-2.5, this was local data not lib data, but now we need this as lib data
 					 * so assume that here we're doing for undo only...
 					 */
-					sima->gpd = restore_pointer_by_name(newmain, (ID *)sima->gpd, USER_ONE);
+					sima->gpd = restore_pointer_by_name(newmain, (ID *)sima->gpd, USER_REAL);
 					sima->mask_info.mask = restore_pointer_by_name(newmain, (ID *)sima->mask_info.mask, USER_REAL);
 				}
 				else if (sl->spacetype == SPACE_SEQ) {
@@ -6594,14 +6582,14 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					/* NOTE: pre-2.5, this was local data not lib data, but now we need this as lib data
 					 * so assume that here we're doing for undo only...
 					 */
-					sseq->gpd = restore_pointer_by_name(newmain, (ID *)sseq->gpd, USER_ONE);
+					sseq->gpd = restore_pointer_by_name(newmain, (ID *)sseq->gpd, USER_REAL);
 				}
 				else if (sl->spacetype == SPACE_NLA) {
 					SpaceNla *snla = (SpaceNla *)sl;
 					bDopeSheet *ads = snla->ads;
 					
 					if (ads) {
-						ads->source = restore_pointer_by_name(newmain, (ID *)ads->source, USER_ONE);
+						ads->source = restore_pointer_by_name(newmain, (ID *)ads->source, USER_REAL);
 						
 						if (ads->filter_grp)
 							ads->filter_grp = restore_pointer_by_name(newmain, (ID *)ads->filter_grp, USER_IGNORE);
@@ -6610,13 +6598,13 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 				else if (sl->spacetype == SPACE_TEXT) {
 					SpaceText *st = (SpaceText *)sl;
 					
-					st->text = restore_pointer_by_name(newmain, (ID *)st->text, USER_ONE);
+					st->text = restore_pointer_by_name(newmain, (ID *)st->text, USER_REAL);
 					if (st->text == NULL) st->text = newmain->text.first;
 				}
 				else if (sl->spacetype == SPACE_SCRIPT) {
 					SpaceScript *scpt = (SpaceScript *)sl;
 					
-					scpt->script = restore_pointer_by_name(newmain, (ID *)scpt->script, USER_ONE);
+					scpt->script = restore_pointer_by_name(newmain, (ID *)scpt->script, USER_REAL);
 					
 					/*sc->script = NULL; - 2.45 set to null, better re-run the script */
 					if (scpt->script) {
@@ -6654,7 +6642,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					bNodeTree *ntree;
 					
 					/* node tree can be stored locally in id too, link this first */
-					snode->id = restore_pointer_by_name(newmain, snode->id, USER_ONE);
+					snode->id = restore_pointer_by_name(newmain, snode->id, USER_REAL);
 					snode->from = restore_pointer_by_name(newmain, snode->from, USER_IGNORE);
 					
 					ntree = nodetree_from_id(snode->id);
@@ -6703,7 +6691,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 				else if (sl->spacetype == SPACE_LOGIC) {
 					SpaceLogic *slogic = (SpaceLogic *)sl;
 					
-					slogic->gpd = restore_pointer_by_name(newmain, (ID *)slogic->gpd, USER_ONE);
+					slogic->gpd = restore_pointer_by_name(newmain, (ID *)slogic->gpd, USER_REAL);
 				}
 			}
 		}
@@ -7273,25 +7261,26 @@ static void lib_link_group(FileData *fd, Main *main)
 {
 	Group *group;
 	GroupObject *go;
-	int add_us;
+	bool add_us;
 	
 	for (group = main->group.first; group; group = group->id.next) {
 		if (group->id.flag & LIB_NEED_LINK) {
 			group->id.flag -= LIB_NEED_LINK;
 			
-			add_us = 0;
+			add_us = false;
 			
 			for (go = group->gobject.first; go; go = go->next) {
 				go->ob= newlibadr(fd, group->id.lib, go->ob);
 				if (go->ob) {
 					go->ob->flag |= OB_FROMGROUP;
 					/* if group has an object, it increments user... */
-					add_us = 1;
-					if (go->ob->id.us == 0)
-						go->ob->id.us = 1;
+					add_us = true;
+					id_us_ensure_real(&go->ob->id);
 				}
 			}
-			if (add_us) group->id.us++;
+			if (add_us) {
+				id_us_ensure_real(&group->id);
+			}
 			BKE_group_object_unlink(group, NULL, NULL, NULL);	/* removes NULL entries */
 		}
 	}
@@ -7914,30 +7903,34 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, int flag, ID
 
 	/* read libblock */
 	id = read_struct(fd, bhead, "lib block");
+
+	if (id) {
+		const short idcode = (bhead->code == ID_ID) ? GS(id->name) : bhead->code;
+		/* do after read_struct, for dna reconstruct */
+		lb = which_libbase(main, idcode);
+		if (lb) {
+			oldnewmap_insert(fd->libmap, bhead->old, id, bhead->code);	/* for ID_ID check */
+			BLI_addtail(lb, id);
+		}
+		else {
+			/* unknown ID type */
+			printf("%s: unknown id code '%c%c'\n", __func__, (idcode & 0xff), (idcode >> 8));
+			MEM_freeN(id);
+			id = NULL;
+		}
+	}
+
 	if (r_id)
 		*r_id = id;
 	if (!id)
 		return blo_nextbhead(fd, bhead);
 	
-	oldnewmap_insert(fd->libmap, bhead->old, id, bhead->code);	/* for ID_ID check */
-	
-	/* do after read_struct, for dna reconstruct */
-	if (bhead->code == ID_ID) {
-		lb = which_libbase(main, GS(id->name));
-	}
-	else {
-		lb = which_libbase(main, bhead->code);
-	}
-	
-	BLI_addtail(lb, id);
-	
 	/* clear first 8 bits */
 	id->flag = (id->flag & 0xFF00) | flag | LIB_NEED_LINK;
 	id->lib = main->curlib;
-	if (id->flag & LIB_FAKEUSER) id->us= 1;
-	else id->us = 0;
+	id->us = ID_FAKE_USERS(id);
 	id->icon_id = 0;
-	id->flag &= ~(LIB_ID_RECALC|LIB_ID_RECALC_DATA|LIB_DOIT);
+	id->flag &= ~(LIB_ID_RECALC | LIB_ID_RECALC_DATA | LIB_DOIT | LIB_MISSING);
 	
 	/* this case cannot be direct_linked: it's just the ID part */
 	if (bhead->code == ID_ID) {
@@ -8034,9 +8027,6 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, int flag, ID
 			break;
 		case ID_PA:
 			direct_link_particlesettings(fd, (ParticleSettings*)id);
-			break;
-		case ID_SCRIPT:
-			direct_link_script(fd, (Script*)id);
 			break;
 		case ID_GD:
 			direct_link_gpencil(fd, (bGPdata *)id);
@@ -9615,11 +9605,30 @@ static void give_base_to_groups(
 	}
 }
 
+static ID *create_placeholder(Main *mainvar, const char *idname, const short flag)
+{
+	const short idcode = GS(idname);
+	ListBase *lb = which_libbase(mainvar, idcode);
+	ID *ph_id = BKE_libblock_alloc_notest(idcode);
+
+	memcpy(ph_id->name, idname, sizeof(ph_id->name));
+	BKE_libblock_init_empty(ph_id);
+	ph_id->lib = mainvar->curlib;
+	ph_id->flag = flag | LIB_MISSING;
+	ph_id->us = ID_FAKE_USERS(ph_id);
+	ph_id->icon_id = 0;
+
+	BLI_addtail(lb, ph_id);
+	id_sort_by_name(lb, ph_id);
+
+	return ph_id;
+}
+
 /* returns true if the item was found
  * but it may already have already been appended/linked */
-static ID *link_named_part(Main *mainl, FileData *fd, const char *idname, const short idcode)
+static ID *link_named_part(Main *mainl, FileData *fd, const short idcode, const char *name)
 {
-	BHead *bhead = find_bhead_from_code_name(fd, idcode, idname);
+	BHead *bhead = find_bhead_from_code_name(fd, idcode, name);
 	ID *id;
 
 	if (bhead) {
@@ -9679,10 +9688,10 @@ void BLO_library_link_all(Main *mainl, BlendHandle *bh)
 }
 
 static ID *link_named_part_ex(
-        Main *mainl, FileData *fd, const char *idname, const int idcode, const int flag,
+        Main *mainl, FileData *fd, const short idcode, const char *name, const short flag,
 		Scene *scene, View3D *v3d)
 {
-	ID *id = link_named_part(mainl, fd, idname, idcode);
+	ID *id = link_named_part(mainl, fd, idcode, name);
 
 	if (id && (GS(id->name) == ID_OB)) {	/* loose object: give a base */
 		if (scene) {
@@ -9726,14 +9735,14 @@ static ID *link_named_part_ex(
  *
  * \param mainl The main database to link from (not the active one).
  * \param bh The blender file handle.
- * \param idname The name of the datablock (without the 2 char ID prefix).
  * \param idcode The kind of datablock to link.
- * \return the appended ID when found.
+ * \param name The name of the datablock (without the 2 char ID prefix).
+ * \return the linked ID when found.
  */
-ID *BLO_library_link_named_part(Main *mainl, BlendHandle **bh, const char *idname, const int idcode)
+ID *BLO_library_link_named_part(Main *mainl, BlendHandle **bh, const short idcode, const char *name)
 {
 	FileData *fd = (FileData*)(*bh);
-	return link_named_part(mainl, fd, idname, idcode);
+	return link_named_part(mainl, fd, idcode, name);
 }
 
 /**
@@ -9742,30 +9751,50 @@ ID *BLO_library_link_named_part(Main *mainl, BlendHandle **bh, const char *idnam
  *
  * \param mainl The main database to link from (not the active one).
  * \param bh The blender file handle.
- * \param idname The name of the datablock (without the 2 char ID prefix).
  * \param idcode The kind of datablock to link.
+ * \param name The name of the datablock (without the 2 char ID prefix).
  * \param flag Options for linking, used for instantiating.
  * \param scene The scene in which to instantiate objects/groups (if NULL, no instantiation is done).
  * \param v3d The active View3D (only to define active layers for instantiated objects & groups, can be NULL).
- * \return the appended ID when found.
+ * \return the linked ID when found.
  */
 ID *BLO_library_link_named_part_ex(
-        Main *mainl, BlendHandle **bh, const char *idname, const int idcode, const short flag,
+        Main *mainl, BlendHandle **bh,
+        const short idcode, const char *name, const short flag,
         Scene *scene, View3D *v3d)
 {
 	FileData *fd = (FileData*)(*bh);
-	return link_named_part_ex(mainl, fd, idname, idcode, flag, scene, v3d);
+	return link_named_part_ex(mainl, fd, idcode, name, flag, scene, v3d);
 }
 
-static void link_id_part(FileData *fd, Main *mainvar, ID *id, ID **r_id)
+static void link_id_part(ReportList *reports, FileData *fd, Main *mainvar, ID *id, ID **r_id)
 {
-	BHead *bhead = find_bhead_from_idname(fd, id->name);
+	BHead *bhead = NULL;
+
+	if (fd) {
+		bhead = find_bhead_from_idname(fd, id->name);
+	}
+
+	id->flag &= ~LIB_READ;
 
 	if (bhead) {
-		id->flag &= ~LIB_READ;
 		id->flag |= LIB_NEED_EXPAND;
 		// printf("read lib block %s\n", id->name);
 		read_libblock(fd, mainvar, bhead, id->flag, r_id);
+	}
+	else {
+		blo_reportf_wrap(
+		        reports, RPT_WARNING,
+		        TIP_("LIB ERROR: %s: '%s' missing from '%s', parent '%s'"),
+		        BKE_idcode_to_name(GS(id->name)),
+		        id->name + 2,
+		        mainvar->curlib->filepath,
+		        library_parent_filepath(mainvar->curlib));
+
+		/* Generate a placeholder for this ID (simplified version of read_libblock actually...). */
+		if (r_id) {
+			*r_id = create_placeholder(mainvar, id->name, id->flag);
+		}
 	}
 }
 
@@ -10011,6 +10040,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					}
 					else {
 						mainptr->curlib->filedata = NULL;
+						mainptr->curlib->id.flag |= LIB_MISSING;
 					}
 					
 					if (fd == NULL) {
@@ -10020,37 +10050,29 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 				}
 				if (fd) {
 					do_it = true;
-					a = set_listbasepointers(mainptr, lbarray);
-					while (a--) {
-						ID *id = lbarray[a]->first;
-						
-						while (id) {
-							ID *idn = id->next;
-							if (id->flag & LIB_READ) {
-								ID *realid = NULL;
-								BLI_remlink(lbarray[a], id);
-								
-								link_id_part(fd, mainptr, id, &realid);
-								if (!realid) {
-									blo_reportf_wrap(
-									        fd->reports, RPT_WARNING,
-									        TIP_("LIB ERROR: %s: '%s' missing from '%s', parent '%s'"),
-									        BKE_idcode_to_name(GS(id->name)),
-									        id->name + 2,
-									        mainptr->curlib->filepath,
-									        library_parent_filepath(mainptr->curlib));
-								}
-								
-								change_idid_adr(mainlist, basefd, id, realid);
-								
-								MEM_freeN(id);
-							}
-							id = idn;
-						}
-					}
-					
-					BLO_expand_main(fd, mainptr);
 				}
+				a = set_listbasepointers(mainptr, lbarray);
+				while (a--) {
+					ID *id = lbarray[a]->first;
+
+					while (id) {
+						ID *idn = id->next;
+						if (id->flag & LIB_READ) {
+							ID *realid = NULL;
+							BLI_remlink(lbarray[a], id);
+
+							link_id_part(basefd->reports, fd, mainptr, id, &realid);
+
+							BLI_assert(realid != NULL);
+
+							change_idid_adr(mainlist, basefd, id, realid);
+
+							MEM_freeN(id);
+						}
+						id = idn;
+					}
+				}
+				BLO_expand_main(fd, mainptr);
 			}
 			
 			mainptr = mainptr->next;
@@ -10058,6 +10080,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 	}
 	
 	/* test if there are unread libblocks */
+	/* XXX This code block is kept for 2.77, until we are sure it never gets reached anymore. Can be removed later. */
 	for (mainptr = mainl->next; mainptr; mainptr = mainptr->next) {
 		a = set_listbasepointers(mainptr, lbarray);
 		while (a--) {
@@ -10066,10 +10089,12 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 			for (id = lbarray[a]->first; id; id = idn) {
 				idn = id->next;
 				if (id->flag & LIB_READ) {
+					BLI_assert(0);
 					BLI_remlink(lbarray[a], id);
 					blo_reportf_wrap(
 					        basefd->reports, RPT_WARNING,
-					        TIP_("LIB ERROR: %s: '%s' unread lib block missing from '%s', parent '%s'"),
+					        TIP_("LIB ERROR: %s: '%s' unread lib block missing from '%s', parent '%s' - "
+					             "Please file a bug report if you see this message"),
 					        BKE_idcode_to_name(GS(id->name)),
 					        id->name + 2,
 					        mainptr->curlib->filepath,

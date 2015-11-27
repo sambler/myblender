@@ -2452,7 +2452,6 @@ static void node_composit_buts_planetrackdeform(uiLayout *layout, bContext *C, P
 		MovieTrackingObject *object;
 		uiLayout *col;
 		PointerRNA tracking_ptr;
-		NodeTrackPosData *data = node->storage;
 
 		RNA_pointer_create(&clip->id, &RNA_MovieTracking, tracking, &tracking_ptr);
 
@@ -3344,7 +3343,7 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 
 
 /* if v2d not NULL, it clips and returns 0 if not visible */
-int node_link_bezier_points(View2D *v2d, SpaceNode *snode, bNodeLink *link, float coord_array[][2], int resol)
+bool node_link_bezier_points(View2D *v2d, SpaceNode *snode, bNodeLink *link, float coord_array[][2], int resol)
 {
 	float dist, vec[4][2];
 	float deltax, deltay;
@@ -3380,7 +3379,8 @@ int node_link_bezier_points(View2D *v2d, SpaceNode *snode, bNodeLink *link, floa
 		toreroute = 0;
 	}
 
-	dist = UI_GetThemeValue(TH_NODE_CURVING) * 0.10f * fabsf(vec[0][0] - vec[3][0]);
+	/* may be called outside of drawing (so pass spacetype) */
+	dist = UI_GetThemeValueType(TH_NODE_CURVING, SPACE_NODE) * 0.10f * fabsf(vec[0][0] - vec[3][0]);
 	deltax = vec[3][0] - vec[0][0];
 	deltay = vec[3][1] - vec[0][1];
 	/* check direction later, for top sockets */

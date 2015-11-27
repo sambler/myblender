@@ -123,10 +123,11 @@ static void library_foreach_modifiersForeachIDLink(
 }
 
 static void library_foreach_constraintObjectLooper(bConstraint *UNUSED(con), ID **id_pointer,
-                                                   bool UNUSED(is_reference), void *user_data)
+                                                   bool is_reference, void *user_data)
 {
 	LibraryForeachIDData *data = (LibraryForeachIDData *) user_data;
-	FOREACH_CALLBACK_INVOKE_ID_PP(data->self_id, id_pointer, data->flag, data->callback, data->user_data, IDWALK_NOP);
+	const int cd_flag = is_reference ? IDWALK_USER : IDWALK_NOP;
+	FOREACH_CALLBACK_INVOKE_ID_PP(data->self_id, id_pointer, data->flag, data->callback, data->user_data, cd_flag);
 }
 
 static void library_foreach_particlesystemsObjectLooper(
@@ -335,14 +336,6 @@ void BKE_library_foreach_ID_link(ID *id, LibraryIDLinkCallback callback, void *u
 			}
 			CALLBACK_INVOKE(object->gpd, IDWALK_USER);
 			CALLBACK_INVOKE(object->dup_group, IDWALK_USER);
-
-			if (object->particlesystem.first) {
-				ParticleSystem *psys;
-				for (psys = object->particlesystem.first; psys; psys = psys->next) {
-					CALLBACK_INVOKE(psys->target_ob, IDWALK_NOP);
-					CALLBACK_INVOKE(psys->parent, IDWALK_NOP);
-				}
-			}
 
 			if (object->pd) {
 				CALLBACK_INVOKE(object->pd->tex, IDWALK_USER);

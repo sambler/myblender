@@ -117,6 +117,8 @@
 
 #include "RNA_access.h"
 
+#include "DEG_depsgraph.h"
+
 #include "transform.h"
 #include "bmesh.h"
 
@@ -845,6 +847,14 @@ static void pose_grab_with_ik_clear(Object *ob)
 			}
 		}
 	}
+
+#ifdef WITH_LEGACY_DEPSGRAPH
+	if (!DEG_depsgraph_use_legacy())
+#endif
+	{
+		/* TODO(sergey): Consuder doing partial update only. */
+		DAG_relations_tag_update(G.main);
+	}
 }
 
 /* adds the IK to pchan - returns if added */
@@ -995,8 +1005,16 @@ static short pose_grab_with_ik(Object *ob)
 	}
 
 	/* iTaSC needs clear for new IK constraints */
-	if (tot_ik)
+	if (tot_ik) {
 		BIK_clear_data(ob->pose);
+#ifdef WITH_LEGACY_DEPSGRAPH
+		if (!DEG_depsgraph_use_legacy())
+#endif
+		{
+			/* TODO(sergey): Consuder doing partial update only. */
+			DAG_relations_tag_update(G.main);
+		}
+	}
 
 	return (tot_ik) ? 1 : 0;
 }
@@ -2029,11 +2047,13 @@ static void editmesh_set_connectivity_distance(BMesh *bm, float mtx[3][3], float
 					if (BM_elem_flag_test(e_iter, BM_ELEM_HIDDEN) == 0) {
 
 						/* edge distance */
-						BMVert *v_other = BM_edge_other_vert(e_iter, v);
-						if (bmesh_test_dist_add(v, v_other, dists, dists_prev, mtx)) {
-							if (BM_elem_flag_test(v_other, BM_ELEM_TAG) == 0) {
-								BM_elem_flag_enable(v_other, BM_ELEM_TAG);
-								BLI_LINKSTACK_PUSH(queue_next, v_other);
+						{
+							BMVert *v_other = BM_edge_other_vert(e_iter, v);
+							if (bmesh_test_dist_add(v, v_other, dists, dists_prev, mtx)) {
+								if (BM_elem_flag_test(v_other, BM_ELEM_TAG) == 0) {
+									BM_elem_flag_enable(v_other, BM_ELEM_TAG);
+									BLI_LINKSTACK_PUSH(queue_next, v_other);
+								}
 							}
 						}
 
@@ -2071,10 +2091,10 @@ static void editmesh_set_connectivity_distance(BMesh *bm, float mtx[3][3], float
 
 		/* clear for the next loop */
 		for (lnk = queue_next; lnk; lnk = lnk->next) {
-			BMVert *v = lnk->link;
-			const int i = BM_elem_index_get(v);
+			BMVert *v_link = lnk->link;
+			const int i = BM_elem_index_get(v_link);
 
-			BM_elem_flag_disable(v, BM_ELEM_TAG);
+			BM_elem_flag_disable(v_link, BM_ELEM_TAG);
 
 			/* keep in sync, avoid having to do full memcpy each iteration */
 			dists_prev[i] = dists[i];
@@ -3733,16 +3753,19 @@ static void createTransActionData(bContext *C, TransInfo *t)
 	
 	/* loop 2: build transdata array */
 	for (ale = anim_data.first; ale; ale = ale->next) {
-		AnimData *adt;
 
 		if (is_prop_edit && !ale->tag)
 			continue;
 
-		adt = ANIM_nla_mapping_get(&ac, ale);
-		if (adt)
-			cfra = BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
-		else
-			cfra = (float)CFRA;
+		cfra = (float)CFRA;
+
+		{
+			AnimData *adt;
+			adt = ANIM_nla_mapping_get(&ac, ale);
+			if (adt) {
+				cfra = BKE_nla_tweakedit_remap(adt, cfra, NLATIME_CONVERT_UNMAP);
+			}
+		}
 
 		if (ale->type == ANIMTYPE_GPLAYER) {
 			bGPDlayer *gpl = (bGPDlayer *)ale->data;
@@ -4560,7 +4583,7 @@ void flushTransGraphData(TransInfo *t)
 		/* handle snapping for time values
 		 *	- we should still be in NLA-mapping timespace
 		 *	- only apply to keyframes (but never to handles)
-		 *  - don't do this when cancelling, or else these changes won't go away
+		 *  - don't do this when canceling, or else these changes won't go away
 		 */
 		if ((t->state != TRANS_CANCEL) && (td->flag & TD_NOTIMESNAP) == 0) {
 			switch (sipo->autosnap) {
@@ -4590,7 +4613,7 @@ void flushTransGraphData(TransInfo *t)
 		 *
 		 * NOTE: We also have to apply to td->loc, as that's what the handle-adjustment step below looks
 		 *       to, otherwise we get "swimming handles"
-		 * NOTE: We don't do this when cancelling transforms, or else these changes don't go away
+		 * NOTE: We don't do this when canceling transforms, or else these changes don't go away
 		 */
 		if ((t->state != TRANS_CANCEL) && (td->flag & TD_NOTIMESNAP) == 0 && 
 		    ELEM(sipo->autosnap, SACTSNAP_STEP, SACTSNAP_TSTEP)) 

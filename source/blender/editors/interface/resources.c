@@ -1382,6 +1382,23 @@ int UI_GetThemeValue(int colorid)
 	return ((int) cp[0]);
 }
 
+/* versions of the function above, which take a space-type */
+float UI_GetThemeValueTypef(int colorid, int spacetype)
+{
+	const unsigned char *cp;
+
+	cp = UI_ThemeGetColorPtr(theme_active, spacetype, colorid);
+	return ((float)cp[0]);
+}
+
+int UI_GetThemeValueType(int colorid, int spacetype)
+{
+	const unsigned char *cp;
+
+	cp = UI_ThemeGetColorPtr(theme_active, spacetype, colorid);
+	return ((int)cp[0]);
+}
+
 
 /* get the color, range 0.0-1.0 */
 void UI_GetThemeColor3fv(int colorid, float col[3])
@@ -1921,10 +1938,6 @@ void init_userdef_do_versions(void)
 			U.audioformat = 0x24;
 		if (U.audiorate == 0)
 			U.audiorate = 44100;
-	}
-
-	if (!USER_VERSION_ATLEAST(250, 3)) {
-		U.gameflags |= USER_DISABLE_VBO;
 	}
 	
 	if (!USER_VERSION_ATLEAST(250, 8)) {

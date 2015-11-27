@@ -89,6 +89,7 @@
 #include "BKE_global.h"
 #include "BKE_group.h"
 #include "BKE_gpencil.h"
+#include "BKE_idcode.h"
 #include "BKE_idprop.h"
 #include "BKE_image.h"
 #include "BKE_ipo.h"
@@ -152,6 +153,7 @@ void BKE_id_lib_local_paths(Main *bmain, Library *lib, ID *id)
 void id_lib_extern(ID *id)
 {
 	if (id) {
+		BLI_assert(BKE_idcode_is_linkable(GS(id->name)));
 		if (id->flag & LIB_INDIRECT) {
 			id->flag -= LIB_INDIRECT;
 			id->flag |= LIB_EXTERN;
@@ -179,10 +181,7 @@ void id_us_plus(ID *id)
 	if (id) {
 		BLI_assert(id->us >= 0);
 		id->us++;
-		if (id->flag & LIB_INDIRECT) {
-			id->flag -= LIB_INDIRECT;
-			id->flag |= LIB_EXTERN;
-		}
+		id_lib_extern(id);
 	}
 }
 
@@ -600,8 +599,9 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	/* BACKWARDS! also watch order of free-ing! (mesh<->mat), first items freed last.
 	 * This is important because freeing data decreases usercounts of other datablocks,
 	 * if this data is its self freed it can crash. */
+	lb[a++] = &(main->library);  /* Libraries may be accessed from pretty much any other ID... */
 	lb[a++] = &(main->ipo);
-	lb[a++] = &(main->action); // xxx moved here to avoid problems when freeing with animato (aligorith)
+	lb[a++] = &(main->action); /* moved here to avoid problems when freeing with animato (aligorith) */
 	lb[a++] = &(main->key);
 	lb[a++] = &(main->gpencil); /* referenced by nodes, objects, view, scene etc, before to free after. */
 	lb[a++] = &(main->nodetree);
@@ -639,7 +639,6 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[a++] = &(main->object);
 	lb[a++] = &(main->linestyle); /* referenced by scenes */
 	lb[a++] = &(main->scene);
-	lb[a++] = &(main->library);
 	lb[a++] = &(main->wm);
 	lb[a++] = &(main->mask);
 	

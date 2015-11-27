@@ -2641,7 +2641,7 @@ static void ui_textedit_set_cursor_select(uiBut *but, uiHandleButtonData *data, 
 /**
  * This is used for both utf8 and ascii
  *
- * For unicode buttons, \a buf is treated as unicde.
+ * For unicode buttons, \a buf is treated as unicode.
  */
 static bool ui_textedit_insert_buf(
         uiBut *but, uiHandleButtonData *data,
@@ -8223,7 +8223,6 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 
 			case MOUSEMOVE:
 				if (ELEM(but->type, UI_BTYPE_LINK, UI_BTYPE_INLINK)) {
-					ARegion *ar = data->region;
 					but->flag |= UI_SELECT;
 					ui_do_button(C, block, but, event);
 					ED_region_tag_redraw(ar);
@@ -9376,7 +9375,6 @@ static int ui_pie_handler(bContext *C, const wmEvent *event, uiPopupBlockHandle 
 {
 	ARegion *ar;
 	uiBlock *block;
-	uiBut *but;
 	float event_xy[2];
 	double duration;
 	bool is_click_style;
@@ -9420,7 +9418,6 @@ static int ui_pie_handler(bContext *C, const wmEvent *event, uiPopupBlockHandle 
 
 			/* handle animation */
 			if (!(block->pie_data.flags & UI_PIE_ANIMATION_FINISHED)) {
-				uiBut *but;
 				double final_time = 0.01 * U.pie_animation_timeout;
 				float fac = duration / final_time;
 				float pie_radius = U.pie_menu_radius * UI_DPI_FAC;
@@ -9430,7 +9427,7 @@ static int ui_pie_handler(bContext *C, const wmEvent *event, uiPopupBlockHandle 
 					block->pie_data.flags |= UI_PIE_ANIMATION_FINISHED;
 				}
 
-				for (but = block->buttons.first; but; but = but->next) {
+				for (uiBut *but = block->buttons.first; but; but = but->next) {
 					if (but->pie_dir != UI_RADIAL_NONE) {
 						float vec[2];
 						float center[2];
@@ -9585,7 +9582,7 @@ static int ui_pie_handler(bContext *C, const wmEvent *event, uiPopupBlockHandle 
 				if ((event->val  == KM_PRESS || event->val == KM_DBL_CLICK) &&
 				    !IS_EVENT_MOD(event, shift, ctrl, oskey))
 				{
-					for (but = block->buttons.first; but; but = but->next) {
+					for (uiBut *but = block->buttons.first; but; but = but->next) {
 						if (but->menu_key == event->type) {
 							ui_but_pie_button_activate(C, but, menu);
 						}
@@ -9607,7 +9604,7 @@ static int ui_pie_handler(bContext *C, const wmEvent *event, uiPopupBlockHandle 
 			CASE_NUM_TO_DIR(8, UI_RADIAL_N);
 			CASE_NUM_TO_DIR(9, UI_RADIAL_NE);
 			{
-				but = ui_block_pie_dir_activate(block, event, num_dir);
+				uiBut *but = ui_block_pie_dir_activate(block, event, num_dir);
 				retval = ui_but_pie_button_activate(C, but, menu);
 				break;
 			}

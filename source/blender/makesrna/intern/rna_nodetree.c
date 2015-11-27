@@ -64,7 +64,7 @@
 
 #include "RE_render_ext.h"
 
-EnumPropertyItem node_socket_in_out_items[] = {
+EnumPropertyItem rna_enum_node_socket_in_out_items[] = {
 	{ SOCK_IN, "IN", 0, "Input", "" },
 	{ SOCK_OUT, "OUT", 0, "Output", "" },
 	{ 0, NULL, 0, NULL, NULL }
@@ -104,14 +104,14 @@ static EnumPropertyItem node_chunksize_items[] = {
 #define DEF_ICON_BLANK_SKIP
 #define DEF_ICON(name) {ICON_##name, (#name), 0, (#name), ""},
 #define DEF_VICO(name)
-EnumPropertyItem node_icon_items[] = {
+EnumPropertyItem rna_enum_node_icon_items[] = {
 #include "UI_icons.h"
 	{0, NULL, 0, NULL, NULL}};
 #undef DEF_ICON_BLANK_SKIP
 #undef DEF_ICON
 #undef DEF_VICO
 
-EnumPropertyItem node_math_items[] = {
+EnumPropertyItem rna_enum_node_math_items[] = {
 	{NODE_MATH_ADD,     "ADD",          0, "Add",          ""},
 	{NODE_MATH_SUB,     "SUBTRACT",     0, "Subtract",     ""},
 	{NODE_MATH_MUL,     "MULTIPLY",     0, "Multiply",     ""},
@@ -134,7 +134,7 @@ EnumPropertyItem node_math_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem node_vec_math_items[] = {
+EnumPropertyItem rna_enum_node_vec_math_items[] = {
 	{0, "ADD",           0, "Add",           ""},
 	{1, "SUBTRACT",      0, "Subtract",      ""},
 	{2, "AVERAGE",       0, "Average",       ""},
@@ -144,7 +144,7 @@ EnumPropertyItem node_vec_math_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem node_filter_items[] = {
+EnumPropertyItem rna_enum_node_filter_items[] = {
 	{0, "SOFTEN",  0, "Soften",  ""},
 	{1, "SHARPEN", 0, "Sharpen", ""},
 	{2, "LAPLACE", 0, "Laplace", ""},
@@ -3016,6 +3016,39 @@ static int point_density_color_source_from_shader(NodeShaderTexPointDensity *sha
 	}
 }
 
+void rna_ShaderNodePointDensity_density_cache(bNode *self,
+                                              Scene *scene,
+                                              int settings)
+{
+	NodeShaderTexPointDensity *shader_point_density = self->storage;
+	PointDensity *pd = &shader_point_density->pd;
+	if (scene == NULL) {
+		return;
+	}
+
+	/* Create PointDensity structure from node for sampling. */
+	memset(pd, 0, sizeof(*pd));
+	BKE_texture_pointdensity_init_data(pd);
+	pd->object = (Object *)self->id;
+	pd->radius = shader_point_density->radius;
+	if (shader_point_density->point_source == SHD_POINTDENSITY_SOURCE_PSYS) {
+		pd->source = TEX_PD_PSYS;
+		pd->psys = shader_point_density->particle_system;
+		pd->psys_cache_space = TEX_PD_OBJECTSPACE;
+	}
+	else {
+		BLI_assert(shader_point_density->point_source == SHD_POINTDENSITY_SOURCE_OBJECT);
+		pd->source = TEX_PD_OBJECT;
+		pd->ob_cache_space = TEX_PD_OBJECTSPACE;
+	}
+	pd->color_source = point_density_color_source_from_shader(shader_point_density);
+
+	/* Single-threaded sampling of the voxel domain. */
+	RE_cache_point_density(scene,
+	                       pd,
+	                       settings == 1);
+}
+
 void rna_ShaderNodePointDensity_density_calc(bNode *self,
                                              Scene *scene,
                                              int settings,
@@ -3023,7 +3056,7 @@ void rna_ShaderNodePointDensity_density_calc(bNode *self,
                                              float **values)
 {
 	NodeShaderTexPointDensity *shader_point_density = self->storage;
-	PointDensity pd;
+	PointDensity *pd = &shader_point_density->pd;
 
 	if (scene == NULL) {
 		*length = 0;
@@ -3038,30 +3071,14 @@ void rna_ShaderNodePointDensity_density_calc(bNode *self,
 		*values = MEM_mallocN(sizeof(float) * (*length), "point density dynamic array");
 	}
 
-	/* Create PointDensity structure from node for sampling. */
-	BKE_texture_pointdensity_init_data(&pd);
-	pd.object = (Object *)self->id;
-	pd.radius = shader_point_density->radius;
-	if (shader_point_density->point_source == SHD_POINTDENSITY_SOURCE_PSYS) {
-		pd.source = TEX_PD_PSYS;
-		pd.psys = shader_point_density->particle_system;
-		pd.psys_cache_space = TEX_PD_OBJECTSPACE;
-	}
-	else {
-		BLI_assert(shader_point_density->point_source == SHD_POINTDENSITY_SOURCE_OBJECT);
-		pd.source = TEX_PD_OBJECT;
-		pd.ob_cache_space = TEX_PD_OBJECTSPACE;
-	}
-	pd.color_source = point_density_color_source_from_shader(shader_point_density);
-
 	/* Single-threaded sampling of the voxel domain. */
-	RE_sample_point_density(scene, &pd,
+	RE_sample_point_density(scene, pd,
 	                        shader_point_density->resolution,
 	                        settings == 1,
 	                        *values);
 
 	/* We're done, time to clean up. */
-	BKE_texture_pointdensity_free_data(&pd);
+	BKE_texture_pointdensity_free_data(pd);
 }
 
 #else
@@ -3234,7 +3251,7 @@ static void def_math(StructRNA *srna)
 	
 	prop = RNA_def_property(srna, "operation", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
-	RNA_def_property_enum_items(prop, node_math_items);
+	RNA_def_property_enum_items(prop, rna_enum_node_math_items);
 	RNA_def_property_ui_text(prop, "Operation", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
@@ -3250,7 +3267,7 @@ static void def_vector_math(StructRNA *srna)
 	
 	prop = RNA_def_property(srna, "operation", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
-	RNA_def_property_enum_items(prop, node_vec_math_items);
+	RNA_def_property_enum_items(prop, rna_enum_node_vec_math_items);
 	RNA_def_property_ui_text(prop, "Operation", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
@@ -3315,7 +3332,7 @@ static void def_mix_rgb(StructRNA *srna)
 	
 	prop = RNA_def_property(srna, "blend_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
-	RNA_def_property_enum_items(prop, ramp_blend_items);
+	RNA_def_property_enum_items(prop, rna_enum_ramp_blend_items);
 	RNA_def_property_ui_text(prop, "Blend Type", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 	
@@ -3993,6 +4010,11 @@ static void def_sh_tex_pointdensity(StructRNA *srna)
 	RNA_def_property_ui_text(prop, "Color Source", "Data to derive color results from");
 	RNA_def_property_update(prop, 0, "rna_Node_update");
 
+	func = RNA_def_function(srna, "cache_point_density", "rna_ShaderNodePointDensity_density_cache");
+	RNA_def_function_ui_description(func, "Cache point density data for later calculation");
+	RNA_def_pointer(func, "scene", "Scene", "", "");
+	RNA_def_enum(func, "settings", calc_mode_items, 1, "", "Calculate density for rendering");
+
 	func = RNA_def_function(srna, "calc_point_density", "rna_ShaderNodePointDensity_density_calc");
 	RNA_def_function_ui_description(func, "Calculate point density");
 	RNA_def_pointer(func, "scene", "Scene", "", "");
@@ -4389,7 +4411,7 @@ static void def_cmp_filter(StructRNA *srna)
 
 	prop = RNA_def_property(srna, "filter_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
-	RNA_def_property_enum_items(prop, node_filter_items);
+	RNA_def_property_enum_items(prop, rna_enum_node_filter_items);
 	RNA_def_property_ui_text(prop, "Filter Type", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
@@ -4783,7 +4805,7 @@ static void def_cmp_dilate_erode(StructRNA *srna)
 	/* CMP_NODE_DILATEERODE_DISTANCE_FEATHER only */
 	prop = RNA_def_property(srna, "falloff", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "falloff");
-	RNA_def_property_enum_items(prop, proportional_falloff_curve_only_items);
+	RNA_def_property_enum_items(prop, rna_enum_proportional_falloff_curve_only_items);
 	RNA_def_property_ui_text(prop, "Falloff", "Falloff type the feather");
 	RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
@@ -6445,7 +6467,7 @@ static void def_cmp_keying(StructRNA *srna)
 
 	prop = RNA_def_property(srna, "feather_falloff", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "feather_falloff");
-	RNA_def_property_enum_items(prop, proportional_falloff_curve_only_items);
+	RNA_def_property_enum_items(prop, rna_enum_proportional_falloff_curve_only_items);
 	RNA_def_property_ui_text(prop, "Feather Falloff", "Falloff type the feather");
 	RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
@@ -7626,7 +7648,7 @@ static void rna_def_node(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "bl_icon", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "typeinfo->ui_icon");
-	RNA_def_property_enum_items(prop, node_icon_items);
+	RNA_def_property_enum_items(prop, rna_enum_node_icon_items);
 	RNA_def_property_enum_default(prop, ICON_NODE);
 	RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
 	RNA_def_property_ui_text(prop, "Icon", "The node icon");
@@ -8005,7 +8027,7 @@ static void rna_def_nodetree(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "bl_icon", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "typeinfo->ui_icon");
-	RNA_def_property_enum_items(prop, node_icon_items);
+	RNA_def_property_enum_items(prop, rna_enum_node_icon_items);
 	RNA_def_property_enum_default(prop, ICON_NODETREE);
 	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_property_ui_text(prop, "Icon", "The node tree icon");

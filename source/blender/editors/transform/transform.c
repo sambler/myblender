@@ -203,7 +203,7 @@ static void applySeqSlide(TransInfo *t, const int mval[2]);
 
 static bool transdata_check_local_center(TransInfo *t, short around)
 {
-	return ((around == V3D_LOCAL) && (
+	return ((around == V3D_AROUND_LOCAL_ORIGINS) && (
 	            (t->flag & (T_OBJECT | T_POSE)) ||
 	            (t->obedit && ELEM(t->obedit->type, OB_MESH, OB_CURVE, OB_MBALL, OB_ARMATURE)) ||
 	            (t->spacetype == SPACE_IPO) ||
@@ -213,7 +213,7 @@ static bool transdata_check_local_center(TransInfo *t, short around)
 
 bool transdata_check_local_islands(TransInfo *t, short around)
 {
-	return ((around == V3D_LOCAL) && (
+	return ((around == V3D_AROUND_LOCAL_ORIGINS) && (
 	        (t->obedit && ELEM(t->obedit->type, OB_MESH))));
 }
 
@@ -275,10 +275,8 @@ void setTransformViewAspect(TransInfo *t, float r_aspect[3])
 
 static void convertViewVec2D(View2D *v2d, float r_vec[3], int dx, int dy)
 {
-	float divx, divy;
-	
-	divx = BLI_rcti_size_x(&v2d->mask);
-	divy = BLI_rcti_size_y(&v2d->mask);
+	float divx = BLI_rcti_size_x(&v2d->mask);
+	float divy = BLI_rcti_size_y(&v2d->mask);
 
 	r_vec[0] = BLI_rctf_size_x(&v2d->cur) * dx / divx;
 	r_vec[1] = BLI_rctf_size_y(&v2d->cur) * dy / divy;
@@ -287,14 +285,11 @@ static void convertViewVec2D(View2D *v2d, float r_vec[3], int dx, int dy)
 
 static void convertViewVec2D_mask(View2D *v2d, float r_vec[3], int dx, int dy)
 {
-	float divx, divy;
-	float mulx, muly;
+	float divx = BLI_rcti_size_x(&v2d->mask);
+	float divy = BLI_rcti_size_y(&v2d->mask);
 
-	divx = BLI_rcti_size_x(&v2d->mask);
-	divy = BLI_rcti_size_y(&v2d->mask);
-
-	mulx = BLI_rctf_size_x(&v2d->cur);
-	muly = BLI_rctf_size_y(&v2d->cur);
+	float mulx = BLI_rctf_size_x(&v2d->cur);
+	float muly = BLI_rctf_size_y(&v2d->cur);
 
 	/* difference with convertViewVec2D */
 	/* clamp w/h, mask only */
@@ -1553,8 +1548,8 @@ bool calculateTransformCenter(bContext *C, int centerMode, float cent3d[3], floa
 
 	initTransInfo(C, t, NULL, NULL);
 
-	/* avoid doing connectivity lookups (when V3D_LOCAL is set) */
-	t->around = V3D_CENTER;
+	/* avoid doing connectivity lookups (when V3D_AROUND_LOCAL_ORIGINS is set) */
+	t->around = V3D_AROUND_CENTER_BOUNDS;
 
 	createTransData(C, t);              // make TransData structs from selection
 
@@ -1716,7 +1711,8 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				UI_ThemeColor(TH_VIEW_OVERLAY);
 
 				setlinestyle(3);
-				glBegin(GL_LINE_STRIP);
+				glLineWidth(1);
+				glBegin(GL_LINES);
 				glVertex2iv(t->mval);
 				glVertex2fv(cent);
 				glEnd();
@@ -1728,7 +1724,6 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glLineWidth(3.0);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
-				glLineWidth(1.0);
 				break;
 			case HLP_HARROW:
 				UI_ThemeColor(TH_VIEW_OVERLAY);
@@ -1738,7 +1733,6 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glLineWidth(3.0);
 				drawArrow(RIGHT, 5, 10, 5);
 				drawArrow(LEFT, 5, 10, 5);
-				glLineWidth(1.0);
 				break;
 			case HLP_VARROW:
 				UI_ThemeColor(TH_VIEW_OVERLAY);
@@ -1748,7 +1742,6 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glLineWidth(3.0);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
-				glLineWidth(1.0);
 				break;
 			case HLP_ANGLE:
 			{
@@ -1760,7 +1753,8 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				UI_ThemeColor(TH_VIEW_OVERLAY);
 
 				setlinestyle(3);
-				glBegin(GL_LINE_STRIP);
+				glLineWidth(1);
+				glBegin(GL_LINES);
 				glVertex2iv(t->mval);
 				glVertex2fv(cent);
 				glEnd();
@@ -1785,8 +1779,6 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glRotatef(RAD2DEGF(angle + delta_angle), 0, 0, 1);
 
 				drawArrowHead(UP, 5);
-
-				glLineWidth(1.0);
 				break;
 			}
 			case HLP_TRACKBALL:
@@ -1809,7 +1801,6 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
-				glLineWidth(1.0);
 				break;
 			}
 		}
@@ -2037,6 +2028,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 
 			RNA_property_boolean_set(op->ptr, prop, (t->flag & T_ALT_TRANSFORM) != 0);
 		}
+	}
+
+	if ((prop = RNA_struct_find_property(op->ptr, "correct_uv"))) {
+		RNA_property_boolean_set(op->ptr, prop, (t->settings->uvcalc_flag & UVCALC_TRANSFORM_CORRECT) != 0);
 	}
 }
 
@@ -3018,7 +3013,7 @@ static void Bend(TransInfo *t, const int UNUSED(mval[2]))
 
 		/* rotation */
 		if ((t->flag & T_POINTS) == 0) {
-			ElementRotation(t, td, mat, V3D_LOCAL);
+			ElementRotation(t, td, mat, V3D_AROUND_LOCAL_ORIGINS);
 		}
 
 		/* location */
@@ -4345,14 +4340,14 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 
 				rotation_between_vecs_to_mat3(mat, original_normal, t->tsnap.snapNormal);
 
-				ElementRotation(t, td, mat, V3D_LOCAL);
+				ElementRotation(t, td, mat, V3D_AROUND_LOCAL_ORIGINS);
 			}
 			else {
 				float mat[3][3];
 				
 				unit_m3(mat);
 				
-				ElementRotation(t, td, mat, V3D_LOCAL);
+				ElementRotation(t, td, mat, V3D_AROUND_LOCAL_ORIGINS);
 			}
 		}
 		
@@ -6821,25 +6816,25 @@ static void drawEdgeSlide(TransInfo *t)
 
 				UI_ThemeColorShadeAlpha(TH_SELECT, -30, alpha_shade);
 				glPointSize(ctrl_size);
-				bglBegin(GL_POINTS);
+				glBegin(GL_POINTS);
 				if (sld->flipped) {
-					if (curr_sv->v_side[1]) bglVertex3fv(curr_sv->v_side[1]->co);
+					if (curr_sv->v_side[1]) glVertex3fv(curr_sv->v_side[1]->co);
 				}
 				else {
-					if (curr_sv->v_side[0]) bglVertex3fv(curr_sv->v_side[0]->co);
+					if (curr_sv->v_side[0]) glVertex3fv(curr_sv->v_side[0]->co);
 				}
-				bglEnd();
+				glEnd();
 
 				UI_ThemeColorShadeAlpha(TH_SELECT, 255, alpha_shade);
 				glPointSize(guide_size);
-				bglBegin(GL_POINTS);
+				glBegin(GL_POINTS);
 #if 0
 				interp_v3_v3v3(co_mark, co_b, co_a, fac);
-				bglVertex3fv(co_mark);
+				glVertex3fv(co_mark);
 #endif
 				interp_line_v3_v3v3v3(co_mark, co_b, curr_sv->v_co_orig, co_a, fac);
-				bglVertex3fv(co_mark);
-				bglEnd();
+				glVertex3fv(co_mark);
+				glEnd();
 			}
 			else {
 				if (is_clamp == false) {
@@ -7432,15 +7427,15 @@ static void drawVertSlide(TransInfo *t)
 					glVertex3fv(b);
 				}
 			}
-			bglEnd();
+			glEnd();
 
 			glPointSize(ctrl_size);
 
-			bglBegin(GL_POINTS);
-			bglVertex3fv((sld->flipped && sld->use_even) ?
-			             curr_sv->co_link_orig_3d[curr_sv->co_link_curr] :
-			             curr_sv->co_orig_3d);
-			bglEnd();
+			glBegin(GL_POINTS);
+			glVertex3fv((sld->flipped && sld->use_even) ?
+			            curr_sv->co_link_orig_3d[curr_sv->co_link_curr] :
+			            curr_sv->co_orig_3d);
+			glEnd();
 
 			glDisable(GL_BLEND);
 
@@ -8524,7 +8519,9 @@ bool checkUseAxisMatrix(TransInfo *t)
 {
 	/* currently only checks for editmode */
 	if (t->flag & T_EDIT) {
-		if ((t->around == V3D_LOCAL) && (ELEM(t->obedit->type, OB_MESH, OB_CURVE, OB_MBALL, OB_ARMATURE))) {
+		if ((t->around == V3D_AROUND_LOCAL_ORIGINS) &&
+		    (ELEM(t->obedit->type, OB_MESH, OB_CURVE, OB_MBALL, OB_ARMATURE)))
+		{
 			/* not all editmode supports axis-matrix */
 			return true;
 		}

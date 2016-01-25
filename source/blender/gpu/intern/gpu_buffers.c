@@ -57,6 +57,7 @@
 
 #include "GPU_buffers.h"
 #include "GPU_draw.h"
+#include "GPU_basic_shader.h"
 
 #include "bmesh.h"
 
@@ -482,10 +483,9 @@ static GPUBuffer *gpu_try_realloc(GPUBufferPool *pool, GPUBuffer *buffer, size_t
 }
 
 static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
-                                   int type, void *user)
+                                   int type, void *user, GPUBuffer *buffer)
 {
 	GPUBufferPool *pool;
-	GPUBuffer *buffer;
 	float *varray;
 	int *mat_orig_to_new;
 	int i;
@@ -499,9 +499,11 @@ static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
 	BLI_mutex_lock(&buffer_mutex);
 
 	/* alloc a GPUBuffer; fall back to legacy mode on failure */
-	if (!(buffer = gpu_buffer_alloc_intern(size))) {
-		BLI_mutex_unlock(&buffer_mutex);
-		return NULL;
+	if (!buffer) {
+		if (!(buffer = gpu_buffer_alloc_intern(size))) {
+			BLI_mutex_unlock(&buffer_mutex);
+			return NULL;
+		}
 	}
 
 	mat_orig_to_new = MEM_mallocN(sizeof(*mat_orig_to_new) * dm->totmat,
@@ -525,6 +527,7 @@ static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
 		if (!(buffer && (varray = glMapBuffer(target, GL_WRITE_ONLY)))) {
 			if (buffer)
 				gpu_buffer_free_intern(buffer);
+			BLI_mutex_unlock(&buffer_mutex);
 			return NULL;
 		}
 	}
@@ -576,33 +579,33 @@ static GPUBuffer **gpu_drawobject_buffer_from_type(GPUDrawObject *gdo, GPUBuffer
 /* get the amount of space to allocate for a buffer of a particular type */
 static size_t gpu_buffer_size_from_type(DerivedMesh *dm, GPUBufferType type)
 {
+	const int components = gpu_buffer_type_settings[type].num_components;
 	switch (type) {
 		case GPU_BUFFER_VERTEX:
-			return sizeof(float) * gpu_buffer_type_settings[type].num_components * (dm->drawObject->tot_loop_verts + dm->drawObject->tot_loose_point);
+			return sizeof(float) * components * (dm->drawObject->tot_loop_verts + dm->drawObject->tot_loose_point);
 		case GPU_BUFFER_NORMAL:
-			return sizeof(short) * gpu_buffer_type_settings[type].num_components * dm->drawObject->tot_loop_verts;
+			return sizeof(short) * components * dm->drawObject->tot_loop_verts;
 		case GPU_BUFFER_COLOR:
-			return sizeof(char) * gpu_buffer_type_settings[type].num_components * dm->drawObject->tot_loop_verts;
+			return sizeof(char) * components * dm->drawObject->tot_loop_verts;
 		case GPU_BUFFER_UV:
-			return sizeof(float) * gpu_buffer_type_settings[type].num_components * dm->drawObject->tot_loop_verts;
+			return sizeof(float) * components * dm->drawObject->tot_loop_verts;
 		case GPU_BUFFER_UV_TEXPAINT:
-			return sizeof(float) * gpu_buffer_type_settings[type].num_components * dm->drawObject->tot_loop_verts;
+			return sizeof(float) * components * dm->drawObject->tot_loop_verts;
 		case GPU_BUFFER_EDGE:
-			return sizeof(int) * gpu_buffer_type_settings[type].num_components * dm->drawObject->totedge;
+			return sizeof(int) * components * dm->drawObject->totedge;
 		case GPU_BUFFER_UVEDGE:
-			return sizeof(int) * gpu_buffer_type_settings[type].num_components * dm->drawObject->tot_loop_verts;
+			return sizeof(int) * components * dm->drawObject->tot_loop_verts;
 		case GPU_BUFFER_TRIANGLES:
-			return sizeof(int) * gpu_buffer_type_settings[type].num_components * dm->drawObject->tot_triangle_point;
+			return sizeof(int) * components * dm->drawObject->tot_triangle_point;
 		default:
 			return -1;
 	}
 }
 
 /* call gpu_buffer_setup with settings for a particular type of buffer */
-static GPUBuffer *gpu_buffer_setup_type(DerivedMesh *dm, GPUBufferType type)
+static GPUBuffer *gpu_buffer_setup_type(DerivedMesh *dm, GPUBufferType type, GPUBuffer *buf)
 {
 	void *user_data = NULL;
-	GPUBuffer *buf;
 
 	/* special handling for MCol and UV buffers */
 	if (type == GPU_BUFFER_COLOR) {
@@ -614,14 +617,14 @@ static GPUBuffer *gpu_buffer_setup_type(DerivedMesh *dm, GPUBufferType type)
 			return NULL;
 	}
 
-	buf = gpu_buffer_setup(dm, dm->drawObject, type, user_data);
+	buf = gpu_buffer_setup(dm, dm->drawObject, type, user_data, buf);
 
 	return buf;
 }
 
 /* get the buffer of `type', initializing the GPUDrawObject and
  * buffer if needed */
-static GPUBuffer *gpu_buffer_setup_common(DerivedMesh *dm, GPUBufferType type)
+static GPUBuffer *gpu_buffer_setup_common(DerivedMesh *dm, GPUBufferType type, bool update)
 {
 	GPUBuffer **buf;
 
@@ -630,14 +633,16 @@ static GPUBuffer *gpu_buffer_setup_common(DerivedMesh *dm, GPUBufferType type)
 
 	buf = gpu_drawobject_buffer_from_type(dm->drawObject, type);
 	if (!(*buf))
-		*buf = gpu_buffer_setup_type(dm, type);
+		*buf = gpu_buffer_setup_type(dm, type, NULL);
+	else if (update)
+		*buf = gpu_buffer_setup_type(dm, type, *buf);
 
 	return *buf;
 }
 
 void GPU_vertex_setup(DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_VERTEX))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_VERTEX, false))
 		return;
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -649,7 +654,7 @@ void GPU_vertex_setup(DerivedMesh *dm)
 
 void GPU_normal_setup(DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_NORMAL))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_NORMAL, false))
 		return;
 
 	glEnableClientState(GL_NORMAL_ARRAY);
@@ -661,7 +666,7 @@ void GPU_normal_setup(DerivedMesh *dm)
 
 void GPU_uv_setup(DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_UV))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_UV, false))
 		return;
 
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -673,7 +678,7 @@ void GPU_uv_setup(DerivedMesh *dm)
 
 void GPU_texpaint_uv_setup(DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_UV_TEXPAINT))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_UV_TEXPAINT, false))
 		return;
 
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -690,6 +695,8 @@ void GPU_texpaint_uv_setup(DerivedMesh *dm)
 
 void GPU_color_setup(DerivedMesh *dm, int colType)
 {
+	bool update = false;
+
 	if (!dm->drawObject) {
 		/* XXX Not really nice, but we need a valid gpu draw object to set the colType...
 		 *     Else we would have to add a new param to gpu_buffer_setup_common. */
@@ -700,17 +707,12 @@ void GPU_color_setup(DerivedMesh *dm, int colType)
 	/* In paint mode, dm may stay the same during stroke, however we still want to update colors!
 	 * Also check in case we changed color type (i.e. which MCol cdlayer we use). */
 	else if ((dm->dirty & DM_DIRTY_MCOL_UPDATE_DRAW) || (colType != dm->drawObject->colType)) {
-		GPUBuffer **buf = gpu_drawobject_buffer_from_type(dm->drawObject, GPU_BUFFER_COLOR);
-		/* XXX Freeing this buffer is a bit stupid, as geometry has not changed, size should remain the same.
-		 *     Not sure though it would be worth defining a sort of gpu_buffer_update func - nor whether
-		 *     it is even possible ! */
-		GPU_buffer_free(*buf);
-		*buf = NULL;
+		update = true;
 		dm->dirty &= ~DM_DIRTY_MCOL_UPDATE_DRAW;
 		dm->drawObject->colType = colType;
 	}
 
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_COLOR))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_COLOR, update))
 		return;
 
 	glEnableClientState(GL_COLOR_ARRAY);
@@ -732,10 +734,10 @@ void GPU_buffer_bind_as_color(GPUBuffer *buffer)
 
 void GPU_edge_setup(DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_EDGE))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_EDGE, false))
 		return;
 
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_VERTEX))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_VERTEX, false))
 		return;
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -749,7 +751,7 @@ void GPU_edge_setup(DerivedMesh *dm)
 
 void GPU_uvedge_setup(DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_UVEDGE))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_UVEDGE, false))
 		return;
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -761,7 +763,7 @@ void GPU_uvedge_setup(DerivedMesh *dm)
 
 void GPU_triangle_setup(struct DerivedMesh *dm)
 {
-	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_TRIANGLES))
+	if (!gpu_buffer_setup_common(dm, GPU_BUFFER_TRIANGLES, false))
 		return;
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, dm->drawObject->triangles->id);
@@ -1014,19 +1016,6 @@ struct GPU_PBVH_Buffers {
 	bool use_matcaps;
 	float diffuse_color[4];
 };
-
-static void gpu_colors_enable(void)
-{
-	glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
-	glEnable(GL_COLOR_MATERIAL);
-	glEnableClientState(GL_COLOR_ARRAY);
-}
-
-static void gpu_colors_disable(void)
-{
-	glDisable(GL_COLOR_MATERIAL);
-	glDisableClientState(GL_COLOR_ARRAY);
-}
 
 static float gpu_color_from_mask(float mask)
 {
@@ -1792,8 +1781,8 @@ void GPU_update_bmesh_pbvh_buffers(GPU_PBVH_Buffers *buffers,
 
 			buffers->tot_tri = tottri;
 			buffers->index_type = (use_short ?
-								   GL_UNSIGNED_SHORT :
-								   GL_UNSIGNED_INT);
+			                       GL_UNSIGNED_SHORT :
+			                       GL_UNSIGNED_INT);
 		}
 		else {
 			/* Memory map failed */
@@ -1843,15 +1832,18 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 		}
 	}
 
-	glShadeModel((buffers->smooth || buffers->face_indices_len) ? GL_SMOOTH : GL_FLAT);
-
 	if (buffers->vert_buf) {
 		char *base = NULL;
 		char *index_base = NULL;
+		int bound_options = 0;
 		glEnableClientState(GL_VERTEX_ARRAY);
 		if (!wireframe) {
 			glEnableClientState(GL_NORMAL_ARRAY);
-			gpu_colors_enable();
+			glEnableClientState(GL_COLOR_ARRAY);
+
+			/* weak inspection of bound options, should not be necessary ideally */
+			bound_options = GPU_basic_shader_bound_options();
+			GPU_basic_shader_bind(bound_options | GPU_SHADER_USE_COLOR);
 		}
 
 		GPU_buffer_bind(buffers->vert_buf, GPU_BINDING_ARRAY);
@@ -1865,6 +1857,8 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 
 		if (wireframe)
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		else
+			glShadeModel((buffers->smooth || buffers->face_indices_len) ? GL_SMOOTH : GL_FLAT);
 
 		if (buffers->tot_quad) {
 			const char *offset = base;
@@ -1874,10 +1868,12 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 
 				glVertexPointer(3, GL_FLOAT, sizeof(VertexBufferFormat),
 				                offset + offsetof(VertexBufferFormat, co));
-				glNormalPointer(GL_SHORT, sizeof(VertexBufferFormat),
-				                offset + offsetof(VertexBufferFormat, no));
-				glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
-				               offset + offsetof(VertexBufferFormat, color));
+				if (!wireframe) {
+					glNormalPointer(GL_SHORT, sizeof(VertexBufferFormat),
+					                offset + offsetof(VertexBufferFormat, no));
+					glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
+					               offset + offsetof(VertexBufferFormat, color));
+				}
 
 				glMultiDrawElementsBaseVertex(GL_TRIANGLES, buffers->baseelemarray, buffers->index_type,
 				                              (const void * const *)buffers->baseindex,
@@ -1890,10 +1886,12 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 				for (i = 0; i < last; i++) {
 					glVertexPointer(3, GL_FLOAT, sizeof(VertexBufferFormat),
 					                offset + offsetof(VertexBufferFormat, co));
-					glNormalPointer(GL_SHORT, sizeof(VertexBufferFormat),
-					                offset + offsetof(VertexBufferFormat, no));
-					glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
-					               offset + offsetof(VertexBufferFormat, color));
+					if (!wireframe) {
+						glNormalPointer(GL_SHORT, sizeof(VertexBufferFormat),
+						                offset + offsetof(VertexBufferFormat, no));
+						glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
+						               offset + offsetof(VertexBufferFormat, color));
+					}
 
 					if (do_fast)
 						glDrawElements(GL_TRIANGLES, buffers->totgrid * 6, buffers->index_type, index_base);
@@ -1909,10 +1907,13 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 
 			glVertexPointer(3, GL_FLOAT, sizeof(VertexBufferFormat),
 			                (void *)(base + offsetof(VertexBufferFormat, co)));
-			glNormalPointer(GL_SHORT, sizeof(VertexBufferFormat),
-			                (void *)(base + offsetof(VertexBufferFormat, no)));
-			glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
-			               (void *)(base + offsetof(VertexBufferFormat, color)));
+
+			if (!wireframe) {
+				glNormalPointer(GL_SHORT, sizeof(VertexBufferFormat),
+				                (void *)(base + offsetof(VertexBufferFormat, no)));
+				glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(VertexBufferFormat),
+				               (void *)(base + offsetof(VertexBufferFormat, color)));
+			}
 
 			if (buffers->index_buf)
 				glDrawElements(GL_TRIANGLES, totelem, buffers->index_type, index_base);
@@ -1930,7 +1931,8 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 		glDisableClientState(GL_VERTEX_ARRAY);
 		if (!wireframe) {
 			glDisableClientState(GL_NORMAL_ARRAY);
-			gpu_colors_disable();
+			glDisableClientState(GL_COLOR_ARRAY);
+			GPU_basic_shader_bind(bound_options);
 		}
 	}
 }
@@ -2046,8 +2048,6 @@ void GPU_init_draw_pbvh_BB(void)
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDisable(GL_LIGHTING);
-	glDisable(GL_COLOR_MATERIAL);
 	glEnable(GL_BLEND);
 }
 

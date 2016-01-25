@@ -106,13 +106,12 @@ void multires_customdata_delete(Mesh *me)
 }
 
 /** Grid hiding **/
-static BLI_bitmap *multires_mdisps_upsample_hidden(BLI_bitmap *lo_hidden,
-                                                   int lo_level,
-                                                   int hi_level,
+static BLI_bitmap *multires_mdisps_upsample_hidden(
+        BLI_bitmap *lo_hidden,
+        int lo_level, int hi_level,
 
-                                                   /* assumed to be at hi_level (or
-                                                    *  null) */
-                                                   const BLI_bitmap *prev_hidden)
+        /* assumed to be at hi_level (or null) */
+        const BLI_bitmap *prev_hidden)
 {
 	BLI_bitmap *subd;
 	int hi_gridsize = BKE_ccg_gridsize(hi_level);
@@ -2227,7 +2226,7 @@ static void multires_apply_smat(Scene *scene, Object *ob, float smat[3][3])
 	dGridSize = multires_side_tot[high_mmd.totlvl];
 	dSkip = (dGridSize - 1) / (gridSize - 1);
 
-#pragma omp parallel for private(i) if (me->totface * gridSize * gridSize * 4 >= CCG_OMP_LIMIT)
+#pragma omp parallel for private(i) if (me->totloop * gridSize * gridSize >= CCG_OMP_LIMIT)
 	for (i = 0; i < me->totpoly; ++i) {
 		const int numVerts = mpoly[i].totloop;
 		MDisps *mdisp = &mdisps[mpoly[i].loopstart];

@@ -428,8 +428,9 @@ static void wait_for_console_key(void)
 }
 #endif
 
-/* called in creator.c even... tsk, split this! */
-/* note, doesnt run exit() call WM_exit() for that */
+/**
+ * \note doesn't run exit() call #WM_exit() for that.
+ */
 void WM_exit_ext(bContext *C, const bool do_python)
 {
 	wmWindowManager *wm = C ? CTX_wm_manager(C) : NULL;
@@ -513,6 +514,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	free_anim_copybuf();
 	free_anim_drivers_copybuf();
 	free_fmodifiers_copybuf();
+	ED_gpencil_anim_copybuf_free();
 	ED_gpencil_strokes_copybuf_free();
 	ED_clipboard_posebuf_free();
 	BKE_node_clipboard_clear();

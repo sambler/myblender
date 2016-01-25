@@ -523,7 +523,12 @@ static void pbvh_build(PBVH *bvh, BB *cb, BBC *prim_bbc, int totprim)
 	build_sub(bvh, 0, cb, prim_bbc, 0, totprim);
 }
 
-/* Do a full rebuild with on Mesh data structure */
+/**
+ * Do a full rebuild with on Mesh data structure.
+ *
+ * \note Unlike mpoly/mloop/verts, looptri is **totally owned** by PBVH (which means it may rewrite it if needed,
+ *       see BKE_pbvh_apply_vertCos().
+ */
 void BKE_pbvh_build_mesh(
         PBVH *bvh, const MPoly *mpoly, const MLoop *mloop, MVert *verts,
         int totvert, struct CustomData *vdata,
@@ -1434,7 +1439,7 @@ void BKE_pbvh_node_get_bm_orco_data(
 /********************************* Raycast ***********************************/
 
 typedef struct {
-	IsectRayAABBData ray;
+	struct IsectRayAABB_Precalc ray;
 	bool original;
 } RaycastData;
 
@@ -1448,7 +1453,7 @@ static bool ray_aabb_intersect(PBVHNode *node, void *data_v)
 	else
 		BKE_pbvh_node_get_BB(node, bb_min, bb_max);
 
-	return isect_ray_aabb(&rcd->ray, bb_min, bb_max, &node->tmin);
+	return isect_ray_aabb_v3(&rcd->ray, bb_min, bb_max, &node->tmin);
 }
 
 void BKE_pbvh_raycast(
@@ -1458,7 +1463,7 @@ void BKE_pbvh_raycast(
 {
 	RaycastData rcd;
 
-	isect_ray_aabb_initialize(&rcd.ray, ray_start, ray_normal);
+	isect_ray_aabb_v3_precalc(&rcd.ray, ray_start, ray_normal);
 	rcd.original = original;
 
 	BKE_pbvh_search_callback_occluded(bvh, ray_aabb_intersect, &rcd, cb, data);
@@ -1632,7 +1637,7 @@ void BKE_pbvh_raycast_project_ray_root(
 	if (bvh->nodes) {
 		float rootmin_start, rootmin_end;
 		float bb_min_root[3], bb_max_root[3], bb_center[3], bb_diff[3];
-		IsectRayAABBData ray;
+		struct IsectRayAABB_Precalc ray;
 		float ray_normal_inv[3];
 		float offset = 1.0f + 1e-3f;
 		float offset_vec[3] = {1e-3f, 1e-3f, 1e-3f};
@@ -1653,15 +1658,15 @@ void BKE_pbvh_raycast_project_ray_root(
 		madd_v3_v3v3fl(bb_min_root, bb_center, bb_diff, -offset);
 
 		/* first project start ray */
-		isect_ray_aabb_initialize(&ray, ray_start, ray_normal);
-		if (!isect_ray_aabb(&ray, bb_min_root, bb_max_root, &rootmin_start))
+		isect_ray_aabb_v3_precalc(&ray, ray_start, ray_normal);
+		if (!isect_ray_aabb_v3(&ray, bb_min_root, bb_max_root, &rootmin_start))
 			return;
 
 		/* then the end ray */
 		mul_v3_v3fl(ray_normal_inv, ray_normal, -1.0);
-		isect_ray_aabb_initialize(&ray, ray_end, ray_normal_inv);
+		isect_ray_aabb_v3_precalc(&ray, ray_end, ray_normal_inv);
 		/* unlikely to fail exiting if entering succeeded, still keep this here */
-		if (!isect_ray_aabb(&ray, bb_min_root, bb_max_root, &rootmin_end))
+		if (!isect_ray_aabb_v3(&ray, bb_min_root, bb_max_root, &rootmin_end))
 			return;
 
 		madd_v3_v3v3fl(ray_start, ray_start, ray_normal, rootmin_start);
@@ -1682,6 +1687,7 @@ void BKE_pbvh_node_draw(PBVHNode *node, void *data_v)
 #if 0
 	/* XXX: Just some quick code to show leaf nodes in different colors */
 	float col[3];
+	float spec[3] = {0.0f, 0.0f, 0.0f};
 
 	if (0) { //is_partial) {
 		col[0] = (rand() / (float)RAND_MAX); col[1] = col[2] = 0.6;
@@ -1691,8 +1697,8 @@ void BKE_pbvh_node_draw(PBVHNode *node, void *data_v)
 		for (int i = 0; i < 3; ++i)
 			col[i] = (rand() / (float)RAND_MAX) * 0.3 + 0.7;
 	}
-	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, col);
 
+	GPU_basic_shader_colors(col, spec, 0, 1.0f);
 	glColor3f(1, 0, 0);
 #endif
 
@@ -1860,7 +1866,7 @@ void BKE_pbvh_apply_vertCos(PBVH *pbvh, float (*vertCos)[3])
 			/* unneeded deformation -- duplicate verts/faces to avoid this */
 
 			pbvh->verts   = MEM_dupallocN(pbvh->verts);
-			pbvh->looptri = MEM_dupallocN(pbvh->looptri);
+			/* No need to dupalloc pbvh->looptri, this one is 'totally owned' by pbvh, it's never some mesh data. */
 
 			pbvh->deformed = true;
 		}

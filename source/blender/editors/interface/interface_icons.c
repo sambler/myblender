@@ -34,6 +34,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "GPU_extensions.h"
+#include "GPU_basic_shader.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -273,8 +274,6 @@ static void vicon_x_draw(int x, int y, int w, int h, float alpha)
 	glVertex2i(x + w, y);
 	glVertex2i(x, y + h);
 	glEnd();
-
-	glLineWidth(1.0);
 	
 	glDisable(GL_LINE_SMOOTH);
 }
@@ -442,7 +441,6 @@ static void vicon_move_up_draw(int x, int y, int w, int h, float UNUSED(alpha))
 	glVertex2i(x + w / 2 + d * 2, y + h / 2 + d);
 	glEnd();
 
-	glLineWidth(1.0);
 	glDisable(GL_LINE_SMOOTH);
 }
 
@@ -460,7 +458,6 @@ static void vicon_move_down_draw(int x, int y, int w, int h, float UNUSED(alpha)
 	glVertex2i(x + w / 2 + d * 2, y + h / 2 + d);
 	glEnd();
 
-	glLineWidth(1.0);
 	glDisable(GL_LINE_SMOOTH);
 }
 
@@ -626,7 +623,7 @@ static void init_internal_icons(void)
 		}
 
 		/* we only use a texture for cards with non-power of two */
-		if (GPU_non_power_of_two_support()) {
+		if (GPU_full_non_power_of_two_support()) {
 			glGenTextures(1, &icongltex.id);
 
 			if (icongltex.id) {
@@ -639,12 +636,12 @@ static void init_internal_icons(void)
 
 				glBindTexture(GL_TEXTURE_2D, icongltex.id);
 				
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, b32buf->x, b32buf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, b32buf->rect);
-				glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA, b16buf->x, b16buf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, b16buf->rect);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, b32buf->x, b32buf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, b32buf->rect);
+				glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA8, b16buf->x, b16buf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, b16buf->rect);
 				
 				while (b16buf->x > 1) {
 					ImBuf *nbuf = IMB_onehalf(b16buf);
-					glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, nbuf->x, nbuf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nbuf->rect);
+					glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA8, nbuf->x, nbuf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nbuf->rect);
 					level++;
 					IMB_freeImBuf(b16buf);
 					b16buf = nbuf;
@@ -1122,7 +1119,7 @@ static void icon_draw_texture(
 	y1 = iy * icongltex.invh;
 	y2 = (iy + ih) * icongltex.invh;
 
-	glEnable(GL_TEXTURE_2D);
+	GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
 	glBindTexture(GL_TEXTURE_2D, icongltex.id);
 
 	/* sharper downscaling, has no effect when scale matches with a mip level */
@@ -1145,7 +1142,7 @@ static void icon_draw_texture(
 	glTexEnvf(GL_TEXTURE_FILTER_CONTROL, GL_TEXTURE_LOD_BIAS, 0.0f);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glDisable(GL_TEXTURE_2D);
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 }
 
 /* Drawing size for preview images */

@@ -44,6 +44,7 @@
 
 #include "BKE_camera.h"
 #include "BKE_global.h"
+#include "BKE_colortools.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 
@@ -414,15 +415,18 @@ rcti* RE_engine_get_current_tiles(Render *re, int *r_total_tiles, bool *r_needs_
 				/* Just in case we're using crazy network rendering with more
 				 * slaves as BLENDER_MAX_THREADS.
 				 */
-				if (tiles == tiles_static)
-					tiles = MEM_mallocN(allocation_step * sizeof(rcti), "current engine tiles");
-				else
-					tiles = MEM_reallocN(tiles, (total_tiles + allocation_step) * sizeof(rcti));
-
 				allocation_size += allocation_step;
+				if (tiles == tiles_static) {
+					/* Can not realloc yet, tiles are pointing to a
+					 * stack memory.
+					 */
+					tiles = MEM_mallocN(allocation_size * sizeof(rcti), "current engine tiles");
+				}
+				else {
+					tiles = MEM_reallocN(tiles, allocation_size * sizeof(rcti));
+				}
 				*r_needs_free = true;
 			}
-
 			tiles[total_tiles] = pa->disprect;
 
 			if (pa->crop) {
@@ -457,6 +461,7 @@ void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Scene *scene)
 	 * not sure how to fix this yet -- dfelinto */
 	BLI_listbase_clear(&re->r.layers);
 	BLI_listbase_clear(&re->r.views);
+	curvemapping_copy_data(&re->r.mblur_shutter_curve, &scene->r.mblur_shutter_curve);
 }
 
 bool RE_bake_has_engine(Render *re)
@@ -469,7 +474,8 @@ bool RE_bake_engine(
         Render *re, Object *object,
         const int object_id, const BakePixel pixel_array[],
         const size_t num_pixels, const int depth,
-        const ScenePassType pass_type, float result[])
+        const ScenePassType pass_type, const int pass_filter,
+        float result[])
 {
 	RenderEngineType *type = RE_engines_find(re->r.engine);
 	RenderEngine *engine;
@@ -505,13 +511,15 @@ bool RE_bake_engine(
 		type->update(engine, re->main, re->scene);
 
 	if (type->bake)
-		type->bake(engine, re->scene, object, pass_type, object_id, pixel_array, num_pixels, depth, result);
+		type->bake(engine, re->scene, object, pass_type, pass_filter, object_id, pixel_array, num_pixels, depth, result);
 
 	engine->tile_x = 0;
 	engine->tile_y = 0;
 	engine->flag &= ~RE_ENGINE_RENDERING;
 
 	BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
+
+	curvemapping_free_data(&re->r.mblur_shutter_curve);
 
 	/* re->engine becomes zero if user changed active render engine during render */
 	if (!persistent_data || !re->engine) {

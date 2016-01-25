@@ -166,6 +166,21 @@ void particle_info(vec4 sprops, vec3 loc, vec3 vel, vec3 avel, out float index, 
     angular_velocity = avel;
 }
 
+void vect_normalize(vec3 vin, out vec3 vout)
+{
+	vout = normalize(vin);
+}
+
+void direction_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
+{
+	vout = (mat*vec4(vin, 0.0)).xyz;
+}
+
+void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
+{
+	vout = (mat*vec4(vin, 1.0)).xyz;
+}
+
 void mapping(vec3 vec, mat4 mat, vec3 minvec, vec3 maxvec, float domin, float domax, out vec3 outvec)
 {
 	outvec = (mat * vec4(vec, 1.0)).xyz;
@@ -2560,7 +2575,8 @@ void node_light_path(
 	out float is_transmission_ray,
 	out float ray_length,
 	out float ray_depth,
-	out float transparent_depth)
+	out float transparent_depth,
+	out float transmission_depth)
 {
 	is_camera_ray = 1.0;
 	is_shadow_ray = 0.0;
@@ -2572,6 +2588,7 @@ void node_light_path(
 	ray_length = 1.0;
 	ray_depth = 1.0;
 	transparent_depth = 1.0;
+	transmission_depth = 1.0;
 }
 
 void node_light_falloff(float strength, float tsmooth, out float quadratic, out float linear, out float constant)

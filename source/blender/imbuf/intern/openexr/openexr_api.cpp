@@ -71,9 +71,6 @@ _CRTIMP void __cdecl _invalid_parameter_noinfo(void)
 #include "IMB_allocimbuf.h"
 #include "IMB_metadata.h"
 
-#include "IMB_colormanagement.h"
-#include "IMB_colormanagement_intern.h"
-
 #include "openexr_multi.h"
 }
 
@@ -103,6 +100,13 @@ _CRTIMP void __cdecl _invalid_parameter_noinfo(void)
 #include <ImfTiledOutputPart.h>
 #include <ImfPartType.h>
 #include <ImfPartHelper.h>
+
+extern "C"
+{
+/* including these before <Imf*> breaks compile with conflicting acosf() definitions */
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
+}
 
 using namespace Imf;
 using namespace Imath;

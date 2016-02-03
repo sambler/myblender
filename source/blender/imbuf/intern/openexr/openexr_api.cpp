@@ -101,9 +101,7 @@ _CRTIMP void __cdecl _invalid_parameter_noinfo(void)
 #include <ImfPartType.h>
 #include <ImfPartHelper.h>
 
-extern "C"
-{
-/* including these before <Imf*> breaks compile with conflicting acosf() definitions */
+extern "C" {
 #include "IMB_colormanagement.h"
 #include "IMB_colormanagement_intern.h"
 }

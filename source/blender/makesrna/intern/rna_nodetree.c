@@ -3045,8 +3045,11 @@ void rna_ShaderNodePointDensity_density_cache(bNode *self,
 		return;
 	}
 
+	/* Make sure there's no cached data. */
+	BKE_texture_pointdensity_free_data(pd);
+	RE_point_density_free(pd);
+
 	/* Create PointDensity structure from node for sampling. */
-	memset(pd, 0, sizeof(*pd));
 	BKE_texture_pointdensity_init_data(pd);
 	pd->object = (Object *)self->id;
 	pd->radius = shader_point_density->radius;
@@ -3098,6 +3101,7 @@ void rna_ShaderNodePointDensity_density_calc(bNode *self,
 
 	/* We're done, time to clean up. */
 	BKE_texture_pointdensity_free_data(pd);
+	memset(pd, 0, sizeof(*pd));
 }
 
 void rna_ShaderNodePointDensity_density_minmax(bNode *self,
@@ -4247,6 +4251,7 @@ static void def_sh_subsurface(StructRNA *srna)
 	static EnumPropertyItem prop_subsurface_falloff_items[] = {
 		{SHD_SUBSURFACE_CUBIC, "CUBIC", 0, "Cubic", "Simple cubic falloff function"},
 		{SHD_SUBSURFACE_GAUSSIAN, "GAUSSIAN", 0, "Gaussian", "Normal distribution, multiple can be combined to fit more complex profiles"},
+		{SHD_SUBSURFACE_BURLEY, "BURLEY", 0, "Christensen-Burley", "Approximation to physically based volume scattering"},
 		{0, NULL, 0, NULL, NULL}
 	};
 

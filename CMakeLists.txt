@@ -673,8 +673,11 @@ if(NOT WITH_BOOST)
 elseif(WITH_CYCLES OR WITH_OPENIMAGEIO OR WITH_AUDASPACE OR WITH_INTERNATIONAL OR WITH_OPENVDB OR WITH_OPENCOLORIO OR WITH_MOD_BOOLEAN)
 	# Keep enabled
 else()
-	# Enabled but we don't need it
-	set(WITH_BOOST OFF)
+	# New dependency graph needs either Boost or C++11 for function bindings.
+	if(NOT USE_CPP11)
+		# Enabled but we don't need it
+		set(WITH_BOOST OFF)
+	endif()
 endif()
 
 # auto enable openimageio for cycles
@@ -1286,6 +1289,10 @@ elseif(WIN32)
 
 		set(PLATFORM_LINKFLAGS "/SUBSYSTEM:CONSOLE /STACK:2097152 /INCREMENTAL:NO /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:msvcmrt.lib /NODEFAULTLIB:msvcurt.lib /NODEFAULTLIB:msvcrtd.lib")
 
+		# Ignore meaningless for us linker warnings.
+		set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} /ignore:4049 /ignore:4217 /ignore:4221")
+		set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:4221")
+
 		# MSVC only, Mingw doesnt need
 		if(CMAKE_CL_64)
 			set(PLATFORM_LINKFLAGS "/MACHINE:X64 /OPT:NOREF ${PLATFORM_LINKFLAGS}")
@@ -1424,7 +1431,7 @@ elseif(WIN32)
 				message(WARNING "Using HARDCODED OpenEXR locations")
 				set(OPENEXR ${LIBDIR}/openexr)
 				set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
-				set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/include/OpenEXR)
+				set(OPENEXR_INCLUDE_DIRS ${OPENEXR_INCLUDE_DIR} ${OPENEXR}/include/OpenEXR)
 				set(OPENEXR_LIBPATH ${OPENEXR}/lib)
 				set(OPENEXR_LIBRARIES
 					${OPENEXR_LIBPATH}/Iex-2_2.lib
@@ -1476,6 +1483,9 @@ elseif(WIN32)
 			endif()
 			if(WITH_INTERNATIONAL)
 				list(APPEND boost_extra_libs locale)
+			endif()
+			if(WITH_OPENVDB)
+				list(APPEND boost_extra_libs iostreams)
 			endif()
 			set(Boost_USE_STATIC_RUNTIME ON) # prefix lib
 			set(Boost_USE_MULTITHREADED ON) # suffix -mt
@@ -1567,11 +1577,12 @@ elseif(WIN32)
 		endif()
 
 		if(WITH_OPENVDB)
+			set(TBB_LIBRARIES ${LIBDIR}/tbb/lib/tbb.lib)
+			set(TBB_INCLUDE_DIR ${LIBDIR}/tbb/include)
 			set(OPENVDB ${LIBDIR}/openvdb)
-			set(OPENVDB_INCLUDE_DIRS ${OPENVDB}/include)
+			set(OPENVDB_INCLUDE_DIRS ${OPENVDB}/include ${TBB_INCLUDE_DIR})
 			set(OPENVDB_LIBRARIES openvdb ${TBB_LIBRARIES})
 			set(OPENVDB_LIBPATH ${LIBDIR}/openvdb/lib)
-			set(OPENVDB_DEFINITIONS)
 		endif()
 
 		if(WITH_MOD_CLOTH_ELTOPO)
@@ -2010,7 +2021,7 @@ elseif(APPLE)
 	if(WITH_IMAGE_OPENEXR)
 		set(OPENEXR ${LIBDIR}/openexr)
 		set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
-		set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/include/OpenEXR)
+		set(OPENEXR_INCLUDE_DIRS ${OPENEXR_INCLUDE_DIR} ${OPENEXR}/include/OpenEXR)
 		set(OPENEXR_LIBRARIES Iex Half IlmImf Imath IlmThread)
 		set(OPENEXR_LIBPATH ${OPENEXR}/lib)
 	endif()
@@ -2134,6 +2145,9 @@ elseif(APPLE)
 		if(WITH_CYCLES_NETWORK)
 			list(APPEND BOOST_LIBRARIES boost_serialization-mt)
 		endif()
+		if(WITH_OPENVDB)
+			list(APPEND BOOST_LIBRARIES boost_iostreams-mt)
+		endif()
 		set(BOOST_LIBPATH ${BOOST}/lib)
 		set(BOOST_DEFINITIONS)
 	endif()
@@ -2161,7 +2175,9 @@ elseif(APPLE)
 	if(WITH_OPENVDB)
 		set(OPENVDB ${LIBDIR}/openvdb)
 		set(OPENVDB_INCLUDE_DIRS ${OPENVDB}/include)
-		set(OPENVDB_LIBRARIES openvdb ${TBB_LIBRARIES})
+		set(TBB_INCLUDE_DIRS ${LIBDIR}/tbb/include)
+		set(TBB_LIBRARIES ${LIBDIR}/tbb/lib/libtbb.a)
+		set(OPENVDB_LIBRARIES openvdb blosc ${TBB_LIBRARIES})
 		set(OPENVDB_LIBPATH ${LIBDIR}/openvdb/lib)
 		set(OPENVDB_DEFINITIONS)
 	endif()

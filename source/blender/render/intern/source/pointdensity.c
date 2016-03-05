@@ -764,12 +764,18 @@ void RE_point_density_minmax(
 	else {
 		float radius[3] = {pd->radius, pd->radius, pd->radius};
 		float *loc, *size;
-		BKE_object_obdata_texspace_get(pd->object, NULL, &loc, &size, NULL);
-		sub_v3_v3v3(r_min, loc, size);
-		add_v3_v3v3(r_max, loc, size);
-		/* Adjust texture space to include density points on the boundaries. */
-		sub_v3_v3(r_min, radius);
-		add_v3_v3(r_max, radius);
+
+		if (BKE_object_obdata_texspace_get(pd->object, NULL, &loc, &size, NULL)) {
+			sub_v3_v3v3(r_min, loc, size);
+			add_v3_v3v3(r_max, loc, size);
+			/* Adjust texture space to include density points on the boundaries. */
+			sub_v3_v3(r_min, radius);
+			add_v3_v3(r_max, radius);
+		}
+		else {
+			zero_v3(r_min);
+			zero_v3(r_max);
+		}
 	}
 }
 
@@ -834,11 +840,13 @@ void RE_point_density_sample(
 		return;
 	}
 
+	BLI_mutex_lock(&sample_mutex);
 	RE_point_density_minmax(scene,
 	                        pd,
 	                        use_render_params,
 	                        min,
 	                        max);
+	BLI_mutex_unlock(&sample_mutex);
 	sub_v3_v3v3(dim, max, min);
 	if (dim[0] <= 0.0f || dim[1] <= 0.0f || dim[2] <= 0.0f) {
 		sample_dummy_point_density(resolution, values);

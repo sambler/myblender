@@ -48,7 +48,8 @@ typedef struct MemHead {
 	/* pad to get sizeof as multiples of 16 to keep alignment
 	 * as the byte after this struct is the ptr used for data
 	 */
-	char pad[8];
+	/* this padding causes cycles to crash */
+	/*char pad[8];*/
 #endif
 } MemHead;
 

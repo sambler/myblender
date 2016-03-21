@@ -148,6 +148,7 @@ struct GPULamp {
 	float spotvec[2];
 	float dyndist, dynatt1, dynatt2;
 	float dist, att1, att2;
+	float coeff_const, coeff_lin, coeff_quad;
 	float shadow_color[3];
 
 	float bias, d, clipend;
@@ -549,6 +550,12 @@ static GPUNodeLink *lamp_get_visibility(GPUMaterial *mat, GPULamp *lamp, GPUNode
 				         GPU_dynamic_uniform(&lamp->dist, GPU_DYNAMIC_LAMP_DISTANCE, lamp->ob),
 				         GPU_dynamic_uniform(&lamp->att1, GPU_DYNAMIC_LAMP_ATT1, lamp->ob),
 				         GPU_dynamic_uniform(&lamp->att2, GPU_DYNAMIC_LAMP_ATT2, lamp->ob), *dist, &visifac);
+				break;
+			case LA_FALLOFF_INVCOEFFICIENTS:
+				GPU_link(mat, "lamp_falloff_invcoefficients",
+					     GPU_dynamic_uniform(&lamp->coeff_const, GPU_DYNAMIC_LAMP_COEFFCONST, lamp->ob),
+					     GPU_dynamic_uniform(&lamp->coeff_lin, GPU_DYNAMIC_LAMP_COEFFLIN, lamp->ob),
+					     GPU_dynamic_uniform(&lamp->coeff_quad, GPU_DYNAMIC_LAMP_COEFFQUAD, lamp->ob), *dist, &visifac);
 				break;
 			case LA_FALLOFF_CURVE:
 			{
@@ -2157,22 +2164,17 @@ static void gpu_lamp_calc_winmat(GPULamp *lamp)
 		wsize = lamp->la->shadow_frustum_size;
 		orthographic_m4(lamp->winmat, -wsize, wsize, -wsize, wsize, lamp->d, lamp->clipend);
 	}
-	else {
+	else if (lamp->type == LA_SPOT) {
 		angle = saacos(lamp->spotsi);
 		temp = 0.5f * lamp->size * cosf(angle) / sinf(angle);
 		pixsize = lamp->d / temp;
 		wsize = pixsize * 0.5f * lamp->size;
-		if (lamp->type & LA_SPOT) {
-			/* compute shadows according to X and Y scaling factors */
-			perspective_m4(
-			        lamp->winmat,
-			        -wsize * lamp->spotvec[0], wsize * lamp->spotvec[0],
-			        -wsize * lamp->spotvec[1], wsize * lamp->spotvec[1],
-			        lamp->d, lamp->clipend);
-		}
-		else {
-			perspective_m4(lamp->winmat, -wsize, wsize, -wsize, wsize, lamp->d, lamp->clipend);
-		}
+		/* compute shadows according to X and Y scaling factors */
+		perspective_m4(
+		        lamp->winmat,
+		        -wsize * lamp->spotvec[0], wsize * lamp->spotvec[0],
+		        -wsize * lamp->spotvec[1], wsize * lamp->spotvec[1],
+		        lamp->d, lamp->clipend);
 	}
 }
 
@@ -2191,12 +2193,16 @@ void GPU_lamp_update(GPULamp *lamp, int lay, int hide, float obmat[4][4])
 	copy_m4_m4(lamp->obmat, mat);
 	invert_m4_m4(lamp->imat, mat);
 
-	/* update spotlamp scale on X and Y axis */
-	lamp->spotvec[0] = obmat_scale[0] / obmat_scale[2];
-	lamp->spotvec[1] = obmat_scale[1] / obmat_scale[2];
+	if (lamp->type == LA_SPOT) {
+		/* update spotlamp scale on X and Y axis */
+		lamp->spotvec[0] = obmat_scale[0] / obmat_scale[2];
+		lamp->spotvec[1] = obmat_scale[1] / obmat_scale[2];
+	}
 
-	/* makeshadowbuf */
-	gpu_lamp_calc_winmat(lamp);
+	if (GPU_lamp_has_shadow_buffer(lamp)) {
+		/* makeshadowbuf */
+		gpu_lamp_calc_winmat(lamp);
+	}
 }
 
 void GPU_lamp_update_colors(GPULamp *lamp, float r, float g, float b, float energy)
@@ -2209,11 +2215,15 @@ void GPU_lamp_update_colors(GPULamp *lamp, float r, float g, float b, float ener
 	lamp->col[2] = b;
 }
 
-void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float att2)
+void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float att2,
+                              float coeff_const, float coeff_lin, float coeff_quad)
 {
 	lamp->dist = distance;
 	lamp->att1 = att1;
 	lamp->att2 = att2;
+	lamp->coeff_const = coeff_const;
+	lamp->coeff_lin = coeff_lin;
+	lamp->coeff_quad = coeff_quad;
 }
 
 void GPU_lamp_update_spot(GPULamp *lamp, float spotsize, float spotblend)
@@ -2254,6 +2264,9 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 	lamp->falloff_type = la->falloff_type;
 	lamp->att1 = la->att1;
 	lamp->att2 = la->att2;
+	lamp->coeff_const = la->coeff_const;
+	lamp->coeff_lin = la->coeff_lin;
+	lamp->coeff_quad = la->coeff_quad;
 	lamp->curfalloff = la->curfalloff;
 
 	/* initshadowbuf */

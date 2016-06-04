@@ -859,10 +859,17 @@ static void widget_draw_icon(
 		else if (but->flag & UI_ACTIVE) {}
 		else alpha = 0.5f;
 	}
-	
-	/* extra feature allows more alpha blending */
-	if ((but->type == UI_BTYPE_LABEL) && but->a1 == 1.0f)
-		alpha *= but->a2;
+	else if ((but->type == UI_BTYPE_LABEL)) {
+		/* extra feature allows more alpha blending */
+		if (but->a1 == 1.0f) {
+			alpha *= but->a2;
+		}
+	}
+	else if (ELEM(but->type, UI_BTYPE_BUT)) {
+		if (but->flag & UI_BUT_DISABLED) {
+			alpha *= 0.5f;
+		}
+	}
 	
 	glEnable(GL_BLEND);
 	
@@ -3042,6 +3049,15 @@ static void widget_swatch(uiBut *but, uiWidgetColors *wcol, rcti *rect, int stat
 
 	wcol->shaded = 0;
 	wcol->alpha_check = (wcol->inner[3] < 255);
+	
+	if (state & (UI_BUT_DISABLED | UI_BUT_INACTIVE)) {
+		/* Now we reduce alpha of the inner color (i.e. the color shown)
+		 * so that this setting can look greyed out, while retaining
+		 * the checkboard (for transparent values). This is needed
+		 * here as the effects of ui_widget_color_disabled() are overwritten.
+		 */
+		wcol->inner[3] /= 2;
+	}
 
 	widgetbase_draw(&wtb, wcol);
 	
@@ -3499,6 +3515,10 @@ static uiWidgetType *widget_type(uiWidgetTypeEnum type)
 			
 		/* specials */
 		case UI_WTYPE_ICON:
+			wt.custom = widget_icon_has_anim;
+			break;
+
+		case UI_WTYPE_ICON_LABEL:
 			/* behave like regular labels (this is simply a label with an icon) */
 			wt.state = widget_state_label;
 			wt.custom = widget_icon_has_anim;
@@ -3628,7 +3648,14 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 	}
 	else if (but->dt == UI_EMBOSS_NONE) {
 		/* "nothing" */
-		wt = widget_type(UI_WTYPE_ICON);
+		switch (but->type) {
+			case UI_BTYPE_LABEL:
+				wt = widget_type(UI_WTYPE_ICON_LABEL);
+				break;
+			default:
+				wt = widget_type(UI_WTYPE_ICON);
+				break;
+		}
 	}
 	else if (but->dt == UI_EMBOSS_RADIAL) {
 		wt = widget_type(UI_WTYPE_MENU_ITEM_RADIAL);

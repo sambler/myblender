@@ -557,7 +557,7 @@ static void UI_OT_copy_to_selected_button(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	RNA_def_boolean(ot->srna, "all", 1, "All", "Reset to default values all elements of the array");
+	RNA_def_boolean(ot->srna, "all", true, "All", "Copy to selected all elements of the array");
 }
 
 /* Reports to Textblock Operator ------------------------ */
@@ -897,7 +897,7 @@ static int edittranslation_exec(bContext *C, wmOperator *op)
 		}
 		ot = WM_operatortype_find(EDTSRC_I18N_OP_NAME, 0);
 		if (ot == NULL) {
-			BKE_reportf(op->reports, RPT_ERROR, "Could not find operator '%s'! Please enable ui_translate addon "
+			BKE_reportf(op->reports, RPT_ERROR, "Could not find operator '%s'! Please enable ui_translate add-on "
 			                                    "in the User Preferences", EDTSRC_I18N_OP_NAME);
 			return OPERATOR_CANCELLED;
 		}
@@ -1107,6 +1107,7 @@ void ED_operatortypes_ui(void)
 	WM_operatortype_append(UI_OT_eyedropper_color);
 	WM_operatortype_append(UI_OT_eyedropper_id);
 	WM_operatortype_append(UI_OT_eyedropper_depth);
+	WM_operatortype_append(UI_OT_eyedropper_driver);
 }
 
 /**

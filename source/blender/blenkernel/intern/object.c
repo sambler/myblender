@@ -244,6 +244,11 @@ bool BKE_object_support_modifier_type_check(Object *ob, int modifier_type)
 
 	mti = modifierType_getInfo(modifier_type);
 
+
+	if (ob->type == OB_LATTICE && (mti->flags & eModifierTypeFlag_AcceptsLattice) == 0) {
+		return false;
+	}
+
 	if (!((mti->flags & eModifierTypeFlag_AcceptsCVs) ||
 	      (ob->type == OB_MESH && (mti->flags & eModifierTypeFlag_AcceptsMesh))))
 	{
@@ -3653,6 +3658,17 @@ static bool object_moves_in_time(Object *object)
 	return false;
 }
 
+static bool object_deforms_in_time(Object *object)
+{
+	if (BKE_key_from_object(object) != NULL) {
+		return true;
+	}
+	if (!BLI_listbase_is_empty(&object->modifiers)) {
+		return true;
+	}
+	return object_moves_in_time(object);
+}
+
 static bool constructive_modifier_is_deform_modified(ModifierData *md)
 {
 	/* TODO(sergey): Consider generalizing this a bit so all modifier logic
@@ -3712,8 +3728,16 @@ int BKE_object_is_deform_modified(Scene *scene, Object *ob)
 	int flag = 0;
 	const bool is_modifier_animated = modifiers_has_animation_check(ob);
 
-	if (BKE_key_from_object(ob))
+	if (BKE_key_from_object(ob)) {
 		flag |= eModifierMode_Realtime | eModifierMode_Render;
+	}
+
+	if (ob->type == OB_CURVE) {
+		Curve *cu = (Curve *)ob->data;
+		if (cu->taperobj != NULL && object_deforms_in_time(cu->taperobj)) {
+			flag |= eModifierMode_Realtime | eModifierMode_Render;
+		}
+	}
 
 	/* cloth */
 	for (md = modifiers_getVirtualModifierList(ob, &virtualModifierData);

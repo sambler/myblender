@@ -566,7 +566,9 @@ int get_effector_data(EffectorCache *eff, EffectorData *efd, EffectedPoint *poin
 	float cfra = eff->scene->r.cfra;
 	int ret = 0;
 
-	if (eff->pd && eff->pd->shape==PFIELD_SHAPE_SURFACE && eff->surmd) {
+	/* In case surface object is in Edit mode when loading the .blend, surface modifier is never executed
+	 * and bvhtree never built, see T48415. */
+	if (eff->pd && eff->pd->shape==PFIELD_SHAPE_SURFACE && eff->surmd && eff->surmd->bvhtree) {
 		/* closest point in the object surface is an effector */
 		float vec[3];
 
@@ -746,13 +748,15 @@ static void do_texture_effector(EffectorCache *eff, EffectorData *efd, EffectedP
 
 	copy_v3_v3(tex_co, point->loc);
 
-	if (eff->pd->flag & PFIELD_TEX_2D) {
-		float fac=-dot_v3v3(tex_co, efd->nor);
-		madd_v3_v3fl(tex_co, efd->nor, fac);
-	}
-
 	if (eff->pd->flag & PFIELD_TEX_OBJECT) {
 		mul_m4_v3(eff->ob->imat, tex_co);
+
+		if (eff->pd->flag & PFIELD_TEX_2D)
+			tex_co[2] = 0.0f;
+	}
+	else if (eff->pd->flag & PFIELD_TEX_2D) {
+		float fac=-dot_v3v3(tex_co, efd->nor);
+		madd_v3_v3fl(tex_co, efd->nor, fac);
 	}
 
 	scene_color_manage = BKE_scene_check_color_management_enabled(eff->scene);

@@ -635,8 +635,8 @@ void ED_area_headerprint(ScrArea *sa, const char *str)
 		if (ar->regiontype == RGN_TYPE_HEADER) {
 			if (str) {
 				if (ar->headerstr == NULL)
-					ar->headerstr = MEM_mallocN(256, "headerprint");
-				BLI_strncpy(ar->headerstr, str, 256);
+					ar->headerstr = MEM_mallocN(UI_MAX_DRAW_STR, "headerprint");
+				BLI_strncpy(ar->headerstr, str, UI_MAX_DRAW_STR);
 			}
 			else if (ar->headerstr) {
 				MEM_freeN(ar->headerstr);
@@ -1507,6 +1507,16 @@ void ED_region_init(bContext *C, ARegion *ar)
 	region_update_rect(ar);
 }
 
+void ED_region_cursor_set(wmWindow *win, ScrArea *sa, ARegion *ar)
+{
+	if (ar && sa && ar->type && ar->type->cursor) {
+		ar->type->cursor(win, sa, ar);
+	}
+	else {
+		WM_cursor_set(win, CURSOR_STD);
+	}
+}
+
 /* for quick toggle, can skip fades */
 void region_toggle_hidden(bContext *C, ARegion *ar, const bool do_fade)
 {
@@ -1753,7 +1763,7 @@ void ED_region_panels(const bContext *C, ARegion *ar, const char *context, int c
 	int redo;
 	int scroll;
 
-	bool use_category_tabs = (ar->regiontype == RGN_TYPE_TOOLS);  /* XXX, should use some better check? */
+	bool use_category_tabs = (ELEM(ar->regiontype, RGN_TYPE_TOOLS, RGN_TYPE_UI));  /* XXX, should use some better check? */
 	/* offset panels for small vertical tab area */
 	const char *category = NULL;
 	const int category_tabs_width = UI_PANEL_CATEGORY_MARGIN_WIDTH;

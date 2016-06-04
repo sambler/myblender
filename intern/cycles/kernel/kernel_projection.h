@@ -47,10 +47,10 @@ ccl_device float2 direction_to_spherical(float3 dir)
 
 ccl_device float3 spherical_to_direction(float theta, float phi)
 {
-	return make_float3(
-		sinf(theta)*cosf(phi),
-		sinf(theta)*sinf(phi),
-		cosf(theta));
+	float sin_theta = sinf(theta);
+	return make_float3(sin_theta*cosf(phi),
+	                   sin_theta*sinf(phi),
+	                   cosf(theta));
 }
 
 /* Equirectangular coordinates <-> Cartesian direction */
@@ -67,11 +67,10 @@ ccl_device float3 equirectangular_range_to_direction(float u, float v, float4 ra
 {
 	float phi = range.x*u + range.y;
 	float theta = range.z*v + range.w;
-
-	return make_float3(
-		sinf(theta)*cosf(phi),
-		sinf(theta)*sinf(phi),
-		cosf(theta));
+	float sin_theta = sinf(theta);
+	return make_float3(sin_theta*cosf(phi),
+	                   sin_theta*sinf(phi),
+	                   cosf(theta));
 }
 
 ccl_device float2 direction_to_equirectangular(float3 dir)
@@ -226,13 +225,28 @@ ccl_device float3 spherical_stereo_position(KernelGlobals *kg,
                                             float3 dir,
                                             float3 pos)
 {
-	const float interocular_offset = kernel_data.cam.interocular_offset;
+	float interocular_offset = kernel_data.cam.interocular_offset;
 
 	/* Interocular offset of zero means either non stereo, or stereo without
 	 * spherical stereo.
 	 */
 	if(interocular_offset == 0.0f) {
 		return pos;
+	}
+
+	if(kernel_data.cam.pole_merge_angle_to > 0.0f) {
+		float3 normalized_direction = normalize(dir);
+		const float pole_merge_angle_from = kernel_data.cam.pole_merge_angle_from,
+		            pole_merge_angle_to = kernel_data.cam.pole_merge_angle_to;
+		float altitude = fabsf(safe_asinf(normalized_direction.z));
+		if(altitude > pole_merge_angle_to) {
+			interocular_offset = 0.0f;
+		}
+		else if(altitude > pole_merge_angle_from) {
+			float fac = (altitude - pole_merge_angle_from) / (pole_merge_angle_to - pole_merge_angle_from);
+			float fade = cosf(fac * M_PI_2_F);
+			interocular_offset *= fade;
+		}
 	}
 
 	float3 up = make_float3(0.0f, 0.0f, 1.0f);

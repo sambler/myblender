@@ -176,6 +176,8 @@ int imb_is_a_photoshop(const char *filename)
 		".psd",
 		".pdd",
 		".psb",
+		".dng",
+		".cr2",
 		NULL
 	};
 

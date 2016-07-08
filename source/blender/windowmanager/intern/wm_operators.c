@@ -1391,7 +1391,7 @@ static void dialog_exec_cb(bContext *C, void *arg1, void *arg2)
 	}
 }
 
-static void dialog_check_cb(bContext *C, void *op_ptr, void *UNUSED(arg))
+static void popup_check_cb(bContext *C, void *op_ptr, void *UNUSED(arg))
 {
 	wmOperator *op = op_ptr;
 	if (op->type->check) {
@@ -1423,7 +1423,7 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
 	
-	UI_block_func_set(block, dialog_check_cb, op, NULL);
+	UI_block_func_set(block, popup_check_cb, op, NULL);
 
 	uiLayoutOperatorButs(C, layout, op, NULL, 'H', UI_LAYOUT_OP_SHOW_TITLE);
 	
@@ -1463,8 +1463,12 @@ static uiBlock *wm_operator_ui_create(bContext *C, ARegion *ar, void *userData)
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
 
+	UI_block_func_set(block, popup_check_cb, op, NULL);
+
 	/* since ui is defined the auto-layout args are not used */
 	uiLayoutOperatorButs(C, layout, op, NULL, 'V', 0);
+
+	UI_block_func_set(block, NULL, NULL, NULL);
 
 	UI_block_bounds_set_popup(block, 4, 0, 0);
 
@@ -3880,7 +3884,7 @@ static void previews_id_ensure(bContext *C, Scene *scene, ID *id)
 
 	/* Only preview non-library datablocks, lib ones do not pertain to this .blend file!
 	 * Same goes for ID with no user. */
-	if (!id->lib && (id->us != 0)) {
+	if (!ID_IS_LINKED_DATABLOCK(id) && (id->us != 0)) {
 		UI_id_icon_render(C, scene, id, false, false);
 		UI_id_icon_render(C, scene, id, true, false);
 	}
@@ -4123,6 +4127,8 @@ void wm_operatortype_init(void)
 	WM_operatortype_append(WM_OT_revert_mainfile);
 	WM_operatortype_append(WM_OT_link);
 	WM_operatortype_append(WM_OT_append);
+	WM_operatortype_append(WM_OT_lib_relocate);
+	WM_operatortype_append(WM_OT_lib_reload);
 	WM_operatortype_append(WM_OT_recover_last_session);
 	WM_operatortype_append(WM_OT_recover_auto_save);
 	WM_operatortype_append(WM_OT_save_as_mainfile);
@@ -4202,7 +4208,8 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_assign(keymap, "MASK_OT_select_circle");
 	WM_modalkeymap_assign(keymap, "NODE_OT_select_circle");
 	WM_modalkeymap_assign(keymap, "GPENCIL_OT_select_circle");
-	WM_modalkeymap_assign(keymap, "GRAPH_OT_select_circle");	
+	WM_modalkeymap_assign(keymap, "GRAPH_OT_select_circle");
+	WM_modalkeymap_assign(keymap, "ACTION_OT_select_circle");
 
 }
 
@@ -4462,7 +4469,7 @@ static EnumPropertyItem *rna_id_itemf(bContext *UNUSED(C), PointerRNA *UNUSED(pt
 	int i = 0;
 
 	for (; id; id = id->next) {
-		if (local == false || id->lib == NULL) {
+		if (local == false || !ID_IS_LINKED_DATABLOCK(id)) {
 			item_tmp.identifier = item_tmp.name = id->name + 2;
 			item_tmp.value = i++;
 			RNA_enum_item_add(&item, &totitem, &item_tmp);

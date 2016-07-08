@@ -81,47 +81,33 @@ void init_def_material(void)
 	BKE_material_init(&defmaterial);
 }
 
-/* not material itself */
+/** Free (or release) any data used by this material (does not free the material itself). */
 void BKE_material_free(Material *ma)
 {
-	BKE_material_free_ex(ma, true);
-}
-
-/* not material itself */
-void BKE_material_free_ex(Material *ma, bool do_id_user)
-{
-	MTex *mtex;
 	int a;
+
+	BKE_animdata_free((ID *)ma, false);
 	
 	for (a = 0; a < MAX_MTEX; a++) {
-		mtex = ma->mtex[a];
-		if (do_id_user && mtex && mtex->tex)
-			id_us_min(&mtex->tex->id);
-		if (mtex)
-			MEM_freeN(mtex);
+		MEM_SAFE_FREE(ma->mtex[a]);
 	}
 	
-	if (ma->ramp_col) MEM_freeN(ma->ramp_col);
-	if (ma->ramp_spec) MEM_freeN(ma->ramp_spec);
-	
-	BKE_animdata_free((ID *)ma);
-	
-	if (ma->preview)
-		BKE_previewimg_free(&ma->preview);
-	BKE_icon_id_delete((struct ID *)ma);
-	ma->id.icon_id = 0;
+	MEM_SAFE_FREE(ma->ramp_col);
+	MEM_SAFE_FREE(ma->ramp_spec);
 	
 	/* is no lib link block, but material extension */
 	if (ma->nodetree) {
-		ntreeFreeTree_ex(ma->nodetree, do_id_user);
+		ntreeFreeTree(ma->nodetree);
 		MEM_freeN(ma->nodetree);
+		ma->nodetree = NULL;
 	}
 
-	if (ma->texpaintslot)
-		MEM_freeN(ma->texpaintslot);
+	MEM_SAFE_FREE(ma->texpaintslot);
 
-	if (ma->gpumaterial.first)
-		GPU_material_free(&ma->gpumaterial);
+	GPU_material_free(&ma->gpumaterial);
+
+	BKE_icon_id_delete((ID *)ma);
+	BKE_previewimg_free(&ma->preview);
 }
 
 void BKE_material_init(Material *ma)
@@ -259,7 +245,7 @@ Material *BKE_material_copy(Material *ma)
 
 	BLI_listbase_clear(&man->gpumaterial);
 	
-	if (ma->id.lib) {
+	if (ID_IS_LINKED_DATABLOCK(ma)) {
 		BKE_id_lib_local_paths(G.main, ma->id.lib, &man->id);
 	}
 
@@ -319,7 +305,7 @@ void BKE_material_make_local(Material *ma)
 	 * - mixed: make copy
 	 */
 	
-	if (ma->id.lib == NULL) return;
+	if (!ID_IS_LINKED_DATABLOCK(ma)) return;
 
 	/* One local user; set flag and return. */
 	if (ma->id.us == 1) {
@@ -336,7 +322,7 @@ void BKE_material_make_local(Material *ma)
 		if (ob->mat) {
 			for (a = 0; a < ob->totcol; a++) {
 				if (ob->mat[a] == ma) {
-					if (ob->id.lib) is_lib = true;
+					if (ID_IS_LINKED_DATABLOCK(ob)) is_lib = true;
 					else is_local = true;
 				}
 			}
@@ -349,7 +335,7 @@ void BKE_material_make_local(Material *ma)
 		if (me->mat) {
 			for (a = 0; a < me->totcol; a++) {
 				if (me->mat[a] == ma) {
-					if (me->id.lib) is_lib = true;
+					if (ID_IS_LINKED_DATABLOCK(me)) is_lib = true;
 					else is_local = true;
 				}
 			}
@@ -362,7 +348,7 @@ void BKE_material_make_local(Material *ma)
 		if (cu->mat) {
 			for (a = 0; a < cu->totcol; a++) {
 				if (cu->mat[a] == ma) {
-					if (cu->id.lib) is_lib = true;
+					if (ID_IS_LINKED_DATABLOCK(cu)) is_lib = true;
 					else is_local = true;
 				}
 			}
@@ -375,7 +361,7 @@ void BKE_material_make_local(Material *ma)
 		if (mb->mat) {
 			for (a = 0; a < mb->totcol; a++) {
 				if (mb->mat[a] == ma) {
-					if (mb->id.lib) is_lib = true;
+					if (ID_IS_LINKED_DATABLOCK(mb)) is_lib = true;
 					else is_local = true;
 				}
 			}
@@ -403,7 +389,7 @@ void BKE_material_make_local(Material *ma)
 			if (ob->mat) {
 				for (a = 0; a < ob->totcol; a++) {
 					if (ob->mat[a] == ma) {
-						if (ob->id.lib == NULL) {
+						if (!ID_IS_LINKED_DATABLOCK(ob)) {
 							ob->mat[a] = ma_new;
 							id_us_plus(&ma_new->id);
 							id_us_min(&ma->id);
@@ -419,7 +405,7 @@ void BKE_material_make_local(Material *ma)
 			if (me->mat) {
 				for (a = 0; a < me->totcol; a++) {
 					if (me->mat[a] == ma) {
-						if (me->id.lib == NULL) {
+						if (!ID_IS_LINKED_DATABLOCK(me)) {
 							me->mat[a] = ma_new;
 							id_us_plus(&ma_new->id);
 							id_us_min(&ma->id);
@@ -435,7 +421,7 @@ void BKE_material_make_local(Material *ma)
 			if (cu->mat) {
 				for (a = 0; a < cu->totcol; a++) {
 					if (cu->mat[a] == ma) {
-						if (cu->id.lib == NULL) {
+						if (!ID_IS_LINKED_DATABLOCK(cu)) {
 							cu->mat[a] = ma_new;
 							id_us_plus(&ma_new->id);
 							id_us_min(&ma->id);
@@ -451,7 +437,7 @@ void BKE_material_make_local(Material *ma)
 			if (mb->mat) {
 				for (a = 0; a < mb->totcol; a++) {
 					if (mb->mat[a] == ma) {
-						if (mb->id.lib == NULL) {
+						if (!ID_IS_LINKED_DATABLOCK(mb)) {
 							mb->mat[a] = ma_new;
 							id_us_plus(&ma_new->id);
 							id_us_min(&ma->id);
@@ -866,8 +852,8 @@ void assign_material(Object *ob, Material *ma, short act, int assign_type)
 	if (act < 1) act = 1;
 	
 	/* prevent crashing when using accidentally */
-	BLI_assert(ob->id.lib == NULL);
-	if (ob->id.lib) return;
+	BLI_assert(!ID_IS_LINKED_DATABLOCK(ob));
+	if (ID_IS_LINKED_DATABLOCK(ob)) return;
 	
 	/* test arraylens */
 	
@@ -1135,7 +1121,7 @@ static void do_init_render_material(Material *ma, int r_mode, float *amb)
 		Group *group;
 
 		for (group = G.main->group.first; group; group = group->id.next) {
-			if (!group->id.lib && STREQ(group->id.name, ma->group->id.name)) {
+			if (!ID_IS_LINKED_DATABLOCK(group) && STREQ(group->id.name, ma->group->id.name)) {
 				ma->group = group;
 			}
 		}
@@ -1840,7 +1826,7 @@ void free_matcopybuf(void)
 	matcopybuf.ramp_spec = NULL;
 
 	if (matcopybuf.nodetree) {
-		ntreeFreeTree_ex(matcopybuf.nodetree, false);
+		ntreeFreeTree(matcopybuf.nodetree);
 		MEM_freeN(matcopybuf.nodetree);
 		matcopybuf.nodetree = NULL;
 	}
@@ -2244,7 +2230,7 @@ int do_version_tface(Main *main)
 	
 	/* 1st part: marking mesh materials to update */
 	for (me = main->mesh.first; me; me = me->id.next) {
-		if (me->id.lib) continue;
+		if (ID_IS_LINKED_DATABLOCK(me)) continue;
 
 		/* get the active tface layer */
 		index = CustomData_get_active_layer_index(&me->fdata, CD_MTFACE);
@@ -2298,7 +2284,7 @@ int do_version_tface(Main *main)
 				 * at doversion time: direct_link might not have happened on it,
 				 * so ma->mtex is not pointing to valid memory yet.
 				 * later we could, but it's better not */
-				else if (ma->id.lib)
+				else if (ID_IS_LINKED_DATABLOCK(ma))
 					continue;
 				
 				/* material already marked as disputed */
@@ -2363,7 +2349,7 @@ int do_version_tface(Main *main)
 
 	/* we shouldn't loop through the materials created in the loop. make the loop stop at its original length) */
 	for (ma = main->mat.first, a = 0; ma; ma = ma->id.next, a++) {
-		if (ma->id.lib) continue;
+		if (ID_IS_LINKED_DATABLOCK(ma)) continue;
 
 		/* disputed material */
 		if (ma->game.flag == MAT_BGE_DISPUTED) {

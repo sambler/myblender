@@ -43,6 +43,7 @@
 #include "MEM_guardedalloc.h" // for MEM_freeN MEM_mallocN MEM_callocN
 
 #include "BLI_utildefines.h"
+#include "BLI_endian_switch.h"
 
 #ifdef WITH_DNA_GHASH
 #  include "BLI_ghash.h"
@@ -195,7 +196,10 @@ int DNA_elem_array_size(const char *str)
 
 void DNA_sdna_free(SDNA *sdna)
 {
-	MEM_freeN(sdna->data);
+	if (sdna->data_alloc) {
+		MEM_freeN((void *)sdna->data);
+	}
+
 	MEM_freeN((void *)sdna->names);
 	MEM_freeN(sdna->types);
 	MEM_freeN(sdna->structs);
@@ -548,15 +552,24 @@ static void init_structDNA(SDNA *sdna, bool do_endian_swap)
 /**
  * Constructs and returns a decoded SDNA structure from the given encoded SDNA data block.
  */
-SDNA *DNA_sdna_from_data(const void *data, const int datalen, bool do_endian_swap)
+SDNA *DNA_sdna_from_data(
+        const void *data, const int datalen,
+        bool do_endian_swap, bool data_alloc)
 {
 	SDNA *sdna = MEM_mallocN(sizeof(*sdna), "sdna");
 	
 	sdna->lastfind = 0;
 
 	sdna->datalen = datalen;
-	sdna->data = MEM_mallocN(datalen, "sdna_data");
-	memcpy(sdna->data, data, datalen);
+	if (data_alloc) {
+		char *data_copy = MEM_mallocN(datalen, "sdna_data");
+		memcpy(data_copy, data, datalen);
+		sdna->data = data_copy;
+	}
+	else {
+		sdna->data = data;
+	}
+	sdna->data_alloc = data_alloc;
 	
 	init_structDNA(sdna, do_endian_swap);
 	
@@ -1126,7 +1139,7 @@ void DNA_struct_switch_endian(SDNA *oldsdna, int oldSDNAnr, char *data)
 	 */
 	int a, mul, elemcount, elen, elena, firststructtypenr;
 	const short *spo, *spc;
-	char *cpo, *cur, cval;
+	char *cur;
 	const char *type, *name;
 
 	if (oldSDNAnr == -1) return;
@@ -1148,9 +1161,9 @@ void DNA_struct_switch_endian(SDNA *oldsdna, int oldSDNAnr, char *data)
 
 		/* test: is type a struct? */
 		if (spc[0] >= firststructtypenr && !ispointer(name)) {
-		  /* struct field type */
+			/* struct field type */
 			/* where does the old data start (is there one?) */
-			cpo = find_elem(oldsdna, type, name, spo, data, NULL);
+			char *cpo = find_elem(oldsdna, type, name, spo, data, NULL);
 			if (cpo) {
 				oldSDNAnr = DNA_struct_find_nr(oldsdna, type);
 				
@@ -1167,18 +1180,7 @@ void DNA_struct_switch_endian(SDNA *oldsdna, int oldSDNAnr, char *data)
 			/* non-struct field type */
 			if (ispointer(name)) {
 				if (oldsdna->pointerlen == 8) {
-
-					mul = DNA_elem_array_size(name);
-					cpo = cur;
-					while (mul--) {
-						cval = cpo[0]; cpo[0] = cpo[7]; cpo[7] = cval;
-						cval = cpo[1]; cpo[1] = cpo[6]; cpo[6] = cval;
-						cval = cpo[2]; cpo[2] = cpo[5]; cpo[5] = cval;
-						cval = cpo[3]; cpo[3] = cpo[4]; cpo[4] = cval;
-						
-						cpo += 8;
-					}
-					
+					BLI_endian_switch_int64_array((int64_t *)cur, DNA_elem_array_size(name));
 				}
 			}
 			else {
@@ -1191,14 +1193,7 @@ void DNA_struct_switch_endian(SDNA *oldsdna, int oldSDNAnr, char *data)
 					}
 
 					if (skip == false) {
-						mul = DNA_elem_array_size(name);
-						cpo = cur;
-						while (mul--) {
-							cval = cpo[0];
-							cpo[0] = cpo[1];
-							cpo[1] = cval;
-							cpo += 2;
-						}
+						BLI_endian_switch_int16_array((int16_t *)cur, DNA_elem_array_size(name));
 					}
 				}
 				else if (ELEM(spc[0], SDNA_TYPE_INT, SDNA_TYPE_FLOAT)) {
@@ -1206,29 +1201,10 @@ void DNA_struct_switch_endian(SDNA *oldsdna, int oldSDNAnr, char *data)
 					 * but turns out we only used for runtime vars and
 					 * only once for a struct type thats no longer used. */
 
-					mul = DNA_elem_array_size(name);
-					cpo = cur;
-					while (mul--) {
-						cval = cpo[0];
-						cpo[0] = cpo[3];
-						cpo[3] = cval;
-						cval = cpo[1];
-						cpo[1] = cpo[2];
-						cpo[2] = cval;
-						cpo += 4;
-					}
+					BLI_endian_switch_int32_array((int32_t *)cur, DNA_elem_array_size(name));
 				}
 				else if (ELEM(spc[0], SDNA_TYPE_INT64, SDNA_TYPE_UINT64, SDNA_TYPE_DOUBLE)) {
-					mul = DNA_elem_array_size(name);
-					cpo = cur;
-					while (mul--) {
-						cval = cpo[0]; cpo[0] = cpo[7]; cpo[7] = cval;
-						cval = cpo[1]; cpo[1] = cpo[6]; cpo[6] = cval;
-						cval = cpo[2]; cpo[2] = cpo[5]; cpo[5] = cval;
-						cval = cpo[3]; cpo[3] = cpo[4]; cpo[4] = cval;
-
-						cpo += 8;
-					}
+					BLI_endian_switch_int64_array((int64_t *)cur, DNA_elem_array_size(name));
 				}
 			}
 		}

@@ -293,31 +293,34 @@ Lattice *BKE_lattice_copy(Lattice *lt)
 
 	ltn->editlatt = NULL;
 
-	if (lt->id.lib) {
+	if (ID_IS_LINKED_DATABLOCK(lt)) {
 		BKE_id_lib_local_paths(G.main, lt->id.lib, &ltn->id);
 	}
 
 	return ltn;
 }
 
+/** Free (or release) any data used by this lattice (does not free the lattice itself). */
 void BKE_lattice_free(Lattice *lt)
 {
-	if (lt->def) MEM_freeN(lt->def);
-	if (lt->dvert) BKE_defvert_array_free(lt->dvert, lt->pntsu * lt->pntsv * lt->pntsw);
+	BKE_animdata_free(&lt->id, false);
+
+	MEM_SAFE_FREE(lt->def);
+	if (lt->dvert) {
+		BKE_defvert_array_free(lt->dvert, lt->pntsu * lt->pntsv * lt->pntsw);
+		lt->dvert = NULL;
+	}
 	if (lt->editlatt) {
 		Lattice *editlt = lt->editlatt->latt;
 
-		if (editlt->def) MEM_freeN(editlt->def);
-		if (editlt->dvert) BKE_defvert_array_free(editlt->dvert, lt->pntsu * lt->pntsv * lt->pntsw);
+		if (editlt->def)
+			MEM_freeN(editlt->def);
+		if (editlt->dvert)
+			BKE_defvert_array_free(editlt->dvert, lt->pntsu * lt->pntsv * lt->pntsw);
 
 		MEM_freeN(editlt);
 		MEM_freeN(lt->editlatt);
-	}
-	
-	/* free animation data */
-	if (lt->adt) {
-		BKE_animdata_free(&lt->id);
-		lt->adt = NULL;
+		lt->editlatt = NULL;
 	}
 }
 
@@ -333,7 +336,7 @@ void BKE_lattice_make_local(Lattice *lt)
 	 * - mixed: make copy
 	 */
 	
-	if (lt->id.lib == NULL) return;
+	if (!ID_IS_LINKED_DATABLOCK(lt)) return;
 	if (lt->id.us == 1) {
 		id_clear_lib_data(bmain, &lt->id);
 		return;
@@ -341,7 +344,7 @@ void BKE_lattice_make_local(Lattice *lt)
 	
 	for (ob = bmain->object.first; ob && ELEM(false, is_lib, is_local); ob = ob->id.next) {
 		if (ob->data == lt) {
-			if (ob->id.lib) is_lib = true;
+			if (ID_IS_LINKED_DATABLOCK(ob)) is_lib = true;
 			else is_local = true;
 		}
 	}
@@ -358,7 +361,7 @@ void BKE_lattice_make_local(Lattice *lt)
 
 		for (ob = bmain->object.first; ob; ob = ob->id.next) {
 			if (ob->data == lt) {
-				if (ob->id.lib == NULL) {
+				if (!ID_IS_LINKED_DATABLOCK(ob)) {
 					ob->data = lt_new;
 					id_us_plus(&lt_new->id);
 					id_us_min(&lt->id);

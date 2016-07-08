@@ -52,38 +52,28 @@
 
 #include "GPU_material.h"
 
-void BKE_world_free_ex(World *wrld, bool do_id_user)
+/** Free (or release) any data used by this world (does not free the world itself). */
+void BKE_world_free(World *wrld)
 {
-	MTex *mtex;
 	int a;
-	
-	for (a = 0; a < MAX_MTEX; a++) {
-		mtex = wrld->mtex[a];
-		if (do_id_user && mtex && mtex->tex)
-			id_us_min(&mtex->tex->id);
-		if (mtex)
-			MEM_freeN(mtex);
-	}
-	BKE_previewimg_free(&wrld->preview);
 
-	BKE_animdata_free((ID *)wrld);
+	BKE_animdata_free((ID *)wrld, false);
+
+	for (a = 0; a < MAX_MTEX; a++) {
+		MEM_SAFE_FREE(wrld->mtex[a]);
+	}
 
 	/* is no lib link block, but world extension */
 	if (wrld->nodetree) {
-		ntreeFreeTree_ex(wrld->nodetree, do_id_user);
+		ntreeFreeTree(wrld->nodetree);
 		MEM_freeN(wrld->nodetree);
+		wrld->nodetree = NULL;
 	}
 
-	if (wrld->gpumaterial.first)
-		GPU_material_free(&wrld->gpumaterial);
+	GPU_material_free(&wrld->gpumaterial);
 	
 	BKE_icon_id_delete((struct ID *)wrld);
-	wrld->id.icon_id = 0;
-}
-
-void BKE_world_free(World *wrld)
-{
-	BKE_world_free_ex(wrld, true);
+	BKE_previewimg_free(&wrld->preview);
 }
 
 void BKE_world_init(World *wrld)
@@ -151,7 +141,7 @@ World *BKE_world_copy(World *wrld)
 
 	BLI_listbase_clear(&wrldn->gpumaterial);
 
-	if (wrld->id.lib) {
+	if (ID_IS_LINKED_DATABLOCK(wrld)) {
 		BKE_id_lib_local_paths(G.main, wrld->id.lib, &wrldn->id);
 	}
 
@@ -195,7 +185,7 @@ void BKE_world_make_local(World *wrld)
 	 * - mixed: make copy
 	 */
 	
-	if (wrld->id.lib == NULL) return;
+	if (!ID_IS_LINKED_DATABLOCK(wrld)) return;
 	if (wrld->id.us == 1) {
 		id_clear_lib_data(bmain, &wrld->id);
 		return;
@@ -203,7 +193,7 @@ void BKE_world_make_local(World *wrld)
 	
 	for (sce = bmain->scene.first; sce && ELEM(false, is_lib, is_local); sce = sce->id.next) {
 		if (sce->world == wrld) {
-			if (sce->id.lib) is_lib = true;
+			if (ID_IS_LINKED_DATABLOCK(sce)) is_lib = true;
 			else is_local = true;
 		}
 	}
@@ -220,7 +210,7 @@ void BKE_world_make_local(World *wrld)
 
 		for (sce = bmain->scene.first; sce; sce = sce->id.next) {
 			if (sce->world == wrld) {
-				if (sce->id.lib == NULL) {
+				if (!ID_IS_LINKED_DATABLOCK(sce)) {
 					sce->world = wrld_new;
 					id_us_plus(&wrld_new->id);
 					id_us_min(&wrld->id);

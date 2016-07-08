@@ -63,7 +63,8 @@ public:
 	device_vector<float4> bvh_nodes;
 	device_vector<float4> bvh_leaf_nodes;
 	device_vector<uint> object_node;
-	device_vector<float4> tri_storage;
+	device_vector<uint> prim_tri_index;
+	device_vector<float4> prim_tri_verts;
 	device_vector<uint> prim_type;
 	device_vector<uint> prim_visibility;
 	device_vector<uint> prim_index;
@@ -72,8 +73,7 @@ public:
 	/* mesh */
 	device_vector<uint> tri_shader;
 	device_vector<float4> tri_vnormal;
-	device_vector<float4> tri_vindex;
-	device_vector<float4> tri_verts;
+	device_vector<uint4> tri_vindex;
 
 	device_vector<float4> curves;
 	device_vector<float4> curve_keys;
@@ -113,6 +113,8 @@ public:
 	device_vector<float4> tex_float4_image[TEX_NUM_FLOAT4_CPU];
 	device_vector<float> tex_float_image[TEX_NUM_FLOAT_CPU];
 	device_vector<uchar> tex_byte_image[TEX_NUM_BYTE_CPU];
+	device_vector<half4> tex_half4_image[TEX_NUM_HALF4_CPU];
+	device_vector<half> tex_half_image[TEX_NUM_HALF_CPU];
 
 	/* opencl images */
 	device_vector<uchar4> tex_image_byte4_packed;

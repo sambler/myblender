@@ -120,30 +120,25 @@ void BKE_armature_bonelist_free(ListBase *lb)
 	BLI_freelistN(lb);
 }
 
+/** Free (or release) any data used by this armature (does not free the armature itself). */
 void BKE_armature_free(bArmature *arm)
 {
-	if (arm) {
-		BKE_armature_bonelist_free(&arm->bonebase);
+	BKE_animdata_free(&arm->id, false);
 
-		/* free editmode data */
-		if (arm->edbo) {
-			BLI_freelistN(arm->edbo);
+	BKE_armature_bonelist_free(&arm->bonebase);
 
-			MEM_freeN(arm->edbo);
-			arm->edbo = NULL;
-		}
+	/* free editmode data */
+	if (arm->edbo) {
+		BLI_freelistN(arm->edbo);
 
-		/* free sketch */
-		if (arm->sketch) {
-			freeSketch(arm->sketch);
-			arm->sketch = NULL;
-		}
+		MEM_freeN(arm->edbo);
+		arm->edbo = NULL;
+	}
 
-		/* free animation data */
-		if (arm->adt) {
-			BKE_animdata_free(&arm->id);
-			arm->adt = NULL;
-		}
+	/* free sketch */
+	if (arm->sketch) {
+		freeSketch(arm->sketch);
+		arm->sketch = NULL;
 	}
 }
 
@@ -153,7 +148,7 @@ void BKE_armature_make_local(bArmature *arm)
 	bool is_local = false, is_lib = false;
 	Object *ob;
 
-	if (arm->id.lib == NULL)
+	if (!ID_IS_LINKED_DATABLOCK(arm))
 		return;
 	if (arm->id.us == 1) {
 		id_clear_lib_data(bmain, &arm->id);
@@ -162,7 +157,7 @@ void BKE_armature_make_local(bArmature *arm)
 
 	for (ob = bmain->object.first; ob && ELEM(0, is_lib, is_local); ob = ob->id.next) {
 		if (ob->data == arm) {
-			if (ob->id.lib)
+			if (ID_IS_LINKED_DATABLOCK(ob))
 				is_lib = true;
 			else
 				is_local = true;
@@ -181,7 +176,7 @@ void BKE_armature_make_local(bArmature *arm)
 
 		for (ob = bmain->object.first; ob; ob = ob->id.next) {
 			if (ob->data == arm) {
-				if (ob->id.lib == NULL) {
+				if (!ID_IS_LINKED_DATABLOCK(ob)) {
 					ob->data = arm_new;
 					id_us_plus(&arm_new->id);
 					id_us_min(&arm->id);
@@ -236,7 +231,7 @@ bArmature *BKE_armature_copy(bArmature *arm)
 	newArm->act_edbone = NULL;
 	newArm->sketch = NULL;
 
-	if (arm->id.lib) {
+	if (ID_IS_LINKED_DATABLOCK(arm)) {
 		BKE_id_lib_local_paths(G.main, arm->id.lib, &newArm->id);
 	}
 
@@ -640,6 +635,7 @@ void b_bone_spline_setup(bPoseChannel *pchan, int rest, Mat4 result_array[MAX_BB
 
 	{
 		const float circle_factor = length * (cubic_tangent_factor_circle_v3(h1, h2) / 0.75f);
+
 		const float hlength1 = bone->ease1 * circle_factor;
 		const float hlength2 = bone->ease2 * circle_factor;
 

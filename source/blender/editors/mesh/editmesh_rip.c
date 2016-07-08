@@ -153,8 +153,7 @@ static float edbm_rip_edge_side_measure(
 	ED_view3d_project_float_v2_m4(ar, e->v2->co, e_v2_co, projectMat);
 
 	sub_v2_v2v2(vec, cent, mid);
-	normalize_v2(vec);
-	mul_v2_fl(vec, 0.01f);
+	normalize_v2_length(vec, 0.01f);
 
 	/* rather then adding to both verts, subtract from the mouse */
 	sub_v2_v2v2(fmval_tweak, fmval, vec);
@@ -463,7 +462,7 @@ static void edbm_tagged_loop_pairs_do_fill_faces(BMesh *bm, UnorderedLoopPair *u
 		if ((ulp->l_pair[0]    && ulp->l_pair[1]) &&
 		    (ulp->l_pair[0]->e != ulp->l_pair[1]->e))
 		{
-			 /* time has come to make a face! */
+			/* time has come to make a face! */
 			BMVert *v_shared = BM_edge_share_vert(ulp->l_pair[0]->e, ulp->l_pair[1]->e);
 			BMFace *f, *f_example = ulp->l_pair[0]->f;
 			BMLoop *l_iter;

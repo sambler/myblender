@@ -76,6 +76,8 @@ set(SRC_CLOSURE_HEADERS
 	closure/bsdf_diffuse.h
 	closure/bsdf_diffuse_ramp.h
 	closure/bsdf_microfacet.h
+	closure/bsdf_microfacet_multi.h
+	closure/bsdf_microfacet_multi_impl.h
 	closure/bsdf_oren_nayar.h
 	closure/bsdf_phong_ramp.h
 	closure/bsdf_reflection.h
@@ -98,6 +100,7 @@ set(SRC_SVM_HEADERS
 	svm/svm_closure.h
 	svm/svm_convert.h
 	svm/svm_checker.h
+	svm/svm_color_util.h
 	svm/svm_brick.h
 	svm/svm_displace.h
 	svm/svm_fresnel.h
@@ -138,6 +141,7 @@ set(SRC_GEOM_HEADERS
 	geom/geom.h
 	geom/geom_attribute.h
 	geom/geom_bvh.h
+	geom/geom_bvh_nodes.h
 	geom/geom_bvh_shadow.h
 	geom/geom_bvh_subsurface.h
 	geom/geom_bvh_traversal.h

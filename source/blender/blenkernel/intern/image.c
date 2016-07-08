@@ -95,8 +95,6 @@
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
 
-#include "WM_api.h"
-
 static SpinLock image_spin;
 
 /* prototypes */
@@ -324,19 +322,15 @@ void BKE_image_free_buffers(Image *ima)
 	ima->ok = IMA_OK;
 }
 
-/* called by library too, do not free ima itself */
+/** Free (or release) any data used by this image (does not free the image itself). */
 void BKE_image_free(Image *ima)
 {
 	int a;
 
+	/* Also frees animdata. */
 	BKE_image_free_buffers(ima);
 
 	image_free_packedfiles(ima);
-
-	BKE_icon_id_delete(&ima->id);
-	ima->id.icon_id = 0;
-
-	BKE_previewimg_free(&ima->preview);
 
 	for (a = 0; a < IMA_MAX_RENDER_SLOT; a++) {
 		if (ima->renders[a]) {
@@ -346,7 +340,10 @@ void BKE_image_free(Image *ima)
 	}
 
 	BKE_image_free_views(ima);
-	MEM_freeN(ima->stereo3d_format);
+	MEM_SAFE_FREE(ima->stereo3d_format);
+
+	BKE_icon_id_delete(&ima->id);
+	BKE_previewimg_free(&ima->preview);
 }
 
 /* only image block itself */
@@ -460,7 +457,7 @@ Image *BKE_image_copy(Main *bmain, Image *ima)
 	nima->stereo3d_format = MEM_dupallocN(ima->stereo3d_format);
 	BLI_duplicatelist(&nima->views, &ima->views);
 
-	if (ima->id.lib) {
+	if (ID_IS_LINKED_DATABLOCK(ima)) {
 		BKE_id_lib_local_paths(bmain, ima->id.lib, &nima->id);
 	}
 
@@ -486,7 +483,7 @@ void BKE_image_make_local(struct Image *ima)
 	 * - mixed: make copy
 	 */
 
-	if (ima->id.lib == NULL) return;
+	if (!ID_IS_LINKED_DATABLOCK(ima)) return;
 
 	/* Can't take short cut here: must check meshes at least because of bogus
 	 * texface ID refs. - z0r */
@@ -500,13 +497,13 @@ void BKE_image_make_local(struct Image *ima)
 
 	for (tex = bmain->tex.first; tex; tex = tex->id.next) {
 		if (tex->ima == ima) {
-			if (tex->id.lib) is_lib = true;
+			if (ID_IS_LINKED_DATABLOCK(tex)) is_lib = true;
 			else is_local = true;
 		}
 	}
 	for (brush = bmain->brush.first; brush; brush = brush->id.next) {
 		if (brush->clone.image == ima) {
-			if (brush->id.lib) is_lib = true;
+			if (ID_IS_LINKED_DATABLOCK(brush)) is_lib = true;
 			else is_local = true;
 		}
 	}
@@ -521,7 +518,7 @@ void BKE_image_make_local(struct Image *ima)
 
 					for (a = 0; a < me->totface; a++, tface++) {
 						if (tface->tpage == ima) {
-							if (me->id.lib) is_lib = true;
+							if (ID_IS_LINKED_DATABLOCK(me)) is_lib = true;
 							else is_local = true;
 						}
 					}
@@ -539,7 +536,7 @@ void BKE_image_make_local(struct Image *ima)
 
 					for (a = 0; a < me->totpoly; a++, mtpoly++) {
 						if (mtpoly->tpage == ima) {
-							if (me->id.lib) is_lib = true;
+							if (ID_IS_LINKED_DATABLOCK(me)) is_lib = true;
 							else is_local = true;
 						}
 					}
@@ -563,7 +560,7 @@ void BKE_image_make_local(struct Image *ima)
 
 		tex = bmain->tex.first;
 		while (tex) {
-			if (tex->id.lib == NULL) {
+			if (!ID_IS_LINKED_DATABLOCK(tex)) {
 				if (tex->ima == ima) {
 					tex->ima = ima_new;
 					id_us_plus(&ima_new->id);
@@ -574,7 +571,7 @@ void BKE_image_make_local(struct Image *ima)
 		}
 		brush = bmain->brush.first;
 		while (brush) {
-			if (brush->id.lib == NULL) {
+			if (!ID_IS_LINKED_DATABLOCK(brush)) {
 				if (brush->clone.image == ima) {
 					brush->clone.image = ima_new;
 					id_us_plus(&ima_new->id);

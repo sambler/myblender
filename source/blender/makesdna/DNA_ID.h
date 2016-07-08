@@ -142,7 +142,6 @@ typedef struct ID {
  */
 typedef struct Library {
 	ID id;
-	ID *idblock;
 	struct FileData *filedata;
 	char name[1024];  /* path name used for reading, can be relative and edited in the outliner */
 
@@ -155,6 +154,9 @@ typedef struct Library {
 	struct Library *parent;	/* set for indirectly linked libs, used in the outliner and while reading */
 	
 	struct PackedFile *packedfile;
+
+	int temp_index;
+	int _pad;
 } Library;
 
 enum eIconSizes {
@@ -266,6 +268,8 @@ typedef struct PreviewImage {
 #define ID_BLEND_PATH(_bmain, _id) ((_id)->lib ? (_id)->lib->filepath : (_bmain)->name)
 
 #define ID_MISSING(_id) (((_id)->tag & LIB_TAG_MISSING) != 0)
+
+#define ID_IS_LINKED_DATABLOCK(_id) (((ID *)(_id))->lib != NULL)
 
 #ifdef GS
 #  undef GS

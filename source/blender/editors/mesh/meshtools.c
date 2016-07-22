@@ -172,7 +172,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	 */
 	if (key) {
 		/* make a duplicate copy that will only be used here... (must remember to free it!) */
-		nkey = BKE_key_copy(key);
+		nkey = BKE_key_copy(bmain, key);
 		
 		/* for all keys in old block, clear data-arrays */
 		for (kb = key->block.first; kb; kb = kb->next) {
@@ -540,7 +540,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	if (matmap) MEM_freeN(matmap);
 	
 	/* other mesh users */
-	test_object_materials(bmain, (ID *)me);
+	test_all_objects_materials(bmain, (ID *)me);
 	
 	/* free temp copy of destination shapekeys (if applicable) */
 	if (nkey) {

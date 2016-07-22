@@ -10,3 +10,7 @@
 [submodule "scons"]
 	path = scons
 	url = ../externals/scons
+[submodule "source/tools"]
+	path = source/tools
+	url = ../externals/blender-dev-tools.git
+	ignore = all

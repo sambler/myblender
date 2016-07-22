@@ -46,6 +46,8 @@
 #include "BKE_global.h"
 #include "BKE_icons.h"
 #include "BKE_library.h"
+#include "BKE_library_query.h"
+#include "BKE_library_remap.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_world.h"
@@ -117,12 +119,12 @@ World *add_world(Main *bmain, const char *name)
 	return wrld;
 }
 
-World *BKE_world_copy(World *wrld)
+World *BKE_world_copy(Main *bmain, World *wrld)
 {
 	World *wrldn;
 	int a;
 	
-	wrldn = BKE_libblock_copy(&wrld->id);
+	wrldn = BKE_libblock_copy(bmain, &wrld->id);
 	
 	for (a = 0; a < MAX_MTEX; a++) {
 		if (wrld->mtex[a]) {
@@ -133,16 +135,16 @@ World *BKE_world_copy(World *wrld)
 	}
 
 	if (wrld->nodetree) {
-		wrldn->nodetree = ntreeCopyTree(wrld->nodetree);
+		wrldn->nodetree = ntreeCopyTree(bmain, wrld->nodetree);
 	}
 	
-	if (wrld->preview)
-		wrldn->preview = BKE_previewimg_copy(wrld->preview);
+	BKE_previewimg_id_copy(&wrldn->id, &wrld->id);
 
 	BLI_listbase_clear(&wrldn->gpumaterial);
 
 	if (ID_IS_LINKED_DATABLOCK(wrld)) {
-		BKE_id_lib_local_paths(G.main, wrld->id.lib, &wrldn->id);
+		BKE_id_expand_local(&wrldn->id);
+		BKE_id_lib_local_paths(bmain, wrld->id.lib, &wrldn->id);
 	}
 
 	return wrldn;
@@ -174,48 +176,7 @@ World *localize_world(World *wrld)
 	return wrldn;
 }
 
-void BKE_world_make_local(World *wrld)
+void BKE_world_make_local(Main *bmain, World *wrld, const bool lib_local)
 {
-	Main *bmain = G.main;
-	Scene *sce;
-	bool is_local = false, is_lib = false;
-
-	/* - only lib users: do nothing
-	 * - only local users: set flag
-	 * - mixed: make copy
-	 */
-	
-	if (!ID_IS_LINKED_DATABLOCK(wrld)) return;
-	if (wrld->id.us == 1) {
-		id_clear_lib_data(bmain, &wrld->id);
-		return;
-	}
-	
-	for (sce = bmain->scene.first; sce && ELEM(false, is_lib, is_local); sce = sce->id.next) {
-		if (sce->world == wrld) {
-			if (ID_IS_LINKED_DATABLOCK(sce)) is_lib = true;
-			else is_local = true;
-		}
-	}
-
-	if (is_local && is_lib == false) {
-		id_clear_lib_data(bmain, &wrld->id);
-	}
-	else if (is_local && is_lib) {
-		World *wrld_new = BKE_world_copy(wrld);
-		wrld_new->id.us = 0;
-
-		/* Remap paths of new ID using old library as base. */
-		BKE_id_lib_local_paths(bmain, wrld->id.lib, &wrld_new->id);
-
-		for (sce = bmain->scene.first; sce; sce = sce->id.next) {
-			if (sce->world == wrld) {
-				if (!ID_IS_LINKED_DATABLOCK(sce)) {
-					sce->world = wrld_new;
-					id_us_plus(&wrld_new->id);
-					id_us_min(&wrld->id);
-				}
-			}
-		}
-	}
+	BKE_id_make_local_generic(bmain, &wrld->id, true, lib_local);
 }

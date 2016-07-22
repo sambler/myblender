@@ -12,5 +12,5 @@
 	url = ../externals/scons
 [submodule "source/tools"]
 	path = source/tools
-	url = ../externals/blender-dev-tools.git
-	ignore = all
+	url = ../externals/blender-dev-tools
+

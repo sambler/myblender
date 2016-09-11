@@ -160,45 +160,49 @@ struct FVarVertex {
 static void interpolate_fvar_data(OpenSubdiv::Far::TopologyRefiner& refiner,
                                   const std::vector<float> uvs,
                                   std::vector<float> &fvar_data) {
-	/* TODO(sergey): Support all FVar channels. */
-	const int channel = 0;
 	/* TODO(sergey): Make it somehow more generic way. */
 	const int fvar_width = 2;
-
-	int max_level = refiner.GetMaxLevel(),
-	    num_values_max = refiner.GetLevel(max_level).GetNumFVarValues(channel),
-	    num_values_total = refiner.GetNumFVarValuesTotal(channel);
-	if (num_values_total <= 0) {
-		return;
-	}
-	OpenSubdiv::Far::PrimvarRefiner primvarRefiner(refiner);
-	if (refiner.IsUniform()) {
-		/* For uniform we only keep the highest level of refinement. */
-		fvar_data.resize(num_values_max * fvar_width);
-		std::vector<FVarVertex> buffer(num_values_total - num_values_max);
-		FVarVertex *src = &buffer[0];
-		memcpy(src, &uvs[0], uvs.size() * sizeof(float));
-		/* Defer the last level to treat separately with its alternate
-		 * destination.
-		 */
-		for (int level = 1; level < max_level; ++level) {
-			FVarVertex *dst = src + refiner.GetLevel(level-1).GetNumFVarValues(channel);
-			primvarRefiner.InterpolateFaceVarying(level, src, dst, channel);
-			src = dst;
+	const int max_level = refiner.GetMaxLevel();
+	size_t fvar_data_offset = 0, values_offset = 0;
+	for (int channel = 0; channel < refiner.GetNumFVarChannels(); ++channel) {
+		const int num_values = refiner.GetLevel(0).GetNumFVarValues(channel) * 2,
+		          num_values_max = refiner.GetLevel(max_level).GetNumFVarValues(channel),
+		          num_values_total = refiner.GetNumFVarValuesTotal(channel);
+		if (num_values_total <= 0) {
+			continue;
 		}
-		FVarVertex *dst = reinterpret_cast<FVarVertex *>(&fvar_data[0]);
-		primvarRefiner.InterpolateFaceVarying(max_level, src, dst, channel);
-	} else {
-		/* For adaptive we keep all levels. */
-		fvar_data.resize(num_values_total * fvar_width);
-		FVarVertex *src = reinterpret_cast<FVarVertex *>(&fvar_data[0]);
-		memcpy(src, &uvs[0], uvs.size() * sizeof(float));
-		for (int level = 1; level <= max_level; ++level) {
-			FVarVertex *dst = src + refiner.GetLevel(level-1).GetNumFVarValues(channel);
-			primvarRefiner.InterpolateFaceVarying(level, src, dst, channel);
-			src = dst;
-        }
-    }
+		OpenSubdiv::Far::PrimvarRefiner primvar_refiner(refiner);
+		if (refiner.IsUniform()) {
+			/* For uniform we only keep the highest level of refinement. */
+			fvar_data.resize(fvar_data.size() + num_values_max * fvar_width);
+			std::vector<FVarVertex> buffer(num_values_total - num_values_max);
+			FVarVertex *src = &buffer[0];
+			memcpy(src, &uvs[values_offset], num_values * sizeof(float));
+			/* Defer the last level to treat separately with its alternate
+			 * destination.
+			 */
+			for (int level = 1; level < max_level; ++level) {
+				FVarVertex *dst = src + refiner.GetLevel(level-1).GetNumFVarValues(channel);
+				primvar_refiner.InterpolateFaceVarying(level, src, dst, channel);
+				src = dst;
+			}
+			FVarVertex *dst = reinterpret_cast<FVarVertex *>(&fvar_data[fvar_data_offset]);
+			primvar_refiner.InterpolateFaceVarying(max_level, src, dst, channel);
+			fvar_data_offset += num_values_max * fvar_width;
+		} else {
+			/* For adaptive we keep all levels. */
+			fvar_data.resize(fvar_data.size() + num_values_total * fvar_width);
+			FVarVertex *src = reinterpret_cast<FVarVertex *>(&fvar_data[fvar_data_offset]);
+			memcpy(src, &uvs[values_offset], num_values * sizeof(float));
+			for (int level = 1; level <= max_level; ++level) {
+				FVarVertex *dst = src + refiner.GetLevel(level-1).GetNumFVarValues(channel);
+				primvar_refiner.InterpolateFaceVarying(level, src, dst, channel);
+				src = dst;
+			}
+			fvar_data_offset += num_values_total * fvar_width;
+		}
+		values_offset += num_values;
+	}
 }
 
 }  // namespace
@@ -275,7 +279,7 @@ struct OpenSubdiv_GLMesh *openSubdiv_createOsdGLMeshFromTopologyRefiner(
 	if (refiner->GetNumFVarChannels() > 0) {
 		std::vector<float> fvar_data;
 		interpolate_fvar_data(*refiner, topology_refiner->uvs, fvar_data);
-		openSubdiv_osdGLAllocFVar(gl_mesh, &fvar_data[0]);
+		openSubdiv_osdGLAllocFVar(topology_refiner, gl_mesh, &fvar_data[0]);
 	}
 	else {
 		gl_mesh->fvar_data = NULL;
@@ -371,6 +375,9 @@ int openSubdiv_supportGPUDisplay(void)
 	return openSubdiv_gpu_legacy_support() &&
 	       (GLEW_VERSION_3_2 ||
 	       (GLEW_VERSION_3_1 && GLEW_EXT_geometry_shader4) ||
-	       (GLEW_VERSION_3_0 && GLEW_EXT_geometry_shader4 && GLEW_ARB_uniform_buffer_object && (GLEW_ARB_texture_buffer_object || GLEW_EXT_texture_buffer_object)));
+	       (GLEW_VERSION_3_0 &&
+	        GLEW_EXT_geometry_shader4 &&
+	        GLEW_ARB_uniform_buffer_object &&
+	        (GLEW_ARB_texture_buffer_object || GLEW_EXT_texture_buffer_object)));
 	/* also ARB_explicit_attrib_location? */
 }

@@ -45,10 +45,22 @@
 #include "MEM_guardedalloc.h"
 
 #include "opensubdiv_capi.h"
+#include "opensubdiv_topology_refiner.h"
 
 using OpenSubdiv::Osd::GLMeshInterface;
 
 extern "C" char datatoc_gpu_shader_opensubd_display_glsl[];
+
+/* TODO(sergey): This is bit of bad level calls :S */
+extern "C" {
+void copy_m3_m3(float m1[3][3], float m2[3][3]);
+void copy_m3_m4(float m1[3][3], float m2[4][4]);
+void adjoint_m3_m3(float m1[3][3], float m[3][3]);
+float determinant_m3_array(float m[3][3]);
+bool invert_m3_m3(float m1[3][3], float m2[3][3]);
+bool invert_m3(float m[3][3]);
+void transpose_m3(float mat[3][3]);
+}
 
 #define MAX_LIGHTS 8
 #define SUPPORT_COLOR_MATERIAL
@@ -82,11 +94,18 @@ typedef struct Transform {
 } Transform;
 
 static bool g_use_osd_glsl = false;
+static int g_active_uv_index = 0;
 
 static GLuint g_flat_fill_solid_program = 0;
 static GLuint g_flat_fill_texture2d_program = 0;
 static GLuint g_smooth_fill_solid_program = 0;
 static GLuint g_smooth_fill_texture2d_program = 0;
+
+static GLuint g_flat_fill_solid_shadeless_program = 0;
+static GLuint g_flat_fill_texture2d_shadeless_program = 0;
+static GLuint g_smooth_fill_solid_shadeless_program = 0;
+static GLuint g_smooth_fill_texture2d_shadeless_program = 0;
+
 static GLuint g_wireframe_program = 0;
 
 static GLuint g_lighting_ub = 0;
@@ -96,7 +115,7 @@ static Transform g_transform;
 struct OpenSubdiv_GLMeshFVarData
 {
 	OpenSubdiv_GLMeshFVarData() :
-		texture_buffer(0) {
+		texture_buffer(0), offset_buffer(0) {
 	}
 
 	~OpenSubdiv_GLMeshFVarData()
@@ -109,26 +128,52 @@ struct OpenSubdiv_GLMeshFVarData
 		if (texture_buffer) {
 			glDeleteTextures(1, &texture_buffer);
 		}
+		if (offset_buffer) {
+			glDeleteTextures(1, &offset_buffer);
+		}
 		texture_buffer = 0;
+		offset_buffer = 0;
+		fvar_width = 0;
+		channel_offsets.clear();
 	}
 
-	void Create(const OpenSubdiv::Far::PatchTable *patch_table,
-	            int fvarWidth,
+	void Create(const OpenSubdiv::Far::TopologyRefiner *refiner,
+	            const OpenSubdiv::Far::PatchTable *patch_table,
+	            int fvar_width,
 	            const float *fvar_src_data)
 	{
 		Release();
-		OpenSubdiv::Far::ConstIndexArray indices = patch_table->GetFVarValues();
 
-		// expand fvardata to per-patch array
+		this->fvar_width = fvar_width;
+
+		/* Expand fvar data to per-patch array */
+		const int max_level = refiner->GetMaxLevel();
+		const int num_channels = patch_table->GetNumFVarChannels();
 		std::vector<float> data;
-		data.reserve(indices.size() * fvarWidth);
+		int fvar_data_offset = 0;
+		channel_offsets.resize(num_channels);
+		for (int channel = 0; channel < num_channels; ++channel) {
+			OpenSubdiv::Far::ConstIndexArray indices =
+			        patch_table->GetFVarValues(channel);
 
-		for (int fvert = 0; fvert < (int)indices.size(); ++fvert) {
-			int index = indices[fvert] * fvarWidth;
-			for (int i = 0; i < fvarWidth; ++i) {
-				data.push_back(fvar_src_data[index++]);
+			channel_offsets[channel] = data.size();
+			data.reserve(data.size() + indices.size() * fvar_width);
+
+			for (int fvert = 0; fvert < (int)indices.size(); ++fvert) {
+				int index = indices[fvert] * fvar_width;
+				for (int i = 0; i < fvar_width; ++i) {
+					data.push_back(fvar_src_data[fvar_data_offset + index++]);
+				}
+			}
+			if (refiner->IsUniform()) {
+				const int num_values_max = refiner->GetLevel(max_level).GetNumFVarValues(channel);
+				fvar_data_offset += num_values_max * fvar_width;
+			} else {
+				const int num_values_total = refiner->GetNumFVarValuesTotal(channel);
+				fvar_data_offset += num_values_total * fvar_width;
 			}
 		}
+
 		GLuint buffer;
 		glGenBuffers(1, &buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -138,110 +183,27 @@ struct OpenSubdiv_GLMeshFVarData
 		glGenTextures(1, &texture_buffer);
 		glBindTexture(GL_TEXTURE_BUFFER, texture_buffer);
 		glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, buffer);
-		glBindTexture(GL_TEXTURE_BUFFER, 0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		glDeleteBuffers(1, &buffer);
+
+		glGenBuffers(1, &buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, buffer);
+		glBufferData(GL_ARRAY_BUFFER, channel_offsets.size()*sizeof(int),
+		             &channel_offsets[0], GL_STATIC_DRAW);
+
+		glGenTextures(1, &offset_buffer);
+		glBindTexture(GL_TEXTURE_BUFFER, offset_buffer);
+		glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, buffer);
+		glBindTexture(GL_TEXTURE_BUFFER, 0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 	GLuint texture_buffer;
+	GLuint offset_buffer;
+	std::vector<int> channel_offsets;
+	int fvar_width;
 };
 
-/* TODO(sergey): This is actually duplicated code from BLI. */
 namespace {
-void copy_m3_m3(float m1[3][3], float m2[3][3])
-{
-	/* destination comes first: */
-	memcpy(&m1[0], &m2[0], 9 * sizeof(float));
-}
-
-void copy_m3_m4(float m1[3][3], float m2[4][4])
-{
-	m1[0][0] = m2[0][0];
-	m1[0][1] = m2[0][1];
-	m1[0][2] = m2[0][2];
-
-	m1[1][0] = m2[1][0];
-	m1[1][1] = m2[1][1];
-	m1[1][2] = m2[1][2];
-
-	m1[2][0] = m2[2][0];
-	m1[2][1] = m2[2][1];
-	m1[2][2] = m2[2][2];
-}
-
-void adjoint_m3_m3(float m1[3][3], float m[3][3])
-{
-	m1[0][0] = m[1][1] * m[2][2] - m[1][2] * m[2][1];
-	m1[0][1] = -m[0][1] * m[2][2] + m[0][2] * m[2][1];
-	m1[0][2] = m[0][1] * m[1][2] - m[0][2] * m[1][1];
-
-	m1[1][0] = -m[1][0] * m[2][2] + m[1][2] * m[2][0];
-	m1[1][1] = m[0][0] * m[2][2] - m[0][2] * m[2][0];
-	m1[1][2] = -m[0][0] * m[1][2] + m[0][2] * m[1][0];
-
-	m1[2][0] = m[1][0] * m[2][1] - m[1][1] * m[2][0];
-	m1[2][1] = -m[0][0] * m[2][1] + m[0][1] * m[2][0];
-	m1[2][2] = m[0][0] * m[1][1] - m[0][1] * m[1][0];
-}
-
-float determinant_m3_array(float m[3][3])
-{
-	return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-	        m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1]) +
-	        m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]));
-}
-
-bool invert_m3_m3(float m1[3][3], float m2[3][3])
-{
-	float det;
-	int a, b;
-	bool success;
-
-	/* calc adjoint */
-	adjoint_m3_m3(m1, m2);
-
-	/* then determinant old matrix! */
-	det = determinant_m3_array(m2);
-
-	success = (det != 0.0f);
-
-	if (det != 0.0f) {
-		det = 1.0f / det;
-		for (a = 0; a < 3; a++) {
-			for (b = 0; b < 3; b++) {
-				m1[a][b] *= det;
-			}
-		}
-	}
-
-	return success;
-}
-
-bool invert_m3(float m[3][3])
-{
-	float tmp[3][3];
-	bool success;
-
-	success = invert_m3_m3(tmp, m);
-	copy_m3_m3(m, tmp);
-
-	return success;
-}
-
-void transpose_m3(float mat[3][3])
-{
-	float t;
-
-	t = mat[0][1];
-	mat[0][1] = mat[1][0];
-	mat[1][0] = t;
-	t = mat[0][2];
-	mat[0][2] = mat[2][0];
-	mat[2][0] = t;
-	t = mat[1][2];
-	mat[1][2] = mat[2][1];
-	mat[2][1] = t;
-}
 
 GLuint compileShader(GLenum shaderType,
                      const char *section,
@@ -357,6 +319,10 @@ GLuint linkProgram(const char *version, const char *define)
 	                   0);  /* GL_TEXTURE0 */
 
 	glProgramUniform1i(program,
+	                   glGetUniformLocation(program, "FVarDataOffsetBuffer"),
+	                   30);  /* GL_TEXTURE30 */
+
+	glProgramUniform1i(program,
 	                   glGetUniformLocation(program, "FVarDataBuffer"),
 	                   31);  /* GL_TEXTURE31 */
 
@@ -408,15 +374,33 @@ void bindProgram(OpenSubdiv_GLMesh *gl_mesh, int program)
 	}
 
 	/* Face-vertex data */
-	if (gl_mesh->fvar_data != NULL && gl_mesh->fvar_data->texture_buffer) {
-		glActiveTexture(GL_TEXTURE31);
-		glBindTexture(GL_TEXTURE_BUFFER, gl_mesh->fvar_data->texture_buffer);
-		glActiveTexture(GL_TEXTURE0);
-	}
+	if (gl_mesh->fvar_data != NULL) {
+		if (gl_mesh->fvar_data->texture_buffer) {
+			glActiveTexture(GL_TEXTURE31);
+			glBindTexture(GL_TEXTURE_BUFFER, gl_mesh->fvar_data->texture_buffer);
+			glActiveTexture(GL_TEXTURE0);
+		}
 
-	/* See notes below about why we use such values. */
-	glUniform1i(glGetUniformLocation(program, "osd_fvar_count"), 2);
-	glUniform1i(glGetUniformLocation(program, "osd_active_uv_offset"), 0);
+		if (gl_mesh->fvar_data->offset_buffer) {
+			glActiveTexture(GL_TEXTURE30);
+			glBindTexture(GL_TEXTURE_BUFFER, gl_mesh->fvar_data->offset_buffer);
+			glActiveTexture(GL_TEXTURE0);
+		}
+
+		glUniform1i(glGetUniformLocation(program, "osd_fvar_count"),
+		            gl_mesh->fvar_data->fvar_width);
+		if (gl_mesh->fvar_data->channel_offsets.size() > 0 &&
+		    g_active_uv_index >= 0)
+		{
+			glUniform1i(glGetUniformLocation(program, "osd_active_uv_offset"),
+			            gl_mesh->fvar_data->channel_offsets[g_active_uv_index]);
+		} else {
+			glUniform1i(glGetUniformLocation(program, "osd_active_uv_offset"), 0);
+		}
+	} else {
+		glUniform1i(glGetUniformLocation(program, "osd_fvar_count"), 0);
+		glUniform1i(glGetUniformLocation(program, "osd_active_uv_offset"), 0);
+	}
 }
 
 }  /* namespace */
@@ -447,21 +431,45 @@ bool openSubdiv_osdGLDisplayInit(void)
 		g_flat_fill_solid_program = linkProgram(
 		        version,
 		        "#define USE_COLOR_MATERIAL\n"
+		        "#define USE_LIGHTING\n"
 		        "#define FLAT_SHADING\n");
 		g_flat_fill_texture2d_program = linkProgram(
 		        version,
 		        "#define USE_COLOR_MATERIAL\n"
+		        "#define USE_LIGHTING\n"
 		        "#define USE_TEXTURE_2D\n"
 		        "#define FLAT_SHADING\n");
 		g_smooth_fill_solid_program = linkProgram(
 		        version,
 		        "#define USE_COLOR_MATERIAL\n"
+		        "#define USE_LIGHTING\n"
 		        "#define SMOOTH_SHADING\n");
 		g_smooth_fill_texture2d_program = linkProgram(
 		        version,
 		        "#define USE_COLOR_MATERIAL\n"
+		        "#define USE_LIGHTING\n"
 		        "#define USE_TEXTURE_2D\n"
 		        "#define SMOOTH_SHADING\n");
+
+		g_flat_fill_solid_shadeless_program = linkProgram(
+		        version,
+		        "#define USE_COLOR_MATERIAL\n"
+		        "#define FLAT_SHADING\n");
+		g_flat_fill_texture2d_shadeless_program = linkProgram(
+		        version,
+		        "#define USE_COLOR_MATERIAL\n"
+		        "#define USE_TEXTURE_2D\n"
+		        "#define FLAT_SHADING\n");
+		g_smooth_fill_solid_shadeless_program = linkProgram(
+		        version,
+		        "#define USE_COLOR_MATERIAL\n"
+		        "#define SMOOTH_SHADING\n");
+		g_smooth_fill_texture2d_shadeless_program = linkProgram(
+		        version,
+		        "#define USE_COLOR_MATERIAL\n"
+		        "#define USE_TEXTURE_2D\n"
+		        "#define SMOOTH_SHADING\n");
+
 		g_wireframe_program = linkProgram(
 		        version,
 		        "#define WIREFRAME\n");
@@ -486,26 +494,31 @@ void openSubdiv_osdGLDisplayDeinit(void)
 	if (g_lighting_ub != 0) {
 		glDeleteBuffers(1, &g_lighting_ub);
 	}
-	if (g_flat_fill_solid_program) {
-		glDeleteProgram(g_flat_fill_solid_program);
-	}
-	if (g_flat_fill_texture2d_program) {
-		glDeleteProgram(g_flat_fill_texture2d_program);
-	}
-	if (g_smooth_fill_solid_program) {
-		glDeleteProgram(g_flat_fill_solid_program);
-	}
-	if (g_smooth_fill_texture2d_program) {
-		glDeleteProgram(g_smooth_fill_texture2d_program);
-	}
-	if (g_wireframe_program) {
-		glDeleteProgram(g_wireframe_program);
-	}
+#define SAFE_DELETE_PROGRAM(program) \
+	do { \
+		if (program) { \
+			glDeleteProgram(program); \
+		} \
+	} while (false)
+
+	SAFE_DELETE_PROGRAM(g_flat_fill_solid_program);
+	SAFE_DELETE_PROGRAM(g_flat_fill_texture2d_program);
+	SAFE_DELETE_PROGRAM(g_smooth_fill_solid_program);
+	SAFE_DELETE_PROGRAM(g_smooth_fill_texture2d_program);
+	SAFE_DELETE_PROGRAM(g_flat_fill_solid_shadeless_program);
+	SAFE_DELETE_PROGRAM(g_flat_fill_texture2d_shadeless_program);
+	SAFE_DELETE_PROGRAM(g_smooth_fill_solid_shadeless_program);
+	SAFE_DELETE_PROGRAM(g_smooth_fill_texture2d_shadeless_program);
+	SAFE_DELETE_PROGRAM(g_wireframe_program);
+
+#undef SAFE_DELETE_PROGRAM
 }
 
-void openSubdiv_osdGLMeshDisplayPrepare(int use_osd_glsl)
+void openSubdiv_osdGLMeshDisplayPrepare(int use_osd_glsl,
+                                        int active_uv_index)
 {
-	g_use_osd_glsl = use_osd_glsl != 0;
+	g_active_uv_index = active_uv_index;
+	g_use_osd_glsl = (use_osd_glsl != 0);
 
 	/* Update transformation matrices. */
 	glGetFloatv(GL_PROJECTION_MATRIX, g_transform.projection_matrix);
@@ -578,29 +591,40 @@ static GLuint prepare_patchDraw(OpenSubdiv_GLMesh *gl_mesh,
 			}
 
 			/* Face-vertex data */
-			if (gl_mesh->fvar_data != NULL &&
-			    gl_mesh->fvar_data->texture_buffer)
-			{
-				glActiveTexture(GL_TEXTURE31);
-				glBindTexture(GL_TEXTURE_BUFFER,
-				              gl_mesh->fvar_data->texture_buffer);
-				glActiveTexture(GL_TEXTURE0);
+			if (gl_mesh->fvar_data != NULL) {
+				if (gl_mesh->fvar_data->texture_buffer) {
+					glActiveTexture(GL_TEXTURE31);
+					glBindTexture(GL_TEXTURE_BUFFER,
+					              gl_mesh->fvar_data->texture_buffer);
+					glActiveTexture(GL_TEXTURE0);
+				}
+
+				if (gl_mesh->fvar_data->offset_buffer) {
+					glActiveTexture(GL_TEXTURE30);
+					glBindTexture(GL_TEXTURE_BUFFER,
+					              gl_mesh->fvar_data->offset_buffer);
+					glActiveTexture(GL_TEXTURE0);
+				}
 
 				GLint location = glGetUniformLocation(program, "osd_fvar_count");
 				if (location != -1) {
-					/* TODO(sergey): This is width of FVar data, which happened to be 2. */
-					glUniform1i(location, 2);
+					glUniform1i(location, gl_mesh->fvar_data->fvar_width);
 				}
 
 				location = glGetUniformLocation(program, "osd_active_uv_offset");
 				if (location != -1) {
-					/* TODO(sergey): Since we only store single UV channel
-					 * we can always suuppose offset is 0.
-					 *
-					 * Ideally it should be active UV index times 2.
-					 */
-					glUniform1i(location, 0);
+					if (gl_mesh->fvar_data->channel_offsets.size() > 0 &&
+					    g_active_uv_index >= 0)
+					{
+						glUniform1i(location,
+						            gl_mesh->fvar_data->channel_offsets[g_active_uv_index]);
+					} else {
+						glUniform1i(location, 0);
+					}
 				}
+			} else {
+				glUniform1i(glGetUniformLocation(program, "osd_fvar_count"), 0);
+				glUniform1i(glGetUniformLocation(program, "osd_active_uv_offset"), 0);
 			}
 		}
 		return program;
@@ -608,23 +632,32 @@ static GLuint prepare_patchDraw(OpenSubdiv_GLMesh *gl_mesh,
 
 	if (fill_quads) {
 		int model;
-		GLboolean use_texture_2d;
+		GLboolean use_texture_2d, use_lighting;
 		glGetIntegerv(GL_SHADE_MODEL, &model);
 		glGetBooleanv(GL_TEXTURE_2D, &use_texture_2d);
+		glGetBooleanv(GL_LIGHTING, &use_lighting);
 		if (model == GL_FLAT) {
 			if (use_texture_2d) {
-				program = g_flat_fill_texture2d_program;
+				program = use_lighting
+				                  ? g_flat_fill_texture2d_program
+				                  : g_flat_fill_texture2d_shadeless_program;
 			}
 			else {
-				program = g_flat_fill_solid_program;
+				program = use_lighting
+				                  ? g_flat_fill_solid_program
+				                  : g_flat_fill_solid_shadeless_program;
 			}
 		}
 		else {
 			if (use_texture_2d) {
-				program = g_smooth_fill_texture2d_program;
+				program = use_lighting
+				                  ? g_smooth_fill_texture2d_program
+				                  : g_smooth_fill_texture2d_shadeless_program;
 			}
 			else {
-				program = g_smooth_fill_solid_program;
+				program = use_lighting
+				                  ? g_smooth_fill_solid_program
+				                  : g_smooth_fill_solid_shadeless_program;
 			}
 		}
 	}
@@ -756,13 +789,15 @@ void openSubdiv_osdGLMeshDisplay(OpenSubdiv_GLMesh *gl_mesh,
 	finish_patchDraw(fill_quads != 0);
 }
 
-void openSubdiv_osdGLAllocFVar(OpenSubdiv_GLMesh *gl_mesh,
+void openSubdiv_osdGLAllocFVar(OpenSubdiv_TopologyRefinerDescr *topology_refiner,
+                               OpenSubdiv_GLMesh *gl_mesh,
                                const float *fvar_data)
 {
 	GLMeshInterface *mesh =
 		(GLMeshInterface *)(gl_mesh->descriptor);
 	gl_mesh->fvar_data = OBJECT_GUARDED_NEW(OpenSubdiv_GLMeshFVarData);
-	gl_mesh->fvar_data->Create(mesh->GetFarPatchTable(),
+	gl_mesh->fvar_data->Create(topology_refiner->osd_refiner,
+	                           mesh->GetFarPatchTable(),
 	                           2,
 	                           fvar_data);
 }

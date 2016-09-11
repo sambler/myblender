@@ -181,6 +181,7 @@ CCL_NAMESPACE_END
 #include "svm_brick.h"
 #include "svm_vector_transform.h"
 #include "svm_voxel.h"
+#include "svm_bump.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -294,6 +295,14 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg, ShaderData *sd, ccl_a
 			case NODE_CLOSURE_SET_NORMAL:
 				svm_node_set_normal(kg, sd, stack, node.y, node.z);
 				break;
+#      if NODES_FEATURE(NODE_FEATURE_BUMP_STATE)
+			case NODE_ENTER_BUMP_EVAL:
+				svm_node_enter_bump_eval(kg, sd, stack, node.y);
+				break;
+			case NODE_LEAVE_BUMP_EVAL:
+				svm_node_leave_bump_eval(kg, sd, stack, node.y);
+				break;
+#      endif /* NODES_FEATURE(NODE_FEATURE_BUMP_STATE) */
 #    endif  /* NODES_FEATURE(NODE_FEATURE_BUMP) */
 			case NODE_HSV:
 				svm_node_hsv(kg, sd, stack, node, &offset);
@@ -405,10 +414,8 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg, ShaderData *sd, ccl_a
 
 #if NODES_GROUP(NODE_GROUP_LEVEL_3)
 			case NODE_RGB_CURVES:
-				svm_node_rgb_curves(kg, sd, stack, node, &offset);
-				break;
 			case NODE_VECTOR_CURVES:
-				svm_node_vector_curves(kg, sd, stack, node, &offset);
+				svm_node_curves(kg, sd, stack, node, &offset);
 				break;
 			case NODE_TANGENT:
 				svm_node_tangent(kg, sd, stack, node);

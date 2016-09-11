@@ -99,6 +99,7 @@ in block {
 	}
 
 uniform samplerBuffer FVarDataBuffer;
+uniform isamplerBuffer FVarDataOffsetBuffer;
 
 out block {
 	VertexData v;
@@ -241,6 +242,7 @@ void main()
 	vec3 L_diffuse = vec3(0.0);
 	vec3 L_specular = vec3(0.0);
 
+#ifdef USE_LIGHTING
 #ifndef USE_COLOR_MATERIAL
 	/* Assume NUM_SOLID_LIGHTS directional lights. */
 	for (int i = 0; i < NUM_SOLID_LIGHTS; i++) {
@@ -311,6 +313,9 @@ void main()
 		L_specular += light_specular * specular_bsdf * intensity;
 	}
 #endif  /* USE_COLOR_MATERIAL */
+#else  /* USE_LIGHTING */
+	L_diffuse = vec3(1.0);
+#endif
 
 	/* Compute diffuse color. */
 #ifdef USE_TEXTURE_2D

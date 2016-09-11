@@ -142,10 +142,7 @@ World *BKE_world_copy(Main *bmain, World *wrld)
 
 	BLI_listbase_clear(&wrldn->gpumaterial);
 
-	if (ID_IS_LINKED_DATABLOCK(wrld)) {
-		BKE_id_expand_local(&wrldn->id);
-		BKE_id_lib_local_paths(bmain, wrld->id.lib, &wrldn->id);
-	}
+	BKE_id_copy_ensure_local(bmain, &wrld->id, &wrldn->id);
 
 	return wrldn;
 }
@@ -161,8 +158,6 @@ World *localize_world(World *wrld)
 		if (wrld->mtex[a]) {
 			wrldn->mtex[a] = MEM_mallocN(sizeof(MTex), "localize_world");
 			memcpy(wrldn->mtex[a], wrld->mtex[a], sizeof(MTex));
-			/* free world decrements */
-			id_us_plus((ID *)wrldn->mtex[a]->tex);
 		}
 	}
 

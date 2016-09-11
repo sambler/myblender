@@ -25,6 +25,7 @@
 
 #include <cstdio>
 #include <vector>
+#include <cstdlib>
 
 #ifdef _MSC_VER
 #  include "iso646.h"

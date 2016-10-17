@@ -3896,6 +3896,19 @@ void GammaNode::constant_fold(const ConstantFolder& folder)
 	if(folder.all_inputs_constant()) {
 		folder.make_constant(svm_math_gamma_color(color, gamma));
 	}
+	else {
+		ShaderInput *color_in = input("Color");
+		ShaderInput *gamma_in = input("Gamma");
+
+		/* 1 ^ X == X ^ 0 == 1 */
+		if(folder.is_one(color_in) || folder.is_zero(gamma_in)) {
+			folder.make_one();
+		}
+		/* X ^ 1 == X */
+		else if(folder.is_one(gamma_in)) {
+			folder.try_bypass_or_make_constant(color_in, false);
+		}
+	}
 }
 
 void GammaNode::compile(SVMCompiler& compiler)
@@ -4762,6 +4775,7 @@ NODE_DEFINE(BumpNode)
 	NodeType* type = NodeType::add("bump", create, NodeType::SHADER);
 
 	SOCKET_BOOLEAN(invert, "Invert", false);
+	SOCKET_BOOLEAN(use_object_space, "UseObjectSpace", false);
 
 	/* this input is used by the user, but after graph transform it is no longer
 	 * used and moved to sampler center/x/y instead */
@@ -4800,7 +4814,8 @@ void BumpNode::compile(SVMCompiler& compiler)
 		compiler.encode_uchar4(
 			compiler.stack_assign_if_linked(normal_in),
 			compiler.stack_assign(distance_in),
-			invert),
+			invert,
+			use_object_space),
 		compiler.encode_uchar4(
 			compiler.stack_assign(center_in),
 			compiler.stack_assign(dx_in),
@@ -4812,6 +4827,7 @@ void BumpNode::compile(SVMCompiler& compiler)
 void BumpNode::compile(OSLCompiler& compiler)
 {
 	compiler.parameter(this, "invert");
+	compiler.parameter(this, "use_object_space");
 	compiler.add(this, "node_bump");
 }
 

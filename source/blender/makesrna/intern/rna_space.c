@@ -454,6 +454,15 @@ EnumPropertyItem *rna_TransformOrientation_itemf(bContext *C, PointerRNA *ptr, P
 }
 
 /* Space 3D View */
+static void rna_SpaceView3D_camera_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	View3D *v3d = (View3D *)(ptr->data);
+	if (v3d->scenelock) {
+		scene->camera = v3d->camera;
+		BKE_screen_view3d_main_sync(&bmain->screen, scene);
+	}
+}
+
 static void rna_SpaceView3D_lock_camera_and_layers_set(PointerRNA *ptr, int value)
 {
 	View3D *v3d = (View3D *)(ptr->data);
@@ -511,6 +520,13 @@ static void rna_SpaceView3D_layer_set(PointerRNA *ptr, const int *values)
 	View3D *v3d = (View3D *)(ptr->data);
 	
 	v3d->lay = ED_view3d_scene_layer_set(v3d->lay, values, &v3d->layact);
+}
+
+static int rna_SpaceView3D_active_layer_get(PointerRNA *ptr)
+{
+	View3D *v3d = (View3D *)(ptr->data);
+
+	return (int)(log(v3d->layact) / M_LN2);
 }
 
 static void rna_SpaceView3D_layer_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
@@ -1645,7 +1661,7 @@ static void rna_FileBrowser_FSMenuEntry_name_set(PointerRNA *ptr, const char *va
 	ED_fsmenu_entry_set_name(fsm, value);
 }
 
-static int rna_FileBrowser_FSMenuEntry_name_get_editable(PointerRNA *ptr)
+static int rna_FileBrowser_FSMenuEntry_name_get_editable(PointerRNA *ptr, const char **UNUSED(r_info))
 {
 	FSMenuEntry *fsm = ptr->data;
 
@@ -2368,7 +2384,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "camera");
 	RNA_def_property_ui_text(prop, "Camera",
 	                         "Active camera used in this view (when unlocked from the scene's active camera)");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_camera_update");
 
 	/* render border */
 	prop = RNA_def_property(srna, "use_render_border", PROP_BOOLEAN, PROP_NONE);
@@ -2637,6 +2653,11 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_SpaceView3D_layer_set");
 	RNA_def_property_ui_text(prop, "Visible Layers", "Layers visible in this 3D View");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_layer_update");
+
+	prop = RNA_def_property(srna, "active_layer", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE | PROP_EDITABLE);
+	RNA_def_property_int_funcs(prop, "rna_SpaceView3D_active_layer_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Active Layer", "Active 3D view layer index");
 
 	prop = RNA_def_property(srna, "layers_local_view", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_boolean_sdna(prop, NULL, "lay", 0x01000000);
@@ -4303,17 +4324,17 @@ static void rna_def_space_node(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "id", PROP_POINTER, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_ui_text(prop, "ID", "Datablock whose nodes are being edited");
+	RNA_def_property_ui_text(prop, "ID", "Data-block whose nodes are being edited");
 
 	prop = RNA_def_property(srna, "id_from", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "from");
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_ui_text(prop, "ID From", "Datablock from which the edited data-block is linked");
+	RNA_def_property_ui_text(prop, "ID From", "Data-block from which the edited data-block is linked");
 
 	prop = RNA_def_property(srna, "path", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_collection_sdna(prop, NULL, "treepath", NULL);
 	RNA_def_property_struct_type(prop, "NodeTreePath");
-	RNA_def_property_ui_text(prop, "Node Tree Path", "Path from the data block to the currently edited node tree");
+	RNA_def_property_ui_text(prop, "Node Tree Path", "Path from the data-block to the currently edited node tree");
 	rna_def_space_node_path_api(brna, prop);
 
 	prop = RNA_def_property(srna, "node_tree", PROP_POINTER, PROP_NONE);

@@ -155,7 +155,7 @@ typedef struct Image {
 	ListBase views;  /* ImageView */
 	struct Stereo3dFormat *stereo3d_format;
 
-	RenderSlot render_slots[8];  /* 8 = IMA_MAX_RENDER_SLOT */
+	RenderSlot render_slots[10];  /* = IMA_MAX_RENDER_SLOT */
 } Image;
 
 

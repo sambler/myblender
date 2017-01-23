@@ -76,6 +76,7 @@
 #include "BLI_ghash.h"
 #include "BLI_linklist.h"
 #include "BLI_memarena.h"
+#include "BLI_string_utils.h"
 
 #include "BLI_threads.h"
 #include "BLT_translation.h"
@@ -1173,31 +1174,6 @@ void *BKE_libblock_copy_nolib(ID *id, const bool do_action)
 	return idn;
 }
 
-static int id_relink_looper(void *UNUSED(user_data), ID *UNUSED(self_id), ID **id_pointer, const int cd_flag)
-{
-	ID *id = *id_pointer;
-	if (id) {
-		/* See: NEW_ID macro */
-		if (id->newid) {
-			BKE_library_update_ID_link_user(id->newid, id, cd_flag);
-			*id_pointer = id->newid;
-		}
-		else if (id->tag & LIB_TAG_NEW) {
-			id->tag &= ~LIB_TAG_NEW;
-			BKE_libblock_relink(id);
-		}
-	}
-	return IDWALK_RET_NOP;
-}
-
-void BKE_libblock_relink(ID *id)
-{
-	if (ID_IS_LINKED_DATABLOCK(id))
-		return;
-
-	BKE_library_foreach_ID_link(id, id_relink_looper, NULL, 0);
-}
-
 void BKE_library_free(Library *lib)
 {
 	if (lib->packedfile)
@@ -1432,7 +1408,8 @@ static ID *is_dupid(ListBase *lb, ID *id, const char *name)
 static bool check_for_dupid(ListBase *lb, ID *id, char *name)
 {
 	ID *idtest;
-	int nr = 0, a, left_len;
+	int nr = 0, a;
+	size_t left_len;
 #define MAX_IN_USE 64
 	bool in_use[MAX_IN_USE];
 	/* to speed up finding unused numbers within [1 .. MAX_IN_USE - 1] */
@@ -1456,13 +1433,17 @@ static bool check_for_dupid(ListBase *lb, ID *id, char *name)
 
 		/* if new name will be too long, truncate it */
 		if (nr > 999 && left_len > (MAX_ID_NAME - 8)) {  /* assumption: won't go beyond 9999 */
-			left[MAX_ID_NAME - 8] = 0;
+			left[MAX_ID_NAME - 8] = '\0';
 			left_len = MAX_ID_NAME - 8;
 		}
 		else if (left_len > (MAX_ID_NAME - 7)) {
-			left[MAX_ID_NAME - 7] = 0;
+			left[MAX_ID_NAME - 7] = '\0';
 			left_len = MAX_ID_NAME - 7;
 		}
+
+		/* Code above may have generated invalid utf-8 string, due to raw truncation.
+		 * Ensure we get a valid one now! */
+		left_len -= (size_t)BLI_utf8_invalid_strip(left, left_len);
 
 		for (idtest = lb->first; idtest; idtest = idtest->next) {
 			int nrtest;
@@ -1504,7 +1485,7 @@ static bool check_for_dupid(ListBase *lb, ID *id, char *name)
 		 * shave off the end chars until we have a unique name.
 		 * Check the null terminators match as well so we don't get Cube.000 -> Cube.00 */
 		if (nr == 0 && name[left_len] == '\0') {
-			int len;
+			size_t len;
 			/* FIXME: this code will never be executed, because either nr will be
 			 * at least 1, or name will not end at left_len! */
 			BLI_assert(0);

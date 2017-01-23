@@ -522,8 +522,7 @@ void BKE_libblock_remap_locked(
 	 * been incremented for that, we have to decrease once more its user count... unless we had to skip
 	 * some 'user_one' cases. */
 	if ((old_id->tag & LIB_TAG_EXTRAUSER_SET) && !(id_remap_data.status & ID_REMAP_IS_USER_ONE_SKIPPED)) {
-		id_us_min(old_id);
-		old_id->tag &= ~LIB_TAG_EXTRAUSER_SET;
+		id_us_clear_real(old_id);
 	}
 
 	BLI_assert(old_id->us - skipped_refcounted >= 0);
@@ -563,8 +562,14 @@ void BKE_libblock_remap_locked(
 		default:
 			break;
 	}
+
 	/* Node trees may virtually use any kind of data-block... */
+	/* XXX Yuck!!!! nodetree update can do pretty much any thing when talking about py nodes,
+	 *     including creating new data-blocks (see T50385), so we need to unlock main here. :(
+	 *     Why can't we have re-entrent locks? */
+	BKE_main_unlock(bmain);
 	libblock_remap_data_postprocess_nodetree_update(bmain, new_id);
+	BKE_main_lock(bmain);
 
 	/* Full rebuild of DAG! */
 	DAG_relations_tag_update(bmain);
@@ -678,6 +683,35 @@ void BKE_libblock_relink_ex(
 		default:
 			break;
 	}
+}
+
+static int id_relink_to_newid_looper(void *UNUSED(user_data), ID *UNUSED(self_id), ID **id_pointer, const int cd_flag)
+{
+	ID *id = *id_pointer;
+	if (id) {
+		/* See: NEW_ID macro */
+		if (id->newid) {
+			BKE_library_update_ID_link_user(id->newid, id, cd_flag);
+			*id_pointer = id->newid;
+		}
+		else if (id->tag & LIB_TAG_NEW) {
+			id->tag &= ~LIB_TAG_NEW;
+			BKE_libblock_relink_to_newid(id);
+		}
+	}
+	return IDWALK_RET_NOP;
+}
+
+/** Similar to libblock_relink_ex, but is remapping IDs to their newid value if non-NULL, in given \a id.
+ *
+ * Very specific usage, not sure we'll keep it on the long run, currently only used in Object duplication code...
+ */
+void BKE_libblock_relink_to_newid(ID *id)
+{
+	if (ID_IS_LINKED_DATABLOCK(id))
+		return;
+
+	BKE_library_foreach_ID_link(id, id_relink_to_newid_looper, NULL, 0);
 }
 
 void BKE_libblock_free_data(Main *UNUSED(bmain), ID *id)
@@ -854,9 +888,10 @@ void BKE_libblock_free_us(Main *bmain, void *idv)      /* test users */
 	 *     Since only 'user_one' usage of objects is groups, and only 'real user' usage of objects is scenes,
 	 *     removing that 'user_one' tag when there is no more real (scene) users of an object ensures it gets
 	 *     fully unlinked.
+	 *     But only for local objects, not linked ones!
 	 *     Otherwise, there is no real way to get rid of an object anymore - better handling of this is TODO.
 	 */
-	if ((GS(id->name) == ID_OB) && (id->us == 1)) {
+	if ((GS(id->name) == ID_OB) && (id->us == 1) && (id->lib == NULL)) {
 		id_us_clear_real(id);
 	}
 

@@ -1442,14 +1442,14 @@ void PointDensityTextureNode::compile(SVMCompiler& compiler)
 		else {
 			if(use_density) {
 				compiler.add_node(NODE_VALUE_F,
-								  __float_as_int(0.0f),
-								  compiler.stack_assign(density_out));
+				                  __float_as_int(0.0f),
+				                  compiler.stack_assign(density_out));
 			}
 			if(use_color) {
 				compiler.add_node(NODE_VALUE_V, compiler.stack_assign(color_out));
 				compiler.add_node(NODE_VALUE_V, make_float3(TEX_IMAGE_MISSING_R,
-															TEX_IMAGE_MISSING_G,
-															TEX_IMAGE_MISSING_B));
+				                                            TEX_IMAGE_MISSING_G,
+				                                            TEX_IMAGE_MISSING_B));
 			}
 		}
 	}
@@ -2421,7 +2421,7 @@ void BackgroundNode::compile(SVMCompiler& compiler)
 	if(color_in->link || strength_in->link) {
 		compiler.add_node(NODE_EMISSION_WEIGHT,
 		                  compiler.stack_assign(color_in),
-						  compiler.stack_assign(strength_in));
+		                  compiler.stack_assign(strength_in));
 	}
 	else
 		compiler.add_node(NODE_CLOSURE_SET_WEIGHT, color*strength);
@@ -3027,6 +3027,8 @@ NODE_DEFINE(LightPathNode)
 	SOCKET_OUT_FLOAT(is_volume_scatter_ray, "Is Volume Scatter Ray");
 	SOCKET_OUT_FLOAT(ray_length, "Ray Length");
 	SOCKET_OUT_FLOAT(ray_depth, "Ray Depth");
+	SOCKET_OUT_FLOAT(diffuse_depth, "Diffuse Depth");
+	SOCKET_OUT_FLOAT(glossy_depth, "Glossy Depth");
 	SOCKET_OUT_FLOAT(transparent_depth, "Transparent Depth");
 	SOCKET_OUT_FLOAT(transmission_depth, "Transmission Depth");
 
@@ -3091,6 +3093,16 @@ void LightPathNode::compile(SVMCompiler& compiler)
 	out = output("Ray Depth");
 	if(!out->links.empty()) {
 		compiler.add_node(NODE_LIGHT_PATH, NODE_LP_ray_depth, compiler.stack_assign(out));
+	}
+
+	out = output("Diffuse Depth");
+	if(!out->links.empty()) {
+		compiler.add_node(NODE_LIGHT_PATH, NODE_LP_ray_diffuse, compiler.stack_assign(out));
+	}
+
+	out = output("Glossy Depth");
+	if(!out->links.empty()) {
+		compiler.add_node(NODE_LIGHT_PATH, NODE_LP_ray_glossy, compiler.stack_assign(out));
 	}
 
 	out = output("Transparent Depth");

@@ -75,6 +75,7 @@
 #include "BKE_lattice.h"
 #include "BKE_library.h"
 #include "BKE_library_query.h"
+#include "BKE_library_remap.h"
 #include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -1110,7 +1111,9 @@ static void object_delete_check_glsl_update(Object *ob)
 /* note: now unlinks constraints as well */
 void ED_base_object_free_and_unlink(Main *bmain, Scene *scene, Base *base)
 {
-	if (BKE_library_ID_is_indirectly_used(bmain, base->object) && ID_REAL_USERS(base->object) <= 1) {
+	if (BKE_library_ID_is_indirectly_used(bmain, base->object) &&
+	    ID_REAL_USERS(base->object) <= 1 && ID_EXTRA_USERS(base->object) == 0)
+	{
 		/* We cannot delete indirectly used object... */
 		printf("WARNING, undeletable object '%s', should have been catched before reaching this function!",
 		       base->object->id.name + 2);
@@ -1144,7 +1147,7 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 			BKE_reportf(op->reports, RPT_WARNING, "Cannot delete indirectly linked object '%s'", base->object->id.name + 2);
 			continue;
 		}
-		else if (is_indirectly_used && ID_REAL_USERS(base->object) <= 1) {
+		else if (is_indirectly_used && ID_REAL_USERS(base->object) <= 1 && ID_EXTRA_USERS(base->object) == 0) {
 			BKE_reportf(op->reports, RPT_WARNING,
 			        "Cannot delete object '%s' from scene '%s', indirectly used objects need at least one user",
 			        base->object->id.name + 2, scene->id.name + 2);
@@ -1178,7 +1181,7 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 				if (scene_iter != scene && !ID_IS_LINKED_DATABLOCK(scene_iter)) {
 					base_other = BKE_scene_base_find(scene_iter, base->object);
 					if (base_other) {
-						if (is_indirectly_used && ID_REAL_USERS(base->object) <= 1) {
+						if (is_indirectly_used && ID_REAL_USERS(base->object) <= 1 && ID_EXTRA_USERS(base->object) == 0) {
 							BKE_reportf(op->reports, RPT_WARNING,
 							            "Cannot delete object '%s' from scene '%s', indirectly used objects need at least one user",
 							            base->object->id.name + 2, scene_iter->id.name + 2);
@@ -1241,7 +1244,7 @@ static void copy_object_set_idnew(bContext *C)
 
 	CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects)
 	{
-		BKE_libblock_relink(&ob->id);
+		BKE_libblock_relink_to_newid(&ob->id);
 	}
 	CTX_DATA_END;
 
@@ -1395,7 +1398,7 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		}
 
 		/* Remap new object to itself, and clear again newid pointer of orig object. */
-		BKE_libblock_relink(&ob->id);
+		BKE_libblock_relink_to_newid(&ob->id);
 		set_sca_new_poins_ob(ob);
 		BKE_id_clear_newpoin(&dob->ob->id);
 
@@ -2219,7 +2222,7 @@ Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag
 	ob = basen->object;
 
 	/* link own references to the newly duplicated data [#26816] */
-	BKE_libblock_relink(&ob->id);
+	BKE_libblock_relink_to_newid(&ob->id);
 	set_sca_new_poins_ob(ob);
 
 	/* DAG_relations_tag_update(bmain); */ /* caller must do */

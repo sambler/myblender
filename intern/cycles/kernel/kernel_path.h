@@ -141,6 +141,10 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 #endif  /* __LAMP_MIS__ */
 
 #ifdef __VOLUME__
+		/* Sanitize volume stack. */
+		if(!hit) {
+			kernel_volume_clean_stack(kg, state->volume_stack);
+		}
 		/* volume attenuation, emission, scatter */
 		if(state->volume_stack[0].shader != SHADER_NONE) {
 			Ray volume_ray = *ray;
@@ -448,7 +452,7 @@ bool kernel_path_subsurface_scatter(
 #  ifdef __VOLUME__
 		ss_indirect->need_update_volume_stack =
 		        kernel_data.integrator.use_volumes &&
-		        ccl_fetch(sd, flag) & SD_OBJECT_INTERSECTS_VOLUME;
+		        ccl_fetch(sd, object_flag) & SD_OBJECT_INTERSECTS_VOLUME;
 #  endif  /* __VOLUME__ */
 
 		/* compute lighting with the BSDF closure */
@@ -630,8 +634,9 @@ ccl_device_inline float4 kernel_path_integrate(KernelGlobals *kg,
 
 #ifdef __KERNEL_DEBUG__
 		if(state.flag & PATH_RAY_CAMERA) {
-			debug_data.num_bvh_traversal_steps += isect.num_traversal_steps;
+			debug_data.num_bvh_traversed_nodes += isect.num_traversed_nodes;
 			debug_data.num_bvh_traversed_instances += isect.num_traversed_instances;
+			debug_data.num_bvh_intersections += isect.num_intersections;
 		}
 		debug_data.num_ray_bounces++;
 #endif  /* __KERNEL_DEBUG__ */
@@ -658,6 +663,10 @@ ccl_device_inline float4 kernel_path_integrate(KernelGlobals *kg,
 #endif  /* __LAMP_MIS__ */
 
 #ifdef __VOLUME__
+		/* Sanitize volume stack. */
+		if(!hit) {
+			kernel_volume_clean_stack(kg, state.volume_stack);
+		}
 		/* volume attenuation, emission, scatter */
 		if(state.volume_stack[0].shader != SHADER_NONE) {
 			Ray volume_ray = ray;
@@ -768,21 +777,25 @@ ccl_device_inline float4 kernel_path_integrate(KernelGlobals *kg,
 
 		/* holdout */
 #ifdef __HOLDOUT__
-		if((sd.flag & (SD_HOLDOUT|SD_HOLDOUT_MASK)) && (state.flag & PATH_RAY_CAMERA)) {
+		if(((sd.flag & SD_HOLDOUT) ||
+		    (sd.object_flag & SD_OBJECT_HOLDOUT_MASK)) &&
+		   (state.flag & PATH_RAY_CAMERA))
+		{
 			if(kernel_data.background.transparent) {
 				float3 holdout_weight;
-				
-				if(sd.flag & SD_HOLDOUT_MASK)
+				if(sd.object_flag & SD_OBJECT_HOLDOUT_MASK) {
 					holdout_weight = make_float3(1.0f, 1.0f, 1.0f);
-				else
+				}
+				else {
 					holdout_weight = shader_holdout_eval(kg, &sd);
-
+				}
 				/* any throughput is ok, should all be identical here */
 				L_transparent += average(holdout_weight*throughput);
 			}
 
-			if(sd.flag & SD_HOLDOUT_MASK)
+			if(sd.object_flag & SD_OBJECT_HOLDOUT_MASK) {
 				break;
+			}
 		}
 #endif  /* __HOLDOUT__ */
 

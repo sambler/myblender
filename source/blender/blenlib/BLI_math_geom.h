@@ -293,23 +293,10 @@ void isect_ray_aabb_v3_precalc(
 bool isect_ray_aabb_v3(
         const struct IsectRayAABB_Precalc *data,
         const float bb_min[3], const float bb_max[3], float *tmin);
-
-struct NearestRayToAABB_Precalc {
-	float ray_origin[3];
-	float ray_direction[3];
-	float ray_inv_dir[3];
-	float cdot_axis[3];
-	float idiag_sq[3];
-	bool sign[3];
-};
-
-void dist_squared_ray_to_aabb_v3_precalc(
-        struct NearestRayToAABB_Precalc *data,
-        const float ray_origin[3], const float ray_direction[3]);
-float dist_squared_ray_to_aabb_v3(
-        const struct NearestRayToAABB_Precalc *data,
+bool isect_ray_aabb_v3_simple(
+        const float orig[3], const float dir[3],
         const float bb_min[3], const float bb_max[3],
-        bool r_axis_closest[3]);
+        float *tmin, float *tmax);
 
 /* other */
 bool isect_sweeping_sphere_tri_v3(const float p1[3], const float p2[3], const float radius,

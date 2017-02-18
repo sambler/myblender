@@ -66,6 +66,11 @@ public:
 #endif
 	}
 
+	//void resize(size_t __sz, value_type __x = value_type()) {std::vector<value_type, allocator_type>::resize(__sz, __x);}
+
+	//value_type			operator[](size_t __n) {return std::vector<value_type, allocator_type>::operator[](__n);}
+	//const value_type	operator[](size_t __n) const {return std::vector<value_type, allocator_type>::operator[](__n);}
+
 	void free_memory(void)
 	{
 		std::vector<value_type, allocator_type>::resize(0);

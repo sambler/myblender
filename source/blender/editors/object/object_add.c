@@ -64,6 +64,7 @@
 #include "BKE_armature.h"
 #include "BKE_camera.h"
 #include "BKE_context.h"
+#include "BKE_constraint.h"
 #include "BKE_curve.h"
 #include "BKE_depsgraph.h"
 #include "BKE_DerivedMesh.h"
@@ -1153,7 +1154,21 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 			        base->object->id.name + 2, scene->id.name + 2);
 			continue;
 		}
+
+		/* This is sort of a quick hack to address T51243 - Proper thing to do here would be to nuke most of all this
+		 * custom scene/object/base handling, and use generic lib remap/query for that.
+		 * But this is for later (aka 2.8, once layers & co are settled and working).
+		 */
+		if (use_global && base->object->id.lib == NULL) {
+			/* We want to nuke the object, let's nuke it the easy way (not for linked data though)... */
+			BKE_libblock_delete(bmain, &base->object->id);
+			changed = true;
+			continue;
+		}
+
 		/* remove from Grease Pencil parent */
+		/* XXX This is likely not correct? Will also remove parent from grease pencil from other scenes,
+		 *     even when use_global is false... */
 		for (bGPdata *gpd = bmain->gpencil.first; gpd; gpd = gpd->id.next) {
 			for (bGPDlayer *gpl = gpd->layers.first; gpl; gpl = gpl->next) {
 				if (gpl->parent != NULL) {
@@ -1377,7 +1392,7 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		ob->proxy = NULL;
 
 		ob->parent = NULL;
-		BLI_listbase_clear(&ob->constraints);
+		BKE_constraints_free(&ob->constraints);
 		ob->curve_cache = NULL;
 		ob->transflag &= ~OB_DUPLI;
 		ob->lay = base->lay;
@@ -1625,7 +1640,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 	MetaBall *mb;
 	Mesh *me;
 	const short target = RNA_enum_get(op->ptr, "target");
-	const bool keep_original = RNA_boolean_get(op->ptr, "keep_original");
+	bool keep_original = RNA_boolean_get(op->ptr, "keep_original");
 	int a, mballConverted = 0;
 
 	/* don't forget multiple users! */
@@ -1655,8 +1670,38 @@ static int convert_exec(bContext *C, wmOperator *op)
 		}
 	}
 
-	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
+	ListBase selected_editable_bases = CTX_data_collection_get(C, "selected_editable_bases");
+
+	/* Ensure we get all meshes calculated with a sufficient data-mask,
+	 * needed since re-evaluating single modifiers causes bugs if they depend
+	 * on other objects data masks too, see: T50950. */
 	{
+		for (CollectionPointerLink *link = selected_editable_bases.first; link; link = link->next) {
+			Base *base = link->ptr.data;
+			ob = base->object;
+
+			/* The way object type conversion works currently (enforcing conversion of *all* objetcs using converted
+			 * obdata, even some un-selected/hidden/inother scene ones, sounds totally bad to me.
+			 * However, changing this is more design than bugfix, not to mention convoluted code below,
+			 * so that will be for later.
+			 * But at the very least, do not do that with linked IDs! */
+			if ((ID_IS_LINKED_DATABLOCK(ob) || ID_IS_LINKED_DATABLOCK(ob->data)) && !keep_original) {
+				keep_original = true;
+				BKE_reportf(op->reports, RPT_INFO,
+				            "Converting some linked object/object data, enforcing 'Keep Original' option to True");
+			}
+
+			DAG_id_tag_update(&base->object->id, OB_RECALC_DATA);
+		}
+
+		uint64_t customdata_mask_prev = scene->customdata_mask;
+		scene->customdata_mask |= CD_MASK_MESH;
+		BKE_scene_update_tagged(bmain->eval_ctx, bmain, scene);
+		scene->customdata_mask = customdata_mask_prev;
+	}
+
+	for (CollectionPointerLink *link = selected_editable_bases.first; link; link = link->next) {
+		Base *base = link->ptr.data;
 		ob = base->object;
 
 		if (ob->flag & OB_DONE || !IS_TAGGED(ob->data)) {
@@ -1699,7 +1744,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 				ED_rigidbody_object_remove(bmain, scene, newob);
 			}
 		}
-		else if (ob->type == OB_MESH && ob->modifiers.first) { /* converting a mesh with no modifiers causes a segfault */
+		else if (ob->type == OB_MESH) {
 			ob->flag |= OB_DONE;
 
 			if (keep_original) {
@@ -1723,7 +1768,6 @@ static int convert_exec(bContext *C, wmOperator *op)
 			 * cases this doesnt give correct results (when MDEF is used for eg)
 			 */
 			dm = mesh_get_derived_final(scene, newob, CD_MASK_MESH);
-			// dm = mesh_create_derived_no_deform(ob1, NULL);  /* this was called original (instead of get_derived). man o man why! (ton) */
 
 			DM_to_mesh(dm, newob->data, newob, CD_MASK_MESH, true);
 
@@ -1888,7 +1932,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			((ID *)ob->data)->tag &= ~LIB_TAG_DOIT; /* flag not to convert this datablock again */
 		}
 	}
-	CTX_DATA_END;
+	BLI_freelistN(&selected_editable_bases);
 
 	if (!keep_original) {
 		if (mballConverted) {

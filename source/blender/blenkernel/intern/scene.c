@@ -233,6 +233,9 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		/* copy Freestyle settings */
 		new_srl = scen->r.layers.first;
 		for (srl = sce->r.layers.first; srl; srl = srl->next) {
+			if (new_srl->prop != NULL) {
+				new_srl->prop = IDP_CopyProperty(new_srl->prop);
+			}
 			BKE_freestyle_config_copy(&new_srl->freestyleConfig, &srl->freestyleConfig);
 			if (type == SCE_COPY_FULL) {
 				for (lineset = new_srl->freestyleConfig.linesets.first; lineset; lineset = lineset->next) {
@@ -416,11 +419,15 @@ void BKE_scene_free(Scene *sce)
 		MEM_freeN(sce->r.ffcodecdata.properties);
 		sce->r.ffcodecdata.properties = NULL;
 	}
-	
+
 	for (srl = sce->r.layers.first; srl; srl = srl->next) {
+		if (srl->prop != NULL) {
+			IDP_FreeProperty(srl->prop);
+			MEM_freeN(srl->prop);
+		}
 		BKE_freestyle_config_free(&srl->freestyleConfig);
 	}
-	
+
 	BLI_freelistN(&sce->markers);
 	BLI_freelistN(&sce->transform_spaces);
 	BLI_freelistN(&sce->r.layers);
@@ -1510,8 +1517,6 @@ static void scene_update_object_func(TaskPool * __restrict pool, void *taskdata,
 		if (add_to_stats) {
 			StatisicsEntry *entry;
 
-			BLI_assert(threadid < BLI_pool_get_num_threads(pool));
-
 			entry = MEM_mallocN(sizeof(StatisicsEntry), "update thread statistics");
 			entry->object = object;
 			entry->start_time = start_time;
@@ -1631,10 +1636,11 @@ static bool scene_need_update_objects(Main *bmain)
 
 static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene *scene, Scene *scene_parent)
 {
-	TaskScheduler *task_scheduler = BLI_task_scheduler_get();
+	TaskScheduler *task_scheduler;
 	TaskPool *task_pool;
 	ThreadedObjectUpdateState state;
 	bool need_singlethread_pass;
+	bool need_free_scheduler;
 
 	/* Early check for whether we need to invoke all the task-based
 	 * things (spawn new ppol, traverse dependency graph and so on).
@@ -1651,6 +1657,15 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene
 	state.scene = scene;
 	state.scene_parent = scene_parent;
 
+	if (G.debug & G_DEBUG_DEPSGRAPH_NO_THREADS) {
+		task_scheduler = BLI_task_scheduler_create(1);
+		need_free_scheduler = true;
+	}
+	else {
+		task_scheduler = BLI_task_scheduler_get();
+		need_free_scheduler = false;
+	}
+
 	/* Those are only needed when blender is run with --debug argument. */
 	if (G.debug & G_DEBUG_DEPSGRAPH) {
 		const int tot_thread = BLI_task_scheduler_num_threads(task_scheduler);
@@ -1665,9 +1680,6 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene
 #endif
 
 	task_pool = BLI_task_pool_create(task_scheduler, &state);
-	if (G.debug & G_DEBUG_DEPSGRAPH_NO_THREADS) {
-		BLI_pool_set_num_threads(task_pool, 1);
-	}
 
 	DAG_threaded_update_begin(scene, scene_update_object_add_task, task_pool);
 	BLI_task_pool_work_and_wait(task_pool);
@@ -1699,6 +1711,10 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene
 
 	if (need_singlethread_pass) {
 		scene_update_all_bases(eval_ctx, scene, scene_parent);
+	}
+
+	if (need_free_scheduler) {
+		BLI_task_scheduler_free(task_scheduler);
 	}
 }
 
@@ -2054,6 +2070,11 @@ bool BKE_scene_remove_render_layer(Main *bmain, Scene *scene, SceneRenderLayer *
 
 	BKE_freestyle_config_free(&srl->freestyleConfig);
 
+	if (srl->prop) {
+		IDP_FreeProperty(srl->prop);
+		MEM_freeN(srl->prop);
+	}
+
 	BLI_remlink(&scene->r.layers, srl);
 	MEM_freeN(srl);
 
@@ -2116,7 +2137,7 @@ bool BKE_scene_remove_render_view(Scene *scene, SceneRenderView *srv)
 
 int get_render_subsurf_level(const RenderData *r, int lvl, bool for_render)
 {
-	if (r->mode & R_SIMPLIFY)  {
+	if (r->mode & R_SIMPLIFY) {
 		if (for_render)
 			return min_ii(r->simplify_subsurf_render, lvl);
 		else

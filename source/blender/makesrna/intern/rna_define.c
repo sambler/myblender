@@ -71,8 +71,8 @@ BlenderDefRNA DefRNA = {NULL, {NULL, NULL}, {NULL, NULL}, NULL, 0, 0, 0, 1, 1};
 	if (description && (description)[0]) {                                         \
 		int i = strlen(description);                                               \
 		if (i > 3 && (description)[i - 1] == '.' && (description)[i - 3] != '.') { \
-			fprintf(stderr, "%s: '%s' '%s' description ends with a '.' !\n",       \
-			        __func__, id1 ? id1 : "", id2 ? id2 : "");                     \
+			fprintf(stderr, "%s: '%s' description from '%s' '%s' ends with a '.' !\n",       \
+			        __func__, description, id1 ? id1 : "", id2 ? id2 : "");                     \
 		}                                                                          \
 	} (void)0
 
@@ -2168,6 +2168,16 @@ void RNA_def_property_update_runtime(PropertyRNA *prop, const void *func)
 	prop->update = (void *)func;
 }
 
+void RNA_def_property_poll_runtime(PropertyRNA *prop, const void *func)
+{
+	if (prop->type == PROP_POINTER) {
+		((PointerPropertyRNA *)prop)->poll = func;
+	}
+	else {
+		fprintf(stderr, "%s: %s is not a Pointer Property.\n", __func__, prop->identifier);
+	}
+}
+
 void RNA_def_property_dynamic_array_funcs(PropertyRNA *prop, const char *getlength)
 {
 	if (!DefRNA.preprocess) {
@@ -2982,6 +2992,9 @@ PropertyRNA *RNA_def_pointer_runtime(StructOrFunctionRNA *cont_, const char *ide
 	
 	prop = RNA_def_property(cont, identifier, PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_runtime(prop, type);
+	if ((type->flag & STRUCT_ID) != 0) {
+		prop->flag |= PROP_EDITABLE;
+	}
 	RNA_def_property_ui_text(prop, ui_name, ui_description);
 
 	return prop;
@@ -3157,8 +3170,9 @@ int rna_parameter_size(PropertyRNA *parm)
 					StringPropertyRNA *sparm = (StringPropertyRNA *)parm;
 					return sizeof(char) * sparm->maxlength;
 				}
-				else
+				else {
 					return sizeof(char *);
+				}
 			case PROP_POINTER:
 			{
 #ifdef RNA_RUNTIME

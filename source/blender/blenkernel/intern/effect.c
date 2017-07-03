@@ -848,6 +848,14 @@ static void do_physical_effector(EffectorCache *eff, EffectorData *efd, Effected
 			break;
 		case PFIELD_FORCE:
 			normalize_v3(force);
+			if (pd->flag & PFIELD_GRAVITATION){ /* Option: Multiply by 1/distance^2 */
+				if (efd->distance < FLT_EPSILON){
+					strength = 0.0f;
+				}
+				else {
+					strength *= powf(efd->distance, -2.0f);
+				}
+			}
 			mul_v3_fl(force, strength * efd->falloff);
 			break;
 		case PFIELD_VORTEX:
@@ -978,19 +986,19 @@ static void do_physical_effector(EffectorCache *eff, EffectorData *efd, Effected
  */
 void pdDoEffectors(ListBase *effectors, ListBase *colliders, EffectorWeights *weights, EffectedPoint *point, float *force, float *impulse)
 {
-/*
- * Modifies the force on a particle according to its
- * relation with the effector object
- * Different kind of effectors include:
- *     Forcefields: Gravity-like attractor
- *     (force power is related to the inverse of distance to the power of a falloff value)
- *     Vortex fields: swirling effectors
- *     (particles rotate around Z-axis of the object. otherwise, same relation as)
- *     (Forcefields, but this is not done through a force/acceleration)
- *     Guide: particles on a path
- *     (particles are guided along a curve bezier or old nurbs)
- *     (is independent of other effectors)
- */
+	/*
+	 * Modifies the force on a particle according to its
+	 * relation with the effector object
+	 * Different kind of effectors include:
+	 *     Forcefields: Gravity-like attractor
+	 *     (force power is related to the inverse of distance to the power of a falloff value)
+	 *     Vortex fields: swirling effectors
+	 *     (particles rotate around Z-axis of the object. otherwise, same relation as)
+	 *     (Forcefields, but this is not done through a force/acceleration)
+	 *     Guide: particles on a path
+	 *     (particles are guided along a curve bezier or old nurbs)
+	 *     (is independent of other effectors)
+	 */
 	EffectorCache *eff;
 	EffectorData efd;
 	int p=0, tot = 1, step = 1;

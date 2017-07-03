@@ -343,7 +343,7 @@ class RENDER_PT_game_stereo(RenderButtonsPanel, Panel):
         stereo_mode = gs.stereo
 
         # stereo options:
-        layout.prop(gs, "stereo", expand=True)
+        layout.row().prop(gs, "stereo", expand=True)
 
         # stereo:
         if stereo_mode == 'STEREO':
@@ -392,7 +392,7 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
 
         gs = context.scene.game_settings
 
-        layout.prop(gs, "material_mode", expand=True)
+        layout.row().prop(gs, "material_mode", expand=True)
 
         if gs.material_mode == 'GLSL':
             split = layout.split()
@@ -852,5 +852,30 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         row.menu("OBJECT_MT_lod_tools", text="", icon='TRIA_DOWN')
 
 
+classes = (
+    PHYSICS_PT_game_physics,
+    PHYSICS_PT_game_collision_bounds,
+    PHYSICS_PT_game_obstacles,
+    RENDER_PT_embedded,
+    RENDER_PT_game_player,
+    RENDER_PT_game_stereo,
+    RENDER_PT_game_shading,
+    RENDER_PT_game_system,
+    RENDER_PT_game_display,
+    SCENE_PT_game_physics,
+    SCENE_PT_game_physics_obstacles,
+    SCENE_PT_game_navmesh,
+    SCENE_PT_game_hysteresis,
+    WORLD_PT_game_context_world,
+    WORLD_PT_game_world,
+    WORLD_PT_game_environment_lighting,
+    WORLD_PT_game_mist,
+    DATA_PT_shadow_game,
+    OBJECT_MT_lod_tools,
+    OBJECT_PT_levels_of_detail,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

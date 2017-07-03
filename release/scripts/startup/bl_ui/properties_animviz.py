@@ -37,7 +37,7 @@ class MotionPathButtonsPanel:
         mps = avs.motion_path
 
         # Display Range
-        layout.prop(mps, "type", expand=True)
+        layout.row().prop(mps, "type", expand=True)
 
         split = layout.split()
 
@@ -120,7 +120,7 @@ class OnionSkinButtonsPanel:
 
         arm = context.armature
 
-        layout.prop(arm, "ghost_type", expand=True)
+        layout.row().prop(arm, "ghost_type", expand=True)
 
         split = layout.split()
 
@@ -139,6 +139,11 @@ class OnionSkinButtonsPanel:
         col.label(text="Display:")
         col.prop(arm, "show_only_ghost_selected", text="Selected Only")
 
+
+classes = (
+)
+
 if __name__ == "__main__":  # only for live edit.
-    import bpy
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

@@ -294,7 +294,7 @@ class OBJECT_PT_duplication(ObjectButtonsPanel, Panel):
 
         ob = context.object
 
-        layout.prop(ob, "dupli_type", expand=True)
+        layout.row().prop(ob, "dupli_type", expand=True)
 
         if ob.dupli_type == 'FRAMES':
             split = layout.split()
@@ -366,5 +366,23 @@ class OBJECT_PT_custom_props(ObjectButtonsPanel, PropertyPanel, Panel):
     _context_path = "object"
     _property_type = bpy.types.Object
 
+
+classes = (
+    OBJECT_PT_context_object,
+    OBJECT_PT_transform,
+    OBJECT_PT_delta_transform,
+    OBJECT_PT_transform_locks,
+    OBJECT_PT_relations,
+    OBJECT_PT_relations_extras,
+    GROUP_MT_specials,
+    OBJECT_PT_groups,
+    OBJECT_PT_display,
+    OBJECT_PT_duplication,
+    OBJECT_PT_motion_paths,
+    OBJECT_PT_custom_props,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

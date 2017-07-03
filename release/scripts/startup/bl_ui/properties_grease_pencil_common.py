@@ -233,7 +233,7 @@ class GreasePencilStrokeEditPanel:
 
         if is_3d_view:
             layout.separator()
-            
+
 
         layout.separator()
         col = layout.column(align=True)
@@ -884,9 +884,9 @@ class GreasePencilDataPanel:
 
         # Owner Selector
         if context.space_data.type == 'VIEW_3D':
-            layout.prop(context.tool_settings, "grease_pencil_source", expand=True)
+            layout.row().prop(context.tool_settings, "grease_pencil_source", expand=True)
         elif context.space_data.type == 'CLIP_EDITOR':
-            layout.prop(context.space_data, "grease_pencil_source", expand=True)
+            layout.row().prop(context.space_data, "grease_pencil_source", expand=True)
 
         # Grease Pencil data selector
         layout.template_ID(gpd_owner, "grease_pencil", new="gpencil.data_add", unlink="gpencil.data_unlink")
@@ -963,7 +963,7 @@ class GreasePencilDataPanel:
         row.prop(gpl, "line_change", text="Thickness Change", slider=True)
         row.operator("gpencil.stroke_apply_thickness", icon='STYLUS_PRESSURE', text="")
 
-        # Parenting 
+        # Parenting
         if context.space_data.type == 'VIEW_3D':
             col = split.column(align=True)
             col.label(text="Parent:")
@@ -1155,3 +1155,24 @@ class GreasePencilToolsPanel:
         layout.separator()
 
         gpencil_stroke_placement_settings(context, layout)
+
+
+classes = (
+    GPENCIL_PIE_tool_palette,
+    GPENCIL_PIE_settings_palette,
+    GPENCIL_PIE_tools_more,
+    GPENCIL_PIE_sculpt,
+    GPENCIL_MT_snap,
+    GPENCIL_MT_gpencil_edit_specials,
+    GPENCIL_UL_brush,
+    GPENCIL_UL_palettecolor,
+    GPENCIL_UL_layer,
+    GPENCIL_MT_layer_specials,
+    GPENCIL_MT_brush_specials,
+    GPENCIL_MT_palettecolor_specials,
+)
+
+if __name__ == "__main__":  # only for live edit.
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

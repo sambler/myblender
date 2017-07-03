@@ -36,6 +36,7 @@
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_dynamicpaint.h"
+#include "BKE_library.h"
 #include "BKE_library_query.h"
 #include "BKE_modifier.h"
 
@@ -58,6 +59,15 @@ static void copyData(ModifierData *md, ModifierData *target)
 	DynamicPaintModifierData *tpmd = (DynamicPaintModifierData *)target;
 	
 	dynamicPaint_Modifier_copy(pmd, tpmd);
+
+	if (tpmd->canvas) {
+		for (DynamicPaintSurface *surface = tpmd->canvas->surfaces.first; surface; surface = surface->next) {
+			id_us_plus((ID *)surface->init_texture);
+		}
+	}
+	if (tpmd->brush) {
+		id_us_plus((ID *)tpmd->brush->mat);
+	}
 }
 
 static void freeData(ModifierData *md)
@@ -116,7 +126,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 static bool is_brush_cb(Object *UNUSED(ob), ModifierData *pmd)
 {
-	return ((DynamicPaintModifierData*)pmd)->brush != NULL;
+	return ((DynamicPaintModifierData *)pmd)->brush != NULL;
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,

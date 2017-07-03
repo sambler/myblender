@@ -470,10 +470,11 @@ static eOLDrawState tree_element_active_defgroup(
 		WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, ob);
 	}
 	else {
-		if (ob == OBACT)
+		if (ob == OBACT) {
 			if (ob->actdef == te->index + 1) {
 				return OL_DRAWSEL_NORMAL;
 			}
+		}
 	}
 	return OL_DRAWSEL_NONE;
 }
@@ -706,7 +707,12 @@ static eOLDrawState tree_element_active_pose(
 {
 	Object *ob = (Object *)tselem->id;
 	Base *base = BKE_scene_base_find(scene, ob);
-	
+
+	if (base == NULL) {
+		/* Armature not instantiated in current scene (e.g. inside an appended group...). */
+		return OL_DRAWSEL_NONE;
+	}
+
 	if (set != OL_SETSEL_NONE) {
 		if (scene->obedit)
 			ED_object_editmode_exit(C, EM_FREEDATA | EM_FREEUNDO | EM_WAITCURSOR | EM_DO_UNDO);

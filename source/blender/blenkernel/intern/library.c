@@ -133,6 +133,12 @@
 
 #include "atomic_ops.h"
 
+//#define DEBUG_TIME
+
+#ifdef DEBUG_TIME
+#  include "PIL_time_utildefines.h"
+#endif
+
 /* GS reads the memory pointed at in a specific ordering. 
  * only use this definition, makes little and big endian systems
  * work fine, in conjunction with MAKE_ID */
@@ -301,7 +307,7 @@ void BKE_id_expand_local(Main *bmain, ID *id)
 /**
  * Ensure new (copied) ID is fully made local.
  */
-void BKE_id_copy_ensure_local(Main *bmain, ID *old_id, ID *new_id)
+void BKE_id_copy_ensure_local(Main *bmain, const ID *old_id, ID *new_id)
 {
 	if (ID_IS_LINKED_DATABLOCK(old_id)) {
 		BKE_id_expand_local(bmain, new_id);
@@ -482,7 +488,7 @@ bool id_make_local(Main *bmain, ID *id, const bool test, const bool lib_local)
  * Invokes the appropriate copy method for the block and returns the result in
  * newid, unless test. Returns true if the block can be copied.
  */
-bool id_copy(Main *bmain, ID *id, ID **newid, bool test)
+bool id_copy(Main *bmain, const ID *id, ID **newid, bool test)
 {
 	if (!test) {
 		*newid = NULL;
@@ -852,118 +858,72 @@ int set_listbasepointers(Main *main, ListBase **lb)
  * **************************** */
 
 /**
+ * Get allocation size fo a given datablock type and optionally allocation name.
+ */
+size_t BKE_libblock_get_alloc_info(short type, const char **name)
+{
+#define CASE_RETURN(id_code, type)  \
+	case id_code:                   \
+		do {                        \
+			if (name != NULL) {     \
+				*name = #type;      \
+			}                       \
+			return sizeof(type);    \
+		} while(0)
+
+	switch ((ID_Type)type) {
+		CASE_RETURN(ID_SCE, Scene);
+		CASE_RETURN(ID_LI,  Library);
+		CASE_RETURN(ID_OB,  Object);
+		CASE_RETURN(ID_ME,  Mesh);
+		CASE_RETURN(ID_CU,  Curve);
+		CASE_RETURN(ID_MB,  MetaBall);
+		CASE_RETURN(ID_MA,  Material);
+		CASE_RETURN(ID_TE,  Tex);
+		CASE_RETURN(ID_IM,  Image);
+		CASE_RETURN(ID_LT,  Lattice);
+		CASE_RETURN(ID_LA,  Lamp);
+		CASE_RETURN(ID_CA,  Camera);
+		CASE_RETURN(ID_IP,  Ipo);
+		CASE_RETURN(ID_KE,  Key);
+		CASE_RETURN(ID_WO,  World);
+		CASE_RETURN(ID_SCR, bScreen);
+		CASE_RETURN(ID_VF,  VFont);
+		CASE_RETURN(ID_TXT, Text);
+		CASE_RETURN(ID_SPK, Speaker);
+		CASE_RETURN(ID_SO,  bSound);
+		CASE_RETURN(ID_GR,  Group);
+		CASE_RETURN(ID_AR,  bArmature);
+		CASE_RETURN(ID_AC,  bAction);
+		CASE_RETURN(ID_NT,  bNodeTree);
+		CASE_RETURN(ID_BR,  Brush);
+		CASE_RETURN(ID_PA,  ParticleSettings);
+		CASE_RETURN(ID_WM,  wmWindowManager);
+		CASE_RETURN(ID_GD,  bGPdata);
+		CASE_RETURN(ID_MC,  MovieClip);
+		CASE_RETURN(ID_MSK, Mask);
+		CASE_RETURN(ID_LS,  FreestyleLineStyle);
+		CASE_RETURN(ID_PAL, Palette);
+		CASE_RETURN(ID_PC,  PaintCurve);
+		CASE_RETURN(ID_CF,  CacheFile);
+	}
+	return 0;
+#undef CASE_RETURN
+}
+
+/**
  * Allocates and returns memory of the right size for the specified block type,
  * initialized to zero.
  */
 void *BKE_libblock_alloc_notest(short type)
 {
-	ID *id = NULL;
-	
-	switch ((ID_Type)type) {
-		case ID_SCE:
-			id = MEM_callocN(sizeof(Scene), "scene");
-			break;
-		case ID_LI:
-			id = MEM_callocN(sizeof(Library), "library");
-			break;
-		case ID_OB:
-			id = MEM_callocN(sizeof(Object), "object");
-			break;
-		case ID_ME:
-			id = MEM_callocN(sizeof(Mesh), "mesh");
-			break;
-		case ID_CU:
-			id = MEM_callocN(sizeof(Curve), "curve");
-			break;
-		case ID_MB:
-			id = MEM_callocN(sizeof(MetaBall), "mball");
-			break;
-		case ID_MA:
-			id = MEM_callocN(sizeof(Material), "mat");
-			break;
-		case ID_TE:
-			id = MEM_callocN(sizeof(Tex), "tex");
-			break;
-		case ID_IM:
-			id = MEM_callocN(sizeof(Image), "image");
-			break;
-		case ID_LT:
-			id = MEM_callocN(sizeof(Lattice), "latt");
-			break;
-		case ID_LA:
-			id = MEM_callocN(sizeof(Lamp), "lamp");
-			break;
-		case ID_CA:
-			id = MEM_callocN(sizeof(Camera), "camera");
-			break;
-		case ID_IP:
-			id = MEM_callocN(sizeof(Ipo), "ipo");
-			break;
-		case ID_KE:
-			id = MEM_callocN(sizeof(Key), "key");
-			break;
-		case ID_WO:
-			id = MEM_callocN(sizeof(World), "world");
-			break;
-		case ID_SCR:
-			id = MEM_callocN(sizeof(bScreen), "screen");
-			break;
-		case ID_VF:
-			id = MEM_callocN(sizeof(VFont), "vfont");
-			break;
-		case ID_TXT:
-			id = MEM_callocN(sizeof(Text), "text");
-			break;
-		case ID_SPK:
-			id = MEM_callocN(sizeof(Speaker), "speaker");
-			break;
-		case ID_SO:
-			id = MEM_callocN(sizeof(bSound), "sound");
-			break;
-		case ID_GR:
-			id = MEM_callocN(sizeof(Group), "group");
-			break;
-		case ID_AR:
-			id = MEM_callocN(sizeof(bArmature), "armature");
-			break;
-		case ID_AC:
-			id = MEM_callocN(sizeof(bAction), "action");
-			break;
-		case ID_NT:
-			id = MEM_callocN(sizeof(bNodeTree), "nodetree");
-			break;
-		case ID_BR:
-			id = MEM_callocN(sizeof(Brush), "brush");
-			break;
-		case ID_PA:
-			id = MEM_callocN(sizeof(ParticleSettings), "ParticleSettings");
-			break;
-		case ID_WM:
-			id = MEM_callocN(sizeof(wmWindowManager), "Window manager");
-			break;
-		case ID_GD:
-			id = MEM_callocN(sizeof(bGPdata), "Grease Pencil");
-			break;
-		case ID_MC:
-			id = MEM_callocN(sizeof(MovieClip), "Movie Clip");
-			break;
-		case ID_MSK:
-			id = MEM_callocN(sizeof(Mask), "Mask");
-			break;
-		case ID_LS:
-			id = MEM_callocN(sizeof(FreestyleLineStyle), "Freestyle Line Style");
-			break;
-		case ID_PAL:
-			id = MEM_callocN(sizeof(Palette), "Palette");
-			break;
-		case ID_PC:
-			id = MEM_callocN(sizeof(PaintCurve), "Paint Curve");
-			break;
-		case ID_CF:
-			id = MEM_callocN(sizeof(CacheFile), "Cache File");
-			break;
+	const char *name;
+	size_t size = BKE_libblock_get_alloc_info(type, &name);
+	if (size != 0) {
+		return MEM_callocN(size, name);
 	}
-	return id;
+	BLI_assert(!"Request to allocate unknown data type");
+	return NULL;
 }
 
 /**
@@ -1132,7 +1092,7 @@ void BKE_libblock_copy_data(ID *id, const ID *id_from, const bool do_action)
 }
 
 /* used everywhere in blenkernel */
-void *BKE_libblock_copy(Main *bmain, ID *id)
+void *BKE_libblock_copy(Main *bmain, const ID *id)
 {
 	ID *idn;
 	size_t idn_len;
@@ -1154,7 +1114,7 @@ void *BKE_libblock_copy(Main *bmain, ID *id)
 	return idn;
 }
 
-void *BKE_libblock_copy_nolib(ID *id, const bool do_action)
+void *BKE_libblock_copy_nolib(const ID *id, const bool do_action)
 {
 	ID *idn;
 	size_t idn_len;
@@ -1716,10 +1676,19 @@ static void library_make_local_copying_check(ID *id, GSet *loop_tags, MainIDRela
 	for (; entry != NULL; entry = entry->next) {
 		ID *par_id = (ID *)entry->id_pointer;  /* used_to_user stores ID pointer, not pointer to ID pointer... */
 
-		/* Shapekeys are considered 'private' to their owner ID here, and never tagged (since they cannot be linked),
-		 * so we have to switch effective parent to their owner. */
-		if (GS(par_id->name) == ID_KE) {
-			par_id = ((Key *)par_id)->from;
+		/* Our oh-so-beloved 'from' pointers... */
+		if (entry->usage_flag & IDWALK_CB_LOOPBACK) {
+			/* We totally disregard Object->proxy_from 'usage' here, this one would only generate fake positives. */
+			if (GS(par_id->name) == ID_OB) {
+				BLI_assert(((Object *)par_id)->proxy_from == (Object *)id);
+				continue;
+			}
+
+			/* Shapekeys are considered 'private' to their owner ID here, and never tagged (since they cannot be linked),
+			 * so we have to switch effective parent to their owner. */
+			if (GS(par_id->name) == ID_KE) {
+				par_id = ((Key *)par_id)->from;
+			}
 		}
 
 		if (par_id->lib == NULL) {
@@ -1777,9 +1746,18 @@ void BKE_library_make_local(
 	LinkNode *copied_ids = NULL;
 	MemArena *linklist_mem = BLI_memarena_new(512 * sizeof(*todo_ids), __func__);
 
+	GSet *done_ids = BLI_gset_ptr_new(__func__);
+
+#ifdef DEBUG_TIME
+	TIMEIT_START(make_local);
+#endif
+
 	BKE_main_relations_create(bmain);
 
-	GSet *done_ids = BLI_gset_ptr_new(__func__);
+#ifdef DEBUG_TIME
+	printf("Pre-compute current ID relations: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
 
 	/* Step 1: Detect datablocks to make local. */
 	for (a = set_listbasepointers(bmain, lbarray); a--; ) {
@@ -1830,6 +1808,11 @@ void BKE_library_make_local(
 		}
 	}
 
+#ifdef DEBUG_TIME
+	printf("Step 1: Detect datablocks to make local: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
+
 	/* Step 2: Check which datablocks we can directly make local (because they are only used by already, or future,
 	 * local data), others will need to be duplicated. */
 	GSet *loop_tags = BLI_gset_ptr_new(__func__);
@@ -1842,6 +1825,11 @@ void BKE_library_make_local(
 
 	/* Next step will most likely add new IDs, better to get rid of this mapping now. */
 	BKE_main_relations_free(bmain);
+
+#ifdef DEBUG_TIME
+	printf("Step 2: Check which datablocks we can directly make local: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
 
 	/* Step 3: Make IDs local, either directly (quick and simple), or using generic process,
 	 * which involves more complex checks and might instead create a local copy of original linked ID. */
@@ -1863,7 +1851,7 @@ void BKE_library_make_local(
 				/* Special case for objects because we don't want proxy pointers to be
 				 * cleared yet. This will happen down the road in this function.
 				 */
-				BKE_object_make_local_ex(bmain, (Object*)id, true, false);
+				BKE_object_make_local_ex(bmain, (Object *)id, true, false);
 			}
 			else {
 				id_make_local(bmain, id, false, true);
@@ -1883,11 +1871,16 @@ void BKE_library_make_local(
 		}
 	}
 
+#ifdef DEBUG_TIME
+	printf("Step 3: Make IDs local: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
+
 	/* At this point, we are done with directly made local IDs. Now we have to handle duplicated ones, since their
 	 * remaining linked original counterpart may not be needed anymore... */
 	todo_ids = NULL;
 
-	/* Step 4: We have to remap local usages of old (linked) ID to new (local) id in a separated loop,
+	/* Step 4: We have to remap local usages of old (linked) ID to new (local) ID in a separated loop,
 	 * as lbarray ordering is not enough to ensure us we did catch all dependencies
 	 * (e.g. if making local a parent object before its child...). See T48907. */
 	/* TODO This is now the biggest step by far (in term of processing time). We may be able to gain here by
@@ -1910,6 +1903,11 @@ void BKE_library_make_local(
 			id_us_ensure_real(id->newid);
 		}
 	}
+
+#ifdef DEBUG_TIME
+	printf("Step 4: Remap local usages of old (linked) ID to new (local) ID: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
 
 	/* Note: Keeping both version of the code (old one being safer, since it still has checks against unused IDs)
 	 * for now, we can remove old one once it has been tested for some time in master... */
@@ -1955,6 +1953,12 @@ void BKE_library_make_local(
 			}
 		}
 	}
+
+#ifdef DEBUG_TIME
+	printf("Step 5: Proxy 'remapping' hack: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
+
 #else
 	LinkNode *linked_loop_candidates = NULL;
 
@@ -2033,6 +2037,11 @@ void BKE_library_make_local(
 		}
 	}
 
+#ifdef DEBUG_TIME
+	printf("Step 5: Remove linked datablocks that have been copied and ended fully localized: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
+
 	/* Step 6: Try to find circle dependencies between indirectly-linked-only datablocks.
 	 * Those are fake 'usages' that prevent their deletion. See T49775 for nice ugly case. */
 	BKE_library_unused_linked_data_set_tag(bmain, false);
@@ -2069,10 +2078,38 @@ void BKE_library_make_local(
 			it->link = NULL;
 		}
 	}
+
+#ifdef DEBUG_TIME
+	printf("Step 6: Try to find circle dependencies between indirectly-linked-only datablocks: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
+#endif
+
+#endif
+
+	/* This is probably more of a hack than something we should do here, but...
+	 * Issue is, the whole copying + remapping done in complex cases above may leave pose channels of armatures
+	 * in complete invalid state (more precisely, the bone pointers of the pchans - very crappy cross-datablocks
+	 * relationship), se we tag it to be fully recomputed, but this does not seems to be enough in some cases,
+	 * and evaluation code ends up trying to evaluate a not-yet-updated armature object's deformations.
+	 * Try "make all local" in 04_01_H.lighting.blend from Agent327 without this, e.g. */
+	for (Object *ob = bmain->object.first; ob; ob = ob->id.next) {
+		if (ob->data != NULL && ob->type == OB_ARMATURE && ob->pose != NULL && ob->pose->flag & POSE_RECALC) {
+			BKE_pose_rebuild(ob, ob->data);
+		}
+	}
+
+#ifdef DEBUG_TIME
+	printf("Hack: Forcefully rebuild armature object poses: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
 #endif
 
 	BKE_main_id_clear_newpoins(bmain);
 	BLI_memarena_free(linklist_mem);
+
+#ifdef DEBUG_TIME
+	printf("Cleanup and finish: Done.\n");
+	TIMEIT_END(make_local);
+#endif
 }
 
 /**

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "constant_fold.h"
-#include "graph.h"
+#include "render/constant_fold.h"
+#include "render/graph.h"
 
-#include "util_foreach.h"
-#include "util_logging.h"
+#include "util/util_foreach.h"
+#include "util/util_logging.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -160,8 +160,15 @@ bool ConstantFolder::try_bypass_or_make_constant(ShaderInput *input, bool clamp)
 		bypass(input->link);
 		return true;
 	}
-
-	return false;
+	else {
+		/* disconnect other inputs if we can't fully bypass due to clamp */
+		foreach(ShaderInput *other, node->inputs) {
+			if(other != input && other->link) {
+				graph->disconnect(other);
+			}
+		}
+		return false;
+	}
 }
 
 bool ConstantFolder::is_zero(ShaderInput *input) const

@@ -572,8 +572,8 @@ float dist_squared_to_ray_v3(
 }
 /**
  * Find the closest point in a seg to a ray and return the distance squared.
- * \param r_point : Is the point on segment closest to ray (or to ray_origin if the ray and the segment are parallel).
- * \param depth: the distance of r_point projection on ray to the ray_origin.
+ * \param r_point: Is the point on segment closest to ray (or to ray_origin if the ray and the segment are parallel).
+ * \param r_depth: the distance of r_point projection on ray to the ray_origin.
  */
 float dist_squared_ray_to_seg_v3(
         const float ray_origin[3], const float ray_direction[3],
@@ -1828,7 +1828,7 @@ bool isect_tri_tri_epsilon_v3(
 		     (range[0].max < range[1].min)) == 0)
 		{
 			if (r_i1 && r_i2) {
-				project_plane_v3_v3v3(plane_co, plane_co, plane_no);
+				project_plane_normalized_v3_v3v3(plane_co, plane_co, plane_no);
 				madd_v3_v3v3fl(r_i1, plane_co, plane_no, max_ff(range[0].min, range[1].min));
 				madd_v3_v3v3fl(r_i2, plane_co, plane_no, min_ff(range[0].max, range[1].max));
 			}
@@ -2851,6 +2851,9 @@ bool barycentric_coords_v2(const float v1[2], const float v2[2], const float v3[
 
 /**
  * \note: using #cross_tri_v2 means locations outside the triangle are correctly weighted
+ *
+ * \note This is *exactly* the same calculation as #resolve_tri_uv_v2,
+ * although it has double precision and is used for texture baking, so keep both.
  */
 void barycentric_weights_v2(const float v1[2], const float v2[2], const float v3[2], const float co[2], float w[3])
 {
@@ -2890,9 +2893,11 @@ void barycentric_weights_v2_persp(const float v1[4], const float v2[4], const fl
 	}
 }
 
-/* same as #barycentric_weights_v2 but works with a quad,
+/**
+ * same as #barycentric_weights_v2 but works with a quad,
  * note: untested for values outside the quad's bounds
- * this is #interp_weights_poly_v2 expanded for quads only */
+ * this is #interp_weights_poly_v2 expanded for quads only
+ */
 void barycentric_weights_v2_quad(const float v1[2], const float v2[2], const float v3[2], const float v4[2],
                                  const float co[2], float w[4])
 {
@@ -3345,6 +3350,8 @@ void interp_cubic_v3(float x[3], float v[3], const float x1[3], const float v1[3
  * Barycentric reverse
  *
  * Compute coordinates (u, v) for point \a st with respect to triangle (\a st0, \a st1, \a st2)
+ *
+ * \note same basic result as #barycentric_weights_v2, see it's comment for details.
  */
 void resolve_tri_uv_v2(float r_uv[2], const float st[2],
                        const float st0[2], const float st1[2], const float st2[2])

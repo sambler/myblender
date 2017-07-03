@@ -57,7 +57,7 @@ class DATA_PT_skeleton(ArmatureButtonsPanel, Panel):
 
         arm = context.armature
 
-        layout.prop(arm, "pose_position", expand=True)
+        layout.row().prop(arm, "pose_position", expand=True)
 
         col = layout.column()
         col.label(text="Layers:")
@@ -80,7 +80,7 @@ class DATA_PT_display(ArmatureButtonsPanel, Panel):
         ob = context.object
         arm = context.armature
 
-        layout.prop(arm, "draw_type", expand=True)
+        layout.row().prop(arm, "draw_type", expand=True)
 
         split = layout.split()
 
@@ -215,7 +215,7 @@ class DATA_PT_ghost(ArmatureButtonsPanel, Panel):
 
         arm = context.armature
 
-        layout.prop(arm, "ghost_type", expand=True)
+        layout.row().prop(arm, "ghost_type", expand=True)
 
         split = layout.split()
 
@@ -252,11 +252,11 @@ class DATA_PT_iksolver_itasc(ArmatureButtonsPanel, Panel):
         layout.prop(ob.pose, "ik_solver")
 
         if itasc:
-            layout.prop(itasc, "mode", expand=True)
+            layout.row().prop(itasc, "mode", expand=True)
             simulation = (itasc.mode == 'SIMULATION')
             if simulation:
                 layout.label(text="Reiteration:")
-                layout.prop(itasc, "reiteration_method", expand=True)
+                layout.row().prop(itasc, "reiteration_method", expand=True)
 
             row = layout.row()
             row.active = not simulation or itasc.reiteration_method != 'NEVER'
@@ -328,5 +328,21 @@ class DATA_PT_custom_props_arm(ArmatureButtonsPanel, PropertyPanel, Panel):
     _context_path = "object.data"
     _property_type = bpy.types.Armature
 
+
+classes = (
+    DATA_PT_context_arm,
+    DATA_PT_skeleton,
+    DATA_PT_display,
+    DATA_PT_bone_group_specials,
+    DATA_PT_bone_groups,
+    DATA_PT_pose_library,
+    DATA_PT_ghost,
+    DATA_PT_iksolver_itasc,
+    DATA_PT_motion_paths,
+    DATA_PT_custom_props_arm,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

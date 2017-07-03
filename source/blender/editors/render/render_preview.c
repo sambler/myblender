@@ -196,7 +196,7 @@ static Main *load_main_from_memory(const void *blend, int blend_size)
 	BlendFileData *bfd;
 
 	G.fileflags |= G_FILE_NO_UI;
-	bfd = BLO_read_from_memory(blend, blend_size, NULL);
+	bfd = BLO_read_from_memory(blend, blend_size, NULL, BLO_READ_SKIP_NONE);
 	if (bfd) {
 		bmain = bfd->main;
 
@@ -1180,7 +1180,7 @@ void ED_preview_icon_render(Main *bmain, Scene *scene, ID *id, unsigned int *rec
 
 	ip.bmain = bmain;
 	ip.scene = scene;
-	ip.owner = id;
+	ip.owner = BKE_previewimg_id_ensure(id);
 	ip.id = id;
 
 	icon_preview_add_size(&ip, rect, sizex, sizey);

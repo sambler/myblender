@@ -64,6 +64,7 @@
 
 
 #include "BLI_strict_flags.h"
+#include "BLI_hash.h"
 
 /* Dupli-Geometry */
 
@@ -179,6 +180,23 @@ static DupliObject *make_dupli(const DupliContext *ctx,
 	 * scene, they will not show up at all, limitation that should be solved once. */
 	if (ob->type == OB_MBALL)
 		dob->no_draw = true;
+
+	/* random number */
+	/* the logic here is designed to match Cycles */
+	dob->random_id = BLI_hash_string(dob->ob->id.name + 2);
+
+	if (dob->persistent_id[0] != INT_MAX) {
+		for (i = 0; i < MAX_DUPLI_RECUR * 2; i++) {
+			dob->random_id = BLI_hash_int_2d(dob->random_id, (unsigned int)dob->persistent_id[i]);
+		}
+	}
+	else {
+		dob->random_id = BLI_hash_int_2d(dob->random_id, 0);
+	}
+
+	if (ctx->object != ob) {
+		dob->random_id ^= BLI_hash_int(BLI_hash_string(ctx->object->id.name + 2));
+	}
 
 	return dob;
 }
@@ -529,10 +547,15 @@ static void make_duplis_verts(const DupliContext *ctx)
 		BMEditMesh *em = BKE_editmesh_from_object(parent);
 		CustomDataMask dm_mask = (use_texcoords ? CD_MASK_BAREMESH | CD_MASK_ORCO : CD_MASK_BAREMESH);
 
-		if (em)
+		if (ctx->eval_ctx->mode == DAG_EVAL_RENDER) {
+			vdd.dm = mesh_create_derived_render(scene, parent, dm_mask);
+		}
+		else if (em) {
 			vdd.dm = editbmesh_get_derived_cage(scene, parent, em, dm_mask);
-		else
+		}
+		else {
 			vdd.dm = mesh_get_derived_final(scene, parent, dm_mask);
+		}
 		vdd.edit_btmesh = me->edit_btmesh;
 
 		if (use_texcoords)
@@ -792,10 +815,15 @@ static void make_duplis_faces(const DupliContext *ctx)
 		BMEditMesh *em = BKE_editmesh_from_object(parent);
 		CustomDataMask dm_mask = (use_texcoords ? CD_MASK_BAREMESH | CD_MASK_ORCO | CD_MASK_MLOOPUV : CD_MASK_BAREMESH);
 
-		if (em)
+		if (ctx->eval_ctx->mode == DAG_EVAL_RENDER) {
+			fdd.dm = mesh_create_derived_render(scene, parent, dm_mask);
+		}
+		else if (em) {
 			fdd.dm = editbmesh_get_derived_cage(scene, parent, em, dm_mask);
-		else
+		}
+		else {
 			fdd.dm = mesh_get_derived_final(scene, parent, dm_mask);
+		}
 
 		if (use_texcoords) {
 			CustomData *ml_data = fdd.dm->getLoopDataLayout(fdd.dm);

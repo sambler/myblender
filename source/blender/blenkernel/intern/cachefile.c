@@ -82,6 +82,7 @@ void BKE_cachefile_init(CacheFile *cache_file)
 	cache_file->is_sequence = false;
 	cache_file->scale = 1.0f;
 	cache_file->handle_mutex = BLI_mutex_alloc();
+	BLI_listbase_clear(&cache_file->object_paths);
 }
 
 /** Free (or release) any data used by this cachefile (does not free the cachefile itself). */
@@ -99,12 +100,12 @@ void BKE_cachefile_free(CacheFile *cache_file)
 	BLI_freelistN(&cache_file->object_paths);
 }
 
-CacheFile *BKE_cachefile_copy(Main *bmain, CacheFile *cache_file)
+CacheFile *BKE_cachefile_copy(Main *bmain, const CacheFile *cache_file)
 {
 	CacheFile *new_cache_file = BKE_libblock_copy(bmain, &cache_file->id);
 	new_cache_file->handle = NULL;
 
-	BLI_listbase_clear(&cache_file->object_paths);
+	BLI_listbase_clear(&new_cache_file->object_paths);
 
 	BKE_id_copy_ensure_local(bmain, &cache_file->id, &new_cache_file->id);
 
@@ -220,7 +221,6 @@ void BKE_cachefile_clean(Scene *scene, CacheFile *cache_file)
 				}
 #endif
 				mcmd->reader = NULL;
-				mcmd->object_path[0] = '\0';
 			}
 		}
 
@@ -238,7 +238,6 @@ void BKE_cachefile_clean(Scene *scene, CacheFile *cache_file)
 				}
 #endif
 				data->reader = NULL;
-				data->object_path[0] = '\0';
 			}
 		}
 	}

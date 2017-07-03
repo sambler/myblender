@@ -351,6 +351,22 @@ void BLI_rcti_init(rcti *rect, int xmin, int xmax, int ymin, int ymax)
 	}
 }
 
+void BLI_rctf_init_pt_radius(rctf *rect, const float xy[2], float size)
+{
+	rect->xmin = xy[0] - size;
+	rect->xmax = xy[0] + size;
+	rect->ymin = xy[1] - size;
+	rect->ymax = xy[1] + size;
+}
+
+void BLI_rcti_init_pt_radius(rcti *rect, const int xy[2], int size)
+{
+	rect->xmin = xy[0] - size;
+	rect->xmax = xy[0] + size;
+	rect->ymin = xy[1] - size;
+	rect->ymax = xy[1] + size;
+}
+
 void BLI_rcti_init_minmax(rcti *rect)
 {
 	rect->xmin = rect->ymin = INT_MAX;
@@ -675,6 +691,14 @@ void BLI_rcti_rctf_copy_floor(rcti *dst, const rctf *src)
 	dst->xmax = floorf(src->xmax);
 	dst->ymin = floorf(src->ymin);
 	dst->ymax = floorf(src->ymax);
+}
+
+void BLI_rcti_rctf_copy_round(rcti *dst, const rctf *src)
+{
+	dst->xmin = floorf(src->xmin + 0.5f);
+	dst->xmax = floorf(src->xmax + 0.5f);
+	dst->ymin = floorf(src->ymin + 0.5f);
+	dst->ymax = floorf(src->ymax + 0.5f);
 }
 
 void BLI_rctf_rcti_copy(rctf *dst, const rcti *src)

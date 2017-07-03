@@ -203,7 +203,7 @@ static float get_animated_scaleinf(StabContext *ctx, int framenr)
 
 static void get_animated_target_pos(StabContext *ctx,
                                     int framenr,
-		                            float target_pos[2])
+                                    float target_pos[2])
 {
 	target_pos[0] = fetch_from_fcurve(ctx->target_pos[0],
 	                                  framenr,
@@ -755,7 +755,8 @@ static void average_marker_positions(StabContext *ctx, int framenr, float r_ref_
 	if (ok) {
 		r_ref_pos[0] /= weight_sum;
 		r_ref_pos[1] /= weight_sum;
-	} else {
+	}
+	else {
 		/* No usable tracking data on any track on this frame.
 		 * Use data from neighbouring frames to extrapolate...
 		 */
@@ -784,7 +785,8 @@ static void average_marker_positions(StabContext *ctx, int framenr, float r_ref_
 			 * Also default to this frame when we're in a gap */
 			average_marker_positions(ctx, next_lower, r_ref_pos);
 
-		} else if (next_higher < MAXFRAME) {
+		}
+		else if (next_higher < MAXFRAME) {
 			average_marker_positions(ctx, next_higher, r_ref_pos);
 		}
 		use_values_from_fcurves(ctx, false);
@@ -1167,7 +1169,8 @@ static void stabilization_calculate_data(StabContext *ctx,
 
 	if (ctx->stab->flag & TRACKING_STABILIZE_SCALE) {
 		*r_scale = expf(scale_step * scaleinf);  /* Averaged in log scale */
-	} else {
+	}
+	else {
 		*r_scale = 1.0f;
 	}
 
@@ -1180,8 +1183,8 @@ static void stabilization_calculate_data(StabContext *ctx,
 	 */
 	get_animated_target_pos(ctx, framenr, target_pos);
 	sub_v2_v2(r_translation, target_pos);
-	*r_angle -= get_animated_target_rot(ctx,framenr);
-	target_scale = get_animated_target_scale(ctx,framenr);
+	*r_angle -= get_animated_target_rot(ctx, framenr);
+	target_scale = get_animated_target_scale(ctx, framenr);
 	if (target_scale != 0.0f) {
 		*r_scale /= target_scale;
 		/* target_scale is an expected/intended reference zoom value */

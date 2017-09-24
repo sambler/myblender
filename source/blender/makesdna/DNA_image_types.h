@@ -108,7 +108,7 @@ typedef struct Image {
 	ListBase anims;
 	struct RenderResult *rr;
 
-	struct RenderResult *renders[10]; /* IMA_MAX_RENDER_SLOT */
+	struct RenderResult *renders[20]; /* IMA_MAX_RENDER_SLOT */
 	short render_slot, last_render_slot;
 
 	int flag;
@@ -155,7 +155,7 @@ typedef struct Image {
 	ListBase views;  /* ImageView */
 	struct Stereo3dFormat *stereo3d_format;
 
-	RenderSlot render_slots[10];  /* = IMA_MAX_RENDER_SLOT */
+	RenderSlot render_slots[20];  /* = IMA_MAX_RENDER_SLOT */
 } Image;
 
 
@@ -197,7 +197,7 @@ enum {
 
 /* render */
 #define IMA_MAX_RENDER_TEXT		512
-#define IMA_MAX_RENDER_SLOT		10
+#define IMA_MAX_RENDER_SLOT		20
 
 /* gen_flag */
 #define IMA_GEN_FLOAT		1

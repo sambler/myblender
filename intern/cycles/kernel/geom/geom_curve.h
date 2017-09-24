@@ -16,17 +16,12 @@ CCL_NAMESPACE_BEGIN
 
 /* Curve Primitive
  *
- * Curve primitive for rendering hair and fur. These can be render as flat ribbons
- * or curves with actual thickness. The curve can also be rendered as line segments
- * rather than curves for better performance */
+ * Curve primitive for rendering hair and fur. These can be render as flat
+ * ribbons or curves with actual thickness. The curve can also be rendered as
+ * line segments rather than curves for better performance.
+ */
 
 #ifdef __HAIR__
-
-#if defined(__KERNEL_CUDA__) && (__CUDA_ARCH__ < 300)
-#  define ccl_device_curveintersect ccl_device
-#else
-#  define ccl_device_curveintersect ccl_device_forceinline
-#endif
 
 /* Reading attributes on various curve elements */
 
@@ -151,7 +146,7 @@ ccl_device float3 curve_motion_center_location(KernelGlobals *kg, ShaderData *sd
 /* Curve tangent normal */
 
 ccl_device float3 curve_tangent_normal(KernelGlobals *kg, ShaderData *sd)
-{	
+{
 	float3 tgN = make_float3(0.0f,0.0f,0.0f);
 
 	if(sd->type & PRIMITIVE_ALL_CURVE) {
@@ -235,14 +230,14 @@ ccl_device_curveintersect bool bvh_cardinal_curve_intersect(KernelGlobals *kg, I
 	float3 P, float3 dir, uint visibility, int object, int curveAddr, float time,int type, uint *lcg_state, float difl, float extmax)
 #endif
 {
-//	const bool is_curve_primitive = (type & PRIMITIVE_CURVE);
+	const bool is_curve_primitive = (type & PRIMITIVE_CURVE);
 
-//	if(!is_curve_primitive && kernel_data.bvh.use_bvh_steps) {
-//		const float2 prim_time = kernel_tex_fetch(__prim_time, curveAddr);
-//		if(time < prim_time.x || time > prim_time.y) {
-//			return false;
-//		}
-//	}
+	if(!is_curve_primitive && kernel_data.bvh.use_bvh_steps) {
+		const float2 prim_time = kernel_tex_fetch(__prim_time, curveAddr);
+		if(time < prim_time.x || time > prim_time.y) {
+			return false;
+		}
+	}
 
 	int segment = PRIMITIVE_UNPACK_SEGMENT(type);
 	float epsilon = 0.0f;
@@ -272,8 +267,7 @@ ccl_device_curveintersect bool bvh_cardinal_curve_intersect(KernelGlobals *kg, I
 
 #if defined(__KERNEL_AVX2__) && defined(__KERNEL_SSE__) && (!defined(_MSC_VER) || _MSC_VER > 1800)
 		avxf P_curve_0_1, P_curve_2_3;
-//		if(is_curve_primitive) {
-		if(type & PRIMITIVE_CURVE) {
+		if(is_curve_primitive) {
 			P_curve_0_1 = _mm256_loadu2_m128(&kg->__curve_keys.data[k0].x, &kg->__curve_keys.data[ka].x);
 			P_curve_2_3 = _mm256_loadu2_m128(&kg->__curve_keys.data[kb].x, &kg->__curve_keys.data[k1].x);
 		}
@@ -284,8 +278,7 @@ ccl_device_curveintersect bool bvh_cardinal_curve_intersect(KernelGlobals *kg, I
 #else  /* __KERNEL_AVX2__ */
 		ssef P_curve[4];
 
-//		if(is_curve_primitive) {
-		if(type & PRIMITIVE_CURVE) {
+		if(is_curve_primitive) {
 			P_curve[0] = load4f(&kg->__curve_keys.data[ka].x);
 			P_curve[1] = load4f(&kg->__curve_keys.data[k0].x);
 			P_curve[2] = load4f(&kg->__curve_keys.data[k1].x);
@@ -380,8 +373,7 @@ ccl_device_curveintersect bool bvh_cardinal_curve_intersect(KernelGlobals *kg, I
 
 		float4 P_curve[4];
 
-//		if(is_curve_primitive) {
-		if(type & PRIMITIVE_CURVE) {
+		if(is_curve_primitive) {
 			P_curve[0] = kernel_tex_fetch(__curve_keys, ka);
 			P_curve[1] = kernel_tex_fetch(__curve_keys, k0);
 			P_curve[2] = kernel_tex_fetch(__curve_keys, k1);
@@ -707,14 +699,14 @@ ccl_device_curveintersect bool bvh_curve_intersect(KernelGlobals *kg, Intersecti
 #  define dot3(x, y) dot(x, y)
 #endif
 
-//	const bool is_curve_primitive = (type & PRIMITIVE_CURVE);
+	const bool is_curve_primitive = (type & PRIMITIVE_CURVE);
 
-//	if(!is_curve_primitive && kernel_data.bvh.use_bvh_steps) {
-//		const float2 prim_time = kernel_tex_fetch(__prim_time, curveAddr);
-//		if(time < prim_time.x || time > prim_time.y) {
-//			return false;
-//		}
-//	}
+	if(!is_curve_primitive && kernel_data.bvh.use_bvh_steps) {
+		const float2 prim_time = kernel_tex_fetch(__prim_time, curveAddr);
+		if(time < prim_time.x || time > prim_time.y) {
+			return false;
+		}
+	}
 
 	int segment = PRIMITIVE_UNPACK_SEGMENT(type);
 	/* curve Intersection check */
@@ -730,8 +722,7 @@ ccl_device_curveintersect bool bvh_curve_intersect(KernelGlobals *kg, Intersecti
 #ifndef __KERNEL_SSE2__
 	float4 P_curve[2];
 
-//	if(is_curve_primitive) {
-	if(type & PRIMITIVE_CURVE) {
+	if(is_curve_primitive) {
 		P_curve[0] = kernel_tex_fetch(__curve_keys, k0);
 		P_curve[1] = kernel_tex_fetch(__curve_keys, k1);
 	}
@@ -766,8 +757,7 @@ ccl_device_curveintersect bool bvh_curve_intersect(KernelGlobals *kg, Intersecti
 #else
 	ssef P_curve[2];
 	
-//	if(is_curve_primitive) {
-	if(type & PRIMITIVE_CURVE) {
+	if(is_curve_primitive) {
 		P_curve[0] = load4f(&kg->__curve_keys.data[k0].x);
 		P_curve[1] = load4f(&kg->__curve_keys.data[k1].x);
 	}
@@ -1113,4 +1103,3 @@ ccl_device_inline float3 bvh_curve_refine(KernelGlobals *kg, ShaderData *sd, con
 #endif
 
 CCL_NAMESPACE_END
-

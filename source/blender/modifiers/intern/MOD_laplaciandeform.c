@@ -29,7 +29,7 @@
  */
 
 #include "BLI_utildefines.h"
-#include "BLI_stackdefines.h"
+#include "BLI_utildefines_stack.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
 
@@ -539,7 +539,7 @@ static void initSystem(LaplacianDeformModifierData *lmd, Object *ob, DerivedMesh
 				STACK_PUSH(index_anchors, i);
 			}
 		}
-		DM_ensure_looptri(dm);
+
 		total_anchors = STACK_SIZE(index_anchors);
 		lmd->cache_system = initLaplacianSystem(numVerts, dm->getNumEdges(dm), dm->getNumLoopTri(dm),
 		                                       total_anchors, lmd->anchor_grp_name, lmd->repeat);

@@ -2688,13 +2688,6 @@ static void write_scene(WriteData *wd, Scene *sce)
 			writedata(wd, DATA, sce->r.avicodecdata->cbParms, sce->r.avicodecdata->lpParms);
 		}
 	}
-
-	if (sce->r.qtcodecdata) {
-		writestruct(wd, DATA, QuicktimeCodecData, 1, sce->r.qtcodecdata);
-		if (sce->r.qtcodecdata->cdParms) {
-			writedata(wd, DATA, sce->r.qtcodecdata->cdSize, sce->r.qtcodecdata->cdParms);
-		}
-	}
 	if (sce->r.ffcodecdata.properties) {
 		IDP_WriteProperty(sce->r.ffcodecdata.properties, wd);
 	}
@@ -3841,6 +3834,9 @@ static bool write_file_handle(
 		}
 
 		for (; id; id = id->next) {
+			/* We should never attempt to write non-regular IDs (i.e. all kind of temp/runtime ones). */
+			BLI_assert((id->tag & (LIB_TAG_NO_MAIN | LIB_TAG_NO_USER_REFCOUNT | LIB_TAG_NOT_ALLOCATED)) == 0);
+
 			switch ((ID_Type)GS(id->name)) {
 				case ID_WM:
 					write_windowmanager(wd, (wmWindowManager *)id);

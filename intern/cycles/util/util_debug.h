@@ -30,6 +30,9 @@ CCL_NAMESPACE_BEGIN
  */
 class DebugFlags {
 public:
+	/* Use static BVH in viewport, to match final render exactly. */
+	bool viewport_static_bvh;
+
 	/* Descriptor of CPU feature-set to be used. */
 	struct CPU {
 		CPU();
@@ -115,6 +118,10 @@ public:
 
 		/* Use single program */
 		bool single_program;
+
+		/* TODO(mai): Currently this is only for OpenCL, but we should have it implemented for all devices. */
+		/* Artificial memory limit in bytes (0 if disabled). */
+		size_t mem_limit;
 	};
 
 	/* Get instance of debug flags registry. */

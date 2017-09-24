@@ -641,8 +641,9 @@ static void emDM_recalcLoopTri(DerivedMesh *dm)
 	int i;
 
 	DM_ensure_looptri_data(dm);
-	mlooptri = dm->looptris.array;
+	mlooptri = dm->looptris.array_wip;
 
+	BLI_assert(tottri == 0 || mlooptri != NULL);
 	BLI_assert(poly_to_tri_count(dm->numPolyData, dm->numLoopData) == dm->looptris.num);
 	BLI_assert(tottri == dm->looptris.num);
 
@@ -659,18 +660,9 @@ static void emDM_recalcLoopTri(DerivedMesh *dm)
 		        BM_elem_index_get(ltri[2]));
 		lt->poly = BM_elem_index_get(ltri[0]->f);
 	}
-}
 
-static const MLoopTri *emDM_getLoopTriArray(DerivedMesh *dm)
-{
-	if (dm->looptris.array) {
-		BLI_assert(poly_to_tri_count(dm->numPolyData, dm->numLoopData) == dm->looptris.num);
-	}
-	else {
-		dm->recalcLoopTri(dm);
-	}
-
-	return dm->looptris.array;
+	BLI_assert(dm->looptris.array == NULL);
+	SWAP(MLoopTri *, dm->looptris.array, dm->looptris.array_wip);
 }
 
 static void emDM_foreachMappedVert(
@@ -2259,8 +2251,6 @@ DerivedMesh *getEditDerivedBMesh(
 	bmdm->dm.getNumLoops = emDM_getNumLoops;
 	bmdm->dm.getNumPolys = emDM_getNumPolys;
 
-	bmdm->dm.getLoopTriArray = emDM_getLoopTriArray;
-
 	bmdm->dm.getVert = emDM_getVert;
 	bmdm->dm.getVertCo = emDM_getVertCo;
 	bmdm->dm.getVertNo = emDM_getVertNo;
@@ -2641,7 +2631,7 @@ static void statvis_calc_distort(
 					              vertexCos[BM_elem_index_get(l_iter->next->v)]);
 				}
 				else {
-					BM_loop_calc_face_normal(l_iter, no_corner);
+					BM_loop_calc_face_normal_safe(l_iter, no_corner);
 				}
 				/* simple way to detect (what is most likely) concave */
 				if (dot_v3v3(f_no, no_corner) < 0.0f) {

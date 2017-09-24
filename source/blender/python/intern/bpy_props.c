@@ -320,7 +320,7 @@ static int bpy_prop_boolean_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 		value = false;
 	}
 	else {
-		value = PyLong_AsLong(ret);
+		value = PyC_Long_AsI32(ret);
 
 		if (value == -1 && PyErr_Occurred()) {
 			printf_func_error(py_func);
@@ -530,12 +530,8 @@ static void bpy_prop_boolean_array_set_cb(struct PointerRNA *ptr, struct Propert
 	self = pyrna_struct_as_instance(ptr);
 	PyTuple_SET_ITEM(args, 0, self);
 
-	py_values = PyC_FromArray(values, len, &PyBool_Type, false, "BoolVectorProperty set");
-	if (!py_values) {
-		printf_func_error(py_func);
-	}
-	else
-		PyTuple_SET_ITEM(args, 1, py_values);
+	py_values = PyC_Tuple_PackArray_I32FromBool(values, len);
+	PyTuple_SET_ITEM(args, 1, py_values);
 
 	ret = PyObject_CallObject(py_func, args);
 
@@ -599,7 +595,7 @@ static int bpy_prop_int_get_cb(struct PointerRNA *ptr, struct PropertyRNA *prop)
 		value = 0.0f;
 	}
 	else {
-		value = PyLong_AsLong(ret);
+		value = PyC_Long_AsI32(ret);
 
 		if (value == -1 && PyErr_Occurred()) {
 			printf_func_error(py_func);
@@ -764,12 +760,8 @@ static void bpy_prop_int_array_set_cb(struct PointerRNA *ptr, struct PropertyRNA
 	self = pyrna_struct_as_instance(ptr);
 	PyTuple_SET_ITEM(args, 0, self);
 
-	py_values = PyC_FromArray(values, len, &PyLong_Type, false, "IntVectorProperty set");
-	if (!py_values) {
-		printf_func_error(py_func);
-	}
-	else
-		PyTuple_SET_ITEM(args, 1, py_values);
+	py_values = PyC_Tuple_PackArray_I32(values, len);
+	PyTuple_SET_ITEM(args, 1, py_values);
 
 	ret = PyObject_CallObject(py_func, args);
 
@@ -998,12 +990,8 @@ static void bpy_prop_float_array_set_cb(struct PointerRNA *ptr, struct PropertyR
 	self = pyrna_struct_as_instance(ptr);
 	PyTuple_SET_ITEM(args, 0, self);
 
-	py_values = PyC_FromArray(values, len, &PyFloat_Type, false, "FloatVectorProperty set");
-	if (!py_values) {
-		printf_func_error(py_func);
-	}
-	else
-		PyTuple_SET_ITEM(args, 1, py_values);
+	py_values = PyC_Tuple_PackArray_F32(values, len);
+	PyTuple_SET_ITEM(args, 1, py_values);
 
 	ret = PyObject_CallObject(py_func, args);
 
@@ -1249,7 +1237,7 @@ static int bpy_prop_enum_get_cb(struct PointerRNA *ptr, struct PropertyRNA *prop
 		value = RNA_property_enum_get_default(ptr, prop);
 	}
 	else {
-		value = PyLong_AsLong(ret);
+		value = PyC_Long_AsI32(ret);
 
 		if (value == -1 && PyErr_Occurred()) {
 			printf_func_error(py_func);
@@ -2697,7 +2685,8 @@ PyDoc_STRVAR(BPy_EnumProperty_doc,
 "      :icon: An icon string identifier or integer icon value\n"
 "         (e.g. returned by :class:`bpy.types.UILayout.icon`)\n"
 "      :number: Unique value used as the identifier for this item (stored in file data).\n"
-"         Use when the identifier may need to change.\n"
+"         Use when the identifier may need to change. If the *ENUM_FLAG* option is used,\n"
+"         the values are bitmasks and should be powers of two.\n"
 "\n"
 "      When an item only contains 4 items they define ``(identifier, name, description, number)``.\n"
 "\n"
@@ -2891,7 +2880,7 @@ PyObject *BPy_PointerProperty(PyObject *self, PyObject *args, PyObject *kw)
 		PyObject *update_cb = NULL, *poll_cb = NULL;
 
 		if (!PyArg_ParseTupleAndKeywords(args, kw,
-		                                 "s#O|ssO!OOO:PointerProperty",
+		                                 "s#O|ssO!OO:PointerProperty",
 		                                 (char **)kwlist, &id, &id_len,
 		                                 &type, &name, &description,
 		                                 &PySet_Type, &pyopts,

@@ -105,7 +105,8 @@ public:
 	                                            device_memory& use_queues_flag,
 	                                            device_memory& work_pool_wgs);
 
-	virtual SplitKernelFunction* get_split_kernel_function(string kernel_name, const DeviceRequestedFeatures&);
+	virtual SplitKernelFunction* get_split_kernel_function(const string& kernel_name,
+	                                                       const DeviceRequestedFeatures&);
 	virtual int2 split_kernel_local_size();
 	virtual int2 split_kernel_global_size(device_memory& kg, device_memory& data, DeviceTask *task);
 };
@@ -1897,17 +1898,13 @@ public:
 		int threads_per_block;
 		cuda_assert(cuFuncGetAttribute(&threads_per_block, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, func));
 
-		int xthreads = (int)sqrt(threads_per_block);
-		int ythreads = (int)sqrt(threads_per_block);
-
-		int xblocks = (dim.global_size[0] + xthreads - 1)/xthreads;
-		int yblocks = (dim.global_size[1] + ythreads - 1)/ythreads;
+		int xblocks = (dim.global_size[0]*dim.global_size[1] + threads_per_block - 1)/threads_per_block;
 
 		cuda_assert(cuFuncSetCacheConfig(func, CU_FUNC_CACHE_PREFER_L1));
 
 		cuda_assert(cuLaunchKernel(func,
-		                           xblocks , yblocks, 1, /* blocks */
-		                           xthreads, ythreads, 1, /* threads */
+		                           xblocks, 1, 1, /* blocks */
+		                           threads_per_block, 1, 1, /* threads */
 		                           0, 0, args, 0));
 
 		device->cuda_pop_context();
@@ -2037,7 +2034,8 @@ bool CUDASplitKernel::enqueue_split_kernel_data_init(const KernelDimensions& dim
 	return !device->have_error();
 }
 
-SplitKernelFunction* CUDASplitKernel::get_split_kernel_function(string kernel_name, const DeviceRequestedFeatures&)
+SplitKernelFunction* CUDASplitKernel::get_split_kernel_function(const string& kernel_name,
+                                                                const DeviceRequestedFeatures&)
 {
 	CUfunction func;
 
@@ -2125,18 +2123,34 @@ Device *device_cuda_create(DeviceInfo& info, Stats &stats, bool background)
 	return new CUDADevice(info, stats, background);
 }
 
+static CUresult device_cuda_safe_init()
+{
+#ifdef _WIN32
+	__try {
+		return cuInit(0);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER) {
+		/* Ignore crashes inside the CUDA driver and hope we can
+		 * survive even with corrupted CUDA installs. */
+		fprintf(stderr, "Cycles CUDA: driver crashed, continuing without CUDA.\n");
+	}
+
+	return CUDA_ERROR_NO_DEVICE;
+#else
+	return cuInit(0);
+#endif
+}
+
 void device_cuda_info(vector<DeviceInfo>& devices)
 {
-	CUresult result;
-	int count = 0;
-
-	result = cuInit(0);
+	CUresult result = device_cuda_safe_init();
 	if(result != CUDA_SUCCESS) {
 		if(result != CUDA_ERROR_NO_DEVICE)
 			fprintf(stderr, "CUDA cuInit: %s\n", cuewErrorString(result));
 		return;
 	}
 
+	int count = 0;
 	result = cuDeviceGetCount(&count);
 	if(result != CUDA_SUCCESS) {
 		fprintf(stderr, "CUDA cuDeviceGetCount: %s\n", cuewErrorString(result));
@@ -2166,7 +2180,6 @@ void device_cuda_info(vector<DeviceInfo>& devices)
 
 		info.advanced_shading = (major >= 2);
 		info.has_bindless_textures = (major >= 3);
-		info.pack_images = false;
 
 		int pci_location[3] = {0, 0, 0};
 		cuDeviceGetAttribute(&pci_location[0], CU_DEVICE_ATTRIBUTE_PCI_DOMAIN_ID, num);
@@ -2194,7 +2207,7 @@ void device_cuda_info(vector<DeviceInfo>& devices)
 
 string device_cuda_capabilities(void)
 {
-	CUresult result = cuInit(0);
+	CUresult result = device_cuda_safe_init();
 	if(result != CUDA_SUCCESS) {
 		if(result != CUDA_ERROR_NO_DEVICE) {
 			return string("Error initializing CUDA: ") + cuewErrorString(result);

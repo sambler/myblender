@@ -41,7 +41,8 @@
 #include <opensubdiv/osd/cpuEvaluator.h>
 
 #ifdef OPENSUBDIV_HAS_OPENMP
-#  include <opensubdiv/osd/ompEvaluator.h>
+#undef OPENSUBDIV_HAS_OPENMP
+//#  include <opensubdiv/osd/ompEvaluator.h>
 #endif  /* OPENSUBDIV_HAS_OPENMP */
 
 #ifdef OPENSUBDIV_HAS_OPENCL

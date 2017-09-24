@@ -88,12 +88,16 @@ endif()
 
 if(WITH_PYTHON)
 	# we use precompiled libraries for py 3.5 and up by default
-	set(PYTHON_VERSION 3.5)
+	set(PYTHON_VERSION 3.6)
 	if(NOT WITH_PYTHON_MODULE AND NOT WITH_PYTHON_FRAMEWORK)
 		# normally cached but not since we include them with blender
 		set(PYTHON_INCLUDE_DIR "${LIBDIR}/python/include/python${PYTHON_VERSION}m")
 		set(PYTHON_EXECUTABLE "${LIBDIR}/python/bin/python${PYTHON_VERSION}m")
-		set(PYTHON_LIBRARY python${PYTHON_VERSION}m)
+		if(WITH_CXX11)
+			set(PYTHON_LIBRARY ${LIBDIR}/python/lib/libpython${PYTHON_VERSION}m.a)
+		else()
+			set(PYTHON_LIBRARY python${PYTHON_VERSION}m)
+		endif()
 		set(PYTHON_LIBPATH "${LIBDIR}/python/lib/python${PYTHON_VERSION}")
 		# set(PYTHON_LINKFLAGS "-u _PyMac_Error")  # won't  build with this enabled
 	else()
@@ -112,6 +116,9 @@ if(WITH_PYTHON)
 	# uncached vars
 	set(PYTHON_INCLUDE_DIRS "${PYTHON_INCLUDE_DIR}")
 	set(PYTHON_LIBRARIES  "${PYTHON_LIBRARY}")
+
+	# needed for Audaspace, numpy is installed into python site-packages
+	set(NUMPY_INCLUDE_DIRS "${PYTHON_LIBPATH}/site-packages/numpy/core/include")
 
 	if(NOT EXISTS "${PYTHON_EXECUTABLE}")
 		message(FATAL_ERROR "Python executable missing: ${PYTHON_EXECUTABLE}")
@@ -192,13 +199,6 @@ set(PLATFORM_CFLAGS "-pipe -funsigned-char")
 set(PLATFORM_LINKFLAGS
 	"-fexceptions -framework CoreServices -framework Foundation -framework IOKit -framework AppKit -framework Cocoa -framework Carbon -framework AudioUnit -framework AudioToolbox -framework CoreAudio"
 )
-if(WITH_CODEC_QUICKTIME)
-	set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -framework QTKit")
-	if(CMAKE_OSX_ARCHITECTURES MATCHES i386)
-		set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -framework QuickTime")
-		# libSDL still needs 32bit carbon quicktime
-	endif()
-endif()
 
 if(WITH_CXX11)
 	list(APPEND PLATFORM_LINKLIBS c++)

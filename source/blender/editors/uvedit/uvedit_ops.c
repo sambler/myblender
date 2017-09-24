@@ -225,7 +225,7 @@ void ED_uvedit_assign_image(Main *UNUSED(bmain), Scene *scene, Object *obedit, I
 			BM_data_layer_add(em->bm, &em->bm->pdata, CD_MTEXPOLY);
 			BM_data_layer_add(em->bm, &em->bm->ldata, CD_MLOOPUV);
 			/* make UVs all nice 0-1 */
-			ED_mesh_uv_loop_reset_ex(obedit->data, CustomData_get_active_layer_index(&em->bm->pdata, CD_MTEXPOLY));
+			ED_mesh_uv_loop_reset_ex(obedit->data, CustomData_get_active_layer(&em->bm->pdata, CD_MTEXPOLY));
 			update = true;
 		}
 
@@ -1136,8 +1136,13 @@ static void uv_select_linked(Scene *scene, Image *ima, BMEditMesh *em, const flo
 
 	BM_mesh_elem_table_ensure(em->bm, BM_FACE); /* we can use this too */
 
-	/* use winding so we don't consider overlapping islands as connected, see T44320 */
-	vmap = BM_uv_vert_map_create(em->bm, limit, !select_faces, true);
+	/* Note, we had 'use winding' so we don't consider overlapping islands as connected, see T44320
+	 * this made *every* projection split the island into front/back islands.
+	 * Keep 'use_winding' to false, see: T50970.
+	 *
+	 * Better solve this by having a delimit option for select-linked operator,
+	 * keeping island-select working as is. */
+	vmap = BM_uv_vert_map_create(em->bm, limit, !select_faces, false);
 
 	if (vmap == NULL)
 		return;

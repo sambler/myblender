@@ -85,6 +85,7 @@ int     BM_vert_face_count(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL
 BMEdge *BM_vert_other_disk_edge(BMVert *v, BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
 bool    BM_vert_is_edge_pair(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+bool    BM_vert_is_edge_pair_manifold(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 bool    BM_vert_edge_pair(BMVert *v, BMEdge **r_e_a, BMEdge **r_e_b);
 bool    BM_vert_face_check(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 bool    BM_vert_is_wire(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
@@ -113,7 +114,9 @@ BMLoop *BM_loop_find_prev_nodouble(BMLoop *l, BMLoop *l_stop, const float eps_sq
 BMLoop *BM_loop_find_next_nodouble(BMLoop *l, BMLoop *l_stop, const float eps_sq);
 
 float   BM_loop_calc_face_angle(const BMLoop *l) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
-void    BM_loop_calc_face_normal(const BMLoop *l, float r_normal[3]) ATTR_NONNULL();
+float   BM_loop_calc_face_normal(const BMLoop *l, float r_normal[3]) ATTR_NONNULL();
+float   BM_loop_calc_face_normal_safe(const BMLoop *l, float r_normal[3]) ATTR_NONNULL();
+float   BM_loop_calc_face_normal_safe_ex(const BMLoop *l, const float epsilon, float r_normal[3]) ATTR_NONNULL();
 void    BM_loop_calc_face_direction(const BMLoop *l, float r_normal[3]);
 void    BM_loop_calc_face_tangent(const BMLoop *l, float r_tangent[3]);
 

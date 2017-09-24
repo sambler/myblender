@@ -47,6 +47,7 @@
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 #include "IMB_filetype.h"
+#include "IMB_filter.h"
 #include "IMB_moviecache.h"
 
 #include "MEM_guardedalloc.h"
@@ -63,6 +64,7 @@
 #include "BKE_context.h"
 #include "BKE_image.h"
 #include "BKE_main.h"
+#include "BKE_sequencer.h"
 
 #include "RNA_define.h"
 
@@ -1112,6 +1114,7 @@ void IMB_colormanagement_check_file_config(Main *bmain)
 	for (scene = bmain->scene.first; scene; scene = scene->id.next) {
 		ColorManagedColorspaceSettings *sequencer_colorspace_settings;
 
+		/* check scene color management settings */
 		colormanage_check_display_settings(&scene->display_settings, "scene", default_display);
 		colormanage_check_view_settings(&scene->display_settings, &scene->view_settings, "scene");
 
@@ -1122,6 +1125,15 @@ void IMB_colormanagement_check_file_config(Main *bmain)
 		if (sequencer_colorspace_settings->name[0] == '\0') {
 			BLI_strncpy(sequencer_colorspace_settings->name, global_role_default_sequencer, MAX_COLORSPACE_NAME);
 		}
+
+		/* check sequencer strip input color space settings */
+		Sequence *seq;
+		SEQ_BEGIN (scene->ed, seq) {
+			if (seq->strip) {
+				colormanage_check_colorspace_settings(&seq->strip->colorspace_settings, "sequencer strip");
+			}
+		}
+		SEQ_END
 	}
 
 	/* ** check input color space settings ** */
@@ -1510,6 +1522,10 @@ static bool is_ibuf_rect_in_display_space(ImBuf *ibuf, const ColorManagedViewSet
 	{
 		const char *from_colorspace = ibuf->rect_colorspace->name;
 		const char *to_colorspace = IMB_colormanagement_get_display_colorspace_name(view_settings, display_settings);
+		ColorManagedLook *look_descr = colormanage_look_get_named(view_settings->look);
+		if (look_descr != NULL && !STREQ(look_descr->process_space, "")) {
+			return false;
+		}
 
 		if (to_colorspace && STREQ(from_colorspace, to_colorspace))
 			return true;
@@ -1624,12 +1640,13 @@ static void *do_processor_transform_thread(void *handle_v)
 	if (float_from_byte) {
 		IMB_buffer_float_from_byte(float_buffer, byte_buffer,
 		                           IB_PROFILE_SRGB, IB_PROFILE_SRGB,
-		                           true,
+		                           false,
 		                           width, height, width, width);
-			IMB_colormanagement_processor_apply(handle->cm_processor,
-			                                    float_buffer,
-			                                    width, height, channels,
-			                                    predivide);
+		IMB_colormanagement_processor_apply(handle->cm_processor,
+		                                    float_buffer,
+		                                    width, height, channels,
+		                                    predivide);
+		IMB_premultiply_rect_float(float_buffer, 4, width, height);
 	}
 	else {
 		if (byte_buffer != NULL) {
@@ -1765,14 +1782,15 @@ void IMB_colormanagement_transform_from_byte_threaded(float *float_buffer, unsig
 		 */
 		IMB_buffer_float_from_byte(float_buffer, byte_buffer,
 		                           IB_PROFILE_SRGB, IB_PROFILE_SRGB,
-		                           true,
+		                           false,
 		                           width, height, width, width);
+		IMB_premultiply_rect_float(float_buffer, 4, width, height);
 		return;
 	}
 	cm_processor = IMB_colormanagement_colorspace_processor_new(from_colorspace, to_colorspace);
 	processor_transform_apply_threaded(byte_buffer, float_buffer,
 	                                   width, height, channels,
-	                                   cm_processor, true, true);
+	                                   cm_processor, false, true);
 	IMB_colormanagement_processor_free(cm_processor);
 }
 
@@ -2554,6 +2572,14 @@ const char *IMB_colormanagement_colorspace_get_indexed_name(int index)
 
 void IMB_colormanagment_colorspace_from_ibuf_ftype(ColorManagedColorspaceSettings *colorspace_settings, ImBuf *ibuf)
 {
+	/* Don't modify non-color data space, it does not change with file type. */
+	ColorSpace *colorspace = colormanage_colorspace_get_named(colorspace_settings->name);
+
+	if (colorspace && colorspace->is_data) {
+		return;
+	}
+
+	/* Get color space from file type. */
 	const ImFileType *type;
 
 	for (type = IMB_FILE_TYPES; type < IMB_FILE_TYPES_LAST; type++) {

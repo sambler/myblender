@@ -263,13 +263,56 @@ static void wm_notifier_clear(wmNotifier *note)
 	memset(((char *)note) + sizeof(Link), 0, sizeof(*note) - sizeof(Link));
 }
 
+/**
+ * Was part of #wm_event_do_notifiers, split out so it can be called once before entering the #WM_main loop.
+ * This ensures operators don't run before the UI and depsgraph are initialized.
+ */
+void wm_event_do_refresh_wm_and_depsgraph(bContext *C)
+{
+	wmWindowManager *wm = CTX_wm_manager(C);
+	uint64_t win_combine_v3d_datamask = 0;
+
+	/* combine datamasks so 1 win doesn't disable UV's in another [#26448] */
+	for (wmWindow *win = wm->windows.first; win; win = win->next) {
+		win_combine_v3d_datamask |= ED_view3d_screen_datamask(win->screen);
+	}
+
+	/* cached: editor refresh callbacks now, they get context */
+	for (wmWindow *win = wm->windows.first; win; win = win->next) {
+		ScrArea *sa;
+
+		CTX_wm_window_set(C, win);
+		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
+			if (sa->do_refresh) {
+				CTX_wm_area_set(C, sa);
+				ED_area_do_refresh(C, sa);
+			}
+		}
+
+		/* XXX make lock in future, or separated derivedmesh users in scene */
+		if (G.is_rendering == false) {
+			/* depsgraph & animation: update tagged datablocks */
+			Main *bmain = CTX_data_main(C);
+
+			/* copied to set's in scene_update_tagged_recursive() */
+			win->screen->scene->customdata_mask = win_combine_v3d_datamask;
+
+			/* XXX, hack so operators can enforce datamasks [#26482], gl render */
+			win->screen->scene->customdata_mask |= win->screen->scene->customdata_mask_modal;
+
+			BKE_scene_update_tagged(bmain->eval_ctx, bmain, win->screen->scene);
+		}
+	}
+
+	CTX_wm_window_set(C, NULL);
+}
+
 /* called in mainloop */
 void wm_event_do_notifiers(bContext *C)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 	wmNotifier *note, *next;
 	wmWindow *win;
-	uint64_t win_combine_v3d_datamask = 0;
 	
 	if (wm == NULL)
 		return;
@@ -373,39 +416,7 @@ void wm_event_do_notifiers(bContext *C)
 		MEM_freeN(note);
 	}
 	
-	/* combine datamasks so 1 win doesn't disable UV's in another [#26448] */
-	for (win = wm->windows.first; win; win = win->next) {
-		win_combine_v3d_datamask |= ED_view3d_screen_datamask(win->screen);
-	}
-
-	/* cached: editor refresh callbacks now, they get context */
-	for (win = wm->windows.first; win; win = win->next) {
-		ScrArea *sa;
-		
-		CTX_wm_window_set(C, win);
-		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
-			if (sa->do_refresh) {
-				CTX_wm_area_set(C, sa);
-				ED_area_do_refresh(C, sa);
-			}
-		}
-		
-		/* XXX make lock in future, or separated derivedmesh users in scene */
-		if (G.is_rendering == false) {
-			/* depsgraph & animation: update tagged datablocks */
-			Main *bmain = CTX_data_main(C);
-
-			/* copied to set's in scene_update_tagged_recursive() */
-			win->screen->scene->customdata_mask = win_combine_v3d_datamask;
-
-			/* XXX, hack so operators can enforce datamasks [#26482], gl render */
-			win->screen->scene->customdata_mask |= win->screen->scene->customdata_mask_modal;
-
-			BKE_scene_update_tagged(bmain->eval_ctx, bmain, win->screen->scene);
-		}
-	}
-
-	CTX_wm_window_set(C, NULL);
+	wm_event_do_refresh_wm_and_depsgraph(C);
 }
 
 static int wm_event_always_pass(const wmEvent *event)
@@ -613,6 +624,16 @@ void WM_report_banner_show(void)
 bool WM_event_is_absolute(const wmEvent *event)
 {
 	return (event->tablet_data != NULL);
+}
+
+bool WM_event_is_last_mousemove(const wmEvent *event)
+{
+	while ((event = event->next)) {
+		if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 #ifdef WITH_INPUT_NDOF
@@ -1079,6 +1100,9 @@ bool WM_operator_last_properties_store(wmOperator *UNUSED(op))
 
 #endif
 
+/**
+ * Also used for exec when 'event' is NULL.
+ */
 static int wm_operator_invoke(
         bContext *C, wmOperatorType *ot, wmEvent *event,
         PointerRNA *properties, ReportList *reports, const bool poll_only)
@@ -1094,7 +1118,9 @@ static int wm_operator_invoke(
 		wmOperator *op = wm_operator_create(wm, ot, properties, reports); /* if reports == NULL, they'll be initialized */
 		const bool is_nested_call = (wm->op_undo_depth != 0);
 		
-		op->flag |= OP_IS_INVOKE;
+		if (event != NULL) {
+			op->flag |= OP_IS_INVOKE;
+		}
 
 		/* initialize setting from previous run */
 		if (!is_nested_call) { /* not called by py script */
@@ -2852,7 +2878,7 @@ void WM_event_add_mousemove(bContext *C)
 
 
 /* for modal callbacks, check configuration for how to interpret exit with tweaks  */
-bool WM_modal_tweak_exit(const wmEvent *event, int tweak_event)
+bool WM_event_is_modal_tweak_exit(const wmEvent *event, int tweak_event)
 {
 	/* if the release-confirm userpref setting is enabled, 
 	 * tweak events can be canceled when mouse is released

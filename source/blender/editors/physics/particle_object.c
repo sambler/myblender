@@ -67,32 +67,9 @@
 
 #include "UI_resources.h"
 
+#include "particle_edit_utildefines.h"
+
 #include "physics_intern.h"
-
-extern void PE_create_particle_edit(Scene *scene, Object *ob, PointCache *cache, ParticleSystem *psys);
-extern void PTCacheUndo_clear(PTCacheEdit *edit);
-extern void recalc_lengths(PTCacheEdit *edit);
-extern void recalc_emitter_field(Object *ob, ParticleSystem *psys);
-extern void update_world_cos(Object *ob, PTCacheEdit *edit);
-
-#define KEY_K					PTCacheEditKey *key; int k
-#define POINT_P					PTCacheEditPoint *point; int p
-#define LOOP_POINTS				for (p=0, point=edit->points; p<edit->totpoint; p++, point++)
-#if 0
-#define LOOP_VISIBLE_POINTS		for (p=0, point=edit->points; p<edit->totpoint; p++, point++) if (!(point->flag & PEP_HIDE))
-#define LOOP_SELECTED_POINTS	for (p=0, point=edit->points; p<edit->totpoint; p++, point++) if (point_is_selected(point))
-#define LOOP_UNSELECTED_POINTS	for (p=0, point=edit->points; p<edit->totpoint; p++, point++) if (!point_is_selected(point))
-#define LOOP_EDITED_POINTS		for (p=0, point=edit->points; p<edit->totpoint; p++, point++) if (point->flag & PEP_EDIT_RECALC)
-#define LOOP_TAGGED_POINTS		for (p=0, point=edit->points; p<edit->totpoint; p++, point++) if (point->flag & PEP_TAG)
-#endif
-#define LOOP_KEYS				for (k=0, key=point->keys; k<point->totkey; k++, key++)
-#if 0
-#define LOOP_VISIBLE_KEYS		for (k=0, key=point->keys; k<point->totkey; k++, key++) if (!(key->flag & PEK_HIDE))
-#define LOOP_SELECTED_KEYS		for (k=0, key=point->keys; k<point->totkey; k++, key++) if ((key->flag & PEK_SELECT) && !(key->flag & PEK_HIDE))
-#define LOOP_TAGGED_KEYS		for (k=0, key=point->keys; k<point->totkey; k++, key++) if (key->flag & PEK_TAG)
-
-#define KEY_WCO					(key->flag & PEK_USE_WCO ? key->world_co : key->co)
-#endif
 
 static float I[4][4] = {{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}};
 
@@ -197,7 +174,7 @@ static int new_particle_settings_exec(bContext *C, wmOperator *UNUSED(op))
 	if (psys->part)
 		part= BKE_particlesettings_copy(bmain, psys->part);
 	else
-		part= psys_new_settings("ParticleSettings", bmain);
+		part= BKE_particlesettings_add(bmain, "ParticleSettings");
 
 	ob= ptr.id.data;
 
@@ -977,7 +954,7 @@ static void remove_particle_systems_from_object(Object *ob_to)
 	
 	if (ob_to->type != OB_MESH)
 		return;
-	if (!ob_to->data || ID_IS_LINKED_DATABLOCK(ob_to->data))
+	if (!ob_to->data || ID_IS_LINKED(ob_to->data))
 		return;
 	
 	for (md = ob_to->modifiers.first; md; md = md_next) {
@@ -1013,7 +990,7 @@ static bool copy_particle_systems_to_object(Main *bmain,
 	
 	if (ob_to->type != OB_MESH)
 		return false;
-	if (!ob_to->data || ID_IS_LINKED_DATABLOCK(ob_to->data))
+	if (!ob_to->data || ID_IS_LINKED(ob_to->data))
 		return false;
 	
 	/* For remapping we need a valid DM.
@@ -1183,7 +1160,7 @@ static int copy_particle_systems_exec(bContext *C, wmOperator *op)
 
 void PARTICLE_OT_copy_particle_systems(wmOperatorType *ot)
 {
-	static EnumPropertyItem space_items[] = {
+	static const EnumPropertyItem space_items[] = {
 		{PAR_COPY_SPACE_OBJECT, "OBJECT", 0, "Object", "Copy inside each object's local space"},
 		{PAR_COPY_SPACE_WORLD, "WORLD", 0, "World", "Copy in world space"},
 		{0, NULL, 0, NULL, NULL}

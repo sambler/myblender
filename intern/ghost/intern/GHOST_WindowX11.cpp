@@ -59,10 +59,6 @@
 //For DPI value
 #include <X11/Xresource.h>
 
-#if defined(__sun__) || defined(__sun) || defined(__sparc) || defined(__sparc__) || defined(_AIX)
-#  include <strings.h>
-#endif
-
 #include <cstring>
 #include <cstdio>
 
@@ -338,6 +334,7 @@ GHOST_WindowX11(GHOST_SystemX11 *system,
       m_empty_cursor(None),
       m_custom_cursor(None),
       m_visible_cursor(None),
+      m_taskbar("blender.desktop"),
 #ifdef WITH_XDND
       m_dropTarget(NULL),
 #endif
@@ -1530,7 +1527,6 @@ setWindowCursorGrab(
 	else {
 		if (m_cursorGrab == GHOST_kGrabHide) {
 			m_system->setCursorPosition(m_cursorGrabInitPos[0], m_cursorGrabInitPos[1]);
-			setWindowCursorVisibility(true);
 		}
 
 		if (m_cursorGrab != GHOST_kGrabNormal) {
@@ -1552,6 +1548,11 @@ setWindowCursorGrab(
 			{
 				XWarpPointer(m_display, None, None, 0, 0, 0, 0, 0, 0);
 			}
+		}
+
+		/* Perform this last so to workaround XWayland bug, see: T53004. */
+		if (m_cursorGrab == GHOST_kGrabHide) {
+			setWindowCursorVisibility(true);
 		}
 
 		/* Almost works without but important otherwise the mouse GHOST location can be incorrect on exit */
@@ -1716,4 +1717,25 @@ getDPIHint()
 	float inchDiagonal = mmDiagonal * 0.039f;
 	int dpi = pixelDiagonal / inchDiagonal;
 	return dpi;
+}
+
+GHOST_TSuccess GHOST_WindowX11::setProgressBar(float progress)
+{
+	if (m_taskbar.is_valid()) {
+		m_taskbar.set_progress(progress);
+		m_taskbar.set_progress_enabled(true);
+		return GHOST_kSuccess;
+	}
+
+	return GHOST_kFailure;
+}
+
+GHOST_TSuccess GHOST_WindowX11::endProgressBar()
+{
+	if (m_taskbar.is_valid()) {
+		m_taskbar.set_progress_enabled(false);
+		return GHOST_kSuccess;
+	}
+
+	return GHOST_kFailure;
 }

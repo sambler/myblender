@@ -1526,9 +1526,9 @@ float BM_loop_calc_face_angle(const BMLoop *l)
  *
  * Calculate the normal at this loop corner or fallback to the face normal on straight lines.
  *
- * \param l The loop to calculate the normal at
- * \param epsilon: Value to avoid numeric errors (1e-5f works well).
- * \param r_normal Resulting normal
+ * \param l: The loop to calculate the normal at.
+ * \param epsilon_sq: Value to avoid numeric errors (1e-5f works well).
+ * \param r_normal: Resulting normal.
  */
 float BM_loop_calc_face_normal_safe_ex(const BMLoop *l, const float epsilon_sq, float r_normal[3])
 {
@@ -1744,6 +1744,7 @@ float BM_vert_calc_edge_angle_ex(const BMVert *v, const float fallback)
 
 	if ((e1 = v->e) &&
 	    (e2 =  bmesh_disk_edge_next(e1, v)) &&
+	    (e1 != e2) &&
 	    /* make sure we come full circle and only have 2 connected edges */
 	    (e1 == bmesh_disk_edge_next(e2, v)))
 	{
@@ -2108,7 +2109,8 @@ bool BM_face_exists_multi(BMVert **varr, BMEdge **earr, int len)
 
 	if (tot_tag == 0) {
 		/* no faces use only boundary verts, quit early */
-		return false;
+		ok = false;
+		goto finally;
 	}
 
 	/* 2) loop over non-boundary edges that use boundary verts,
@@ -2143,6 +2145,12 @@ bool BM_face_exists_multi(BMVert **varr, BMEdge **earr, int len)
 		}
 	}
 
+finally:
+	/* Cleanup */
+	for (i = 0; i < len; i++) {
+		BM_elem_flag_disable(varr[i], BM_ELEM_INTERNAL_TAG);
+		BM_elem_flag_disable(earr[i], BM_ELEM_INTERNAL_TAG);
+	}
 	return ok;
 }
 

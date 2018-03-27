@@ -37,7 +37,7 @@
 
 #include "BLI_math.h"
 #include "BLI_heap.h"
-#include "BLI_polyfill2d_beautify.h"
+#include "BLI_polyfill_2d_beautify.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -150,7 +150,7 @@ static float bm_edge_calc_rotate_beauty__area(
 			           (ELEM(v4, v1, v2, v3) == false));
 
 			add_v3_v3v3(no, no_a, no_b);
-			if (UNLIKELY((no_scale = normalize_v3(no)) <= FLT_EPSILON)) {
+			if (UNLIKELY((no_scale = normalize_v3(no)) == 0.0f)) {
 				break;
 			}
 
@@ -392,7 +392,7 @@ void BM_mesh_beautify_fill(
 	bm->elem_index_dirty |= BM_EDGE;
 
 	while (BLI_heap_is_empty(eheap) == false) {
-		BMEdge *e = BLI_heap_popmin(eheap);
+		BMEdge *e = BLI_heap_pop_min(eheap);
 		i = BM_elem_index_get(e);
 		eheap_table[i] = NULL;
 

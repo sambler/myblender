@@ -15,11 +15,12 @@
  */
 
 #include "kernel/kernel_jitter.h"
+#include "util/util_hash.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Pseudo random numbers, uncomment this for debugging correlations. Only run
- * this single threaded on a CPU for repeatable resutls. */
+ * this single threaded on a CPU for repeatable results. */
 //#define __DEBUG_CORRELATION__
 
 
@@ -30,10 +31,17 @@ CCL_NAMESPACE_BEGIN
 
 #ifdef __SOBOL__
 
+/* Skip initial numbers that for some dimensions have clear patterns that
+ * don't cover the entire sample space. Ideally we would have a better
+ * progressive pattern that doesn't suffer from this problem, because even
+ * with this offset some dimensions are quite poor.
+ */
+#define SOBOL_SKIP 64
+
 ccl_device uint sobol_dimension(KernelGlobals *kg, int index, int dimension)
 {
 	uint result = 0;
-	uint i = index;
+	uint i = index + SOBOL_SKIP;
 	for(uint j = 0; i; i >>= 1, j++) {
 		if(i & 1) {
 			result ^= kernel_tex_fetch(__sobol_directions, 32*dimension + j);
@@ -115,14 +123,13 @@ ccl_device_forceinline void path_rng_2D(KernelGlobals *kg,
 }
 
 ccl_device_inline void path_rng_init(KernelGlobals *kg,
-                                     ccl_global uint *rng_state,
                                      int sample, int num_samples,
                                      uint *rng_hash,
                                      int x, int y,
                                      float *fx, float *fy)
 {
 	/* load state */
-	*rng_hash = *rng_state;
+	*rng_hash = hash_int_2d(x, y);
 	*rng_hash ^= kernel_data.integrator.seed;
 
 #ifdef __DEBUG_CORRELATION__
@@ -190,6 +197,19 @@ ccl_device_inline void path_state_rng_2D(KernelGlobals *kg,
 	            state->sample, state->num_samples,
 	            state->rng_offset + dimension,
 	            fx, fy);
+}
+
+ccl_device_inline float path_state_rng_1D_hash(KernelGlobals *kg,
+                                          const ccl_addr_space PathState *state,
+                                          uint hash)
+{
+	/* Use a hash instead of dimension, this is not great but avoids adding
+	 * more dimensions to each bounce which reduces quality of dimensions we
+	 * are already using. */
+	return path_rng_1D(kg,
+	                   cmj_hash_simple(state->rng_hash, hash),
+	                   state->sample, state->num_samples,
+	                   state->rng_offset);
 }
 
 ccl_device_inline float path_branched_rng_1D(

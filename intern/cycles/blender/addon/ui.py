@@ -225,31 +225,32 @@ class CYCLES_RENDER_PT_geometry(CyclesButtonsPanel, Panel):
         cscene = scene.cycles
         ccscene = scene.cycles_curves
 
+        row = layout.row()
+        row.label("Volume Sampling:")
+        row = layout.row()
+        row.prop(cscene, "volume_step_size")
+        row.prop(cscene, "volume_max_steps")
+
+        layout.separator()
+
         if cscene.feature_set == 'EXPERIMENTAL':
+            layout.label("Subdivision Rate:")
             split = layout.split()
 
             col = split.column()
-
             sub = col.column(align=True)
-            sub.label("Volume Sampling:")
-            sub.prop(cscene, "volume_step_size")
-            sub.prop(cscene, "volume_max_steps")
-
-            col = split.column()
-
-            sub = col.column(align=True)
-            sub.label("Subdivision Rate:")
             sub.prop(cscene, "dicing_rate", text="Render")
             sub.prop(cscene, "preview_dicing_rate", text="Preview")
-            sub.separator()
-            sub.prop(cscene, "max_subdivisions")
-        else:
-            row = layout.row()
-            row.label("Volume Sampling:")
-            row = layout.row()
-            row.prop(cscene, "volume_step_size")
-            row.prop(cscene, "volume_max_steps")
 
+            col = split.column()
+            col.prop(cscene, "offscreen_dicing_scale", text="Offscreen Scale")
+            col.prop(cscene, "max_subdivisions")
+
+            layout.prop(cscene, "dicing_camera")
+
+            layout.separator()
+
+        layout.label("Hair:")
         layout.prop(ccscene, "use_curves", text="Use Hair")
         col = layout.column()
         col.active = ccscene.use_curves
@@ -366,13 +367,20 @@ class CYCLES_RENDER_PT_film(CyclesButtonsPanel, Panel):
 
         col = split.column()
         col.prop(cscene, "film_exposure")
-        col.prop(cscene, "film_transparent")
-
-        col = split.column()
+        col.separator()
         sub = col.column(align=True)
         sub.prop(cscene, "pixel_filter_type", text="")
         if cscene.pixel_filter_type != 'BOX':
             sub.prop(cscene, "filter_width", text="Width")
+
+        col = split.column()
+        col.prop(cscene, "film_transparent")
+        sub = col.row()
+        sub.prop(cscene, "film_transparent_glass", text="Transparent Glass")
+        sub.active = cscene.film_transparent
+        sub = col.row()
+        sub.prop(cscene, "film_transparent_roughness", text="Roughness Threshold")
+        sub.active = cscene.film_transparent and cscene.film_transparent_glass
 
 
 class CYCLES_RENDER_PT_performance(CyclesButtonsPanel, Panel):
@@ -405,7 +413,12 @@ class CYCLES_RENDER_PT_performance(CyclesButtonsPanel, Panel):
         sub.prop(rd, "tile_x", text="X")
         sub.prop(rd, "tile_y", text="Y")
 
-        sub.prop(cscene, "use_progressive_refine")
+        subsub = sub.column()
+        subsub.active = not rd.use_save_buffers
+        for rl in rd.layers:
+            if rl.cycles.use_denoising:
+                subsub.active = False
+        subsub.prop(cscene, "use_progressive_refine")
 
         col = split.column()
 
@@ -436,6 +449,7 @@ class CYCLES_RENDER_PT_layer_options(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        with_freestyle = bpy.app.build_options.freestyle
 
         scene = context.scene
         rd = scene.render
@@ -464,6 +478,10 @@ class CYCLES_RENDER_PT_layer_options(CyclesButtonsPanel, Panel):
         col.prop(rl, "use_ao", "Use AO")
         col.prop(rl, "use_solid", "Use Surfaces")
         col.prop(rl, "use_strand", "Use Hair")
+        if with_freestyle:
+            row = col.row()
+            row.prop(rl, "use_freestyle", "Use Freestyle")
+            row.active = rd.use_freestyle
 
 
 class CYCLES_RENDER_PT_layer_passes(CyclesButtonsPanel, Panel):
@@ -521,6 +539,10 @@ class CYCLES_RENDER_PT_layer_passes(CyclesButtonsPanel, Panel):
         row.prop(rl, "use_pass_subsurface_direct", text="Direct", toggle=True)
         row.prop(rl, "use_pass_subsurface_indirect", text="Indirect", toggle=True)
         row.prop(rl, "use_pass_subsurface_color", text="Color", toggle=True)
+        col.label(text="Volume:")
+        row = col.row(align=True)
+        row.prop(crl, "use_pass_volume_direct", text="Direct", toggle=True)
+        row.prop(crl, "use_pass_volume_indirect", text="Indirect", toggle=True)
 
         col.separator()
         col.prop(rl, "use_pass_emit", text="Emission")
@@ -532,8 +554,9 @@ class CYCLES_RENDER_PT_layer_passes(CyclesButtonsPanel, Panel):
             sub.active = crl.use_denoising
             sub.prop(crl, "denoising_store_passes", text="Denoising")
 
+        col = layout.column()
+        col.prop(crl, "pass_debug_render_time")
         if _cycles.with_cycles_debug:
-            col = layout.column()
             col.prop(crl, "pass_debug_bvh_traversed_nodes")
             col.prop(crl, "pass_debug_bvh_traversed_instances")
             col.prop(crl, "pass_debug_bvh_intersections")
@@ -595,7 +618,6 @@ class CYCLES_RENDER_PT_denoising(CyclesButtonsPanel, Panel):
         cscene = context.scene.cycles
         layout = self.layout
 
-        layout.active = not cscene.use_progressive_refine
         layout.prop(crl, "use_denoising", text="")
 
     def draw(self, context):
@@ -607,7 +629,7 @@ class CYCLES_RENDER_PT_denoising(CyclesButtonsPanel, Panel):
         rl = rd.layers.active
         crl = rl.cycles
 
-        layout.active = crl.use_denoising and not cscene.use_progressive_refine
+        layout.active = crl.use_denoising
 
         split = layout.split()
 
@@ -787,7 +809,7 @@ class CYCLES_OBJECT_PT_motion_blur(CyclesButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         if CyclesButtonsPanel.poll(context) and ob:
-            if ob.type in {'MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META'}:
+            if ob.type in {'MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META', 'CAMERA'}:
                 return True
             if ob.dupli_type == 'GROUP' and ob.dupli_group:
                 return True
@@ -819,11 +841,9 @@ class CYCLES_OBJECT_PT_motion_blur(CyclesButtonsPanel, Panel):
         layout.active = (rd.use_motion_blur and cob.use_motion_blur)
 
         row = layout.row()
-        row.prop(cob, "use_deform_motion", text="Deformation")
-
-        sub = row.row()
-        sub.active = cob.use_deform_motion
-        sub.prop(cob, "motion_steps", text="Steps")
+        if ob.type != 'CAMERA':
+            row.prop(cob, "use_deform_motion", text="Deformation")
+        row.prop(cob, "motion_steps", text="Steps")
 
 
 class CYCLES_OBJECT_PT_cycles_settings(CyclesButtonsPanel, Panel):
@@ -859,7 +879,9 @@ class CYCLES_OBJECT_PT_cycles_settings(CyclesButtonsPanel, Panel):
         if ob.type != 'LAMP':
             flow.prop(visibility, "shadow")
 
-        layout.prop(cob, "is_shadow_catcher")
+        row = layout.row()
+        row.prop(cob, "is_shadow_catcher")
+        row.prop(cob, "is_holdout")
 
         col = layout.column()
         col.label(text="Performance:")
@@ -1208,7 +1230,7 @@ class CYCLES_WORLD_PT_settings(CyclesButtonsPanel, Panel):
         sub = col.column()
         sub.active = use_cpu(context)
         sub.prop(cworld, "volume_sampling", text="")
-        sub.prop(cworld, "volume_interpolation", text="")
+        col.prop(cworld, "volume_interpolation", text="")
         col.prop(cworld, "homogeneous_volume", text="Homogeneous")
 
 
@@ -1279,7 +1301,6 @@ class CYCLES_MATERIAL_PT_displacement(CyclesButtonsPanel, Panel):
 class CYCLES_MATERIAL_PT_settings(CyclesButtonsPanel, Panel):
     bl_label = "Settings"
     bl_context = "material"
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -1297,38 +1318,50 @@ class CYCLES_MATERIAL_PT_settings(CyclesButtonsPanel, Panel):
         col.prop(cmat, "sample_as_light", text="Multiple Importance")
         col.prop(cmat, "use_transparent_shadow")
 
-        if context.scene.cycles.feature_set == 'EXPERIMENTAL':
-            col.separator()
-            col.label(text="Displacement:")
-            col.prop(cmat, "displacement_method", text="")
+        col.separator()
+        col.label(text="Geometry:")
+        col.prop(cmat, "displacement_method", text="")
 
         col = split.column()
         col.label(text="Volume:")
         sub = col.column()
         sub.active = use_cpu(context)
         sub.prop(cmat, "volume_sampling", text="")
-        sub.prop(cmat, "volume_interpolation", text="")
+        col.prop(cmat, "volume_interpolation", text="")
         col.prop(cmat, "homogeneous_volume", text="Homogeneous")
 
-        layout.separator()
+        col.separator()
+        col.prop(mat, "pass_index")
+
+
+class CYCLES_MATERIAL_PT_viewport(CyclesButtonsPanel, Panel):
+    bl_label = "Viewport"
+    bl_context = "material"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.material and CyclesButtonsPanel.poll(context)
+
+    def draw(self, context):
+        mat = context.material
+
+        layout = self.layout
         split = layout.split()
 
         col = split.column(align=True)
-        col.label("Viewport Color:")
+        col.label("Color:")
         col.prop(mat, "diffuse_color", text="")
         col.prop(mat, "alpha")
 
         col.separator()
-        col.label("Viewport Alpha:")
+        col.label("Alpha:")
         col.prop(mat.game_settings, "alpha_blend", text="")
 
         col = split.column(align=True)
-        col.label("Viewport Specular:")
+        col.label("Specular:")
         col.prop(mat, "specular_color", text="")
         col.prop(mat, "specular_hardness", text="Hardness")
-
-        col.separator()
-        col.prop(mat, "pass_index")
 
 
 class CYCLES_TEXTURE_PT_context(CyclesButtonsPanel, Panel):
@@ -1590,7 +1623,7 @@ class CYCLES_RENDER_PT_debug(CyclesButtonsPanel, Panel):
         row.prop(cscene, "debug_use_cpu_sse41", toggle=True)
         row.prop(cscene, "debug_use_cpu_avx", toggle=True)
         row.prop(cscene, "debug_use_cpu_avx2", toggle=True)
-        col.prop(cscene, "debug_use_qbvh")
+        col.prop(cscene, "debug_bvh_layout")
         col.prop(cscene, "debug_use_cpu_split_kernel")
 
         col.separator()
@@ -1834,6 +1867,7 @@ classes = (
     CYCLES_MATERIAL_PT_volume,
     CYCLES_MATERIAL_PT_displacement,
     CYCLES_MATERIAL_PT_settings,
+    CYCLES_MATERIAL_PT_viewport,
     CYCLES_TEXTURE_PT_context,
     CYCLES_TEXTURE_PT_node,
     CYCLES_TEXTURE_PT_mapping,

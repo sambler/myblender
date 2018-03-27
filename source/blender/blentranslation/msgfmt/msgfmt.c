@@ -184,8 +184,9 @@ typedef struct Offset {
 } Offset;
 
 /* Return the generated binary output. */
-static char *generate(GHash *messages, size_t *r_output_size) {
-	const uint32_t num_keys = BLI_ghash_size(messages);
+static char *generate(GHash *messages, size_t *r_output_size)
+{
+	const uint32_t num_keys = BLI_ghash_len(messages);
 
 	/* Get list of sorted keys. */
 	char **keys = get_keys_sorted(messages, num_keys);

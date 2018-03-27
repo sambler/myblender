@@ -354,6 +354,8 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 		dy -= NODE_DYS / 2;
 	
 	/* output sockets */
+	bool add_output_space = false;
+
 	for (nsock = node->outputs.first; nsock; nsock = nsock->next) {
 		if (nodeSocketIsHidden(nsock))
 			continue;
@@ -386,6 +388,12 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 		dy = buty;
 		if (nsock->next)
 			dy -= NODE_SOCKDY;
+
+		add_output_space = true;
+	}
+
+	if (add_output_space) {
+		dy -= NODE_DY / 4;
 	}
 
 	node->prvr.xmin = locx + NODE_DYS;
@@ -1091,7 +1099,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		//	BLI_snprintf(showname, sizeof(showname), "[%s]", showname); /* XXX - don't print into self! */
 
 		uiDefBut(node->block, UI_BTYPE_LABEL, 0, showname,
-		         iroundf(rct->xmin + NODE_MARGIN_X), iroundf(centy - NODE_DY * 0.5f),
+		         round_fl_to_int(rct->xmin + NODE_MARGIN_X), round_fl_to_int(centy - NODE_DY * 0.5f),
 		         (short)(BLI_rctf_size_x(rct) - 18.0f - 12.0f), (short)NODE_DY,
 		         NULL, 0, 0, 0, 0, "");
 	}

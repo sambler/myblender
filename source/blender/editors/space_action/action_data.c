@@ -125,7 +125,7 @@ static bAction *action_create_new(bContext *C, bAction *oldact)
 	}
 	else {
 		/* just make a new (empty) action */
-		action = add_empty_action(CTX_data_main(C), "Action");
+		action = BKE_action_add(CTX_data_main(C), "Action");
 	}
 	
 	/* when creating new ID blocks, there is already 1 user (as for all new datablocks), 
@@ -568,11 +568,11 @@ void ED_animedit_unlink_action(bContext *C, ID *id, AnimData *adt, bAction *act,
 						
 						if (strip->act == act) {
 							/* Remove this strip, and the track too if it doesn't have anything else */
-							free_nlastrip(&nlt->strips, strip);
+							BKE_nlastrip_free(&nlt->strips, strip);
 							
 							if (nlt->strips.first == NULL) {
 								BLI_assert(nstrip == NULL);
-								free_nlatrack(&adt->nla_tracks, nlt);
+								BKE_nlatrack_free(&adt->nla_tracks, nlt);
 							}
 						}
 					}

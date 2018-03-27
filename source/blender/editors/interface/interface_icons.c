@@ -1192,7 +1192,7 @@ static int ui_id_brush_get_icon(const bContext *C, ID *id)
 	else {
 		Object *ob = CTX_data_active_object(C);
 		SpaceImage *sima;
-		EnumPropertyItem *items = NULL;
+		const EnumPropertyItem *items = NULL;
 		int tool = PAINT_TOOL_DRAW, mode = 0;
 
 		/* XXX: this is not nice, should probably make brushes
@@ -1301,7 +1301,7 @@ int UI_idcode_icon_get(const int idcode)
 {
 	switch (idcode) {
 		case ID_AC:
-			return ICON_ANIM_DATA;
+			return ICON_ACTION;
 		case ID_AR:
 			return ICON_ARMATURE_DATA;
 		case ID_BR:

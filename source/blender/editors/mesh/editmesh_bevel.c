@@ -58,8 +58,7 @@
 
 #define MVAL_PIXEL_MARGIN  5.0f
 
-/* until implement profile = 0 case, need to clamp somewhat above zero */
-#define PROFILE_HARD_MIN 0.15f
+#define PROFILE_HARD_MIN 0.0f
 
 #define SEGMENTS_HARD_MAX 1000
 
@@ -138,6 +137,10 @@ static bool edbm_bevel_init(bContext *C, wmOperator *op, const bool is_modal)
 
 	if (em->bm->totvertsel == 0) {
 		return false;
+	}
+
+	if (is_modal) {
+		RNA_float_set(op->ptr, "offset", 0.0f);
 	}
 
 	op->customdata = opdata = MEM_mallocN(sizeof(BevelData), "beveldata_mesh_operator");
@@ -335,10 +338,11 @@ static int edbm_bevel_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 		 * ideally this will never happen and should be checked for above */
 		opdata->mcenter[0] = opdata->mcenter[1] = 0;
 	}
-	edbm_bevel_calc_initial_length(op, event, false);
 
 	/* for OFFSET_VALUE only, the scale is the size of a pixel under the mouse in 3d space */
 	opdata->scale[OFFSET_VALUE] = rv3d ? ED_view3d_pixel_size(rv3d, center_3d) : 1.0f;
+
+	edbm_bevel_calc_initial_length(op, event, false);
 
 	edbm_bevel_update_header(C, op);
 
@@ -596,7 +600,7 @@ void MESH_OT_bevel(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 
-	static EnumPropertyItem offset_type_items[] = {
+	static const EnumPropertyItem offset_type_items[] = {
 		{BEVEL_AMT_OFFSET, "OFFSET", 0, "Offset", "Amount is offset of new edges from original"},
 		{BEVEL_AMT_WIDTH, "WIDTH", 0, "Width", "Amount is width of new face"},
 		{BEVEL_AMT_DEPTH, "DEPTH", 0, "Depth", "Amount is perpendicular distance from original edge to bevel face"},

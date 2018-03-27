@@ -557,7 +557,7 @@ static int kill_selection(Object *obedit, int ins)  /* 1 == new character */
 
 /******************* set style operator ********************/
 
-static EnumPropertyItem style_items[] = {
+static const EnumPropertyItem style_items[] = {
 	{CU_CHINFO_BOLD, "BOLD", 0, "Bold", ""},
 	{CU_CHINFO_ITALIC, "ITALIC", 0, "Italic", ""},
 	{CU_CHINFO_UNDERLINE, "UNDERLINE", 0, "Underline", ""},
@@ -877,7 +877,7 @@ void FONT_OT_text_paste(wmOperatorType *ot)
 
 /************************ move operator ************************/
 
-static EnumPropertyItem move_type_items[] = {
+static const EnumPropertyItem move_type_items[] = {
 	{LINE_BEGIN, "LINE_BEGIN", 0, "Line Begin", ""},
 	{LINE_END, "LINE_END", 0, "Line End", ""},
 	{PREV_CHAR, "PREVIOUS_CHARACTER", 0, "Previous Character", ""},
@@ -1169,7 +1169,7 @@ void FONT_OT_line_break(wmOperatorType *ot)
 
 /******************* delete operator **********************/
 
-static EnumPropertyItem delete_type_items[] = {
+static const EnumPropertyItem delete_type_items[] = {
 	{DEL_NEXT_CHAR, "NEXT_CHARACTER", 0, "Next Character", ""},
 	{DEL_PREV_CHAR, "PREVIOUS_CHARACTER", 0, "Previous Character", ""},
 	{DEL_NEXT_WORD, "NEXT_WORD", 0, "Next Word", ""},
@@ -1590,7 +1590,7 @@ void ED_curve_editfont_free(Object *obedit)
 
 /********************** set case operator *********************/
 
-static EnumPropertyItem case_items[] = {
+static const EnumPropertyItem case_items[] = {
 	{CASE_LOWER, "LOWER", 0, "Lower", ""},
 	{CASE_UPPER, "UPPER", 0, "Upper", ""},
 	{0, NULL, 0, NULL, NULL}};
@@ -1850,7 +1850,7 @@ bool ED_curve_editfont_select_pick(bContext *C, const int mval[2], bool extend, 
 	const float dist = ED_view3d_select_dist_px();
 	float dist_sq_best = dist * dist;
 
-	view3d_set_viewcontext(C, &vc);
+	ED_view3d_viewcontext_init(C, &vc);
 
 	ED_view3d_init_mats_rv3d(vc.obedit, vc.rv3d);
 

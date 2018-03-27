@@ -111,8 +111,6 @@ void DEG_on_visible_update(struct Main *bmain, const bool do_time);
 void DEG_graph_id_tag_update(struct Main *bmain,
                              Depsgraph *graph,
                              struct ID *id);
-void DEG_graph_data_tag_update(Depsgraph *graph, const struct PointerRNA *ptr);
-void DEG_graph_property_tag_update(Depsgraph *graph, const struct PointerRNA *ptr, const struct PropertyRNA *prop);
 
 /* Tag given ID for an update in all the dependency graphs. */
 void DEG_id_tag_update(struct ID *id, short flag);
@@ -120,10 +118,9 @@ void DEG_id_tag_update_ex(struct Main *bmain,
                           struct ID *id,
                           short flag);
 
-/* Tag given ID type for update.
- *
- * Used by all sort of render engines to quickly check if
- * IDs of a given type need to be checked for update.
+/* Mark a particular datablock type as having changing. This does
+ * not cause any updates but is used by external render engines to detect if for
+ * example a datablock was removed.
  */
 void DEG_id_type_tag(struct Main *bmain, short idtype);
 
@@ -210,6 +207,32 @@ void DEG_editors_set_update_cb(DEG_EditorUpdateIDCb id_func,
                                DEG_EditorUpdateScenePreCb scene_pre_func);
 
 void DEG_editors_update_pre(struct Main *bmain, struct Scene *scene, bool time);
+
+/* Evaluation Debug ------------------------------ */
+
+void DEG_debug_print_eval(const char* function_name,
+                          const char* object_name,
+                          const void* object_address);
+
+void DEG_debug_print_eval_subdata(const char *function_name,
+                                  const char *object_name,
+                                  const void *object_address,
+                                  const char *subdata_comment,
+                                  const char *subdata_name,
+                                  const void *subdata_address);
+
+void DEG_debug_print_eval_subdata_index(const char *function_name,
+                                        const char *object_name,
+                                        const void *object_address,
+                                        const char *subdata_comment,
+                                        const char *subdata_name,
+                                        const void *subdata_address,
+                                        const int subdata_index);
+
+void DEG_debug_print_eval_time(const char* function_name,
+                               const char* object_name,
+                               const void* object_address,
+                               float time);
 
 #ifdef __cplusplus
 } /* extern "C" */

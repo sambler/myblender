@@ -289,7 +289,7 @@ static void mem_unlock_thread(void)
 		thread_unlock_callback();
 }
 
-bool MEM_guarded_check_memory_integrity(void)
+bool MEM_guarded_consistency_check(void)
 {
 	const char *err_val = NULL;
 	MemHead *listend;
@@ -299,7 +299,7 @@ bool MEM_guarded_check_memory_integrity(void)
 	
 	err_val = check_memlist(listend);
 
-	return (err_val != NULL);
+	return (err_val == NULL);
 }
 
 
@@ -549,6 +549,21 @@ void *MEM_guarded_mallocN(size_t len, const char *str)
 	return NULL;
 }
 
+void *MEM_guarded_malloc_arrayN(size_t len, size_t size, const char *str)
+{
+	size_t total_size;
+	if (UNLIKELY(!MEM_size_safe_multiply(len, size, &total_size))) {
+		print_error("Malloc array aborted due to integer overflow: "
+		            "len=" SIZET_FORMAT "x" SIZET_FORMAT " in %s, total %u\n",
+		            SIZET_ARG(len), SIZET_ARG(size), str,
+		            (unsigned int) mem_in_use);
+		abort();
+		return NULL;
+	}
+
+	return MEM_guarded_mallocN(total_size, str);
+}
+
 void *MEM_guarded_mallocN_aligned(size_t len, size_t alignment, const char *str)
 {
 	MemHead *memh;
@@ -617,6 +632,21 @@ void *MEM_guarded_callocN(size_t len, const char *str)
 	print_error("Calloc returns null: len=" SIZET_FORMAT " in %s, total %u\n",
 	            SIZET_ARG(len), str, (unsigned int) mem_in_use);
 	return NULL;
+}
+
+void *MEM_guarded_calloc_arrayN(size_t len, size_t size, const char *str)
+{
+	size_t total_size;
+	if (UNLIKELY(!MEM_size_safe_multiply(len, size, &total_size))) {
+		print_error("Calloc array aborted due to integer overflow: "
+		            "len=" SIZET_FORMAT "x" SIZET_FORMAT " in %s, total %u\n",
+		            SIZET_ARG(len), SIZET_ARG(size), str,
+		            (unsigned int) mem_in_use);
+		abort();
+		return NULL;
+	}
+
+	return MEM_guarded_callocN(total_size, str);
 }
 
 /* note; mmap returns zero'd memory */

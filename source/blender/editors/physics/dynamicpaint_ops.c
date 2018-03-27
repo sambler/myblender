@@ -253,7 +253,7 @@ static int output_toggle_exec(bContext *C, wmOperator *op)
 
 void DPAINT_OT_output_toggle(wmOperatorType *ot)
 {
-	static EnumPropertyItem prop_output_toggle_types[] = {
+	static const EnumPropertyItem prop_output_toggle_types[] = {
 		{0, "A", 0, "Output A", ""},
 		{1, "B", 0, "Output B", ""},
 		{0, NULL, 0, NULL, NULL}
@@ -359,7 +359,7 @@ static void dynamicPaint_bakeImageSequence(DynamicPaintBakeJob *job)
 	scene->r.cfra = (int)frame;
 	ED_update_for_newframe(job->bmain, scene, 1);
 
-	/* Init surface	*/
+	/* Init surface */
 	if (!dynamicPaint_createUVSurface(scene, surface, job->progress, job->do_update)) {
 		job->success = 0;
 		return;
@@ -493,7 +493,7 @@ static int dynamicpaint_bake_exec(struct bContext *C, struct wmOperator *op)
 
 	WM_set_locked_interface(CTX_wm_manager(C), true);
 
-	/*  Bake Dynamic Paint	*/
+	/* Bake Dynamic Paint */
 	WM_jobs_start(CTX_wm_manager(C), wm_job);
 
 	return OPERATOR_FINISHED;

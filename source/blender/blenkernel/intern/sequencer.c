@@ -1160,6 +1160,7 @@ static const char *give_seqname_by_type(int type)
 		case SEQ_TYPE_ALPHAOVER:     return "Alpha Over";
 		case SEQ_TYPE_ALPHAUNDER:    return "Alpha Under";
 		case SEQ_TYPE_OVERDROP:      return "Over Drop";
+		case SEQ_TYPE_COLORMIX:      return "Color Mix";
 		case SEQ_TYPE_WIPE:          return "Wipe";
 		case SEQ_TYPE_GLOW:          return "Glow";
 		case SEQ_TYPE_TRANSFORM:     return "Transform";
@@ -1674,6 +1675,11 @@ static bool seq_proxy_get_fname(Editing *ed, Sequence *seq, int cfra, int render
 		}
 		else if (seq->type == SEQ_TYPE_IMAGE) {
 			fname[0] = 0;
+		}
+		else {
+			/* We could make a name here, except non-movie's don't generate proxies,
+			 * cancel until other types of sequence strips are supported. */
+			return false;
 		}
 		BLI_path_append(dir, sizeof(dir), fname);
 		BLI_path_abs(name, G.main->name);
@@ -3198,11 +3204,12 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 		int scemode;
 		int cfra;
 		float subframe;
+
 #ifdef DURIAN_CAMERA_SWITCH
-		ListBase markers;
+		int mode;
 #endif
 	} orig_data;
-	
+
 	/* Old info:
 	 * Hack! This function can be called from do_render_seq(), in that case
 	 * the seq->scene can already have a Render initialized with same name,
@@ -3262,7 +3269,7 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 	orig_data.cfra = scene->r.cfra;
 	orig_data.subframe = scene->r.subframe;
 #ifdef DURIAN_CAMERA_SWITCH
-	orig_data.markers = scene->markers;
+	orig_data.mode = scene->r.mode;
 #endif
 
 	BKE_scene_frame_set(scene, frame);
@@ -3285,20 +3292,27 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 
 	/* prevent eternal loop */
 	scene->r.scemode &= ~R_DOSEQ;
-	
+
 #ifdef DURIAN_CAMERA_SWITCH
 	/* stooping to new low's in hackyness :( */
-	BLI_listbase_clear(&scene->markers);
+	scene->r.mode |= R_NO_CAMERA_SWITCH;
 #endif
 
 	is_frame_update = (orig_data.cfra != scene->r.cfra) || (orig_data.subframe != scene->r.subframe);
 
 	if ((sequencer_view3d_cb && do_seq_gl && camera) && is_thread_main) {
 		char err_out[256] = "unknown";
-		int width = (scene->r.xsch * scene->r.size) / 100;
-		int height = (scene->r.ysch * scene->r.size) / 100;
+		const int width = (scene->r.xsch * scene->r.size) / 100;
+		const int height = (scene->r.ysch * scene->r.size) / 100;
 		const bool use_background = (scene->r.alphamode == R_ADDSKY);
 		const char *viewname = BKE_scene_multiview_render_view_name_get(&scene->r, context->view_id);
+
+		unsigned int draw_flags = SEQ_OFSDRAW_NONE;
+		draw_flags |= (use_gpencil) ? SEQ_OFSDRAW_USE_GPENCIL : 0;
+		draw_flags |= (use_background) ? SEQ_OFSDRAW_USE_BACKGROUND : 0;
+		draw_flags |= (context->gpu_full_samples) ? SEQ_OFSDRAW_USE_FULL_SAMPLE : 0;
+		draw_flags |= (context->scene->r.seq_flag & R_SEQ_SOLID_TEX) ? SEQ_OFSDRAW_USE_SOLID_TEX : 0;
+		draw_flags |= (context->scene->r.seq_flag & R_SEQ_CAMERA_DOF) ? SEQ_OFSDRAW_USE_CAMERA_DOF : 0;
 
 		/* for old scene this can be uninitialized,
 		 * should probably be added to do_versions at some point if the functionality stays */
@@ -3309,11 +3323,8 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 		BKE_scene_update_for_newframe(context->eval_ctx, context->bmain, scene, scene->lay);
 		ibuf = sequencer_view3d_cb(
 		        /* set for OpenGL render (NULL when scrubbing) */
-		        scene, camera, width, height, IB_rect,
-		        context->scene->r.seq_prev_type,
-		        (context->scene->r.seq_flag & R_SEQ_SOLID_TEX) != 0,
-		        use_gpencil, use_background, scene->r.alphamode,
-		        context->gpu_samples, context->gpu_full_samples, viewname,
+		        scene, camera, width, height, IB_rect, draw_flags, context->scene->r.seq_prev_type,
+		        scene->r.alphamode, context->gpu_samples, viewname,
 		        context->gpu_fx, context->gpu_offscreen, err_out);
 		if (ibuf == NULL) {
 			fprintf(stderr, "seq_render_scene_strip failed to get opengl buffer: %s\n", err_out);
@@ -3404,7 +3415,7 @@ finally:
 
 #ifdef DURIAN_CAMERA_SWITCH
 	/* stooping to new low's in hackyness :( */
-	scene->markers = orig_data.markers;
+	scene->r.mode &= ~(orig_data.mode & R_NO_CAMERA_SWITCH);
 #endif
 
 	return ibuf;
@@ -4479,8 +4490,11 @@ Sequence *BKE_sequencer_foreground_frame_get(Scene *scene, int frame)
 	for (seq = ed->seqbasep->first; seq; seq = seq->next) {
 		if (seq->flag & SEQ_MUTE || seq->startdisp > frame || seq->enddisp <= frame)
 			continue;
-		/* only use elements you can see - not */
-		if (ELEM(seq->type, SEQ_TYPE_IMAGE, SEQ_TYPE_META, SEQ_TYPE_SCENE, SEQ_TYPE_MOVIE, SEQ_TYPE_COLOR)) {
+		/* Only use strips that generate an image, not ones that combine
+		 * other strips or apply some effect. */
+		if (ELEM(seq->type, SEQ_TYPE_IMAGE, SEQ_TYPE_META, SEQ_TYPE_SCENE,
+		         SEQ_TYPE_MOVIE, SEQ_TYPE_COLOR, SEQ_TYPE_TEXT))
+		{
 			if (seq->machine > best_machine) {
 				best_seq = seq;
 				best_machine = seq->machine;
@@ -5139,6 +5153,40 @@ void BKE_sequence_init_colorspace(Sequence *seq)
 			}
 		}
 	}
+}
+
+float BKE_sequence_get_fps(Scene *scene, Sequence *seq)
+{
+	switch (seq->type) {
+		case SEQ_TYPE_MOVIE:
+		{
+			seq_open_anim_file(scene, seq, true);
+			if (BLI_listbase_is_empty(&seq->anims)) {
+				return 0.0f;
+			}
+			StripAnim *strip_anim = seq->anims.first;
+			if (strip_anim->anim == NULL) {
+				return 0.0f;
+			}
+			short frs_sec;
+			float frs_sec_base;
+			if (IMB_anim_get_fps(strip_anim->anim, &frs_sec, &frs_sec_base, true)) {
+				return (float)frs_sec / frs_sec_base;
+			}
+			break;
+		}
+		case SEQ_TYPE_MOVIECLIP:
+			if (seq->clip != NULL) {
+				return BKE_movieclip_get_fps(seq->clip);
+			}
+			break;
+		case SEQ_TYPE_SCENE:
+			if (seq->scene != NULL) {
+				return (float)seq->scene->r.frs_sec / seq->scene->r.frs_sec_base;
+			}
+			break;
+	}
+	return 0.0f;
 }
 
 /* NOTE: this function doesn't fill in image names */

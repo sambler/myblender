@@ -75,7 +75,7 @@ typedef struct FFMpegContext {
 	bool ffmpeg_preview;
 
 	int ffmpeg_crf;  /* set to 0 to not use CRF mode; we have another flag for lossless anyway. */
-	int ffmpeg_preset; /* see FFMpegPreset */
+	int ffmpeg_preset; /* see eFFMpegPreset */
 
 	AVFormatContext *outfile;
 	AVStream *video_stream;
@@ -158,7 +158,7 @@ static int write_audio_frame(FFMpegContext *context)
 		for (channel = 0; channel < c->channels; channel++) {
 			for (i = 0; i < frame->nb_samples; i++) {
 				memcpy(context->audio_deinterleave_buffer + (i + channel * frame->nb_samples) * context->audio_sample_size,
-					   context->audio_input_buffer + (c->channels * i + channel) * context->audio_sample_size, context->audio_sample_size);
+				       context->audio_input_buffer + (c->channels * i + channel) * context->audio_sample_size, context->audio_sample_size);
 			}
 		}
 

@@ -28,7 +28,7 @@
 
 #include "DNA_cloth_types.h"
 #include "DNA_object_types.h"
-#include "DNA_object_force.h"
+#include "DNA_object_force_types.h"
 #include "DNA_particle_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
@@ -41,7 +41,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-static EnumPropertyItem effector_shape_items[] = {
+static const EnumPropertyItem effector_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Surface", ""},
@@ -55,20 +55,20 @@ static EnumPropertyItem effector_shape_items[] = {
 
 
 /* type specific return values only used from functions */
-static EnumPropertyItem curve_shape_items[] = {
+static const EnumPropertyItem curve_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Curve", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
-static EnumPropertyItem empty_shape_items[] = {
+static const EnumPropertyItem empty_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
-static EnumPropertyItem vortex_shape_items[] = {
+static const EnumPropertyItem vortex_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Surface falloff (New)", ""},
@@ -76,14 +76,14 @@ static EnumPropertyItem vortex_shape_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-static EnumPropertyItem curve_vortex_shape_items[] = {
+static const EnumPropertyItem curve_vortex_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Curve (New)", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
-static EnumPropertyItem empty_vortex_shape_items[] = {
+static const EnumPropertyItem empty_vortex_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{0, NULL, 0, NULL, NULL}
@@ -736,7 +736,7 @@ static void rna_softbody_dependency_update(Main *bmain, Scene *scene, PointerRNA
 	rna_softbody_update(bmain, scene, ptr);
 }
 
-static EnumPropertyItem *rna_Effector_shape_itemf(bContext *UNUSED(C), PointerRNA *ptr,
+static const EnumPropertyItem *rna_Effector_shape_itemf(bContext *UNUSED(C), PointerRNA *ptr,
                                                   PropertyRNA *UNUSED(prop), bool *UNUSED(r_free))
 {
 	Object *ob = NULL;
@@ -768,50 +768,23 @@ static EnumPropertyItem *rna_Effector_shape_itemf(bContext *UNUSED(C), PointerRN
 
 #else
 
-/* ptcache.point_caches */
-static void rna_def_ptcache_point_caches(BlenderRNA *brna, PropertyRNA *cprop)
+static void rna_def_pointcache_common(StructRNA *srna)
 {
-	StructRNA *srna;
 	PropertyRNA *prop;
 
-	/* FunctionRNA *func; */
-	/* PropertyRNA *parm; */
-
-	RNA_def_property_srna(cprop, "PointCaches");
-	srna = RNA_def_struct(brna, "PointCaches", NULL);
-	RNA_def_struct_sdna(srna, "PointCache");
-	RNA_def_struct_ui_text(srna, "Point Caches", "Collection of point caches");
-
-	prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_int_funcs(prop, "rna_Cache_active_point_cache_index_get",
-	                           "rna_Cache_active_point_cache_index_set",
-	                           "rna_Cache_active_point_cache_index_range");
-	RNA_def_property_ui_text(prop, "Active Point Cache Index", "");
-	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_change");
-}
-
-static void rna_def_pointcache(BlenderRNA *brna)
-{
-	StructRNA *srna;
-	PropertyRNA *prop;
-
-	static EnumPropertyItem point_cache_compress_items[] = {
+	static const EnumPropertyItem point_cache_compress_items[] = {
 		{PTCACHE_COMPRESS_NO, "NO", 0, "No", "No compression"},
 		{PTCACHE_COMPRESS_LZO, "LIGHT", 0, "Light", "Fast but not so effective compression"},
 		{PTCACHE_COMPRESS_LZMA, "HEAVY", 0, "Heavy", "Effective but slow compression"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
-	srna = RNA_def_struct(brna, "PointCache", NULL);
-	RNA_def_struct_ui_text(srna, "Point Cache", "Point cache for physics simulations");
-	RNA_def_struct_ui_icon(srna, ICON_PHYSICS);
-	
 	prop = RNA_def_property(srna, "frame_start", PROP_INT, PROP_TIME);
 	RNA_def_property_int_sdna(prop, NULL, "startframe");
 	RNA_def_property_range(prop, -MAXFRAME, MAXFRAME);
 	RNA_def_property_ui_range(prop, 1, MAXFRAME, 1, 1);
 	RNA_def_property_ui_text(prop, "Start", "Frame on which the simulation starts");
-	
+
 	prop = RNA_def_property(srna, "frame_end", PROP_INT, PROP_TIME);
 	RNA_def_property_int_sdna(prop, NULL, "endframe");
 	RNA_def_property_range(prop, 1, MAXFRAME);
@@ -892,13 +865,59 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	                         "Use this file's path for the disk cache when library linked into another file "
 	                         "(for local bakes per scene file, disable this option)");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_idname_change");
+}
 
+static void rna_def_ptcache_point_caches(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	/* FunctionRNA *func; */
+	/* PropertyRNA *parm; */
+
+	RNA_def_property_srna(cprop, "PointCaches");
+	srna = RNA_def_struct(brna, "PointCaches", NULL);
+	RNA_def_struct_sdna(srna, "PointCache");
+	RNA_def_struct_ui_text(srna, "Point Caches", "Collection of point caches");
+
+	prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_funcs(prop, "rna_Cache_active_point_cache_index_get",
+	                           "rna_Cache_active_point_cache_index_set",
+	                           "rna_Cache_active_point_cache_index_range");
+	RNA_def_property_ui_text(prop, "Active Point Cache Index", "");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_change");
+
+	/* And define another RNA type for those collection items. */
+	srna = RNA_def_struct(brna, "PointCacheItem", NULL);
+	RNA_def_struct_sdna(srna, "PointCache");
+	RNA_def_struct_ui_text(srna, "Point Cache", "point cache for physics simulations");
+	RNA_def_struct_ui_icon(srna, ICON_PHYSICS);
+
+	rna_def_pointcache_common(srna);
+}
+
+static void rna_def_pointcache_active(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "PointCache", NULL);
+	RNA_def_struct_ui_text(srna, "Active Point Cache", "Active point cache for physics simulations");
+	RNA_def_struct_ui_icon(srna, ICON_PHYSICS);
+
+	rna_def_pointcache_common(srna);
+
+	/* This first-level RNA pointer also has list of all caches from owning ID.
+	 * Those caches items have exact same content as 'active' one, except for that collection,
+	 * to prevent ugly recursive layout pattern.
+	 * Note: This shall probably be redone from scratch in a proper way at some poitn, but for now that will do,
+	 *       and shall not break anything in the API. */
 	prop = RNA_def_property(srna, "point_caches", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_collection_funcs(prop, "rna_Cache_list_begin", "rna_iterator_listbase_next",
 	                                  "rna_iterator_listbase_end", "rna_iterator_listbase_get",
 	                                  NULL, NULL, NULL, NULL);
-	RNA_def_property_struct_type(prop, "PointCache");
-	RNA_def_property_ui_text(prop, "Point Cache List", "Point cache list");
+	RNA_def_property_struct_type(prop, "PointCacheItem");
+	RNA_def_property_ui_text(prop, "Point Cache List", "");
 	rna_def_ptcache_point_caches(brna, prop);
 }
 
@@ -1123,7 +1142,7 @@ static void rna_def_field(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 	
-	static EnumPropertyItem field_type_items[] = {
+	static const EnumPropertyItem field_type_items[] = {
 		{0, "NONE", 0, "None", ""},
 		{PFIELD_FORCE, "FORCE", ICON_FORCE_FORCE, "Force", "Radial field toward the center of object"},
 		{PFIELD_WIND, "WIND", ICON_FORCE_WIND, "Wind", "Constant force along the force object's local Z axis"},
@@ -1146,28 +1165,28 @@ static void rna_def_field(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
-	static EnumPropertyItem falloff_items[] = {
+	static const EnumPropertyItem falloff_items[] = {
 		{PFIELD_FALL_SPHERE, "SPHERE", 0, "Sphere", ""},
 		{PFIELD_FALL_TUBE, "TUBE", 0, "Tube", ""},
 		{PFIELD_FALL_CONE, "CONE", 0, "Cone", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 		
-	static EnumPropertyItem texture_items[] = {
+	static const EnumPropertyItem texture_items[] = {
 		{PFIELD_TEX_RGB, "RGB", 0, "RGB", ""},
 		{PFIELD_TEX_GRAD, "GRADIENT", 0, "Gradient", ""},
 		{PFIELD_TEX_CURL, "CURL", 0, "Curl", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
-	static EnumPropertyItem zdirection_items[] = {
+	static const EnumPropertyItem zdirection_items[] = {
 		{PFIELD_Z_BOTH, "BOTH", 0, "Both Z", ""},
 		{PFIELD_Z_POS, "POSITIVE", 0, "+Z", ""},
 		{PFIELD_Z_NEG, "NEGATIVE", 0, "-Z", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 		
-	static EnumPropertyItem guide_kink_items[] = {
+	static const EnumPropertyItem guide_kink_items[] = {
 		{0, "NONE", 0, "Nothing", ""},
 		{1, "CURL", 0, "Curl", ""},
 		{2, "RADIAL", 0, "Radial", ""},
@@ -1262,7 +1281,8 @@ static void rna_def_field(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "f_size");
-	RNA_def_property_range(prop, 0.0f, 10.0f);
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 1.0f, 3);
 	RNA_def_property_ui_text(prop, "Size", "Size of the turbulence");
 	RNA_def_property_update(prop, 0, "rna_FieldSettings_update");
 
@@ -1286,7 +1306,8 @@ static void rna_def_field(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "distance_max", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "maxdist");
-	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.0f, 1000.0f, 1.0f, 3);
 	RNA_def_property_ui_text(prop, "Maximum Distance", "Maximum distance for the field to work");
 	RNA_def_property_update(prop, 0, "rna_FieldSettings_update");
 	
@@ -1565,7 +1586,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 	
-	static EnumPropertyItem collision_type_items[] = {
+	static const EnumPropertyItem collision_type_items[] = {
 		{SBC_MODE_MANUAL, "MANUAL", 0, "Manual", "Manual adjust"},
 		{SBC_MODE_AVG, "AVERAGE", 0, "Average", "Average Spring length * Ball Size"},
 		{SBC_MODE_MIN, "MINIMAL", 0, "Minimal", "Minimal Spring length * Ball Size"},
@@ -1574,7 +1595,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 	
-	static EnumPropertyItem aerodynamics_type[] = {
+	static const EnumPropertyItem aerodynamics_type[] = {
 		{0, "SIMPLE", 0, "Simple", "Edges receive a drag force from surrounding media"},
 		{1, "LIFT_FORCE", 0, "Lift Force", "Edges receive a lift force when passing through surrounding media"},
 		{0, NULL, 0, NULL, NULL}
@@ -1876,7 +1897,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 
 void RNA_def_object_force(BlenderRNA *brna)
 {
-	rna_def_pointcache(brna);
+	rna_def_pointcache_active(brna);
 	rna_def_collision(brna);
 	rna_def_effector_weight(brna);
 	rna_def_field(brna);

@@ -57,6 +57,7 @@ ccl_device_noinline void shader_setup_from_ray(KernelGlobals *kg,
 #ifdef __INSTANCING__
 	sd->object = (isect->object == PRIM_NONE)? kernel_tex_fetch(__prim_object, isect->prim): isect->object;
 #endif
+	sd->lamp = LAMP_NONE;
 
 	sd->type = isect->type;
 	sd->flag = 0;
@@ -96,7 +97,7 @@ ccl_device_noinline void shader_setup_from_ray(KernelGlobals *kg,
 		sd->P = triangle_refine(kg, sd, isect, ray);
 		sd->Ng = Ng;
 		sd->N = Ng;
-		
+
 		/* smooth normal */
 		if(sd->shader & SHADER_SMOOTH_NORMAL)
 			sd->N = triangle_smooth_normal(kg, Ng, sd->prim, sd->u, sd->v);
@@ -113,7 +114,7 @@ ccl_device_noinline void shader_setup_from_ray(KernelGlobals *kg,
 
 	sd->I = -ray->D;
 
-	sd->flag |= kernel_tex_fetch(__shader_flag, (sd->shader & SHADER_MASK)*SHADER_SIZE);
+	sd->flag |= kernel_tex_fetch(__shaders, (sd->shader & SHADER_MASK)).flags;
 
 #ifdef __INSTANCING__
 	if(isect->object != OBJECT_NONE) {
@@ -181,7 +182,7 @@ void shader_setup_from_subsurface(
 		sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
 
 		/* static triangle */
-		sd->P = triangle_refine_subsurface(kg, sd, isect, ray);
+		sd->P = triangle_refine_local(kg, sd, isect, ray);
 		sd->Ng = Ng;
 		sd->N = Ng;
 
@@ -198,7 +199,7 @@ void shader_setup_from_subsurface(
 		motion_triangle_shader_setup(kg, sd, isect, ray, true);
 	}
 
-	sd->flag |= kernel_tex_fetch(__shader_flag, (sd->shader & SHADER_MASK)*SHADER_SIZE);
+	sd->flag |= kernel_tex_fetch(__shaders, (sd->shader & SHADER_MASK)).flags;
 
 #  ifdef __INSTANCING__
 	if(isect->object != OBJECT_NONE) {
@@ -265,6 +266,7 @@ ccl_device_inline void shader_setup_from_sample(KernelGlobals *kg,
 #ifdef __INSTANCING__
 	sd->object = object;
 #endif
+	sd->lamp = LAMP_NONE;
 	/* currently no access to bvh prim index for strand sd->prim*/
 	sd->prim = prim;
 #ifdef __UV__
@@ -274,7 +276,7 @@ ccl_device_inline void shader_setup_from_sample(KernelGlobals *kg,
 	sd->time = time;
 	sd->ray_length = t;
 
-	sd->flag = kernel_tex_fetch(__shader_flag, (sd->shader & SHADER_MASK)*SHADER_SIZE);
+	sd->flag = kernel_tex_fetch(__shaders, (sd->shader & SHADER_MASK)).flags;
 	sd->object_flag = 0;
 	if(sd->object != OBJECT_NONE) {
 		sd->object_flag |= kernel_tex_fetch(__object_flag,
@@ -286,6 +288,7 @@ ccl_device_inline void shader_setup_from_sample(KernelGlobals *kg,
 	else if(lamp != LAMP_NONE) {
 		sd->ob_tfm  = lamp_fetch_transform(kg, lamp, false);
 		sd->ob_itfm = lamp_fetch_transform(kg, lamp, true);
+		sd->lamp = lamp;
 #endif
 	}
 
@@ -383,7 +386,7 @@ ccl_device_inline void shader_setup_from_background(KernelGlobals *kg, ShaderDat
 	sd->Ng = -ray->D;
 	sd->I = -ray->D;
 	sd->shader = kernel_data.background.surface_shader;
-	sd->flag = kernel_tex_fetch(__shader_flag, (sd->shader & SHADER_MASK)*SHADER_SIZE);
+	sd->flag = kernel_tex_fetch(__shaders, (sd->shader & SHADER_MASK)).flags;
 	sd->object_flag = 0;
 	sd->time = ray->time;
 	sd->ray_length = 0.0f;
@@ -391,6 +394,7 @@ ccl_device_inline void shader_setup_from_background(KernelGlobals *kg, ShaderDat
 #ifdef __INSTANCING__
 	sd->object = PRIM_NONE;
 #endif
+	sd->lamp = LAMP_NONE;
 	sd->prim = PRIM_NONE;
 #ifdef __UV__
 	sd->u = 0.0f;
@@ -419,7 +423,7 @@ ccl_device_inline void shader_setup_from_volume(KernelGlobals *kg, ShaderData *s
 {
 	/* vectors */
 	sd->P = ray->P;
-	sd->N = -ray->D;  
+	sd->N = -ray->D;
 	sd->Ng = -ray->D;
 	sd->I = -ray->D;
 	sd->shader = SHADER_NONE;
@@ -428,36 +432,37 @@ ccl_device_inline void shader_setup_from_volume(KernelGlobals *kg, ShaderData *s
 	sd->time = ray->time;
 	sd->ray_length = 0.0f; /* todo: can we set this to some useful value? */
 
-#ifdef __INSTANCING__
+#  ifdef __INSTANCING__
 	sd->object = PRIM_NONE; /* todo: fill this for texture coordinates */
-#endif
+#  endif
+	sd->lamp = LAMP_NONE;
 	sd->prim = PRIM_NONE;
 	sd->type = PRIMITIVE_NONE;
 
-#ifdef __UV__
+#  ifdef __UV__
 	sd->u = 0.0f;
 	sd->v = 0.0f;
-#endif
+#  endif
 
-#ifdef __DPDU__
+#  ifdef __DPDU__
 	/* dPdu/dPdv */
 	sd->dPdu = make_float3(0.0f, 0.0f, 0.0f);
 	sd->dPdv = make_float3(0.0f, 0.0f, 0.0f);
-#endif
+#  endif
 
-#ifdef __RAY_DIFFERENTIALS__
+#  ifdef __RAY_DIFFERENTIALS__
 	/* differentials */
 	sd->dP = ray->dD;
 	differential_incoming(&sd->dI, sd->dP);
 	sd->du = differential_zero();
 	sd->dv = differential_zero();
-#endif
+#  endif
 
 	/* for NDC coordinates */
 	sd->ray_P = ray->P;
 	sd->ray_dP = ray->dP;
 }
-#endif
+#endif  /* __VOLUME__ */
 
 /* Merging */
 
@@ -492,7 +497,7 @@ ccl_device_inline void shader_merge_closures(ShaderData *sd)
 		}
 	}
 }
-#endif
+#endif  /* __BRANCHED_PATH__ || __VOLUME__ */
 
 /* Defensive sampling. */
 
@@ -571,7 +576,7 @@ ccl_device_inline void _shader_bsdf_multi_eval_branched(KernelGlobals *kg,
 		}
 	}
 }
-#endif
+#endif  /* __BRANCHED_PATH__ */
 
 
 #ifndef __KERNEL_CUDA__
@@ -606,6 +611,8 @@ void shader_bsdf_eval(KernelGlobals *kg,
 ccl_device_inline const ShaderClosure *shader_bsdf_pick(ShaderData *sd,
                                                         float *randu)
 {
+	/* Note the sampling here must match shader_bssrdf_pick,
+	 * since we reuse the same random number. */
 	int sampled = 0;
 
 	if(sd->num_closure > 1) {
@@ -615,7 +622,7 @@ ccl_device_inline const ShaderClosure *shader_bsdf_pick(ShaderData *sd,
 		for(int i = 0; i < sd->num_closure; i++) {
 			const ShaderClosure *sc = &sd->closure[i];
 
-			if(CLOSURE_IS_BSDF(sc->type)) {
+			if(CLOSURE_IS_BSDF_OR_BSSRDF(sc->type)) {
 				sum += sc->sample_weight;
 			}
 		}
@@ -626,7 +633,7 @@ ccl_device_inline const ShaderClosure *shader_bsdf_pick(ShaderData *sd,
 		for(int i = 0; i < sd->num_closure; i++) {
 			const ShaderClosure *sc = &sd->closure[i];
 
-			if(CLOSURE_IS_BSDF(sc->type)) {
+			if(CLOSURE_IS_BSDF_OR_BSSRDF(sc->type)) {
 				float next_sum = partial_sum + sc->sample_weight;
 
 				if(r < next_sum) {
@@ -643,13 +650,16 @@ ccl_device_inline const ShaderClosure *shader_bsdf_pick(ShaderData *sd,
 		}
 	}
 
-	return &sd->closure[sampled];
+	const ShaderClosure *sc = &sd->closure[sampled];
+	return CLOSURE_IS_BSDF(sc->type)? sc: NULL;
 }
 
 ccl_device_inline const ShaderClosure *shader_bssrdf_pick(ShaderData *sd,
                                                           ccl_addr_space float3 *throughput,
                                                           float *randu)
 {
+	/* Note the sampling here must match shader_bsdf_pick,
+	 * since we reuse the same random number. */
 	int sampled = 0;
 
 	if(sd->num_closure > 1) {
@@ -698,7 +708,8 @@ ccl_device_inline const ShaderClosure *shader_bssrdf_pick(ShaderData *sd,
 		}
 	}
 
-	return &sd->closure[sampled];
+	const ShaderClosure *sc = &sd->closure[sampled];
+	return CLOSURE_IS_BSSRDF(sc->type)? sc: NULL;
 }
 
 ccl_device_inline int shader_bsdf_sample(KernelGlobals *kg,
@@ -752,6 +763,26 @@ ccl_device int shader_bsdf_sample_closure(KernelGlobals *kg, ShaderData *sd,
 	return label;
 }
 
+ccl_device float shader_bsdf_average_roughness(ShaderData *sd)
+{
+	float roughness = 0.0f;
+	float sum_weight = 0.0f;
+
+	for(int i = 0; i < sd->num_closure; i++) {
+		ShaderClosure *sc = &sd->closure[i];
+
+		if(CLOSURE_IS_BSDF(sc->type)) {
+			/* sqrt once to undo the squaring from multiplying roughness on the
+			 * two axes, and once for the squared roughness convention. */
+			float weight = fabsf(average(sc->weight));
+			roughness += weight * sqrtf(safe_sqrtf(bsdf_get_roughness_squared(sc)));
+			sum_weight += weight;
+		}
+	}
+
+	return (sum_weight > 0.0f) ? roughness / sum_weight : 0.0f;
+}
+
 ccl_device void shader_bsdf_blur(KernelGlobals *kg, ShaderData *sd, float roughness)
 {
 	for(int i = 0; i < sd->num_closure; i++) {
@@ -764,30 +795,30 @@ ccl_device void shader_bsdf_blur(KernelGlobals *kg, ShaderData *sd, float roughn
 
 ccl_device float3 shader_bsdf_transparency(KernelGlobals *kg, const ShaderData *sd)
 {
-	if(sd->flag & SD_HAS_ONLY_VOLUME)
+	if(sd->flag & SD_HAS_ONLY_VOLUME) {
 		return make_float3(1.0f, 1.0f, 1.0f);
-
-	float3 eval = make_float3(0.0f, 0.0f, 0.0f);
-
-	for(int i = 0; i < sd->num_closure; i++) {
-		const ShaderClosure *sc = &sd->closure[i];
-
-		if(sc->type == CLOSURE_BSDF_TRANSPARENT_ID) // todo: make this work for osl
-			eval += sc->weight;
 	}
-
-	return eval;
+	else if(sd->flag & SD_TRANSPARENT) {
+		return sd->closure_transparent_extinction;
+	}
+	else {
+		return make_float3(0.0f, 0.0f, 0.0f);
+	}
 }
 
 ccl_device void shader_bsdf_disable_transparency(KernelGlobals *kg, ShaderData *sd)
 {
-	for(int i = 0; i < sd->num_closure; i++) {
-		ShaderClosure *sc = &sd->closure[i];
+	if(sd->flag & SD_TRANSPARENT) {
+		for(int i = 0; i < sd->num_closure; i++) {
+			ShaderClosure *sc = &sd->closure[i];
 
-		if(sc->type == CLOSURE_BSDF_TRANSPARENT_ID) {
-			sc->sample_weight = 0.0f;
-			sc->weight = make_float3(0.0f, 0.0f, 0.0f);
+			if(sc->type == CLOSURE_BSDF_TRANSPARENT_ID) {
+				sc->sample_weight = 0.0f;
+				sc->weight = make_float3(0.0f, 0.0f, 0.0f);
+			}
 		}
+
+		sd->flag &= ~SD_TRANSPARENT;
 	}
 }
 
@@ -797,7 +828,7 @@ ccl_device float3 shader_bsdf_alpha(KernelGlobals *kg, ShaderData *sd)
 
 	alpha = max(alpha, make_float3(0.0f, 0.0f, 0.0f));
 	alpha = min(alpha, make_float3(1.0f, 1.0f, 1.0f));
-	
+
 	return alpha;
 }
 
@@ -864,7 +895,7 @@ ccl_device float3 shader_bsdf_average_normal(KernelGlobals *kg, ShaderData *sd)
 	for(int i = 0; i < sd->num_closure; i++) {
 		ShaderClosure *sc = &sd->closure[i];
 		if(CLOSURE_IS_BSDF_OR_BSSRDF(sc->type))
-			N += sc->N*average(sc->weight);
+			N += sc->N*fabsf(average(sc->weight));
 	}
 
 	return (is_zero(N))? sd->N : normalize(N);
@@ -881,11 +912,11 @@ ccl_device float3 shader_bsdf_ao(KernelGlobals *kg, ShaderData *sd, float ao_fac
 		if(CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
 			const DiffuseBsdf *bsdf = (const DiffuseBsdf*)sc;
 			eval += sc->weight*ao_factor;
-			N += bsdf->N*average(sc->weight);
+			N += bsdf->N*fabsf(average(sc->weight));
 		}
 		else if(CLOSURE_IS_AMBIENT_OCCLUSION(sc->type)) {
 			eval += sc->weight;
-			N += sd->N*average(sc->weight);
+			N += sd->N*fabsf(average(sc->weight));
 		}
 	}
 
@@ -919,31 +950,21 @@ ccl_device float3 shader_bssrdf_sum(ShaderData *sd, float3 *N_, float *texture_b
 
 	if(texture_blur_)
 		*texture_blur_ = safe_divide(texture_blur, weight_sum);
-	
+
 	return eval;
 }
-#endif
+#endif  /* __SUBSURFACE__ */
 
 /* Emission */
 
-ccl_device float3 emissive_eval(KernelGlobals *kg, ShaderData *sd, ShaderClosure *sc)
-{
-	return emissive_simple_eval(sd->Ng, sd->I);
-}
-
 ccl_device float3 shader_emissive_eval(KernelGlobals *kg, ShaderData *sd)
 {
-	float3 eval;
-	eval = make_float3(0.0f, 0.0f, 0.0f);
-
-	for(int i = 0; i < sd->num_closure; i++) {
-		ShaderClosure *sc = &sd->closure[i];
-
-		if(CLOSURE_IS_EMISSION(sc->type))
-			eval += emissive_eval(kg, sd, sc)*sc->weight;
+	if(sd->flag & SD_EMISSION) {
+		return emissive_simple_eval(sd->Ng, sd->I) * sd->closure_emission_background;
 	}
-
-	return eval;
+	else {
+		return make_float3(0.0f, 0.0f, 0.0f);
+	}
 }
 
 /* Holdout */
@@ -967,8 +988,19 @@ ccl_device float3 shader_holdout_eval(KernelGlobals *kg, ShaderData *sd)
 ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
 	ccl_addr_space PathState *state, int path_flag)
 {
+	/* If path is being terminated, we are tracing a shadow ray or evaluating
+	 * emission, then we don't need to store closures. The emission and shadow
+	 * shader data also do not have a closure array to save GPU memory. */
+	int max_closures;
+	if(path_flag & (PATH_RAY_TERMINATE|PATH_RAY_SHADOW|PATH_RAY_EMISSION)) {
+		max_closures = 0;
+	}
+	else {
+		max_closures = kernel_data.integrator.max_closures;
+	}
+
 	sd->num_closure = 0;
-	sd->num_closure_extra = 0;
+	sd->num_closure_left = max_closures;
 
 #ifdef __OSL__
 	if(kg->osl)
@@ -982,8 +1014,10 @@ ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
 		DiffuseBsdf *bsdf = (DiffuseBsdf*)bsdf_alloc(sd,
 		                                             sizeof(DiffuseBsdf),
 		                                             make_float3(0.8f, 0.8f, 0.8f));
-		bsdf->N = sd->N;
-		sd->flag |= bsdf_diffuse_setup(bsdf);
+		if (bsdf != NULL) {
+			bsdf->N = sd->N;
+			sd->flag |= bsdf_diffuse_setup(bsdf);
+		}
 #endif
 	}
 
@@ -998,32 +1032,28 @@ ccl_device float3 shader_eval_background(KernelGlobals *kg, ShaderData *sd,
 	ccl_addr_space PathState *state, int path_flag)
 {
 	sd->num_closure = 0;
-	sd->num_closure_extra = 0;
+	sd->num_closure_left = 0;
 
 #ifdef __SVM__
-#ifdef __OSL__
+#  ifdef __OSL__
 	if(kg->osl) {
 		OSLShader::eval_background(kg, sd, state, path_flag);
 	}
 	else
-#endif
+#  endif  /* __OSL__ */
 	{
 		svm_eval_nodes(kg, sd, state, SHADER_TYPE_SURFACE, path_flag);
 	}
 
-	float3 eval = make_float3(0.0f, 0.0f, 0.0f);
-
-	for(int i = 0; i < sd->num_closure; i++) {
-		const ShaderClosure *sc = &sd->closure[i];
-
-		if(CLOSURE_IS_BACKGROUND(sc->type))
-			eval += sc->weight;
+	if(sd->flag & SD_EMISSION) {
+		return sd->closure_emission_background;
 	}
-
-	return eval;
-#else
+	else {
+		return make_float3(0.0f, 0.0f, 0.0f);
+	}
+#else  /* __SVM__ */
 	return make_float3(0.8f, 0.8f, 0.8f);
-#endif
+#endif  /* __SVM__ */
 }
 
 /* Volume */
@@ -1075,7 +1105,7 @@ ccl_device int shader_volume_phase_sample(KernelGlobals *kg, const ShaderData *s
 
 		for(sampled = 0; sampled < sd->num_closure; sampled++) {
 			const ShaderClosure *sc = &sd->closure[sampled];
-			
+
 			if(CLOSURE_IS_PHASE(sc->type))
 				sum += sc->sample_weight;
 		}
@@ -1085,7 +1115,7 @@ ccl_device int shader_volume_phase_sample(KernelGlobals *kg, const ShaderData *s
 
 		for(sampled = 0; sampled < sd->num_closure; sampled++) {
 			const ShaderClosure *sc = &sd->closure[sampled];
-			
+
 			if(CLOSURE_IS_PHASE(sc->type)) {
 				float next_sum = partial_sum + sc->sample_weight;
 
@@ -1145,10 +1175,21 @@ ccl_device_inline void shader_eval_volume(KernelGlobals *kg,
                                           ccl_addr_space VolumeStack *stack,
                                           int path_flag)
 {
+	/* If path is being terminated, we are tracing a shadow ray or evaluating
+	 * emission, then we don't need to store closures. The emission and shadow
+	 * shader data also do not have a closure array to save GPU memory. */
+	int max_closures;
+	if(path_flag & (PATH_RAY_TERMINATE|PATH_RAY_SHADOW|PATH_RAY_EMISSION)) {
+		max_closures = 0;
+	}
+	else {
+		max_closures = kernel_data.integrator.max_closures;
+	}
+
 	/* reset closures once at the start, we will be accumulating the closures
 	 * for all volumes in the stack into a single array of closures */
 	sd->num_closure = 0;
-	sd->num_closure_extra = 0;
+	sd->num_closure_left = max_closures;
 	sd->flag = 0;
 	sd->object_flag = 0;
 
@@ -1156,10 +1197,11 @@ ccl_device_inline void shader_eval_volume(KernelGlobals *kg,
 		/* setup shaderdata from stack. it's mostly setup already in
 		 * shader_setup_from_volume, this switching should be quick */
 		sd->object = stack[i].object;
+		sd->lamp = LAMP_NONE;
 		sd->shader = stack[i].shader;
 
 		sd->flag &= ~SD_SHADER_FLAGS;
-		sd->flag |= kernel_tex_fetch(__shader_flag, (sd->shader & SHADER_MASK)*SHADER_SIZE);
+		sd->flag |= kernel_tex_fetch(__shaders, (sd->shader & SHADER_MASK)).flags;
 		sd->object_flag &= ~SD_OBJECT_FLAGS;
 
 		if(sd->object != OBJECT_NONE) {
@@ -1191,20 +1233,20 @@ ccl_device_inline void shader_eval_volume(KernelGlobals *kg,
 	}
 }
 
-#endif
+#endif  /* __VOLUME__ */
 
 /* Displacement Evaluation */
 
 ccl_device void shader_eval_displacement(KernelGlobals *kg, ShaderData *sd, ccl_addr_space PathState *state)
 {
 	sd->num_closure = 0;
-	sd->num_closure_extra = 0;
+	sd->num_closure_left = 0;
 
 	/* this will modify sd->P */
 #ifdef __SVM__
 #  ifdef __OSL__
 	if(kg->osl)
-		OSLShader::eval_displacement(kg, sd);
+		OSLShader::eval_displacement(kg, sd, state);
 	else
 #  endif
 	{
@@ -1232,11 +1274,10 @@ ccl_device bool shader_transparent_shadow(KernelGlobals *kg, Intersection *isect
 		shader = __float_as_int(str.z);
 	}
 #endif
-	int flag = kernel_tex_fetch(__shader_flag, (shader & SHADER_MASK)*SHADER_SIZE);
+	int flag = kernel_tex_fetch(__shaders, (shader & SHADER_MASK)).flags;
 
 	return (flag & SD_HAS_TRANSPARENT_SHADOW) != 0;
 }
-#endif
+#endif  /* __TRANSPARENT_SHADOWS__ */
 
 CCL_NAMESPACE_END
-

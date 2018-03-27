@@ -381,6 +381,9 @@ void BKE_screen_free(bScreen *sc)
 	BLI_freelistN(&sc->vertbase);
 	BLI_freelistN(&sc->edgebase);
 	BLI_freelistN(&sc->areabase);
+
+	/* Region and timer are freed by the window manager. */
+	MEM_SAFE_FREE(sc->tool_tip);
 }
 
 /* for depsgraph */
@@ -617,7 +620,7 @@ void BKE_screen_view3d_twmode_remove(View3D *v3d, const int i)
 {
 	const int selected_index = (v3d->twmode - V3D_MANIP_CUSTOM);
 	if (selected_index == i) {
-		v3d->twmode = V3D_MANIP_GLOBAL; /* fallback to global	*/
+		v3d->twmode = V3D_MANIP_GLOBAL; /* fallback to global */
 	}
 	else if (selected_index > i) {
 		v3d->twmode--;

@@ -184,11 +184,6 @@ MINLINE unsigned power_of_2_min_u(unsigned x)
 
 /* rounding and clamping */
 
-MINLINE int iroundf(float a)
-{
-	return (int)floorf(a + 0.5f);
-}
-
 #define _round_clamp_fl_impl(arg, ty, min, max) { \
 	float r = floorf(arg + 0.5f); \
 	if      (UNLIKELY(r <= (float)min)) return (ty)min; \
@@ -202,6 +197,26 @@ MINLINE int iroundf(float a)
 	else if (UNLIKELY(r >= (double)max)) return (ty)max; \
 	else return (ty)r; \
 }
+
+#define _round_fl_impl(arg, ty) { return (ty)floorf(arg + 0.5f); }
+#define _round_db_impl(arg, ty) { return (ty)floor(arg + 0.5); }
+
+MINLINE signed char    round_fl_to_char(float a) { _round_fl_impl(a, signed char) }
+MINLINE unsigned char  round_fl_to_uchar(float a) { _round_fl_impl(a, unsigned char) }
+MINLINE short          round_fl_to_short(float a) { _round_fl_impl(a, short) }
+MINLINE unsigned short round_fl_to_ushort(float a) { _round_fl_impl(a, unsigned short) }
+MINLINE int            round_fl_to_int(float a) { _round_fl_impl(a, int) }
+MINLINE unsigned int   round_fl_to_uint(float a) { _round_fl_impl(a, unsigned int) }
+
+MINLINE signed char    round_db_to_char(double a) { _round_db_impl(a, signed char) }
+MINLINE unsigned char  round_db_to_uchar(double a) { _round_db_impl(a, unsigned char) }
+MINLINE short          round_db_to_short(double a) { _round_db_impl(a, short) }
+MINLINE unsigned short round_db_to_ushort(double a) { _round_db_impl(a, unsigned short) }
+MINLINE int            round_db_to_int(double a) { _round_db_impl(a, int) }
+MINLINE unsigned int   round_db_to_uint(double a) { _round_db_impl(a, unsigned int) }
+
+#undef _round_fl_impl
+#undef _round_db_impl
 
 MINLINE signed char    round_fl_to_char_clamp(float a) { _round_clamp_fl_impl(a, signed char, SCHAR_MIN, SCHAR_MAX) }
 MINLINE unsigned char  round_fl_to_uchar_clamp(float a) { _round_clamp_fl_impl(a, unsigned char, 0, UCHAR_MAX) }
@@ -300,6 +315,36 @@ MINLINE int max_iiii(int a, int b, int c, int d)
 	return max_ii(max_iii(a, b, c), d);
 }
 
+MINLINE size_t min_zz(size_t a, size_t b)
+{
+	return (a < b) ? a : b;
+}
+MINLINE size_t max_zz(size_t a, size_t b)
+{
+	return (b < a) ? a : b;
+}
+
+MINLINE int clamp_i(int value, int min, int max)
+{
+	return min_ii(max_ii(value, min), max);
+}
+
+MINLINE float clamp_f(float value, float min, float max)
+{
+	if (value > max) {
+		return max;
+	}
+	else if (value < min) {
+		return min;
+	}
+	return value;
+}
+
+MINLINE size_t clamp_z(size_t value, size_t min, size_t max)
+{
+	return min_zz(max_zz(value, min), max);
+}
+
 /**
  * Almost-equal for IEEE floats, using absolute difference method.
  *
@@ -323,10 +368,8 @@ MINLINE int compare_ff_relative(float a, float b, const float max_diff, const in
 {
 	union {float f; int i;} ua, ub;
 
-#if 0  /* No BLI_assert in INLINE :/ */
 	BLI_assert(sizeof(float) == sizeof(int));
 	BLI_assert(max_ulps < (1 << 22));
-#endif
 
 	if (fabsf(a - b) <= max_diff) {
 		return 1;
@@ -373,6 +416,10 @@ MINLINE int integer_digits_d(const double d)
 	return (d == 0.0) ? 0 : (int)floor(log10(fabs(d))) + 1;
 }
 
+MINLINE int integer_digits_i(const int i)
+{
+	return (int)log10((double)i) + 1;
+}
 
 /* Internal helpers for SSE2 implementation.
  *
@@ -426,7 +473,7 @@ MALWAYS_INLINE __m128 _bli_math_fastpow24(const __m128 arg)
 	 */
 	/* 0x3F4CCCCD = 4/5 */
 	/* 0x4F55A7FB = 2^(127/(4/5) - 127) * 0.994^(1/(4/5)) */
-	/* error max = 0.17	avg = 0.0018	|avg| = 0.05 */
+	/* error max = 0.17, avg = 0.0018, |avg| = 0.05 */
 	__m128 x = _bli_math_fastpow(0x3F4CCCCD, 0x4F55A7FB, arg);
 	__m128 arg2 = _mm_mul_ps(arg, arg);
 	__m128 arg4 = _mm_mul_ps(arg2, arg2);

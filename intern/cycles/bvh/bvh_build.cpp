@@ -28,7 +28,6 @@
 #include "render/curves.h"
 
 #include "util/util_algorithm.h"
-#include "util/util_debug.h"
 #include "util/util_foreach.h"
 #include "util/util_logging.h"
 #include "util/util_progress.h"
@@ -129,7 +128,7 @@ void BVHBuild::add_reference_triangles(BoundBox& root, BoundBox& center, Mesh *m
 		if(attr_mP == NULL) {
 			BoundBox bounds = BoundBox::empty;
 			t.bounds_grow(verts, bounds);
-			if(bounds.valid()) {
+			if(bounds.valid() && t.valid(verts)) {
 				references.push_back(BVHReference(bounds,
 				                                  j,
 				                                  i,

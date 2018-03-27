@@ -68,7 +68,7 @@ bool kernel_path_volume_bounce(
     ShaderData *sd,
     ccl_addr_space float3 *throughput,
     ccl_addr_space PathState *state,
-    PathRadiance *L,
+    PathRadianceState *L_state,
     ccl_addr_space Ray *ray)
 {
 	/* sample phase function */
@@ -87,7 +87,7 @@ bool kernel_path_volume_bounce(
 		return false;
 	
 	/* modify throughput */
-	path_radiance_bsdf_bounce(L, throughput, &phase_eval, phase_pdf, state->bounce, label);
+	path_radiance_bsdf_bounce(kg, L_state, throughput, &phase_eval, phase_pdf, state->bounce, label);
 
 	/* set labels */
 	state->ray_pdf = phase_pdf;
@@ -98,6 +98,23 @@ bool kernel_path_volume_bounce(
 
 	/* update path state */
 	path_state_next(kg, state, label);
+
+	/* Russian roulette termination of volume ray scattering. */
+	float probability = path_state_continuation_probability(kg, state, *throughput);
+
+	if(probability == 0.0f) {
+		return false;
+	}
+	else if(probability != 1.0f) {
+		/* Use dimension from the previous bounce, has not been used yet. */
+		float terminate = path_state_rng_1D(kg, state, PRNG_TERMINATE - PRNG_BOUNCE_NUM);
+
+		if(terminate >= probability) {
+			return false;
+		}
+
+		*throughput /= probability;
+	}
 
 	/* setup ray */
 	ray->P = sd->P;

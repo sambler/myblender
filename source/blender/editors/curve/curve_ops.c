@@ -94,6 +94,7 @@ void ED_operatortypes_curve(void)
 	WM_operatortype_append(CURVE_OT_spline_weight_set);
 	WM_operatortype_append(CURVE_OT_handle_type_set);
 	WM_operatortype_append(CURVE_OT_normals_make_consistent);
+	WM_operatortype_append(CURVE_OT_decimate);
 	WM_operatortype_append(CURVE_OT_shade_smooth);
 	WM_operatortype_append(CURVE_OT_shade_flat);
 	WM_operatortype_append(CURVE_OT_tilt_clear);
@@ -238,6 +239,9 @@ void ED_keymap_curve(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "CURVE_OT_vertex_add", ACTIONMOUSE, KM_CLICK, KM_CTRL, 0);
 
 	kmi = WM_keymap_add_item(keymap, "CURVE_OT_draw", ACTIONMOUSE, KM_PRESS, KM_SHIFT, 0);
+	RNA_boolean_set(kmi->ptr, "wait_for_input", false);
+
+	kmi = WM_keymap_add_item(keymap, "CURVE_OT_draw", TABLET_STYLUS, KM_PRESS, KM_SHIFT, 0);
 	RNA_boolean_set(kmi->ptr, "wait_for_input", false);
 
 	kmi = WM_keymap_add_item(keymap, "CURVE_OT_select_all", AKEY, KM_PRESS, 0, 0);

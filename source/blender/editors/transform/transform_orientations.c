@@ -70,7 +70,7 @@ void BIF_clearTransformOrientation(bContext *C)
 	
 	// Need to loop over all view3d
 	if (v3d && v3d->twmode >= V3D_MANIP_CUSTOM) {
-		v3d->twmode = V3D_MANIP_GLOBAL; /* fallback to global	*/
+		v3d->twmode = V3D_MANIP_GLOBAL; /* fallback to global */
 	}
 }
 
@@ -743,10 +743,19 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 							SWAP(BMVert *, v_pair[0], v_pair[1]);
 						}
 
-						add_v3_v3v3(normal, v_pair[0]->no, v_pair[1]->no);
-						sub_v3_v3v3(plane, v_pair[0]->co, v_pair[1]->co);
-						/* flip the plane normal so we point outwards */
-						negate_v3(plane);
+						add_v3_v3v3(normal, v_pair[1]->no, v_pair[0]->no);
+						sub_v3_v3v3(plane, v_pair[1]->co, v_pair[0]->co);
+
+						if (normalize_v3(plane) != 0.0f) {
+							/* For edges it'd important the resulting matrix can rotate around the edge,
+							 * project onto the plane so we can use a fallback value. */
+							project_plane_normalized_v3_v3v3(normal, normal, plane);
+							if (UNLIKELY(normalize_v3(normal) == 0.0f)) {
+								/* in the case the normal and plane are aligned,
+								 * use a fallback normal which is orthogonal to the plane. */
+								ortho_v3_v3(normal, plane);
+							}
+						}
 					}
 
 					result = ORIENTATION_EDGE;
@@ -910,7 +919,7 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 								}
 								else if (is_next_sel) {
 									/* A segment, add the edge normal */
-									sub_v3_v3v3(tvec, bp->vec, bp_next->vec	);
+									sub_v3_v3v3(tvec, bp->vec, bp_next->vec);
 									normalize_v3(tvec);
 									add_v3_v3(normal, tvec);
 								}

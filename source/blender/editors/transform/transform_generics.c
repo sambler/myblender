@@ -82,7 +82,6 @@
 #include "BKE_editmesh.h"
 #include "BKE_tracking.h"
 #include "BKE_mask.h"
-#include "BKE_utildefines.h"
 
 #include "ED_anim_api.h"
 #include "ED_armature.h"
@@ -277,7 +276,7 @@ static void animrecord_check_state(Scene *scene, ID *id, wmTimer *animtimer)
 				/* only push down if action is more than 1-2 frames long */
 				calc_action_range(adt->action, &astart, &aend, 1);
 				if (aend > astart + 2.0f) {
-					NlaStrip *strip = add_nlastrip_to_stack(adt, adt->action);
+					NlaStrip *strip = BKE_nlastack_add_strip(adt, adt->action);
 					
 					/* clear reference to action now that we've pushed it onto the stack */
 					id_us_min(&adt->action->id);
@@ -1208,7 +1207,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		if (prop_id && (prop = RNA_struct_find_property(op->ptr, prop_id)) &&
 		    RNA_property_is_set(op->ptr, prop))
 		{
-			BKE_BIT_TEST_SET(t->flag, RNA_property_boolean_get(op->ptr, prop), T_ALT_TRANSFORM);
+			SET_FLAG_FROM_TEST(t->flag, RNA_property_boolean_get(op->ptr, prop), T_ALT_TRANSFORM);
 		}
 	}
 

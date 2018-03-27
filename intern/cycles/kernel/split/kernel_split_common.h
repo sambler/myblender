@@ -29,7 +29,10 @@
 #endif
 
 #ifdef __KERNEL_OPENCL__
-#  include "kernel/kernel_image_opencl.h"
+#  include "kernel/kernels/opencl/kernel_opencl_image.h"
+#endif
+#ifdef __KERNEL_CUDA__
+#  include "kernel/kernels/cuda/kernel_cuda_image.h"
 #endif
 #ifdef __KERNEL_CPU__
 #  include "kernel/kernels/cpu/kernel_cpu_image.h"
@@ -56,7 +59,12 @@ ccl_device_inline void kernel_split_path_end(KernelGlobals *kg, int ray_index)
 	ccl_global char *ray_state = kernel_split_state.ray_state;
 
 #ifdef __BRANCHED_PATH__
-	if(IS_FLAG(ray_state, ray_index, RAY_BRANCHED_INDIRECT_SHARED)) {
+	ccl_addr_space SubsurfaceIndirectRays *ss_indirect = &kernel_split_state.ss_rays[ray_index];
+
+	if(ss_indirect->num_rays) {
+		ASSIGN_RAY_STATE(ray_state, ray_index, RAY_UPDATE_BUFFER);
+	}
+	else if(IS_FLAG(ray_state, ray_index, RAY_BRANCHED_INDIRECT_SHARED)) {
 		int orig_ray = kernel_split_state.branched_state[ray_index].original_ray;
 
 		PathRadiance *L = &kernel_split_state.path_radiance[ray_index];

@@ -184,7 +184,7 @@ static int has_poselib_pose_data_poll(bContext *C)
 static int has_poselib_pose_data_for_editing_poll(bContext *C)
 {
 	Object *ob = get_poselib_object(C);
-	return (ob && ob->poselib && !ID_IS_LINKED_DATABLOCK(ob->poselib));
+	return (ob && ob->poselib && !ID_IS_LINKED(ob->poselib));
 }
 
 /* ----------------------------------- */
@@ -200,7 +200,7 @@ static bAction *poselib_init_new(Object *ob)
 	if (ob->poselib)
 		id_us_min(&ob->poselib->id);
 		
-	ob->poselib = add_empty_action(G.main, "PoseLib");
+	ob->poselib = BKE_action_add(G.main, "PoseLib");
 	ob->poselib->idroot = ID_OB;
 	
 	return ob->poselib;
@@ -386,7 +386,7 @@ static int poselib_add_poll(bContext *C)
 	if (ED_operator_posemode(C)) {
 		Object *ob = get_poselib_object(C);
 		if (ob) {
-			if ((ob->poselib == NULL) || !ID_IS_LINKED_DATABLOCK(ob->poselib)) {
+			if ((ob->poselib == NULL) || !ID_IS_LINKED(ob->poselib)) {
 				return true;
 			}
 		}
@@ -410,11 +410,10 @@ static void poselib_add_menu_invoke__replacemenu(bContext *C, uiLayout *layout, 
 	/* add each marker to this menu */
 	for (marker = act->markers.first; marker; marker = marker->next) {
 		PointerRNA props_ptr;
-		
-		props_ptr = uiItemFullO_ptr(layout, ot,
-		                            marker->name, ICON_ARMATURE_DATA, NULL,
-		                            WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-		
+		uiItemFullO_ptr(
+		        layout, ot,
+		        marker->name, ICON_ARMATURE_DATA, NULL,
+		        WM_OP_EXEC_DEFAULT, 0, &props_ptr);
 		RNA_int_set(&props_ptr, "frame", marker->frame);
 		RNA_string_set(&props_ptr, "name", marker->name);
 	}
@@ -529,7 +528,7 @@ void POSELIB_OT_pose_add(wmOperatorType *ot)
 /* ----- */
 
 /* can be called with C == NULL */
-static EnumPropertyItem *poselib_stored_pose_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+static const EnumPropertyItem *poselib_stored_pose_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
 {
 	Object *ob = get_poselib_object(C);
 	bAction *act = (ob) ? ob->poselib : NULL;
@@ -785,7 +784,7 @@ static int poselib_move_exec(bContext *C, wmOperator *op)
 void POSELIB_OT_pose_move(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
-	static EnumPropertyItem pose_lib_pose_move[] = {
+	static const EnumPropertyItem pose_lib_pose_move[] = {
 		{-1, "UP", 0, "Up", ""},
 		{1, "DOWN", 0, "Down", ""},
 		{0, NULL, 0, NULL, NULL}
@@ -834,7 +833,6 @@ typedef struct tPoseLib_PreviewData {
 	bAction *act;           /* poselib to use */
 	TimeMarker *marker;     /* 'active' pose */
 
-	int selcount;           /* number of selected elements to work on */
 	int totcount;           /* total number of elements to work on */
 
 	short state;            /* state of main loop */
@@ -867,7 +865,8 @@ enum {
 /* defines for tPoseLib_PreviewData->flag values */
 enum {
 	PL_PREVIEW_FIRSTTIME    = (1 << 0),
-	PL_PREVIEW_SHOWORIGINAL = (1 << 1)
+	PL_PREVIEW_SHOWORIGINAL = (1 << 1),
+	PL_PREVIEW_ANY_BONE_SELECTED = (1 << 2),
 };
 
 /* ---------------------------- */
@@ -887,7 +886,20 @@ static void poselib_backup_posecopy(tPoseLib_PreviewData *pld)
 {
 	bActionGroup *agrp;
 	bPoseChannel *pchan;
-	
+	bool selected = false;
+
+	/* determine whether any bone is selected. */
+	LISTBASE_FOREACH (bPoseChannel *, bchan, &pld->pose->chanbase) {
+		selected = bchan->bone != NULL && bchan->bone->flag & BONE_SELECTED;
+		if (selected) {
+			pld->flag |= PL_PREVIEW_ANY_BONE_SELECTED;
+			break;
+		}
+	}
+	if (!selected) {
+		pld->flag &= ~PL_PREVIEW_ANY_BONE_SELECTED;
+	}
+
 	/* for each posechannel that has an actionchannel in */
 	for (agrp = pld->act->groups.first; agrp; agrp = agrp->next) {
 		/* try to find posechannel */
@@ -909,8 +921,6 @@ static void poselib_backup_posecopy(tPoseLib_PreviewData *pld)
 			BLI_addtail(&pld->backups, plb);
 			
 			/* mark as being affected */
-			if ((pchan->bone) && (pchan->bone->flag & BONE_SELECTED))
-				pld->selcount++;
 			pld->totcount++;
 		}
 	}
@@ -971,6 +981,7 @@ static void poselib_apply_pose(tPoseLib_PreviewData *pld)
 	KeyframeEditData ked = {{NULL}};
 	KeyframeEditFunc group_ok_cb;
 	int frame = 1;
+	const bool any_bone_selected = pld->flag & PL_PREVIEW_ANY_BONE_SELECTED;
 	
 	/* get the frame */
 	if (pld->marker)
@@ -983,8 +994,7 @@ static void poselib_apply_pose(tPoseLib_PreviewData *pld)
 	group_ok_cb = ANIM_editkeyframes_ok(BEZT_OK_FRAMERANGE);
 	ked.f1 = ((float)frame) - 0.5f;
 	ked.f2 = ((float)frame) + 0.5f;
-	
-	
+
 	/* start applying - only those channels which have a key at this point in time! */
 	for (agrp = act->groups.first; agrp; agrp = agrp->next) {
 		/* check if group has any keyframes */
@@ -996,7 +1006,7 @@ static void poselib_apply_pose(tPoseLib_PreviewData *pld)
 				bool ok = 0;
 				
 				/* check if this bone should get any animation applied */
-				if (pld->selcount == 0) {
+				if (!any_bone_selected) {
 					/* if no bones are selected, then any bone is ok */
 					ok = 1;
 				}
@@ -1009,7 +1019,7 @@ static void poselib_apply_pose(tPoseLib_PreviewData *pld)
 						ok = 1;
 					}
 				}
-				
+
 				if (ok) 
 					animsys_evaluate_action_group(ptr, act, agrp, NULL, (float)frame);
 			}
@@ -1028,14 +1038,15 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, tPoseLib_PreviewData 
 	KeyingSet *ks = ANIM_get_keyingset_for_autokeying(scene, ANIM_KS_WHOLE_CHARACTER_ID);
 	ListBase dsources = {NULL, NULL};
 	bool autokey = autokeyframe_cfra_can_key(scene, &pld->ob->id);
-	
+	const bool any_bone_selected = pld->flag & PL_PREVIEW_ANY_BONE_SELECTED;
+
 	/* start tagging/keying */
 	for (agrp = act->groups.first; agrp; agrp = agrp->next) {
 		/* only for selected bones unless there aren't any selected, in which case all are included  */
 		pchan = BKE_pose_channel_find_name(pose, agrp->name);
 		
 		if (pchan) {
-			if ((pld->selcount == 0) || ((pchan->bone) && (pchan->bone->flag & BONE_SELECTED))) {
+			if (!any_bone_selected || ((pchan->bone) && (pchan->bone->flag & BONE_SELECTED))) {
 				if (autokey) {
 					/* add datasource override for the PoseChannel, to be used later */
 					ANIM_relative_keyingset_add_source(&dsources, &pld->ob->id, &RNA_PoseBone, pchan); 

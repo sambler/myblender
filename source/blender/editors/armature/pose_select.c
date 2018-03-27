@@ -155,7 +155,7 @@ bool ED_do_pose_selectbuffer(
 		 * always give predictable behavior in weight paint mode - campbell */
 		if ((ob_act == NULL) || ((ob_act != ob) && (ob_act->mode & OB_MODE_WEIGHT_PAINT) == 0)) {
 			/* when we are entering into posemode via toggle-select,
-			 * frop another active object - always select the bone. */
+			 * from another active object - always select the bone. */
 			if (!extend && !deselect && toggle) {
 				/* re-select below */
 				nearBone->flag &= ~BONE_SELECTED;
@@ -227,7 +227,7 @@ void ED_pose_de_selectall(Object *ob, int select_mode, const bool ignore_visibil
 		return;
 	}
 	
-	/*	Determine if we're selecting or deselecting	*/
+	/* Determine if we're selecting or deselecting */
 	if (select_mode == SEL_TOGGLE) {
 		select_mode = SEL_SELECT;
 		for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
@@ -591,7 +591,7 @@ static int pose_select_hierarchy_exec(bContext *C, wmOperator *op)
 
 void POSE_OT_select_hierarchy(wmOperatorType *ot)
 {
-	static EnumPropertyItem direction_items[] = {
+	static const EnumPropertyItem direction_items[] = {
 		{BONE_SELECT_PARENT, "PARENT", 0, "Select Parent", ""},
 		{BONE_SELECT_CHILD, "CHILD", 0, "Select Child", ""},
 		{0, NULL, 0, NULL, NULL}
@@ -840,7 +840,7 @@ static int pose_select_grouped_exec(bContext *C, wmOperator *op)
 
 void POSE_OT_select_grouped(wmOperatorType *ot)
 {
-	static EnumPropertyItem prop_select_grouped_types[] = {
+	static const EnumPropertyItem prop_select_grouped_types[] = {
 		{POSE_SEL_SAME_LAYER, "LAYER", 0, "Layer", "Shared layers"},
 		{POSE_SEL_SAME_GROUP, "GROUP", 0, "Group", "Shared group"},
 		{POSE_SEL_SAME_KEYINGSET, "KEYINGSET", 0, "Keying Set", "All bones affected by active Keying Set"},

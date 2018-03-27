@@ -177,10 +177,12 @@ elseif(WITH_X11)
 		intern/GHOST_DisplayManagerX11.cpp
 		intern/GHOST_SystemX11.cpp
 		intern/GHOST_WindowX11.cpp
+		intern/GHOST_TaskbarX11.cpp
 
 		intern/GHOST_DisplayManagerX11.h
 		intern/GHOST_SystemX11.h
 		intern/GHOST_WindowX11.h
+		intern/GHOST_TaskbarX11.h
 	)
 
 	if(NOT WITH_GL_EGL)
@@ -216,6 +218,13 @@ elseif(WITH_X11)
 		add_definitions(-DWITH_X11_XF86VMODE)
 		list(APPEND INC_SYS
 			${X11_xf86vmode_INCLUDE_PATH}
+		)
+	endif()
+
+	if(WITH_X11_XFIXES)
+		add_definitions(-DWITH_X11_XFIXES)
+		list(APPEND INC_SYS
+			${X11_Xfixes_INCLUDE_PATH}
 		)
 	endif()
 

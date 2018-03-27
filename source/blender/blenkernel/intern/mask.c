@@ -1196,14 +1196,14 @@ static void mask_calc_point_handle(MaskSplinePoint *point, MaskSplinePoint *poin
 
 #if 1
 	if (bezt_prev || bezt_next) {
-		BKE_nurb_handle_calc(bezt, bezt_prev, bezt_next, 0);
+		BKE_nurb_handle_calc(bezt, bezt_prev, bezt_next, 0, 0);
 	}
 #else
 	if (handle_type == HD_VECT) {
-		BKE_nurb_handle_calc(bezt, bezt_prev, bezt_next, 0);
+		BKE_nurb_handle_calc(bezt, bezt_prev, bezt_next, 0, 0);
 	}
 	else if (handle_type == HD_AUTO) {
-		BKE_nurb_handle_calc(bezt, bezt_prev, bezt_next, 0);
+		BKE_nurb_handle_calc(bezt, bezt_prev, bezt_next, 0, 0);
 	}
 	else if (handle_type == HD_ALIGN || handle_type == HD_ALIGN_DOUBLESIDE) {
 		float v1[3], v2[3];
@@ -1463,8 +1463,8 @@ void BKE_mask_update_scene(Main *bmain, Scene *scene)
 	Mask *mask;
 
 	for (mask = bmain->mask.first; mask; mask = mask->id.next) {
-		if (mask->id.tag & (LIB_TAG_ID_RECALC | LIB_TAG_ID_RECALC_DATA)) {
-			bool do_new_frame = (mask->id.tag & LIB_TAG_ID_RECALC_DATA) != 0;
+		if (mask->id.recalc & ID_RECALC_ALL) {
+			bool do_new_frame = (mask->id.recalc & ID_RECALC_DATA) != 0;
 			BKE_mask_evaluate_all_masks(bmain, CFRA, do_new_frame);
 		}
 	}

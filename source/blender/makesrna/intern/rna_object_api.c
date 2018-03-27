@@ -47,7 +47,7 @@
 
 #include "rna_internal.h"  /* own include */
 
-static EnumPropertyItem space_items[] = {
+static const EnumPropertyItem space_items[] = {
 	{CONSTRAINT_SPACE_WORLD,    "WORLD", 0, "World Space",
 	                            "The most gobal space in Blender"},
 	{CONSTRAINT_SPACE_POSE,     "POSE", 0, "Pose Space",
@@ -91,7 +91,7 @@ static EnumPropertyItem space_items[] = {
 #include "DEG_depsgraph.h"
 
 /* Convert a given matrix from a space to another (using the object and/or a bone as reference). */
-static void rna_Scene_mat_convert_space(Object *ob, ReportList *reports, bPoseChannel *pchan,
+static void rna_Object_mat_convert_space(Object *ob, ReportList *reports, bPoseChannel *pchan,
                                         float *mat, float *mat_ret, int from, int to)
 {
 	copy_m4_m4((float (*)[4])mat_ret, (float (*)[4])mat);
@@ -476,10 +476,7 @@ void rna_Object_dm_info(struct Object *ob, int type, char *result)
 
 static int rna_Object_update_from_editmode(Object *ob)
 {
-	if (ob->mode & OB_MODE_EDIT) {
-		return ED_object_editmode_load(ob);
-	}
-	return false;
+	return ED_object_editmode_load(ob);
 }
 #else /* RNA_RUNTIME */
 
@@ -488,13 +485,13 @@ void RNA_api_object(StructRNA *srna)
 	FunctionRNA *func;
 	PropertyRNA *parm;
 
-	static EnumPropertyItem mesh_type_items[] = {
+	static const EnumPropertyItem mesh_type_items[] = {
 		{eModifierMode_Realtime, "PREVIEW", 0, "Preview", "Apply modifier preview settings"},
 		{eModifierMode_Render, "RENDER", 0, "Render", "Apply modifier render settings"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
-	static EnumPropertyItem dupli_eval_mode_items[] = {
+	static const EnumPropertyItem dupli_eval_mode_items[] = {
 		{DAG_EVAL_VIEWPORT, "VIEWPORT", 0, "Viewport", "Generate duplis using viewport settings"},
 		{DAG_EVAL_PREVIEW, "PREVIEW", 0, "Preview", "Generate duplis using preview settings"},
 		{DAG_EVAL_RENDER, "RENDER", 0, "Render", "Generate duplis using render settings"},
@@ -502,7 +499,7 @@ void RNA_api_object(StructRNA *srna)
 	};
 
 #ifndef NDEBUG
-	static EnumPropertyItem mesh_dm_info_items[] = {
+	static const EnumPropertyItem mesh_dm_info_items[] = {
 		{0, "SOURCE", 0, "Source", "Source mesh"},
 		{1, "DEFORM", 0, "Deform", "Objects deform mesh"},
 		{2, "FINAL", 0, "Final", "Objects final mesh"},
@@ -511,7 +508,7 @@ void RNA_api_object(StructRNA *srna)
 #endif
 
 	/* Matrix space conversion */
-	func = RNA_def_function(srna, "convert_space", "rna_Scene_mat_convert_space");
+	func = RNA_def_function(srna, "convert_space", "rna_Object_mat_convert_space");
 	RNA_def_function_ui_description(func, "Convert (transform) the given matrix from one space to another");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm = RNA_def_pointer(func, "pose_bone", "PoseBone", "",

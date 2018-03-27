@@ -201,7 +201,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 				uv_poly_copy_aspect(tf_uvorig, tf_uv, aspx, aspy, efa->len);
 
 				totarea += BM_face_calc_area(efa);
-				totuvarea += area_poly_v2((const float (*)[2])tf_uv, efa->len);
+				totuvarea += area_poly_v2(tf_uv, efa->len);
 				
 				if (uvedit_face_visible_test(scene, ima, efa, tf)) {
 					BM_elem_flag_enable(efa, BM_ELEM_TAG);
@@ -244,7 +244,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 
 						uv_poly_copy_aspect(tf_uvorig, tf_uv, aspx, aspy, efa->len);
 
-						uvarea = area_poly_v2((const float (*)[2])tf_uv, efa->len) / totuvarea;
+						uvarea = area_poly_v2(tf_uv, efa->len) / totuvarea;
 						
 						if (area < FLT_EPSILON || uvarea < FLT_EPSILON)
 							areadiff = 1.0f;
@@ -570,7 +570,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 	const int cd_loop_uv_offset  = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
 	const int cd_poly_tex_offset = CustomData_get_offset(&bm->pdata, CD_MTEXPOLY);
 
-	activetf = EDBM_mtexpoly_active_get(em, &efa_act, false, false); /* will be set to NULL if hidden */
+	efa_act = EDBM_uv_active_face_get(em, false, false, &activetf); /* will be set to NULL if hidden */
 #ifndef USE_EDBM_LOOPTRIS
 	activef = BM_mesh_active_face_get(bm, false, false);
 #endif
@@ -967,7 +967,7 @@ static void draw_uv_shadows_get(SpaceImage *sima, Object *ob, Object *obedit, bo
 	if ((sima->mode == SI_MODE_PAINT) && obedit && obedit->type == OB_MESH) {
 		struct BMEditMesh *em = BKE_editmesh_from_object(obedit);
 		
-		*show_shadow = EDBM_mtexpoly_check(em);
+		*show_shadow = EDBM_uv_check(em);
 	}
 	
 	*show_texpaint = (ob && ob->type == OB_MESH && ob->mode == OB_MODE_TEXTURE_PAINT);

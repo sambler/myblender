@@ -66,11 +66,6 @@ public:
 #endif
 	}
 
-	//void resize(size_t __sz, value_type __x = value_type()) {std::vector<value_type, allocator_type>::resize(__sz, __x);}
-
-	//value_type			operator[](size_t __n) {return std::vector<value_type, allocator_type>::operator[](__n);}
-	//const value_type	operator[](size_t __n) const {return std::vector<value_type, allocator_type>::operator[](__n);}
-
 	void free_memory(void)
 	{
 		std::vector<value_type, allocator_type>::resize(0);
@@ -91,9 +86,9 @@ public:
  *   this was actually showing up in profiles quite significantly. it
  *   also does not run any constructors/destructors
  * - if this is used, we are not tempted to use inefficient operations
- * - aligned allocation for SSE data types */
+ * - aligned allocation for CPU native data types */
 
-template<typename T, size_t alignment = 16>
+template<typename T, size_t alignment = MIN_ALIGNMENT_CPU_DATA_TYPES>
 class array
 {
 public:
@@ -167,6 +162,11 @@ public:
 		return memcmp(data_, other.data_, datasize_*sizeof(T)) == 0;
 	}
 
+	bool operator!=(const array<T>& other) const
+	{
+		return !(*this == other);
+	}
+
 	void steal_data(array& from)
 	{
 		if(this != &from) {
@@ -180,6 +180,14 @@ public:
 			from.datasize_ = 0;
 			from.capacity_ = 0;
 		}
+	}
+
+	T *steal_pointer()
+	{
+		T *ptr = data_;
+		data_ = NULL;
+		clear();
+		return ptr;
 	}
 
 	T* resize(size_t newsize)
@@ -204,6 +212,18 @@ public:
 			}
 			datasize_ = newsize;
 		}
+		return data_;
+	}
+
+	T* resize(size_t newsize, const T& value)
+	{
+		size_t oldsize = size();
+		resize(newsize);
+
+		for(size_t i = oldsize; i < size(); i++) {
+			data_[i] = value;
+		}
+
 		return data_;
 	}
 
@@ -276,6 +296,15 @@ public:
 	{
 		assert(datasize_ < capacity_);
 		push_back_slow(t);
+	}
+
+	void append(const array<T>& from)
+	{
+		if(from.size()) {
+			size_t old_size = size();
+			resize(old_size + from.size());
+			memcpy(data_ + old_size, from.data(), sizeof(T) * from.size());
+		}
 	}
 
 protected:

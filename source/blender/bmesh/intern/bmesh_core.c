@@ -1282,8 +1282,8 @@ BMFace *BM_faces_join(BMesh *bm, BMFace **faces, int totface, const bool do_del)
 	}
 
 	/* create region face */
-	f_new = BLI_array_count(edges) ?
-	        BM_face_create_ngon(bm, v1, v2, edges, BLI_array_count(edges), faces[0], BM_CREATE_NOP) : NULL;
+	f_new = BLI_array_len(edges) ?
+	        BM_face_create_ngon(bm, v1, v2, edges, BLI_array_len(edges), faces[0], BM_CREATE_NOP) : NULL;
 	if (UNLIKELY(f_new == NULL)) {
 		/* Invalid boundary region to join faces */
 		goto error;
@@ -1347,11 +1347,11 @@ BMFace *BM_faces_join(BMesh *bm, BMFace **faces, int totface, const bool do_del)
 
 	/* delete old geometry */
 	if (do_del) {
-		for (i = 0; i < BLI_array_count(deledges); i++) {
+		for (i = 0; i < BLI_array_len(deledges); i++) {
 			BM_edge_kill(bm, deledges[i]);
 		}
 
-		for (i = 0; i < BLI_array_count(delverts); i++) {
+		for (i = 0; i < BLI_array_len(delverts); i++) {
 			BM_vert_kill(bm, delverts[i]);
 		}
 	}
@@ -2090,24 +2090,32 @@ BMFace *bmesh_kernel_join_face_kill_edge(BMesh *bm, BMFace *f1, BMFace *f2, BMEd
 	}
 
 	/* validate no internal join */
-	for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f1); i < f1len; i++, l_iter = l_iter->next) {
-		BM_elem_flag_disable(l_iter->v, BM_ELEM_INTERNAL_TAG);
-	}
-	for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f2); i < f2len; i++, l_iter = l_iter->next) {
-		BM_elem_flag_disable(l_iter->v, BM_ELEM_INTERNAL_TAG);
-	}
+	{
+		bool is_dupe = false;
 
-	for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f1); i < f1len; i++, l_iter = l_iter->next) {
-		if (l_iter != l_f1) {
-			BM_elem_flag_enable(l_iter->v, BM_ELEM_INTERNAL_TAG);
+		/* TODO: skip clearing once this is ensured. */
+		for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f2); i < f2len; i++, l_iter = l_iter->next) {
+			BM_elem_flag_disable(l_iter->v, BM_ELEM_INTERNAL_TAG);
 		}
-	}
-	for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f2); i < f2len; i++, l_iter = l_iter->next) {
-		if (l_iter != l_f2) {
-			/* as soon as a duplicate is found, bail out */
-			if (BM_elem_flag_test(l_iter->v, BM_ELEM_INTERNAL_TAG)) {
-				return NULL;
+
+		for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f1); i < f1len; i++, l_iter = l_iter->next) {
+			BM_elem_flag_set(l_iter->v, BM_ELEM_INTERNAL_TAG, l_iter != l_f1);
+		}
+		for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f2); i < f2len; i++, l_iter = l_iter->next) {
+			if (l_iter != l_f2) {
+				/* as soon as a duplicate is found, bail out */
+				if (BM_elem_flag_test(l_iter->v, BM_ELEM_INTERNAL_TAG)) {
+					is_dupe = true;
+					break;
+				}
 			}
+		}
+		/* Cleanup tags. */
+		for (i = 0, l_iter = BM_FACE_FIRST_LOOP(f1); i < f1len; i++, l_iter = l_iter->next) {
+			BM_elem_flag_disable(l_iter->v, BM_ELEM_INTERNAL_TAG);
+		}
+		if (is_dupe) {
+			return NULL;
 		}
 	}
 
@@ -2415,9 +2423,10 @@ static void bmesh_kernel_vert_separate__cleanup(BMesh *bm, LinkNode *edges_separ
 					/* don't visit again */
 					n_prev->next = n_step->next;
 				}
-			} while ((void)
-			         (n_prev = n_step),
-			         (n_step = n_step->next));
+				else {
+					n_prev = n_step;
+				}
+			} while ((n_step = n_step->next));
 
 		} while ((n_orig = n_orig->next) && n_orig->next);
 	} while ((edges_separate = edges_separate->next));

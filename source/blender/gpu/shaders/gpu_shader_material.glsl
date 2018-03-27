@@ -189,16 +189,18 @@ void geom(
 }
 
 void particle_info(
-        vec4 sprops, vec3 loc, vec3 vel, vec3 avel,
-        out float index, out float age, out float life_time, out vec3 location,
+        vec4 sprops, vec4 loc, vec3 vel, vec3 avel,
+        out float index, out float random, out float age,
+        out float life_time, out vec3 location,
         out float size, out vec3 velocity, out vec3 angular_velocity)
 {
 	index = sprops.x;
+	random = loc.w;
 	age = sprops.y;
 	life_time = sprops.z;
 	size = sprops.w;
 
-	location = loc;
+	location = loc.xyz;
 	velocity = vel;
 	angular_velocity = avel;
 }
@@ -954,8 +956,8 @@ void texco_orco(vec3 attorco, out vec3 orco)
 
 void texco_uv(vec2 attuv, out vec3 uv)
 {
-	/* disabled for now, works together with leaving out mtex_2d_mapping
-	   uv = vec3(attuv*2.0 - vec2(1.0, 1.0), 0.0); */
+	/* disabled for now, works together with leaving out mtex_2d_mapping */
+	// uv = vec3(attuv*2.0 - vec2(1.0, 1.0), 0.0); */
 	uv = vec3(attuv, 0.0);
 }
 
@@ -2478,8 +2480,7 @@ uint hash(int kx, int ky, int kz)
 
 float bits_to_01(uint bits)
 {
-	float x = float(bits) * (1.0 / float(0xffffffffu));
-	return x;
+	return (float(bits) / 4294967295.0);
 }
 
 float cellnoise(vec3 p)
@@ -2524,7 +2525,11 @@ float schlick_fresnel(float u)
 
 float GTR1(float NdotH, float a)
 {
-	if (a >= 1.0) return M_1_PI;
+	if (a >= 1.0) {
+		return M_1_PI;
+	}
+
+	a = max(a, 0.001);
 	float a2 = a*a;
 	float t = 1.0 + (a2 - 1.0) * NdotH*NdotH;
 	return (a2 - 1.0) / (M_PI * log(a2) * t);
@@ -2594,7 +2599,8 @@ void node_bsdf_glossy(vec4 color, float roughness, vec3 N, out vec4 result)
 		vec3 light_specular = gl_LightSource[i].specular.rgb;
 
 		/* we mix in some diffuse so low roughness still shows up */
-		float bsdf = 0.5 * pow(max(dot(N, H), 0.0), 1.0 / roughness);
+		float r2 = roughness * roughness;
+		float bsdf = 0.5 * pow(max(dot(N, H), 0.0), 1.0 / r2);
 		bsdf += 0.5 * max(dot(N, light_position), 0.0);
 		L += light_specular * bsdf;
 	}
@@ -2967,7 +2973,10 @@ float calc_gradient(vec3 p, int gradient_type)
 		return atan(y, x) / (M_PI * 2) + 0.5;
 	}
 	else {
-		float r = max(1.0 - sqrt(x * x + y * y + z * z), 0.0);
+		/* Bias a little bit for the case where p is a unit length vector,
+		 * to get exactly zero instead of a small random value depending
+		 * on float precision. */
+		float r = max(0.999999 - sqrt(x * x + y * y + z * z), 0.0);
 		if (gradient_type == 5) {  /* quadratic sphere */
 			return r * r;
 		}
@@ -3307,17 +3316,29 @@ float noise_perlin(float x, float y, float z)
 	float v = noise_fade(fy);
 	float w = noise_fade(fz);
 
-	float result;
+	float noise_u[2], noise_v[2];
 
-	result = noise_nerp(w, noise_nerp(v, noise_nerp(u, noise_grad(hash(X, Y, Z), fx, fy, fz),
-	                                                noise_grad(hash(X + 1, Y, Z), fx - 1.0, fy, fz)),
-	                                  noise_nerp(u, noise_grad(hash(X, Y + 1, Z), fx, fy - 1.0, fz),
-	                                             noise_grad(hash(X + 1, Y + 1, Z), fx - 1.0, fy - 1.0, fz))),
-	                    noise_nerp(v, noise_nerp(u, noise_grad(hash(X, Y, Z + 1), fx, fy, fz - 1.0),
-	                                             noise_grad(hash(X + 1, Y, Z + 1), fx - 1.0, fy, fz - 1.0)),
-	                               noise_nerp(u, noise_grad(hash(X, Y + 1, Z + 1), fx, fy - 1.0, fz - 1.0),
-	                                          noise_grad(hash(X + 1, Y + 1, Z + 1), fx - 1.0, fy - 1.0, fz - 1.0))));
-	return noise_scale3(result);
+	noise_u[0] = noise_nerp(u,
+	        noise_grad(hash(X, Y, Z), fx, fy, fz),
+	        noise_grad(hash(X + 1, Y, Z), fx - 1.0, fy, fz));
+
+	noise_u[1] = noise_nerp(u,
+	        noise_grad(hash(X, Y + 1, Z), fx, fy - 1.0, fz),
+	        noise_grad(hash(X + 1, Y + 1, Z), fx - 1.0, fy - 1.0, fz));
+
+	noise_v[0] = noise_nerp(v, noise_u[0], noise_u[1]);
+
+	noise_u[0] = noise_nerp(u,
+	        noise_grad(hash(X, Y, Z + 1), fx, fy, fz - 1.0),
+	        noise_grad(hash(X + 1, Y, Z + 1), fx - 1.0, fy, fz - 1.0));
+
+	noise_u[1] = noise_nerp(u,
+	        noise_grad(hash(X, Y + 1, Z + 1), fx, fy - 1.0, fz - 1.0),
+	        noise_grad(hash(X + 1, Y + 1, Z + 1), fx - 1.0, fy - 1.0, fz - 1.0));
+
+	noise_v[1] = noise_nerp(v, noise_u[0], noise_u[1]);
+
+	return noise_scale3(noise_nerp(w, noise_v[0], noise_v[1]));
 }
 
 float noise(vec3 p)
@@ -3804,9 +3825,48 @@ void node_bump(float strength, float dist, float height, vec3 N, vec3 surf_pos, 
 	result = normalize(strength * result + (1.0 - strength) * N);
 }
 
+void node_bevel(float radius, vec3 N, out vec3 result)
+{
+	result = N;
+}
+
+void node_displacement_object(float height, float midlevel, float scale, vec3 N, mat4 obmat, out vec3 result)
+{
+	N = (vec4(N, 0.0) * obmat).xyz;
+	result = (height - midlevel) * scale * normalize(N);
+	result = (obmat * vec4(result, 0.0)).xyz;
+}
+
+void node_displacement_world(float height, float midlevel, float scale, vec3 N, out vec3 result)
+{
+	result = (height - midlevel) * scale * normalize(N);
+}
+
+void node_vector_displacement_tangent(vec4 vector, float midlevel, float scale, vec4 tangent, vec3 normal, mat4 obmat, mat4 viewmat, out vec3 result)
+{
+	vec3 N_object = normalize(((vec4(normal, 0.0) * viewmat) * obmat).xyz);
+	vec3 T_object = normalize(((vec4(tangent.xyz, 0.0) * viewmat) * obmat).xyz);
+	vec3 B_object = tangent.w * normalize(cross(N_object, T_object));
+
+	vec3 offset = (vector.xyz - vec3(midlevel)) * scale;
+	result = offset.x * T_object + offset.y * N_object + offset.z * B_object;
+	result = (obmat * vec4(result, 0.0)).xyz;
+}
+
+void node_vector_displacement_object(vec4 vector, float midlevel, float scale, mat4 obmat, out vec3 result)
+{
+	result = (vector.xyz - vec3(midlevel)) * scale;
+	result = (obmat * vec4(result, 0.0)).xyz;
+}
+
+void node_vector_displacement_world(vec4 vector, float midlevel, float scale, out vec3 result)
+{
+	result = (vector.xyz - vec3(midlevel)) * scale;
+}
+
 /* output */
 
-void node_output_material(vec4 surface, vec4 volume, float displacement, out vec4 result)
+void node_output_material(vec4 surface, vec4 volume, vec3 displacement, out vec4 result)
 {
 	result = surface;
 }

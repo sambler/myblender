@@ -365,8 +365,8 @@ static int nlaedit_previewrange_exec(bContext *C, wmOperator *UNUSED(op))
 	/* set the range directly */
 	get_nlastrip_extents(&ac, &min, &max, true);
 	scene->r.flag |= SCER_PRV_RANGE;
-	scene->r.psfra = iroundf(min);
-	scene->r.pefra = iroundf(max);
+	scene->r.psfra = round_fl_to_int(min);
+	scene->r.pefra = round_fl_to_int(max);
 	
 	/* set notifier that things have changed */
 	// XXX err... there's nothing for frame ranges yet, but this should do fine too
@@ -645,7 +645,7 @@ static int nlaedit_add_actionclip_exec(bContext *C, wmOperator *op)
 		}
 		
 		/* create a new strip, and offset it to start on the current frame */
-		strip = add_nlastrip(act);
+		strip = BKE_nlastrip_new(act);
 		
 		strip->end      += (cfra - strip->start);
 		strip->start     = cfra;
@@ -655,7 +655,7 @@ static int nlaedit_add_actionclip_exec(bContext *C, wmOperator *op)
 			/* trying to add to the current failed (no space), 
 			 * so add a new track to the stack, and add to that...
 			 */
-			nlt = add_nlatrack(adt, NULL);
+			nlt = BKE_nlatrack_add(adt, NULL);
 			BKE_nlatrack_add_strip(nlt, strip);
 		}
 		
@@ -858,7 +858,7 @@ static int nlaedit_add_sound_exec(bContext *C, wmOperator *UNUSED(op))
 			continue;
 			
 		/* create a new strip, and offset it to start on the current frame */
-		strip = add_nla_soundstrip(ac.scene, ob->data);
+		strip = BKE_nla_add_soundstrip(ac.scene, ob->data);
 		
 		strip->start += cfra;
 		strip->end   += cfra;
@@ -868,7 +868,7 @@ static int nlaedit_add_sound_exec(bContext *C, wmOperator *UNUSED(op))
 			/* trying to add to the current failed (no space), 
 			 * so add a new track to the stack, and add to that...
 			 */
-			nlt = add_nlatrack(adt, NULL);
+			nlt = BKE_nlatrack_add(adt, NULL);
 			BKE_nlatrack_add_strip(nlt, strip);
 		}
 		
@@ -1057,7 +1057,7 @@ static int nlaedit_duplicate_exec(bContext *C, wmOperator *op)
 			/* if selected, split the strip at its midpoint */
 			if (strip->flag & NLASTRIP_FLAG_SELECT) {
 				/* make a copy (assume that this is possible) */
-				nstrip = copy_nlastrip(strip, linked);
+				nstrip = BKE_nlastrip_copy(strip, linked);
 				
 				/* in case there's no space in the track above, or we haven't got a reference to it yet, try adding */
 				if (BKE_nlatrack_add_strip(nlt->next, nstrip) == 0) {
@@ -1065,7 +1065,7 @@ static int nlaedit_duplicate_exec(bContext *C, wmOperator *op)
 					 *	- if the current one is the last one, nlt->next will be NULL, which defaults to adding 
 					 *	  at the top of the stack anyway...
 					 */
-					track = add_nlatrack(adt, nlt->next);
+					track = BKE_nlatrack_add(adt, nlt->next);
 					BKE_nlatrack_add_strip(track, nstrip);
 				}
 				
@@ -1160,14 +1160,14 @@ static int nlaedit_delete_exec(bContext *C, wmOperator *UNUSED(op))
 			if (strip->flag & NLASTRIP_FLAG_SELECT) {
 				/* if a strip either side of this was a transition, delete those too */
 				if ((strip->prev) && (strip->prev->type == NLASTRIP_TYPE_TRANSITION)) 
-					free_nlastrip(&nlt->strips, strip->prev);
+					BKE_nlastrip_free(&nlt->strips, strip->prev);
 				if ((nstrip) && (nstrip->type == NLASTRIP_TYPE_TRANSITION)) {
 					nstrip = nstrip->next;
-					free_nlastrip(&nlt->strips, strip->next);
+					BKE_nlastrip_free(&nlt->strips, strip->next);
 				}
 				
 				/* finally, delete this strip */
-				free_nlastrip(&nlt->strips, strip);
+				BKE_nlastrip_free(&nlt->strips, strip);
 			}
 		}
 	}
@@ -1242,7 +1242,7 @@ static void nlaedit_split_strip_actclip(AnimData *adt, NlaTrack *nlt, NlaStrip *
 	/* make a copy (assume that this is possible) and append
 	 * it immediately after the current strip
 	 */
-	nstrip = copy_nlastrip(strip, true);
+	nstrip = BKE_nlastrip_copy(strip, true);
 	BLI_insertlinkafter(&nlt->strips, strip, nstrip);
 	
 	/* set the endpoint of the first strip and the start of the new strip 
@@ -2089,7 +2089,7 @@ void NLA_OT_clear_scale(wmOperatorType *ot)
 /* Moves the start-point of the selected strips to the specified places */
 
 /* defines for snap keyframes tool */
-static EnumPropertyItem prop_nlaedit_snap_types[] = {
+static const EnumPropertyItem prop_nlaedit_snap_types[] = {
 	{NLAEDIT_SNAP_CFRA, "CFRA", 0, "Current Frame", ""},
 	{NLAEDIT_SNAP_NEAREST_FRAME, "NEAREST_FRAME", 0, "Nearest Frame", ""}, // XXX as single entry?
 	{NLAEDIT_SNAP_NEAREST_SECOND, "NEAREST_SECOND", 0, "Nearest Second", ""}, // XXX as single entry?
@@ -2186,7 +2186,7 @@ static int nlaedit_snap_exec(bContext *C, wmOperator *op)
 			/* in case there's no space in the current track, try adding */
 			if (BKE_nlatrack_add_strip(nlt, strip) == 0) {
 				/* need to add a new track above the current one */
-				track = add_nlatrack(adt, nlt);
+				track = BKE_nlatrack_add(adt, nlt);
 				BKE_nlatrack_add_strip(track, strip);
 				
 				/* clear temp meta-strips on this new track, as we may not be able to get back to it */
@@ -2239,7 +2239,7 @@ void NLA_OT_snap(wmOperatorType *ot)
 
 /* ******************** Add F-Modifier Operator *********************** */
 
-static EnumPropertyItem *nla_fmodifier_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+static const EnumPropertyItem *nla_fmodifier_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
 {
 	EnumPropertyItem *item = NULL;
 	int totitem = 0;
@@ -2316,7 +2316,7 @@ static int nla_fmodifier_add_exec(bContext *C, wmOperator *op)
 				continue;
 			
 			/* add F-Modifier of specified type to selected, and make it the active one */
-			fcm = add_fmodifier(&strip->modifiers, type);
+			fcm = add_fmodifier(&strip->modifiers, type, NULL);
 			
 			if (fcm) {
 				set_active_fmodifier(&strip->modifiers, fcm);
@@ -2470,7 +2470,7 @@ static int nla_fmodifier_paste_exec(bContext *C, wmOperator *op)
 			}
 			
 			/* paste FModifiers from buffer */
-			ok += ANIM_fmodifiers_paste_from_buf(&strip->modifiers, replace);
+			ok += ANIM_fmodifiers_paste_from_buf(&strip->modifiers, replace, NULL);
 			ale->update |= ANIM_UPDATE_DEPS;
 		}
 	}

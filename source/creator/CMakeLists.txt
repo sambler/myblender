@@ -327,7 +327,8 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release" OR
+	   "${BLENDER_VERSION_CYCLE}" STREQUAL "rc")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything
@@ -863,8 +864,8 @@ elseif(APPLE)
 
 	set_target_properties(blender PROPERTIES
 		MACOSX_BUNDLE_INFO_PLIST ${OSX_APP_SOURCEDIR}/Contents/Info.plist
-		MACOSX_BUNDLE_SHORT_VERSION_STRING ${BLENDER_VERSION}
-		MACOSX_BUNDLE_LONG_VERSION_STRING "${BLENDER_VERSION} ${BLENDER_DATE}")
+		MACOSX_BUNDLE_SHORT_VERSION_STRING "${BLENDER_VERSION}${BLENDER_VERSION_CHAR}"
+		MACOSX_BUNDLE_LONG_VERSION_STRING "${BLENDER_VERSION}${BLENDER_VERSION_CHAR} ${BLENDER_DATE}")
 
 	# Gather the date in finder-style
 	execute_process(COMMAND date "+%m/%d/%Y/%H:%M"
@@ -893,18 +894,6 @@ elseif(APPLE)
 		blender.app/Contents/
 	)
 
-	if(WITH_OPENMP AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT ${CMAKE_C_COMPILER_VERSION} VERSION_LESS '3.4')
-		install(
-			FILES ${LIBDIR}/openmp/lib/libiomp5.dylib
-			DESTINATION blender.app/Contents/Resources/lib/
-		)
-		install(
-			FILES ${LIBDIR}/openmp/LICENSE.txt
-			DESTINATION "."
-			RENAME LICENSE-libiomp5.txt
-		)
-	endif()
-
 	if(WITH_LLVM AND NOT LLVM_STATIC)
 		install(
 			FILES ${LIBDIR}/llvm/lib/libLLVM-3.4.dylib
@@ -914,49 +903,11 @@ elseif(APPLE)
 
 	# python
 	if(WITH_PYTHON AND NOT WITH_PYTHON_MODULE AND NOT WITH_PYTHON_FRAMEWORK)
-		if(WITH_CXX11)
-			# Copy the python libs into the install directory
-			install_dir(
-				${PYTHON_LIBPATH}
-				${TARGETDIR_VER}/python/lib
-			)
-		else()
-			# the python zip is first extracted as part of the build process,
-			# and then later installed as part of make install. this is much
-			# quicker, and means we can easily exclude files on copy
-			# Not needed for PYTHON_MODULE or WEB_PLUGIN due uses Pyhon framework
-			# use a hash of the .zip path to handle switching between different
-			# lib directories without needing a clean build
-			string(SHA1 PYTHON_ZIP_HASH ${LIBDIR}/release/${PYTHON_ZIP})
-			set(PYTHON_EXTRACT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON_ZIP_HASH}/python)
-
-			add_custom_target(
-				extractpyzip
-				DEPENDS ${PYTHON_EXTRACT_DIR})
-
-			set(PYTHON_ZIP "python_${CMAKE_OSX_ARCHITECTURES}.zip")
-
-			add_custom_command(
-				OUTPUT ${PYTHON_EXTRACT_DIR}
-				COMMAND ${CMAKE_COMMAND} -E remove_directory "${PYTHON_EXTRACT_DIR}/"
-				COMMAND ${CMAKE_COMMAND} -E make_directory "${PYTHON_EXTRACT_DIR}/"
-				COMMAND ${CMAKE_COMMAND} -E chdir "${PYTHON_EXTRACT_DIR}/"
-						${CMAKE_COMMAND} -E tar xzfv "${LIBDIR}/release/${PYTHON_ZIP}"
-				DEPENDS ${LIBDIR}/release/${PYTHON_ZIP})
-
-			add_dependencies(blender extractpyzip)
-
-			# copy extracted python files
-			install_dir(
-				${PYTHON_EXTRACT_DIR}
-				\${TARGETDIR_VER}
-			)
-			# copy site-packages files
-			install_dir(
-				${LIBDIR}/release/site-packages
-				\${TARGETDIR_VER}/python/lib/python${PYTHON_VERSION}
-			)
-		endif()
+		# Copy the python libs into the install directory
+		install_dir(
+			${PYTHON_LIBPATH}
+			${TARGETDIR_VER}/python/lib
+		)
 
 		install(DIRECTORY ${LIBDIR}/python/bin
 			DESTINATION ${TARGETDIR_VER}/python
@@ -1011,27 +962,11 @@ elseif(APPLE)
 
 		# python
 		if(WITH_PYTHON AND NOT WITH_PYTHON_FRAMEWORK)
-			if(WITH_CXX11)
-				# Copy the python libs into the install directory
-				install_dir(
-					${PYTHON_LIBPATH}
-					${PLAYER_TARGETDIR_VER}/python/lib
-				)
-			else()
-				add_custom_command(
-					OUTPUT ${PYTHON_EXTRACT_DIR}
-					COMMAND ${CMAKE_COMMAND} -E remove_directory "${PYTHON_EXTRACT_DIR}/"
-					COMMAND ${CMAKE_COMMAND} -E make_directory "${PYTHON_EXTRACT_DIR}/"
-					COMMAND ${CMAKE_COMMAND} -E chdir "${PYTHON_EXTRACT_DIR}/"
-							${CMAKE_COMMAND} -E tar xzfv "${LIBDIR}/release/${PYTHON_ZIP}"
-					DEPENDS ${LIBDIR}/release/${PYTHON_ZIP})
-
-				# copy extracted python files
-				install_dir(
-					${PYTHON_EXTRACT_DIR}
-					\${PLAYER_TARGETDIR_VER}
-				)
-			endif()
+			# Copy the python libs into the install directory
+			install_dir(
+				${PYTHON_LIBPATH}
+				${PLAYER_TARGETDIR_VER}/python/lib
+			)
 		endif()
 
 	endif()
@@ -1089,70 +1024,4 @@ if(WIN32 AND NOT WITH_PYTHON_MODULE)
 		COMPONENT Blender
 		DESTINATION "."
 	)
-	if(CMAKE_CL_64)
-		set(_WIN_PLATFORM x64)
-	else()
-		set(_WIN_PLATFORM x86)
-	endif()
-	if(MSVC12_REDIST_DIR)
-		install(
-			FILES
-				${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.CRT/msvcp120.dll
-				${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.CRT/msvcr120.dll
-			DESTINATION "."
-		)
-		if(WITH_OPENMP)
-			install(
-				FILES ${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.OpenMP/vcomp120.dll
-				DESTINATION "."
-			)
-		endif()
-	endif()
-	
-	if(MSVC14_REDIST_DIR)
-		set(KITSDIRx86 "$ENV{${ProgramFilesX86_NAME}}/Windows Kits/10/")
-		set(KITSDIR "$ENV{ProgramFiles}/Windows Kits/10/")
-		if(IS_DIRECTORY ${KITSDIR})
-			set(KITSPATH "${KITSDIR}/Redist/ucrt/DLLs/${_WIN_PLATFORM}")
-		else()
-			if(IS_DIRECTORY ${KITSDIRx86})
-				set(KITSPATH "${KITSDIRx86}/Redist/ucrt/DLLs/${_WIN_PLATFORM}")
-			else()
-				message(FATAL_ERROR "Windows 10 SDK directory not found")
-			endif()
-		endif()
-		FILE(TO_CMAKE_PATH  ${KITSPATH} KITSPATH)
-		install(
-			FILES
-				${KITSPATH}/api-ms-win-core-file-l1-2-0.dll
-				${KITSPATH}/api-ms-win-core-file-l2-1-0.dll
-				${KITSPATH}/api-ms-win-core-localization-l1-2-0.dll
-				${KITSPATH}/api-ms-win-core-processthreads-l1-1-0.dll
-				${KITSPATH}/api-ms-win-core-processthreads-l1-1-1.dll
-				${KITSPATH}/api-ms-win-core-synch-l1-1-0.dll
-				${KITSPATH}/api-ms-win-core-synch-l1-2-0.dll
-				${KITSPATH}/api-ms-win-core-timezone-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-conio-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-convert-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-environment-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-filesystem-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-heap-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-locale-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-math-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-process-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-runtime-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-stdio-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-string-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-time-l1-1-0.dll
-				${KITSPATH}/ucrtbase.dll
-				${MSVC14_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC140.CRT/vcruntime140.dll
-			DESTINATION "."
-		)
-		if(WITH_OPENMP)
-			install(
-				FILES ${MSVC14_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC140.OpenMP/vcomp140.dll
-				DESTINATION "."
-			)
-		endif()
-	endif()
 endif()

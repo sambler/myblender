@@ -801,7 +801,7 @@ enum {
 /* called in transform_ops.c, on each regeneration of keymaps */
 wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 {
-	static EnumPropertyItem modal_items[] = {
+	static const EnumPropertyItem modal_items[] = {
 		{TFM_MODAL_CANCEL, "CANCEL", 0, "Cancel", ""},
 		{TFM_MODAL_CONFIRM, "CONFIRM", 0, "Confirm", ""},
 		{TFM_MODAL_TRANSLATE, "TRANSLATE", 0, "Translate", ""},
@@ -1936,7 +1936,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	}
 
 	// If modal, save settings back in scene if not set as operator argument
-	if (t->flag & T_MODAL) {
+	if ((t->flag & T_MODAL) || (op->flag & OP_IS_REPEAT)) {
 		/* save settings if not set in operator */
 
 		/* skip saving proportional edit if it was not actually used */
@@ -1956,10 +1956,9 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 					ts->proportional_objects = (proportional != PROP_EDIT_OFF);
 			}
 
-			if ((prop = RNA_struct_find_property(op->ptr, "proportional_size")) &&
-			    !RNA_property_is_set(op->ptr, prop))
-			{
-				ts->proportional_size = t->prop_size;
+			if ((prop = RNA_struct_find_property(op->ptr, "proportional_size"))) {
+				ts->proportional_size =
+				        RNA_property_is_set(op->ptr, prop) ? RNA_property_float_get(op->ptr, prop) : t->prop_size;
 			}
 
 			if ((prop = RNA_struct_find_property(op->ptr, "proportional_edit_falloff")) &&
@@ -4333,7 +4332,7 @@ static void headerTranslation(TransInfo *t, const float vec[3], char str[UI_MAX_
 			const char *str_dir = (snode->insert_ofs_dir == SNODE_INSERTOFS_DIR_RIGHT) ? IFACE_("right") : IFACE_("left");
 			char str_km[64];
 
-			WM_modalkeymap_items_to_string(t->keymap, TFM_MODAL_INSERTOFS_TOGGLE_DIR, true, sizeof(str_km), str_km);
+			WM_modalkeymap_items_to_string(t->keymap, TFM_MODAL_INSERTOFS_TOGGLE_DIR, true, str_km, sizeof(str_km));
 
 			ofs += BLI_snprintf(str, UI_MAX_DRAW_STR, IFACE_("Auto-offset set to %s - press %s to toggle direction  |  %s"),
 			                    str_dir, str_km, str_old);
@@ -4549,7 +4548,7 @@ static void applyShrinkFatten(TransInfo *t, const int UNUSED(mval[2]))
 	if (t->keymap) {
 		wmKeyMapItem *kmi = WM_modalkeymap_find_propvalue(t->keymap, TFM_MODAL_RESIZE);
 		if (kmi) {
-			ofs += WM_keymap_item_to_string(kmi, false, sizeof(str) - ofs, str + ofs);
+			ofs += WM_keymap_item_to_string(kmi, false, str + ofs, sizeof(str) - ofs);
 		}
 	}
 	BLI_snprintf(str + ofs, sizeof(str) - ofs, IFACE_(" or Alt) Even Thickness %s"),
@@ -5626,12 +5625,12 @@ static void slide_origdata_interp_data_vert(
 	if (sod->layer_math_map_num) {
 		if (do_loop_weight) {
 			for (j = 0; j < sod->layer_math_map_num; j++) {
-				 BM_vert_loop_groups_data_layer_merge_weights(bm, sv->cd_loop_groups[j], sod->layer_math_map[j], loop_weights);
+				BM_vert_loop_groups_data_layer_merge_weights(bm, sv->cd_loop_groups[j], sod->layer_math_map[j], loop_weights);
 			}
 		}
 		else {
 			for (j = 0; j < sod->layer_math_map_num; j++) {
-				 BM_vert_loop_groups_data_layer_merge(bm, sv->cd_loop_groups[j], sod->layer_math_map[j]);
+				BM_vert_loop_groups_data_layer_merge(bm, sv->cd_loop_groups[j], sod->layer_math_map[j]);
 			}
 		}
 	}
@@ -7991,7 +7990,7 @@ static void headerSeqSlide(TransInfo *t, const float val[2], char str[UI_MAX_DRA
 	if (t->keymap) {
 		wmKeyMapItem *kmi = WM_modalkeymap_find_propvalue(t->keymap, TFM_MODAL_TRANSLATE);
 		if (kmi) {
-			ofs += WM_keymap_item_to_string(kmi, false, UI_MAX_DRAW_STR - ofs, str + ofs);
+			ofs += WM_keymap_item_to_string(kmi, false, str + ofs, UI_MAX_DRAW_STR - ofs);
 		}
 	}
 	ofs += BLI_snprintf(str + ofs, UI_MAX_DRAW_STR - ofs, IFACE_(" or Alt) Expand to fit %s"),

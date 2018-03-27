@@ -41,9 +41,8 @@ extern "C" {
 #include "BLI_compiler_compat.h"
 #include "BLI_utildefines_variadic.h"
 
-#ifndef NDEBUG /* for BLI_assert */
-#include <stdio.h>
-#endif
+/* We could remove in future. */
+#include "BLI_assert.h"
 
 /* useful for finding bad use of min/max */
 #if 0
@@ -509,6 +508,16 @@ extern bool BLI_memory_is_zero(const void *arr, const size_t arr_size);
 #define SET_UINT_IN_POINTER(i)    ((void *)(uintptr_t)(i))
 #define GET_UINT_FROM_POINTER(i)  ((void)0, ((unsigned int)(uintptr_t)(i)))
 
+/* Set flag from a single test */
+#define SET_FLAG_FROM_TEST(value, test, flag) \
+{ \
+	if (test) { \
+		(value) |=  (flag); \
+	} \
+	else { \
+		(value) &= ~(flag); \
+	} \
+} ((void)0)
 
 /* Macro to convert a value to string in the preprocessor
  * STRINGIFY_ARG: gives the argument as a string
@@ -603,52 +612,6 @@ extern bool BLI_memory_is_zero(const void *arr, const size_t arr_size);
 #  define UNUSED_VARS_NDEBUG(...)
 #else
 #  define UNUSED_VARS_NDEBUG UNUSED_VARS
-#endif
-
-
-/* BLI_assert(), default only to print
- * for aborting need to define WITH_ASSERT_ABORT
- */
-#ifndef NDEBUG
-#  include "BLI_system.h"
-#  ifdef WITH_ASSERT_ABORT
-#    define _BLI_DUMMY_ABORT abort
-#  else
-#    define _BLI_DUMMY_ABORT() (void)0
-#  endif
-#  if defined(__GNUC__) || defined(_MSC_VER) /* check __func__ is available */
-#    define BLI_assert(a)                                                     \
-	(void)((!(a)) ?  (                                                        \
-		(                                                                     \
-		BLI_system_backtrace(stderr),                                         \
-		fprintf(stderr,                                                       \
-			"BLI_assert failed: %s:%d, %s(), at \'%s\'\n",                    \
-			__FILE__, __LINE__, __func__, STRINGIFY(a)),                      \
-		_BLI_DUMMY_ABORT(),                                                   \
-		NULL)) : NULL)
-#  else
-#    define BLI_assert(a)                                                     \
-	(void)((!(a)) ?  (                                                        \
-		(                                                                     \
-		fprintf(stderr,                                                       \
-			"BLI_assert failed: %s:%d, at \'%s\'\n",                          \
-			__FILE__, __LINE__, STRINGIFY(a)),                                \
-		_BLI_DUMMY_ABORT(),                                                   \
-		NULL)) : NULL)
-#  endif
-#else
-#  define BLI_assert(a) (void)0
-#endif
-
-/* C++ can't use _Static_assert, expects static_assert() but c++0x only,
- * Coverity also errors out. */
-#if (!defined(__cplusplus)) && \
-    (!defined(__COVERITY__)) && \
-    (defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 406))  /* gcc4.6+ only */
-#  define BLI_STATIC_ASSERT(a, msg) __extension__ _Static_assert(a, msg);
-#else
-   /* TODO msvc, clang */
-#  define BLI_STATIC_ASSERT(a, msg)
 #endif
 
 /* hints for branch prediction, only use in code that runs a _lot_ where */

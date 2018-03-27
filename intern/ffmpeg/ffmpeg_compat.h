@@ -224,11 +224,7 @@ enum AVSampleFormat av_get_packed_sample_fmt(enum AVSampleFormat sample_fmt)
 }
 #endif
 
-#if ((LIBAVFORMAT_VERSION_MAJOR < 53) || ((LIBAVFORMAT_VERSION_MAJOR == 53) && (LIBAVFORMAT_VERSION_MINOR < 24)) || ((LIBAVFORMAT_VERSION_MAJOR == 53) && (LIBAVFORMAT_VERSION_MINOR < 24) && (LIBAVFORMAT_VERSION_MICRO < 2)))
-#  define avformat_close_input(x) av_close_input_file(*(x))
-#endif
-
-#if ((LIBAVCODEC_VERSION_MAJOR < 52) || (LIBAVCODEC_VERSION_MAJOR == 53 && LIBAVCODEC_VERSION_MINOR < 42) || (LIBAVCODEC_VERSION_MAJOR == 52 && LIBAVCODEC_VERSION_MINOR < 123))
+#if ((LIBAVCODEC_VERSION_MAJOR < 53) || (LIBAVCODEC_VERSION_MAJOR == 53 && LIBAVCODEC_VERSION_MINOR < 35))
 FFMPEG_INLINE
 int avcodec_open2(AVCodecContext *avctx, AVCodec *codec, AVDictionary **options)
 {
@@ -246,9 +242,7 @@ AVStream *avformat_new_stream(AVFormatContext *s, AVCodec *c)
 	(void) c;
 	return av_new_stream(s, 0);
 }
-#endif
 
-#if ((LIBAVFORMAT_VERSION_MAJOR < 52) || (LIBAVFORMAT_VERSION_MAJOR == 53 && LIBAVFORMAT_VERSION_MINOR < 24) || (LIBAVFORMAT_VERSION_MAJOR == 52 && LIBAVFORMAT_VERSION_MINOR < 110))
 FFMPEG_INLINE
 int avformat_find_stream_info(AVFormatContext *ic, AVDictionary **options)
 {

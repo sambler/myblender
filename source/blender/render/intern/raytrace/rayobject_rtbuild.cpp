@@ -33,7 +33,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <algorithm>
-#include <cmath>
 
 #if __cplusplus >= 201103L
 #include <cmath>

@@ -327,7 +327,8 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release" OR
+	   "${BLENDER_VERSION_CYCLE}" STREQUAL "rc")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything

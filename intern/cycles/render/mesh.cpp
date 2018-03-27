@@ -2144,10 +2144,6 @@ void MeshManager::device_update(Device *device, DeviceScene *dscene, Scene *scen
 	}
 	if(progress.get_cancel()) return;
 
-	/* after mesh data has been copied to device memory we need to update
-	 * offsets for patch tables as this can't be known before hand */
-	scene->object_manager->device_update_patch_map_offsets(device, dscene, scene);
-
 	device_update_attributes(device, dscene, scene, progress);
 	if(progress.get_cancel()) return;
 

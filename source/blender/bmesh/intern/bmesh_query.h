@@ -23,7 +23,7 @@
 #ifndef __BMESH_QUERIES_H__
 #define __BMESH_QUERIES_H__
 
-/** \file blender/bmesh/intern/bmesh_queries.h
+/** \file blender/bmesh/intern/bmesh_query.h
  *  \ingroup bmesh
  */
 
@@ -70,17 +70,17 @@ BMFace *BM_edge_pair_share_face_by_len(
         const bool allow_adjacent) ATTR_NONNULL();
 
 int     BM_vert_edge_count_nonwire(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
-#define BM_vert_edge_count_is_equal(v, n) (BM_vert_edge_count_ex(v, (n) + 1) == n)
-#define BM_vert_edge_count_is_over(v, n) (BM_vert_edge_count_ex(v, (n) + 1) == (n) + 1)
-int     BM_vert_edge_count_ex(const BMVert *v, const int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+#define BM_vert_edge_count_is_equal(v, n) (BM_vert_edge_count_at_most(v, (n) + 1) == n)
+#define BM_vert_edge_count_is_over(v, n) (BM_vert_edge_count_at_most(v, (n) + 1) == (n) + 1)
+int     BM_vert_edge_count_at_most(const BMVert *v, const int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 int     BM_vert_edge_count(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
-#define BM_edge_face_count_is_equal(e, n) (BM_edge_face_count_ex(e, (n) + 1) == n)
-#define BM_edge_face_count_is_over(e, n) (BM_edge_face_count_ex(e, (n) + 1) == (n) + 1)
-int     BM_edge_face_count_ex(const BMEdge *e, const int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+#define BM_edge_face_count_is_equal(e, n) (BM_edge_face_count_at_most(e, (n) + 1) == n)
+#define BM_edge_face_count_is_over(e, n) (BM_edge_face_count_at_most(e, (n) + 1) == (n) + 1)
+int     BM_edge_face_count_at_most(const BMEdge *e, const int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 int     BM_edge_face_count(const BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
-#define BM_vert_face_count_is_equal(v, n) (BM_vert_face_count_ex(v, (n) + 1) == n)
-#define BM_vert_face_count_is_over(v, n) (BM_vert_face_count_ex(v, (n) + 1) == (n) + 1)
-int     BM_vert_face_count_ex(const BMVert *v, int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+#define BM_vert_face_count_is_equal(v, n) (BM_vert_face_count_at_most(v, (n) + 1) == n)
+#define BM_vert_face_count_is_over(v, n) (BM_vert_face_count_at_most(v, (n) + 1) == (n) + 1)
+int     BM_vert_face_count_at_most(const BMVert *v, int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 int     BM_vert_face_count(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 BMEdge *BM_vert_other_disk_edge(BMVert *v, BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
@@ -103,7 +103,7 @@ bool    BM_edge_is_contiguous_loop_cd(
         const int cd_loop_type, const int cd_loop_offset)
         ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
-int     BM_loop_region_loops_count_ex(BMLoop *l, int *r_loop_total) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1);
+int     BM_loop_region_loops_count_at_most(BMLoop *l, int *r_loop_total) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1);
 int     BM_loop_region_loops_count(BMLoop *l) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1);
 bool    BM_loop_is_convex(const BMLoop *l) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 BLI_INLINE bool BM_loop_is_adjacent(const BMLoop *l_a, const BMLoop *l_b) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
@@ -196,6 +196,6 @@ int   BM_mesh_calc_edge_groups(
 /* not really any good place  to put this */
 float bmesh_subd_falloff_calc(const int falloff, float val) ATTR_WARN_UNUSED_RESULT;
 
-#include "bmesh_queries_inline.h"
+#include "bmesh_query_inline.h"
 
 #endif /* __BMESH_QUERIES_H__ */

@@ -180,7 +180,7 @@ static const char *ui_item_name_add_colon(const char *name, char namestr[UI_MAX_
 	int len = strlen(name);
 
 	if (len != 0 && len + 1 < UI_MAX_NAME_STR) {
-		BLI_strncpy(namestr, name, UI_MAX_NAME_STR);
+		memcpy(namestr, name, len);
 		namestr[len] = ':';
 		namestr[len + 1] = '\0';
 		return namestr;
@@ -299,7 +299,7 @@ static void ui_item_position(uiItem *item, int x, int y, int w, int h)
 		bitem->but->rect.ymin = y;
 		bitem->but->rect.xmax = x + w;
 		bitem->but->rect.ymax = y + h;
-		
+
 		ui_but_update(bitem->but); /* for strlen */
 	}
 	else {
@@ -319,7 +319,7 @@ static void ui_item_move(uiItem *item, int delta_xmin, int delta_xmax)
 
 		bitem->but->rect.xmin += delta_xmin;
 		bitem->but->rect.xmax += delta_xmax;
-		
+
 		ui_but_update(bitem->but); /* for strlen */
 	}
 	else {
@@ -351,7 +351,7 @@ static int ui_layout_local_dir(uiLayout *layout)
 	}
 }
 
-static uiLayout *ui_item_local_sublayout(uiLayout *test, uiLayout *layout, int align)
+static uiLayout *ui_item_local_sublayout(uiLayout *test, uiLayout *layout, bool align)
 {
 	uiLayout *sub;
 
@@ -359,7 +359,7 @@ static uiLayout *ui_item_local_sublayout(uiLayout *test, uiLayout *layout, int a
 		sub = uiLayoutRow(layout, align);
 	else
 		sub = uiLayoutColumn(layout, align);
-	
+
 	sub->space = 0;
 	return sub;
 }
@@ -429,9 +429,9 @@ static void ui_item_array(
 
 		if (ptr->type == &RNA_Armature) {
 			bArmature *arm = (bArmature *)ptr->data;
-			
+
 			layer_used = arm->layer_used;
-			
+
 			if (arm->edbo) {
 				if (arm->act_edbone) {
 					layer_active |= arm->act_edbone->layer;
@@ -450,7 +450,7 @@ static void ui_item_array(
 			for (a = 0; a < colbuts; a++) {
 				const int layer_num  = a + b * colbuts;
 				const unsigned int layer_flag = (1u << layer_num);
-				
+
 				if (layer_used & layer_flag) {
 					if (layer_active & layer_flag)
 						icon = ICON_LAYER_ACTIVE;
@@ -468,7 +468,7 @@ static void ui_item_array(
 			for (a = 0; a < colbuts; a++) {
 				const int layer_num  = a + len / 2 + b * colbuts;
 				const unsigned int layer_flag = (1u << layer_num);
-				
+
 				if (layer_used & layer_flag) {
 					if (layer_active & layer_flag)
 						icon = ICON_LAYER_ACTIVE;
@@ -496,7 +496,7 @@ static void ui_item_array(
 
 		totdim = RNA_property_array_dimension(ptr, prop, dim_size);
 		if (totdim != 2) return;    /* only 2D matrices supported in UI so far */
-		
+
 		w /= dim_size[0];
 		/* h /= dim_size[1]; */ /* UNUSED */
 
@@ -521,7 +521,7 @@ static void ui_item_array(
 			uiDefAutoButR(block, ptr, prop, -1, "", ICON_NONE, 0, 0, w, UI_UNIT_Y);
 		}
 		else {
-			int *boolarr = NULL;
+			bool *boolarr = NULL;
 
 			/* even if 'expand' is fale, expanding anyway */
 
@@ -536,7 +536,7 @@ static void ui_item_array(
 
 			/* show checkboxes for rna on a non-emboss block (menu for eg) */
 			if (type == PROP_BOOLEAN && ELEM(layout->root->block->dt, UI_EMBOSS_NONE, UI_EMBOSS_PULLDOWN)) {
-				boolarr = MEM_callocN(sizeof(int) * len, __func__);
+				boolarr = MEM_callocN(sizeof(bool) * len, __func__);
 				RNA_property_boolean_get_array(ptr, prop, boolarr);
 			}
 
@@ -700,8 +700,9 @@ static uiBut *ui_item_with_label(uiLayout *layout, uiBlock *block, const char *n
 		but = uiDefAutoButR(block, ptr, prop, index, "", icon, x, y, w - UI_UNIT_X, h);
 
 		/* BUTTONS_OT_file_browse calls UI_context_active_but_prop_get_filebrowser */
-		uiDefIconButO(block, UI_BTYPE_BUT, subtype == PROP_DIRPATH ? "BUTTONS_OT_directory_browse" : "BUTTONS_OT_file_browse",
-		              WM_OP_INVOKE_DEFAULT, ICON_FILESEL, x, y, UI_UNIT_X, h, NULL);
+		uiDefIconButO(
+		        block, UI_BTYPE_BUT, subtype == PROP_DIRPATH ? "BUTTONS_OT_directory_browse" : "BUTTONS_OT_file_browse",
+		        WM_OP_INVOKE_DEFAULT, ICON_FILESEL, x, y, UI_UNIT_X, h, NULL);
 	}
 	else if (flag & UI_ITEM_R_EVENT) {
 		but = uiDefButR_prop(block, UI_BTYPE_KEY_EVENT, 0, name, x, y, w, h, ptr, prop, index, 0, 0, -1, -1, NULL);
@@ -1085,8 +1086,9 @@ void uiItemsFullEnumO_items(
 				}
 				else {
 					/* Do not use uiItemL here, as our root layout is a menu one, it will add a fake blank icon! */
-					but = uiDefBut(block, UI_BTYPE_LABEL, 0, item->name, 0, 0, UI_UNIT_X * 5, UI_UNIT_Y, NULL,
-					               0.0, 0.0, 0, 0, "");
+					but = uiDefBut(
+					        block, UI_BTYPE_LABEL, 0, item->name, 0, 0, UI_UNIT_X * 5, UI_UNIT_Y, NULL,
+					        0.0, 0.0, 0, 0, "");
 				}
 				ui_but_tip_from_enum_item(but, item);
 			}
@@ -1402,7 +1404,7 @@ void uiItemFullR(uiLayout *layout, PointerRNA *ptr, PropertyRNA *prop, int index
 
 	if (icon == ICON_NONE)
 		icon = RNA_property_ui_icon(prop);
-	
+
 	if (flag & UI_ITEM_R_ICON_ONLY) {
 		/* pass */
 	}
@@ -1447,7 +1449,7 @@ void uiItemFullR(uiLayout *layout, PointerRNA *ptr, PropertyRNA *prop, int index
 
 	if (no_bg)
 		UI_block_emboss_set(block, UI_EMBOSS_NONE);
-	
+
 	/* array property */
 	if (index == RNA_NO_INDEX && is_array)
 		ui_item_array(layout, block, name, icon, ptr, prop, len, 0, 0, w, h, expand, slider, toggle, icon_only);
@@ -1467,7 +1469,7 @@ void uiItemFullR(uiLayout *layout, PointerRNA *ptr, PropertyRNA *prop, int index
 	else if (type == PROP_ENUM || type == PROP_STRING || type == PROP_POINTER) {
 		but = ui_item_with_label(layout, block, name, icon, ptr, prop, index, 0, 0, w, h, flag);
 		ui_but_add_search(but, ptr, prop, NULL, NULL);
-		
+
 		if (layout->redalert)
 			UI_but_flag_enable(but, UI_BUT_REDALERT);
 	}
@@ -1480,13 +1482,13 @@ void uiItemFullR(uiLayout *layout, PointerRNA *ptr, PropertyRNA *prop, int index
 
 		if (toggle && but->type == UI_BTYPE_CHECKBOX)
 			but->type = UI_BTYPE_TOGGLE;
-		
+
 		if (layout->redalert)
 			UI_but_flag_enable(but, UI_BUT_REDALERT);
 	}
 
 	/* Mark non-embossed textfields inside a listbox. */
-	if (but && (block->flag & UI_BLOCK_LIST_ITEM) && (but->dt & UI_EMBOSS_NONE)) {
+	if (but && (block->flag & UI_BLOCK_LIST_ITEM) && (but->type == UI_BTYPE_TEXT) && (but->dt & UI_EMBOSS_NONE)) {
 		UI_but_flag_enable(but, UI_BUT_LIST_ITEM);
 	}
 
@@ -1650,7 +1652,7 @@ static int sort_search_items_list(const void *a, const void *b)
 {
 	const CollItemSearch *cis1 = a;
 	const CollItemSearch *cis2 = b;
-	
+
 	if (BLI_strcasecmp(cis1->name, cis2->name) > 0)
 		return 1;
 	else
@@ -1711,9 +1713,9 @@ static void rna_search_cb(const struct bContext *C, void *arg_but, const char *s
 		i++;
 	}
 	RNA_PROP_END;
-	
+
 	BLI_listbase_sort(items_list, sort_search_items_list);
-	
+
 	/* add search items from temporary list */
 	for (cis = items_list->first; cis; cis = cis->next) {
 		if (false == UI_search_item_add(items, cis->name, SET_INT_IN_POINTER(cis->index), cis->iconid)) {
@@ -1733,7 +1735,8 @@ static void search_id_collection(StructRNA *ptype, PointerRNA *ptr, PropertyRNA 
 	StructRNA *srna;
 
 	/* look for collection property in Main */
-	RNA_main_pointer_create(G.main, ptr);
+	/* Note: using global Main is OK-ish here, UI shall not access other Mains anyay... */
+	RNA_main_pointer_create(G_MAIN, ptr);
 
 	*prop = NULL;
 
@@ -1800,7 +1803,7 @@ void uiItemPointerR(uiLayout *layout, struct PointerRNA *ptr, const char *propna
 	StructRNA *icontype;
 	int w, h;
 	char namestr[UI_MAX_NAME_STR];
-	
+
 	/* validate arguments */
 	prop = RNA_struct_find_property(ptr, propname);
 
@@ -1809,7 +1812,7 @@ void uiItemPointerR(uiLayout *layout, struct PointerRNA *ptr, const char *propna
 		            RNA_struct_identifier(ptr->type), propname);
 		return;
 	}
-	
+
 	type = RNA_property_type(prop);
 	if (!ELEM(type, PROP_POINTER, PROP_STRING, PROP_ENUM)) {
 		RNA_warning("Property %s must be a pointer, string or enum", propname);
@@ -1888,11 +1891,11 @@ static uiBut *ui_item_menu(
 
 	if (layout->root->type == UI_LAYOUT_HEADER) { /* ugly .. */
 		if (force_menu) {
-			w += UI_UNIT_Y;
+			w += UI_UNIT_X;
 		}
 		else {
 			if (name[0]) {
-				w -= UI_UNIT_Y / 2;
+				w -= UI_UNIT_X / 2;
 			}
 		}
 	}
@@ -1921,7 +1924,7 @@ static uiBut *ui_item_menu(
 	return but;
 }
 
-void uiItemM(uiLayout *layout, bContext *UNUSED(C), const char *menuname, const char *name, int icon)
+void uiItemM(uiLayout *layout, const char *menuname, const char *name, int icon)
 {
 	MenuType *mt;
 
@@ -2085,8 +2088,9 @@ void uiItemMenuEnumO_ptr(
 	BLI_strncpy(lvl->propname, propname, sizeof(lvl->propname));
 	lvl->opcontext = layout->root->opcontext;
 
-	but = ui_item_menu(layout, name, icon, menu_item_enum_opname_menu, NULL, lvl,
-	                   RNA_struct_ui_description(ot->srna), true);
+	but = ui_item_menu(
+	        layout, name, icon, menu_item_enum_opname_menu, NULL, lvl,
+	        RNA_struct_ui_description(ot->srna), true);
 
 	/* add hotkey here, lower UI code can't detect it */
 	if ((layout->root->block->flag & UI_BLOCK_LOOP) &&
@@ -2214,7 +2218,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 
 	if (totw == 0)
 		return;
-	
+
 	if (w != 0)
 		w -= (tot - 1) * litem->space;
 	fixedw = 0;
@@ -2245,7 +2249,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 			/* ignore min flag for rows with right or center alignment */
 			if (item->type != ITEM_BUTTON &&
 			    ELEM(((uiLayout *)item)->alignment, UI_LAYOUT_ALIGN_RIGHT, UI_LAYOUT_ALIGN_CENTER) &&
-			    litem->alignment == UI_LAYOUT_ALIGN_EXPAND && 
+			    litem->alignment == UI_LAYOUT_ALIGN_EXPAND &&
 			    ((uiItem *)litem)->flag & UI_ITEM_MIN)
 			{
 				min_flag = false;
@@ -2353,7 +2357,7 @@ static void ui_litem_estimate_column(uiLayout *litem, bool is_box)
 		if (item->next && (!is_box || item != litem->items.first))
 			litem->h += litem->space;
 	}
-	
+
 	if (min_size_flag) {
 		litem->item.flag |= UI_ITEM_MIN;
 	}
@@ -2743,7 +2747,7 @@ static void ui_litem_layout_absolute(uiLayout *litem)
 		scalex = (float)litem->w / (float)totw;
 	if (litem->h && toth > 0)
 		scaley = (float)litem->h / (float)toth;
-	
+
 	x = litem->x;
 	y = litem->y - scaley * toth;
 
@@ -2794,7 +2798,7 @@ static void ui_litem_layout_split(uiLayout *litem)
 	y = litem->y;
 
 	percentage = (split->percentage == 0.0f) ? 1.0f / (float)tot : split->percentage;
-	
+
 	w = (litem->w - (tot - 1) * litem->space);
 	colw = w * percentage;
 	colw = MAX2(colw, 0);
@@ -2858,7 +2862,7 @@ static void ui_litem_layout_overlap(uiLayout *litem)
 }
 
 /* layout create functions */
-uiLayout *uiLayoutRow(uiLayout *layout, int align)
+uiLayout *uiLayoutRow(uiLayout *layout, bool align)
 {
 	uiLayout *litem;
 
@@ -2879,7 +2883,7 @@ uiLayout *uiLayoutRow(uiLayout *layout, int align)
 	return litem;
 }
 
-uiLayout *uiLayoutColumn(uiLayout *layout, int align)
+uiLayout *uiLayoutColumn(uiLayout *layout, bool align)
 {
 	uiLayout *litem;
 
@@ -2900,7 +2904,7 @@ uiLayout *uiLayoutColumn(uiLayout *layout, int align)
 	return litem;
 }
 
-uiLayout *uiLayoutColumnFlow(uiLayout *layout, int number, int align)
+uiLayout *uiLayoutColumnFlow(uiLayout *layout, int number, bool align)
 {
 	uiLayoutItemFlow *flow;
 
@@ -3022,7 +3026,7 @@ uiLayout *uiLayoutListBox(
 	return (uiLayout *)box;
 }
 
-uiLayout *uiLayoutAbsolute(uiLayout *layout, int align)
+uiLayout *uiLayoutAbsolute(uiLayout *layout, bool align)
 {
 	uiLayout *litem;
 
@@ -3069,7 +3073,7 @@ uiLayout *uiLayoutOverlap(uiLayout *layout)
 	return litem;
 }
 
-uiLayout *uiLayoutSplit(uiLayout *layout, float percentage, int align)
+uiLayout *uiLayoutSplit(uiLayout *layout, float percentage, bool align)
 {
 	uiLayoutItemSplit *split;
 
@@ -3437,7 +3441,7 @@ uiLayout *UI_block_layout(uiBlock *block, int dir, int type, int x, int y, int s
 	BLI_addtail(&block->layouts, root);
 
 	ui_layout_add_padding_button(root);
-	
+
 	return layout;
 }
 
@@ -3460,7 +3464,7 @@ void UI_block_layout_set_current(uiBlock *block, uiLayout *layout)
 void ui_layout_add_but(uiLayout *layout, uiBut *but)
 {
 	uiButtonItem *bitem;
-	
+
 	bitem = MEM_callocN(sizeof(uiButtonItem), "uiButtonItem");
 	bitem->item.type = ITEM_BUTTON;
 	bitem->but = but;
@@ -3545,93 +3549,6 @@ void uiLayoutSetContextFromBut(uiLayout *layout, uiBut *but)
 		uiLayoutSetContextPointer(layout, "button_prop", &ptr_prop);
 		uiLayoutSetContextPointer(layout, "button_pointer", &but->rnapoin);
 	}
-}
-
-/* introspect funcs */
-#include "BLI_dynstr.h"
-
-static void ui_intro_button(DynStr *ds, uiButtonItem *bitem)
-{
-	uiBut *but = bitem->but;
-	BLI_dynstr_appendf(ds, "'type':%d, ", (int)but->type);
-	BLI_dynstr_appendf(ds, "'draw_string':'''%s''', ", but->drawstr);
-	BLI_dynstr_appendf(ds, "'tip':'''%s''', ", but->tip ? but->tip : "");  /* not exactly needed, rna has this */
-
-	if (but->optype) {
-		char *opstr = WM_operator_pystring_ex(but->block->evil_C, NULL, false, true, but->optype, but->opptr);
-		BLI_dynstr_appendf(ds, "'operator':'''%s''', ", opstr ? opstr : "");
-		MEM_freeN(opstr);
-	}
-
-	if (but->rnaprop) {
-		BLI_dynstr_appendf(ds, "'rna':'%s.%s[%d]', ", RNA_struct_identifier(but->rnapoin.type), RNA_property_identifier(but->rnaprop), but->rnaindex);
-	}
-
-}
-
-static void ui_intro_items(DynStr *ds, ListBase *lb)
-{
-	uiItem *item;
-
-	BLI_dynstr_append(ds, "[");
-
-	for (item = lb->first; item; item = item->next) {
-
-		BLI_dynstr_append(ds, "{");
-
-		/* could also use the INT but this is nicer*/
-		switch (item->type) {
-			case ITEM_BUTTON:             BLI_dynstr_append(ds, "'type':'BUTTON', "); break;
-			case ITEM_LAYOUT_ROW:         BLI_dynstr_append(ds, "'type':'UI_BTYPE_ROW', "); break;
-			case ITEM_LAYOUT_COLUMN:      BLI_dynstr_append(ds, "'type':'COLUMN', "); break;
-			case ITEM_LAYOUT_COLUMN_FLOW: BLI_dynstr_append(ds, "'type':'COLUMN_FLOW', "); break;
-			case ITEM_LAYOUT_ROW_FLOW:    BLI_dynstr_append(ds, "'type':'ROW_FLOW', "); break;
-			case ITEM_LAYOUT_BOX:         BLI_dynstr_append(ds, "'type':'BOX', "); break;
-			case ITEM_LAYOUT_ABSOLUTE:    BLI_dynstr_append(ds, "'type':'ABSOLUTE', "); break;
-			case ITEM_LAYOUT_SPLIT:       BLI_dynstr_append(ds, "'type':'SPLIT', "); break;
-			case ITEM_LAYOUT_OVERLAP:     BLI_dynstr_append(ds, "'type':'OVERLAP', "); break;
-			case ITEM_LAYOUT_ROOT:        BLI_dynstr_append(ds, "'type':'ROOT', "); break;
-			default:                      BLI_dynstr_append(ds, "'type':'UNKNOWN', "); break;
-		}
-
-		switch (item->type) {
-			case ITEM_BUTTON:
-				ui_intro_button(ds, (uiButtonItem *)item);
-				break;
-			default:
-				BLI_dynstr_append(ds, "'items':");
-				ui_intro_items(ds, &((uiLayout *)item)->items);
-				break;
-		}
-
-		BLI_dynstr_append(ds, "}");
-
-		if (item != lb->last)
-			BLI_dynstr_append(ds, ", ");
-	}
-	BLI_dynstr_append(ds, "], ");
-}
-
-static void ui_intro_uiLayout(DynStr *ds, uiLayout *layout)
-{
-	ui_intro_items(ds, &layout->items);
-}
-
-static char *str = NULL;  /* XXX, constant re-freeing, far from ideal. */
-const char *uiLayoutIntrospect(uiLayout *layout)
-{
-	DynStr *ds = BLI_dynstr_new();
-
-	if (str) {
-		MEM_freeN(str);
-	}
-
-	ui_intro_uiLayout(ds, layout);
-
-	str = BLI_dynstr_get_cstring(ds);
-	BLI_dynstr_free(ds);
-
-	return str;
 }
 
 /* this is a bit of a hack but best keep it in one place at least */

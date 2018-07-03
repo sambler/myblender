@@ -379,6 +379,11 @@ typedef void (*uiMenuHandleFunc)(struct bContext *C, void *arg, int event);
  */
 typedef bool (*uiMenuStepFunc)(struct bContext *C, int direction, void *arg1);
 
+
+/* interface_query.c */
+bool UI_block_is_empty(const uiBlock *block);
+
+
 /* interface_region_menu_popup.c */
 /* Popup Menus
  *
@@ -395,6 +400,7 @@ uiPopupMenu *UI_popup_menu_begin_ex(
         struct bContext *C, const char *title, const char *block_name,
         int icon) ATTR_NONNULL();
 void UI_popup_menu_end(struct bContext *C, struct uiPopupMenu *head);
+bool UI_popup_menu_end_or_cancel(struct bContext *C, struct uiPopupMenu *head);
 struct uiLayout *UI_popup_menu_layout(uiPopupMenu *head);
 
 void UI_popup_menu_reports(struct bContext *C, struct ReportList *reports) ATTR_NONNULL();
@@ -441,7 +447,7 @@ void UI_popup_block_close(struct bContext *C, struct wmWindow *win, uiBlock *blo
  *
  * Functions for creating, drawing and freeing blocks. A Block is a
  * container of buttons and used for various purposes.
- * 
+ *
  * Begin/Define Buttons/End/Draw is the typical order in which these
  * function should be called, though for popup blocks Draw is left out.
  * Freeing blocks is done by the screen/ module automatically.
@@ -543,7 +549,7 @@ bool UI_but_online_manual_id_from_active(
  * - R: RNA
  * - O: operator */
 
-uiBut *uiDefBut(uiBlock *block, 
+uiBut *uiDefBut(uiBlock *block,
                 int type, int retval, const char *str,
                 int x1, int y1,
                 short x2, short y2,
@@ -563,7 +569,7 @@ uiBut *uiDefButR_prop(uiBlock *block, int type, int retval, const char *str, int
 uiBut *uiDefButO(uiBlock *block, int type, const char *opname, int opcontext, const char *str, int x, int y, short width, short height, const char *tip);
 uiBut *uiDefButO_ptr(uiBlock *block, int type, struct wmOperatorType *ot, int opcontext, const char *str, int x, int y, short width, short height, const char *tip);
 
-uiBut *uiDefIconBut(uiBlock *block, 
+uiBut *uiDefIconBut(uiBlock *block,
                     int type, int retval, int icon,
                     int x1, int y1,
                     short x2, short y2,
@@ -627,7 +633,7 @@ enum {
 typedef struct uiStringInfo {
 	int type;
 	char *strinfo;
-} uiStringInfo; 
+} uiStringInfo;
 
 /* Note: Expects pointers to uiStringInfo structs as parameters.
  *       Will fill them with translated strings, when possible.
@@ -807,7 +813,7 @@ void UI_popup_handlers_remove_all(struct bContext *C, struct ListBase *handlers)
  * be used to reinitialize some internal state if user preferences change. */
 
 void UI_init(void);
-void UI_init_userdef(void);
+void UI_init_userdef(struct Main *bmain);
 void UI_reinit_font(void);
 void UI_reinit_gl_state(void);
 void UI_exit(void);
@@ -886,7 +892,6 @@ uiBlock *uiLayoutGetBlock(uiLayout *layout);
 void uiLayoutSetFunc(uiLayout *layout, uiMenuHandleFunc handlefunc, void *argv);
 void uiLayoutSetContextPointer(uiLayout *layout, const char *name, struct PointerRNA *ptr);
 void uiLayoutContextCopy(uiLayout *layout, struct bContextStore *context);
-const char *uiLayoutIntrospect(uiLayout *layout); // XXX - testing
 struct MenuType *UI_but_menutype_get(uiBut *but);
 void UI_menutype_draw(struct bContext *C, struct MenuType *mt, struct uiLayout *layout);
 
@@ -913,14 +918,14 @@ float uiLayoutGetScaleX(uiLayout *layout);
 float uiLayoutGetScaleY(uiLayout *layout);
 
 /* layout specifiers */
-uiLayout *uiLayoutRow(uiLayout *layout, int align);
-uiLayout *uiLayoutColumn(uiLayout *layout, int align);
-uiLayout *uiLayoutColumnFlow(uiLayout *layout, int number, int align);
+uiLayout *uiLayoutRow(uiLayout *layout, bool align);
+uiLayout *uiLayoutColumn(uiLayout *layout, bool align);
+uiLayout *uiLayoutColumnFlow(uiLayout *layout, int number, bool align);
 uiLayout *uiLayoutBox(uiLayout *layout);
 uiLayout *uiLayoutListBox(uiLayout *layout, struct uiList *ui_list, struct PointerRNA *ptr, struct PropertyRNA *prop,
                           struct PointerRNA *actptr, struct PropertyRNA *actprop);
-uiLayout *uiLayoutAbsolute(uiLayout *layout, int align);
-uiLayout *uiLayoutSplit(uiLayout *layout, float percentage, int align);
+uiLayout *uiLayoutAbsolute(uiLayout *layout, bool align);
+uiLayout *uiLayoutSplit(uiLayout *layout, float percentage, bool align);
 uiLayout *uiLayoutOverlap(uiLayout *layout);
 uiBlock *uiLayoutAbsoluteBlock(uiLayout *layout);
 uiLayout *uiLayoutRadial(uiLayout *layout);
@@ -936,29 +941,29 @@ void uiTemplateIDBrowse(
 void uiTemplateIDPreview(
         uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname,
         const char *newop, const char *openop, const char *unlinkop, int rows, int cols, int filter);
-void uiTemplateAnyID(uiLayout *layout, struct PointerRNA *ptr, const char *propname, 
+void uiTemplateAnyID(uiLayout *layout, struct PointerRNA *ptr, const char *propname,
                      const char *proptypename, const char *text);
-void uiTemplatePathBuilder(uiLayout *layout, struct PointerRNA *ptr, const char *propname, 
+void uiTemplatePathBuilder(uiLayout *layout, struct PointerRNA *ptr, const char *propname,
                            struct PointerRNA *root_ptr, const char *text);
 uiLayout *uiTemplateModifier(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr);
 uiLayout *uiTemplateConstraint(uiLayout *layout, struct PointerRNA *ptr);
-void uiTemplatePreview(uiLayout *layout, struct bContext *C, struct ID *id, int show_buttons, struct ID *parent,
+void uiTemplatePreview(uiLayout *layout, struct bContext *C, struct ID *id, bool show_buttons, struct ID *parent,
                        struct MTex *slot, const char *preview_id);
-void uiTemplateColorRamp(uiLayout *layout, struct PointerRNA *ptr, const char *propname, int expand);
-void uiTemplateIconView(uiLayout *layout, struct PointerRNA *ptr, const char *propname, int show_labels, float icon_scale);
+void uiTemplateColorRamp(uiLayout *layout, struct PointerRNA *ptr, const char *propname, bool expand);
+void uiTemplateIconView(uiLayout *layout, struct PointerRNA *ptr, const char *propname, bool show_labels, float icon_scale);
 void uiTemplateHistogram(uiLayout *layout, struct PointerRNA *ptr, const char *propname);
 void uiTemplateWaveform(uiLayout *layout, struct PointerRNA *ptr, const char *propname);
 void uiTemplateVectorscope(uiLayout *layout, struct PointerRNA *ptr, const char *propname);
 void uiTemplateCurveMapping(uiLayout *layout, struct PointerRNA *ptr, const char *propname, int type,
-                            int levels, int brush, int neg_slope);
-void uiTemplateColorPicker(uiLayout *layout, struct PointerRNA *ptr, const char *propname, int value_slider, int lock, int lock_luminosity, int cubic);
-void uiTemplatePalette(uiLayout *layout, struct PointerRNA *ptr, const char *propname, int color);
+                            bool levels, bool brush, bool neg_slope);
+void uiTemplateColorPicker(uiLayout *layout, struct PointerRNA *ptr, const char *propname, bool value_slider, bool lock, bool lock_luminosity, bool cubic);
+void uiTemplatePalette(uiLayout *layout, struct PointerRNA *ptr, const char *propname, bool color);
 void uiTemplateLayers(uiLayout *layout, struct PointerRNA *ptr, const char *propname,
                       PointerRNA *used_ptr, const char *used_propname, int active_layer);
 void uiTemplateGameStates(uiLayout *layout, struct PointerRNA *ptr, const char *propname,
                       PointerRNA *used_ptr, const char *used_propname, int active_state);
-void uiTemplateImage(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, struct PointerRNA *userptr, int compact, int multiview);
-void uiTemplateImageSettings(uiLayout *layout, struct PointerRNA *imfptr, int color_management);
+void uiTemplateImage(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, struct PointerRNA *userptr, bool compact, bool multiview);
+void uiTemplateImageSettings(uiLayout *layout, struct PointerRNA *imfptr, bool color_management);
 void uiTemplateImageStereo3d(uiLayout *layout, struct PointerRNA *stereo3d_format_ptr);
 void uiTemplateImageViews(uiLayout *layout, struct PointerRNA *imaptr);
 void uiTemplateImageFormatViews(uiLayout *layout, PointerRNA *imfptr, PointerRNA *ptr);
@@ -989,9 +994,9 @@ void uiTemplateNodeView(uiLayout *layout, struct bContext *C, struct bNodeTree *
 void uiTemplateTextureUser(uiLayout *layout, struct bContext *C);
 void uiTemplateTextureShow(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop);
 
-void uiTemplateMovieClip(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, int compact);
+void uiTemplateMovieClip(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, bool compact);
 void uiTemplateTrack(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname);
-void uiTemplateMarker(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, PointerRNA *userptr, PointerRNA *trackptr, int cmpact);
+void uiTemplateMarker(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, PointerRNA *userptr, PointerRNA *trackptr, bool compact);
 void uiTemplateMovieclipInformation(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, struct PointerRNA *userptr);
 
 void uiTemplateColorspaceSettings(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname);
@@ -1040,7 +1045,7 @@ void uiItemsFullEnumO_items(
 
 void uiItemL(uiLayout *layout, const char *name, int icon); /* label */
 void uiItemLDrag(uiLayout *layout, struct PointerRNA *ptr, const char *name, int icon); /* label icon for dragging */
-void uiItemM(uiLayout *layout, struct bContext *C, const char *menuname, const char *name, int icon); /* menu */
+void uiItemM(uiLayout *layout, const char *menuname, const char *name, int icon); /* menu */
 void uiItemV(uiLayout *layout, const char *name, int icon, int argval); /* value */
 void uiItemS(uiLayout *layout); /* separator */
 
@@ -1060,7 +1065,7 @@ void ED_operatortypes_ui(void);
 void ED_keymap_ui(struct wmKeyConfig *keyconf);
 
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
-int UI_drop_color_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
+bool UI_drop_color_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
 
 bool UI_context_copy_to_selected_list(
         struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop,

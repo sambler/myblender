@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,7 +18,7 @@
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
  *
- * 
+ *
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -55,6 +55,7 @@ struct wmOperator;
 struct wmOperatorType;
 struct wmWindowManager;
 struct DMCoNo;
+struct UndoStep;
 enum ePaintMode;
 
 /* paint_stroke.c */
@@ -86,16 +87,16 @@ struct ViewContext *paint_stroke_view_context(struct PaintStroke *stroke);
 void *paint_stroke_mode_data(struct PaintStroke *stroke);
 float paint_stroke_distance_get(struct PaintStroke *stroke);
 void paint_stroke_set_mode_data(struct PaintStroke *stroke, void *mode_data);
-int paint_poll(struct bContext *C);
-void paint_cursor_start(struct bContext *C, int (*poll)(struct bContext *C));
-void paint_cursor_start_explicit(struct Paint *p, struct wmWindowManager *wm, int (*poll)(struct bContext *C));
+bool paint_poll(struct bContext *C);
+void paint_cursor_start(struct bContext *C, bool (*poll)(struct bContext *C));
+void paint_cursor_start_explicit(struct Paint *p, struct wmWindowManager *wm, bool (*poll)(struct bContext *C));
 void paint_cursor_delete_textures(void);
 
 /* paint_vertex.c */
-int weight_paint_poll(struct bContext *C);
-int weight_paint_mode_poll(struct bContext *C);
-int vertex_paint_poll(struct bContext *C);
-int vertex_paint_mode_poll(struct bContext *C);
+bool weight_paint_poll(struct bContext *C);
+bool weight_paint_mode_poll(struct bContext *C);
+bool vertex_paint_poll(struct bContext *C);
+bool vertex_paint_mode_poll(struct bContext *C);
 
 typedef void (*VPaintTransform_Callback)(const float col[3], const void *user_data, float r_col[3]);
 
@@ -176,7 +177,7 @@ typedef struct ImagePaintPartialRedraw {
 #define IMAPAINT_TILE_SIZE          (1 << IMAPAINT_TILE_BITS)
 #define IMAPAINT_TILE_NUMBER(size)  (((size) + IMAPAINT_TILE_SIZE - 1) >> IMAPAINT_TILE_BITS)
 
-int image_texture_paint_poll(struct bContext *C);
+bool image_texture_paint_poll(struct bContext *C);
 void imapaint_image_update(struct SpaceImage *sima, struct Image *image, struct ImBuf *ibuf, short texpaint);
 struct ImagePaintPartialRedraw *get_imapaintpartial(void);
 void set_imapaintpartial(struct ImagePaintPartialRedraw *ippr);
@@ -221,18 +222,23 @@ void PAINT_OT_add_simple_uvs(struct wmOperatorType *ot);
 
 /* paint_image_undo.c */
 void *image_undo_find_tile(
+        ListBase *undo_tiles,
         struct Image *ima, struct ImBuf *ibuf, int x_tile, int y_tile,
         unsigned short **mask, bool validate);
 void *image_undo_push_tile(
+        ListBase *undo_tiles,
         struct Image *ima, struct ImBuf *ibuf, struct ImBuf **tmpibuf, int x_tile, int y_tile,
         unsigned short **, bool **valid, bool proj, bool find_prev);
 void image_undo_remove_masks(void);
 void image_undo_init_locks(void);
 void image_undo_end_locks(void);
 
+struct ListBase *ED_image_undosys_step_get_tiles(struct UndoStep *us_p);
+struct ListBase *ED_image_undo_get_tiles(void);
+
 /* sculpt_uv.c */
-int uv_sculpt_poll(struct bContext *C);
-int uv_sculpt_keymap_poll(struct bContext *C);
+bool uv_sculpt_poll(struct bContext *C);
+bool uv_sculpt_keymap_poll(struct bContext *C);
 
 void SCULPT_OT_uv_sculpt_stroke(struct wmOperatorType *ot);
 
@@ -259,7 +265,9 @@ void paint_calc_redraw_planes(float planes[4][4],
 
 float paint_calc_object_space_radius(struct ViewContext *vc, const float center[3], float pixel_radius);
 float paint_get_tex_pixel(const struct MTex *mtex, float u, float v, struct ImagePool *pool, int thread);
-void paint_get_tex_pixel_col(const struct MTex *mtex, float u, float v, float rgba[4], struct ImagePool *pool, int thread, bool convert, struct ColorSpace *colorspace);
+void paint_get_tex_pixel_col(
+        const struct MTex *mtex, float u, float v, float rgba[4],
+        struct ImagePool *pool, int thread, bool convert, struct ColorSpace *colorspace);
 
 void paint_sample_color(struct bContext *C, struct ARegion *ar, int x, int y, bool texpaint_proj, bool palette);
 
@@ -276,11 +284,11 @@ void PAINT_OT_face_select_reveal(struct wmOperatorType *ot);
 void PAINT_OT_vert_select_all(struct wmOperatorType *ot);
 void PAINT_OT_vert_select_ungrouped(struct wmOperatorType *ot);
 
-int vert_paint_poll(struct bContext *C);
-int mask_paint_poll(struct bContext *C);
-int paint_curve_poll(struct bContext *C);
+bool vert_paint_poll(struct bContext *C);
+bool mask_paint_poll(struct bContext *C);
+bool paint_curve_poll(struct bContext *C);
 
-int facemask_paint_poll(struct bContext *C);
+bool facemask_paint_poll(struct bContext *C);
 void flip_v3_v3(float out[3], const float in[3], const char symm);
 void flip_qt_qt(float out[3], const float in[3], const char symm);
 
@@ -303,10 +311,6 @@ typedef enum {
 
 void set_brush_rc_props(struct PointerRNA *ptr, const char *paint, const char *prop, const char *secondary_prop,
                         RCFlags flags);
-
-/* paint_undo.c */
-struct ListBase *undo_paint_push_get_list(int type);
-void undo_paint_push_count_alloc(int type, int size);
 
 /* paint_hide.c */
 

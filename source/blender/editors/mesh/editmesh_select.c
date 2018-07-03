@@ -3533,6 +3533,13 @@ static int edbm_select_sharp_edges_exec(bContext *C, wmOperator *op)
 		}
 	}
 
+	if ((em->bm->selectmode & (SCE_SELECT_VERTEX | SCE_SELECT_EDGE)) == 0) {
+		/* Since we can't select individual edges, select faces connected to them. */
+		EDBM_selectmode_convert(em, SCE_SELECT_EDGE, SCE_SELECT_FACE);
+	}
+	else {
+		EDBM_selectmode_flush(em);
+	}
 	WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -3826,7 +3833,7 @@ void MESH_OT_select_random(wmOperatorType *ot)
 /** \name Select Ungrouped Operator
  * \{ */
 
-static int edbm_select_ungrouped_poll(bContext *C)
+static bool edbm_select_ungrouped_poll(bContext *C)
 {
 	if (ED_operator_editmesh(C)) {
 		Object *obedit = CTX_data_edit_object(C);

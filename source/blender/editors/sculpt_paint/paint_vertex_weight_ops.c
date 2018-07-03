@@ -115,7 +115,7 @@ static void wpaint_prev_destroy(struct WPaintPrev *wpp)
 /** \name Weight from Bones Operator
  * \{ */
 
-static int weight_from_bones_poll(bContext *C)
+static bool weight_from_bones_poll(bContext *C)
 {
 	Object *ob = CTX_data_active_object(C);
 
@@ -130,7 +130,7 @@ static int weight_from_bones_exec(bContext *C, wmOperator *op)
 	Mesh *me = ob->data;
 	int type = RNA_enum_get(op->ptr, "type");
 
-	create_vgroups_from_armature(op->reports, scene, ob, armob, type, (me->editflag & ME_EDIT_MIRROR_X));
+	ED_object_vgroup_calc_from_armature(op->reports, scene, ob, armob, type, (me->editflag & ME_EDIT_MIRROR_X));
 
 	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
@@ -148,8 +148,9 @@ void PAINT_OT_weight_from_bones(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Weight from Bones";
 	ot->idname = "PAINT_OT_weight_from_bones";
-	ot->description = "Set the weights of the groups matching the attached armature's selected bones, "
-	                  "using the distance between the vertices and the bones";
+	ot->description = (
+	        "Set the weights of the groups matching the attached armature's selected bones, "
+	        "using the distance between the vertices and the bones");
 
 	/* api callbacks */
 	ot->exec = weight_from_bones_exec;

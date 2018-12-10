@@ -1347,6 +1347,11 @@ bool DocumentImporter::writeAnimationList(const COLLADAFW::AnimationList *animat
 	return anim_importer.write_animation_list(animationList);
 }
 
+bool DocumentImporter::writeAnimationClip(const COLLADAFW::AnimationClip *AnimationClip)
+{
+	return true;
+}
+
 /** When this method is called, the writer must write the skin controller data.
  * \return The writer should return true, if writing succeeded, false otherwise.*/
 bool DocumentImporter::writeSkinControllerData(const COLLADAFW::SkinControllerData *skin)

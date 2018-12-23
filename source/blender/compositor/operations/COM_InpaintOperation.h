@@ -16,12 +16,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor: Peter Schlaile
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_InpaintOperation_h
-#define _COM_InpaintOperation_h
+#ifndef __COM_INPAINTOPERATION_H__
+#define __COM_INPAINTOPERATION_H__
 #include "COM_NodeOperation.h"
 
 class InpaintSimpleOperation : public NodeOperation {

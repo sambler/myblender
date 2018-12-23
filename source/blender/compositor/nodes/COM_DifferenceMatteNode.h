@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_DifferenceMatteNode_h_
-#define _COM_DifferenceMatteNode_h_
+#ifndef __COM_DIFFERENCEMATTENODE_H__
+#define __COM_DIFFERENCEMATTENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief DifferenceMatteNode
- * @ingroup Node
+ * \brief DifferenceMatteNode
+ * \ingroup Node
  */
 class DifferenceMatteNode : public Node {
 public:

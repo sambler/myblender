@@ -16,12 +16,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_ColorRampOperation_h
-#define _COM_ColorRampOperation_h
+#ifndef __COM_COLORRAMPOPERATION_H__
+#define __COM_COLORRAMPOPERATION_H__
 #include "COM_NodeOperation.h"
 #include "DNA_texture_types.h"
 

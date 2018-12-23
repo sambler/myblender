@@ -252,8 +252,8 @@ void PackedPatchTable::pack(Far::PatchTable* patch_table, int offset)
 
 	build_patch_map(*this, patch_table, offset);
 #else
-	(void)patch_table;
-	(void)offset;
+	(void) patch_table;
+	(void) offset;
 #endif
 }
 
@@ -294,4 +294,3 @@ void PackedPatchTable::copy_adjusting_offsets(uint* dest, int doffset)
 }
 
 CCL_NAMESPACE_END
-

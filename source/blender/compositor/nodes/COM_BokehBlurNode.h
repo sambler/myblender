@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_BokehBlurNode_h_
-#define _COM_BokehBlurNode_h_
+#ifndef __COM_BOKEHBLURNODE_H__
+#define __COM_BOKEHBLURNODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief BokehBlurNode
- * @ingroup Node
+ * \brief BokehBlurNode
+ * \ingroup Node
  */
 class BokehBlurNode : public Node {
 public:

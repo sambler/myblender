@@ -199,7 +199,7 @@ endfunction()
 # Support per-target CMake flags
 # Read from: CMAKE_C_FLAGS_**** (made upper case) when set.
 #
-# 'name' should alway match the target name,
+# 'name' should always match the target name,
 # use this macro before add_library or add_executable.
 #
 # Optionally takes an arg passed to set(), eg PARENT_SCOPE.
@@ -326,7 +326,7 @@ function(SETUP_LIBDIRS)
 			link_directories(${JACK_LIBPATH})
 		endif()
 		if(WITH_CODEC_SNDFILE)
-			link_directories(${SNDFILE_LIBPATH})
+			link_directories(${LIBSNDFILE_LIBPATH})
 		endif()
 		if(WITH_FFTW3)
 			link_directories(${FFTW3_LIBPATH})
@@ -370,6 +370,11 @@ function(setup_liblinks
 	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${PLATFORM_LINKFLAGS}" PARENT_SCOPE)
 	set(CMAKE_MODULE_LINKER_FLAGS_DEBUG "${CMAKE_MODULE_LINKER_FLAGS_DEBUG} ${PLATFORM_LINKFLAGS_DEBUG}" PARENT_SCOPE)
 
+	# jemalloc must be early in the list, to be before pthread (see T57998)
+	if(WITH_MEM_JEMALLOC)
+		target_link_libraries(${target} ${JEMALLOC_LIBRARIES})
+	endif()
+
 	target_link_libraries(
 		${target}
 		${PNG_LIBRARIES}
@@ -412,7 +417,7 @@ function(setup_liblinks
 		target_link_libraries(${target} ${JACK_LIBRARIES})
 	endif()
 	if(WITH_CODEC_SNDFILE)
-		target_link_libraries(${target} ${SNDFILE_LIBRARIES})
+		target_link_libraries(${target} ${LIBSNDFILE_LIBRARIES})
 	endif()
 	if(WITH_SDL AND NOT WITH_SDL_DYNLOAD)
 		target_link_libraries(${target} ${SDL_LIBRARY})
@@ -426,7 +431,7 @@ function(setup_liblinks
 	if(WITH_OPENCOLORIO)
 		target_link_libraries(${target} ${OPENCOLORIO_LIBRARIES})
 	endif()
-	if(WITH_OPENSUBDIV OR WITH_CYCLES_OPENSUBDIV)
+	if(WITH_OPENSUBDIV)
 			target_link_libraries(${target} ${OPENSUBDIV_LIBRARIES})
 	endif()
 	if(WITH_OPENVDB)
@@ -434,6 +439,9 @@ function(setup_liblinks
 	endif()
 	if(WITH_CYCLES_OSL)
 		target_link_libraries(${target} ${OSL_LIBRARIES})
+	endif()
+	if(WITH_CYCLES_EMBREE)
+		target_link_libraries(${target} ${EMBREE_LIBRARIES})
 	endif()
 	if(WITH_BOOST)
 		target_link_libraries(${target} ${BOOST_LIBRARIES})
@@ -448,7 +456,7 @@ function(setup_liblinks
 	if(WITH_IMAGE_OPENEXR)
 		target_link_libraries(${target} ${OPENEXR_LIBRARIES})
 	endif()
-	if(WITH_IMAGE_OPENJPEG AND WITH_SYSTEM_OPENJPEG)
+	if(WITH_IMAGE_OPENJPEG)
 		target_link_libraries(${target} ${OPENJPEG_LIBRARIES})
 	endif()
 	if(WITH_CODEC_FFMPEG)
@@ -482,9 +490,6 @@ function(setup_liblinks
 			)
 		endif()
 	endif()
-	if(WITH_MEM_JEMALLOC)
-		target_link_libraries(${target} ${JEMALLOC_LIBRARIES})
-	endif()
 	if(WITH_MOD_CLOTH_ELTOPO)
 		target_link_libraries(${target} ${LAPACK_LIBRARIES})
 	endif()
@@ -509,7 +514,7 @@ function(setup_liblinks
 		target_link_libraries(${target} ${GFLAGS_LIBRARIES})
 	endif()
 
-	# We put CLEW and CUEW here because OPENSUBDIV_LIBRARIES dpeends on them..
+	# We put CLEW and CUEW here because OPENSUBDIV_LIBRARIES depends on them..
 	if(WITH_CYCLES OR WITH_COMPOSITOR OR WITH_OPENSUBDIV)
 		target_link_libraries(${target} "extern_clew")
 		if(WITH_CUDA_DYNLOAD)
@@ -560,6 +565,12 @@ function(SETUP_BLENDER_SORTED_LIBS)
 		endif()
 	endif()
 
+	if(WITH_AUDASPACE AND NOT WITH_SYSTEM_AUDASPACE)
+		list(APPEND BLENDER_LINK_LIBS
+			audaspace
+			audaspace-py)
+	endif()
+
 	# Sort libraries
 	set(BLENDER_SORTED_LIBS
 		bf_windowmanager
@@ -580,25 +591,28 @@ function(SETUP_BLENDER_SORTED_LIBS)
 		bf_editor_space_outliner
 		bf_editor_space_script
 		bf_editor_space_sequencer
+		bf_editor_space_statusbar
 		bf_editor_space_text
 		bf_editor_space_time
+		bf_editor_space_topbar
 		bf_editor_space_userpref
 		bf_editor_space_view3d
 		bf_editor_space_clip
 
 		bf_editor_transform
-		bf_editor_util
 		bf_editor_uvedit
 		bf_editor_curve
-		bf_editor_gpencil
 		bf_editor_interface
+		bf_editor_gizmo_library
 		bf_editor_mesh
 		bf_editor_metaball
 		bf_editor_object
+		bf_editor_gpencil
 		bf_editor_lattice
 		bf_editor_armature
 		bf_editor_physics
 		bf_editor_render
+		bf_editor_scene
 		bf_editor_screen
 		bf_editor_sculpt_paint
 		bf_editor_sound
@@ -606,23 +620,31 @@ function(SETUP_BLENDER_SORTED_LIBS)
 		bf_editor_datafiles
 		bf_editor_mask
 		bf_editor_io
+		bf_editor_util
 
 		bf_render
 		bf_python
 		bf_python_ext
 		bf_python_mathutils
+		bf_python_gpu
 		bf_python_bmesh
 		bf_freestyle
 		bf_ikplugin
 		bf_modifiers
+		bf_gpencil_modifiers
 		bf_alembic
 		bf_bmesh
 		bf_gpu
+		bf_draw
 		bf_blenloader
 		bf_blenkernel
+		bf_shader_fx
+		bf_gpencil_modifiers
 		bf_physics
 		bf_nodes
 		bf_rna
+		bf_editor_gizmo_library  # rna -> gizmo bad-level calls
+		bf_python
 		bf_imbuf
 		bf_blenlib
 		bf_depsgraph
@@ -639,41 +661,31 @@ function(SETUP_BLENDER_SORTED_LIBS)
 		bf_intern_guardedalloc
 		bf_intern_ctr
 		bf_intern_utfconv
-		ge_blen_routines
-		ge_converter
-		ge_phys_dummy
-		ge_phys_bullet
 		bf_intern_smoke
 		extern_lzma
 		extern_curve_fit_nd
-		ge_logic_ketsji
-		extern_recastnavigation
-		ge_logic
-		ge_rasterizer
-		ge_oglrasterizer
-		ge_logic_expressions
-		ge_scenegraph
-		ge_logic_network
-		ge_logic_ngnetwork
-		ge_logic_loopbacknetwork
 		bf_intern_moto
 		extern_openjpeg
-		ge_videotex
 		bf_dna
+
 		bf_blenfont
+		bf_gpu  # duplicate for blenfont
 		bf_blentranslation
 		bf_intern_audaspace
+		audaspace
+		audaspace-py
 		bf_intern_mikktspace
 		bf_intern_dualcon
 		bf_intern_cycles
+		cycles_device
 		cycles_render
 		cycles_graph
 		cycles_bvh
-		cycles_device
 		cycles_kernel
 		cycles_util
 		cycles_subd
 		bf_intern_opencolorio
+		bf_intern_gawain
 		bf_intern_eigen
 		extern_rangetree
 		extern_wcwidth
@@ -682,6 +694,8 @@ function(SETUP_BLENDER_SORTED_LIBS)
 
 		bf_intern_glew_mx
 		bf_intern_clog
+		bf_intern_opensubdiv
+		bf_intern_numaapi
 	)
 
 	if(NOT WITH_SYSTEM_GLOG)
@@ -747,19 +761,11 @@ function(SETUP_BLENDER_SORTED_LIBS)
 	endif()
 
 	if(WITH_BULLET AND NOT WITH_SYSTEM_BULLET)
-		list_insert_after(BLENDER_SORTED_LIBS "ge_logic_ngnetwork" "extern_bullet")
-	endif()
-
-	if(WITH_GAMEENGINE_DECKLINK)
-		list(APPEND BLENDER_SORTED_LIBS bf_intern_decklink)
+		list_insert_after(BLENDER_SORTED_LIBS "extern_openjpeg" "extern_bullet")
 	endif()
 
 	if(WIN32)
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_gpudirect)
-	endif()
-
-	if(WITH_OPENSUBDIV OR WITH_CYCLES_OPENSUBDIV)
-		list(APPEND BLENDER_SORTED_LIBS bf_intern_opensubdiv)
 	endif()
 
 	if(WITH_OPENVDB)
@@ -856,164 +862,6 @@ endmacro()
 macro(message_first_run)
 	if(FIRST_RUN)
 		message(${ARGV})
-	endif()
-endmacro()
-
-macro(TEST_UNORDERED_MAP_SUPPORT)
-	# - Detect unordered_map availability
-	# Test if a valid implementation of unordered_map exists
-	# and define the include path
-	# This module defines
-	#  HAVE_UNORDERED_MAP, whether unordered_map implementation was found
-	#
-	#  HAVE_STD_UNORDERED_MAP_HEADER, <unordered_map.h> was found
-	#  HAVE_UNORDERED_MAP_IN_STD_NAMESPACE, unordered_map is in namespace std
-	#  HAVE_UNORDERED_MAP_IN_TR1_NAMESPACE, unordered_map is in namespace std::tr1
-	#
-	#  UNORDERED_MAP_INCLUDE_PREFIX, include path prefix for unordered_map, if found
-	#  UNORDERED_MAP_NAMESPACE, namespace for unordered_map, if found
-
-	include(CheckIncludeFileCXX)
-
-	# Workaround for newer GCC (6.x+) where C++11 was enabled by default, which lead us
-	# to a situation when there is <unordered_map> include but which can't be used uless
-	# C++11 is enabled.
-	if(CMAKE_COMPILER_IS_GNUCC AND (NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "6.0") AND (NOT WITH_CXX11))
-		set(HAVE_STD_UNORDERED_MAP_HEADER False)
-	else()
-		CHECK_INCLUDE_FILE_CXX("unordered_map" HAVE_STD_UNORDERED_MAP_HEADER)
-	endif()
-	if(HAVE_STD_UNORDERED_MAP_HEADER)
-		# Even so we've found unordered_map header file it doesn't
-		# mean unordered_map and unordered_set will be declared in
-		# std namespace.
-		#
-		# Namely, MSVC 2008 have unordered_map header which declares
-		# unordered_map class in std::tr1 namespace. In order to support
-		# this, we do extra check to see which exactly namespace is
-		# to be used.
-
-		include(CheckCXXSourceCompiles)
-		CHECK_CXX_SOURCE_COMPILES("#include <unordered_map>
-		                          int main() {
-		                            std::unordered_map<int, int> map;
-		                            return 0;
-		                          }"
-		                          HAVE_UNORDERED_MAP_IN_STD_NAMESPACE)
-		if(HAVE_UNORDERED_MAP_IN_STD_NAMESPACE)
-			message_first_run(STATUS "Found unordered_map/set in std namespace.")
-
-			set(HAVE_UNORDERED_MAP "TRUE")
-			set(UNORDERED_MAP_INCLUDE_PREFIX "")
-			set(UNORDERED_MAP_NAMESPACE "std")
-		else()
-			CHECK_CXX_SOURCE_COMPILES("#include <unordered_map>
-			                          int main() {
-			                            std::tr1::unordered_map<int, int> map;
-			                            return 0;
-			                          }"
-			                          HAVE_UNORDERED_MAP_IN_TR1_NAMESPACE)
-			if(HAVE_UNORDERED_MAP_IN_TR1_NAMESPACE)
-				message_first_run(STATUS "Found unordered_map/set in std::tr1 namespace.")
-
-				set(HAVE_UNORDERED_MAP "TRUE")
-				set(UNORDERED_MAP_INCLUDE_PREFIX "")
-				set(UNORDERED_MAP_NAMESPACE "std::tr1")
-			else()
-				message_first_run(STATUS "Found <unordered_map> but cannot find either std::unordered_map "
-				                  "or std::tr1::unordered_map.")
-			endif()
-		endif()
-	else()
-		CHECK_INCLUDE_FILE_CXX("tr1/unordered_map" HAVE_UNORDERED_MAP_IN_TR1_NAMESPACE)
-		if(HAVE_UNORDERED_MAP_IN_TR1_NAMESPACE)
-			message_first_run(STATUS "Found unordered_map/set in std::tr1 namespace.")
-
-			set(HAVE_UNORDERED_MAP "TRUE")
-			set(UNORDERED_MAP_INCLUDE_PREFIX "tr1")
-			set(UNORDERED_MAP_NAMESPACE "std::tr1")
-		else()
-			message_first_run(STATUS "Unable to find <unordered_map> or <tr1/unordered_map>. ")
-		endif()
-	endif()
-endmacro()
-
-macro(TEST_SHARED_PTR_SUPPORT)
-	# This check are coming from Ceres library.
-	#
-	# Find shared pointer header and namespace.
-	#
-	# This module defines the following variables:
-	#
-	# SHARED_PTR_FOUND: TRUE if shared_ptr found.
-	# SHARED_PTR_TR1_MEMORY_HEADER: True if <tr1/memory> header is to be used
-	# for the shared_ptr object, otherwise use <memory>.
-	# SHARED_PTR_TR1_NAMESPACE: TRUE if shared_ptr is defined in std::tr1 namespace,
-	# otherwise it's assumed to be defined in std namespace.
-
-	include(CheckIncludeFileCXX)
-	include(CheckCXXSourceCompiles)
-	set(SHARED_PTR_FOUND FALSE)
-	# Workaround for newer GCC (6.x+) where C++11 was enabled by default, which lead us
-	# to a situation when there is <unordered_map> include but which can't be used uless
-	# C++11 is enabled.
-	if(CMAKE_COMPILER_IS_GNUCC AND (NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "6.0") AND (NOT WITH_CXX11))
-		set(HAVE_STD_MEMORY_HEADER False)
-	else()
-		CHECK_INCLUDE_FILE_CXX(memory HAVE_STD_MEMORY_HEADER)
-	endif()
-	if(HAVE_STD_MEMORY_HEADER)
-		# Finding the memory header doesn't mean that shared_ptr is in std
-		# namespace.
-		#
-		# In particular, MSVC 2008 has shared_ptr declared in std::tr1.  In
-		# order to support this, we do an extra check to see which namespace
-		# should be used.
-		CHECK_CXX_SOURCE_COMPILES("#include <memory>
-		                           int main() {
-		                             std::shared_ptr<int> int_ptr;
-		                             return 0;
-		                           }"
-		                          HAVE_SHARED_PTR_IN_STD_NAMESPACE)
-
-		if(HAVE_SHARED_PTR_IN_STD_NAMESPACE)
-			message_first_run("-- Found shared_ptr in std namespace using <memory> header.")
-			set(SHARED_PTR_FOUND TRUE)
-		else()
-			CHECK_CXX_SOURCE_COMPILES("#include <memory>
-			                           int main() {
-			                           std::tr1::shared_ptr<int> int_ptr;
-			                           return 0;
-			                           }"
-			                          HAVE_SHARED_PTR_IN_TR1_NAMESPACE)
-			if(HAVE_SHARED_PTR_IN_TR1_NAMESPACE)
-				message_first_run("-- Found shared_ptr in std::tr1 namespace using <memory> header.")
-				set(SHARED_PTR_TR1_NAMESPACE TRUE)
-				set(SHARED_PTR_FOUND TRUE)
-			endif()
-		endif()
-	endif()
-
-	if(NOT SHARED_PTR_FOUND)
-		# Further, gcc defines shared_ptr in std::tr1 namespace and
-		# <tr1/memory> is to be included for this. And what makes things
-		# even more tricky is that gcc does have <memory> header, so
-		# all the checks above wouldn't find shared_ptr.
-		CHECK_INCLUDE_FILE_CXX("tr1/memory" HAVE_TR1_MEMORY_HEADER)
-		if(HAVE_TR1_MEMORY_HEADER)
-			CHECK_CXX_SOURCE_COMPILES("#include <tr1/memory>
-			                           int main() {
-			                           std::tr1::shared_ptr<int> int_ptr;
-			                           return 0;
-			                           }"
-			                           HAVE_SHARED_PTR_IN_TR1_NAMESPACE_FROM_TR1_MEMORY_HEADER)
-			if(HAVE_SHARED_PTR_IN_TR1_NAMESPACE_FROM_TR1_MEMORY_HEADER)
-				message_first_run("-- Found shared_ptr in std::tr1 namespace using <tr1/memory> header.")
-				set(SHARED_PTR_TR1_MEMORY_HEADER TRUE)
-				set(SHARED_PTR_TR1_NAMESPACE TRUE)
-				set(SHARED_PTR_FOUND TRUE)
-			endif()
-		endif()
 	endif()
 endmacro()
 
@@ -1353,7 +1201,11 @@ function(delayed_do_install
 		foreach(i RANGE ${n})
 			list(GET files ${i} f)
 			list(GET destinations ${i} d)
-			install(FILES ${f} DESTINATION ${targetdir}/${d})
+			if(NOT IS_ABSOLUTE ${d})
+				install(FILES ${f} DESTINATION ${targetdir}/${d})
+			else()
+				install(FILES ${f} DESTINATION ${d})
+			endif()
 		endforeach()
 	endif()
 endfunction()
@@ -1390,6 +1242,8 @@ function(data_to_c_simple
 	get_filename_component(_file_to   ${CMAKE_CURRENT_BINARY_DIR}/${file_from}.c REALPATH)
 
 	list(APPEND ${list_to_add} ${_file_to})
+	source_group(Generated FILES ${_file_to})
+	list(APPEND ${list_to_add} ${file_from})
 	set(${list_to_add} ${${list_to_add}} PARENT_SCOPE)
 
 	get_filename_component(_file_to_path ${_file_to} PATH)
@@ -1534,6 +1388,7 @@ function(find_python_package
 		  NAMES
 		    ${package}
 		  HINTS
+		    "${PYTHON_LIBPATH}/"
 		    "${PYTHON_LIBPATH}/python${PYTHON_VERSION}/"
 		    "${PYTHON_LIBPATH}/python${_PY_VER_MAJOR}/"
 		  PATH_SUFFIXES

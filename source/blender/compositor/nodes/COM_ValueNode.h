@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_ValueNode_h_
-#define _COM_ValueNode_h_
+#ifndef __COM_VALUENODE_H__
+#define __COM_VALUENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief ValueNode
- * @ingroup Node
+ * \brief ValueNode
+ * \ingroup Node
  */
 class ValueNode : public Node {
 public:

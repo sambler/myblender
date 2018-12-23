@@ -16,14 +16,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Lukas Tönne
+ *      Jeroen Bakker
+ *      Monique Dewanchand
+ *      Lukas Tönne
  */
 
 
-#ifndef _COM_MultilayerImageOperation_h
-#define _COM_MultilayerImageOperation_h
+#ifndef __COM_MULTILAYERIMAGEOPERATION_H__
+#define __COM_MULTILAYERIMAGEOPERATION_H__
 
 #include "COM_ImageOperation.h"
 

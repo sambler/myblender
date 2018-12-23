@@ -23,12 +23,14 @@
 #include "util/util_image.h"
 #include "util/util_string.h"
 #include "util/util_thread.h"
+#include "util/util_unique_ptr.h"
 #include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 
 class Device;
 class Progress;
+class RenderStats;
 class Scene;
 
 class ImageMetaData {
@@ -82,12 +84,18 @@ public:
 	                        int flat_slot,
 	                        Progress *progress);
 	void device_free(Device *device);
+
+	void device_load_builtin(Device *device,
+	                         Scene *scene,
+	                         Progress& progress);
 	void device_free_builtin(Device *device);
 
 	void set_osl_texture_system(void *texture_system);
 	bool set_animation_frame_update(int frame);
 
 	device_memory *image_memory(int flat_slot);
+
+	void collect_statistics(RenderStats *stats);
 
 	bool need_update;
 
@@ -138,8 +146,7 @@ private:
 	vector<Image*> images[IMAGE_DATA_NUM_TYPES];
 	void *osl_texture_system;
 
-	bool file_load_image_generic(Image *img,
-	                             ImageInput **in);
+	bool file_load_image_generic(Image *img, unique_ptr<ImageInput> *in);
 
 	template<TypeDesc::BASETYPE FileFormat,
 	         typename StorageType,
@@ -149,16 +156,11 @@ private:
 	                     int texture_limit,
 	                     device_vector<DeviceType>& tex_img);
 
-	int max_flattened_slot(ImageDataType type);
-	int type_index_to_flattened_slot(int slot, ImageDataType type);
-	int flattened_slot_to_type_index(int flat_slot, ImageDataType *type);
-	string name_from_type(int type);
-
 	void device_load_image(Device *device,
 	                       Scene *scene,
 	                       ImageDataType type,
 	                       int slot,
-	                       Progress *progess);
+	                       Progress *progress);
 	void device_free_image(Device *device,
 	                       ImageDataType type,
 	                       int slot);
@@ -166,5 +168,4 @@ private:
 
 CCL_NAMESPACE_END
 
-#endif /* __IMAGE_H__ */
-
+#endif  /* __IMAGE_H__ */

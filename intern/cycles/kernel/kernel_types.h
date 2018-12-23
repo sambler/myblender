@@ -17,6 +17,12 @@
 #ifndef __KERNEL_TYPES_H__
 #define __KERNEL_TYPES_H__
 
+#if !defined(__KERNEL_GPU__) && defined(WITH_EMBREE)
+#  include <embree3/rtcore.h>
+#  include <embree3/rtcore_scene.h>
+#  define __EMBREE__
+#endif
+
 #include "kernel/kernel_math.h"
 #include "kernel/svm/svm_types.h"
 #include "util/util_static_assert.h"
@@ -53,8 +59,9 @@ CCL_NAMESPACE_BEGIN
 #define OBJECT_NONE				(~0)
 #define PRIM_NONE				(~0)
 #define LAMP_NONE				(~0)
+#define ID_NONE					(0.0f)
 
-#define VOLUME_STACK_SIZE		16
+#define VOLUME_STACK_SIZE		32
 
 /* Split kernel constants */
 #define WORK_POOL_SIZE_GPU 64
@@ -415,6 +422,7 @@ typedef enum PassType {
 	PASS_RAY_BOUNCES,
 #endif
 	PASS_RENDER_TIME,
+	PASS_CRYPTOMATTE,
 	PASS_CATEGORY_MAIN_END = 31,
 
 	PASS_MIST = 32,
@@ -443,6 +451,14 @@ typedef enum PassType {
 
 #define PASS_ANY (~0)
 
+typedef enum CryptomatteType {
+	CRYPT_NONE = 0,
+	CRYPT_OBJECT = (1 << 0),
+	CRYPT_MATERIAL = (1 << 1),
+	CRYPT_ASSET = (1 << 2),
+	CRYPT_ACCURATE = (1 << 3),
+} CryptomatteType;
+
 typedef enum DenoisingPassOffsets {
 	DENOISING_PASS_NORMAL             = 0,
 	DENOISING_PASS_NORMAL_VAR         = 3,
@@ -454,6 +470,7 @@ typedef enum DenoisingPassOffsets {
 	DENOISING_PASS_SHADOW_B           = 17,
 	DENOISING_PASS_COLOR              = 20,
 	DENOISING_PASS_COLOR_VAR          = 23,
+	DENOISING_PASS_CLEAN              = 26,
 
 	DENOISING_PASS_SIZE_BASE          = 26,
 	DENOISING_PASS_SIZE_CLEAN         = 3,
@@ -598,7 +615,7 @@ typedef ccl_addr_space struct PathRadiance {
 
 #ifdef __KERNEL_DEBUG__
 	DebugData debug_data;
-#endif /* __KERNEL_DEBUG__ */
+#endif  /* __KERNEL_DEBUG__ */
 } PathRadiance;
 
 typedef struct BsdfEval {
@@ -711,6 +728,9 @@ typedef struct Ray {
 /* Intersection */
 
 typedef struct Intersection {
+#ifdef __EMBREE__
+	float3 Ng;
+#endif
 	float t, u, v;
 	int prim;
 	int object;
@@ -1238,19 +1258,19 @@ typedef struct KernelFilm {
 	int pass_glossy_color;
 	int pass_transmission_color;
 	int pass_subsurface_color;
-	
+
 	int pass_diffuse_indirect;
 	int pass_glossy_indirect;
 	int pass_transmission_indirect;
 	int pass_subsurface_indirect;
 	int pass_volume_indirect;
-	
+
 	int pass_diffuse_direct;
 	int pass_glossy_direct;
 	int pass_transmission_direct;
 	int pass_subsurface_direct;
 	int pass_volume_direct;
-	
+
 	int pass_emission;
 	int pass_background;
 	int pass_ao;
@@ -1259,6 +1279,9 @@ typedef struct KernelFilm {
 	int pass_shadow;
 	float pass_shadow_scale;
 	int filter_table_offset;
+	int cryptomatte_passes;
+	int cryptomatte_depth;
+	int pass_cryptomatte;
 
 	int pass_mist;
 	float mist_start;
@@ -1268,8 +1291,6 @@ typedef struct KernelFilm {
 	int pass_denoising_data;
 	int pass_denoising_clean;
 	int denoising_flags;
-
-	int pad1, pad2, pad3;
 
 	/* XYZ to rendering color space transform. float4 instead of float3 to
 	 * ensure consistent padding/alignment across devices. */
@@ -1383,20 +1404,30 @@ typedef enum KernelBVHLayout {
 
 	BVH_LAYOUT_BVH2 = (1 << 0),
 	BVH_LAYOUT_BVH4 = (1 << 1),
-
-	BVH_LAYOUT_DEFAULT = BVH_LAYOUT_BVH4,
+	BVH_LAYOUT_BVH8 = (1 << 2),
+	BVH_LAYOUT_EMBREE = (1 << 3),
+	BVH_LAYOUT_DEFAULT = BVH_LAYOUT_BVH8,
 	BVH_LAYOUT_ALL = (unsigned int)(-1),
 } KernelBVHLayout;
 
 typedef struct KernelBVH {
-	/* root node */
+	/* Own BVH */
 	int root;
 	int have_motion;
 	int have_curves;
 	int have_instancing;
 	int bvh_layout;
 	int use_bvh_steps;
+
+	/* Embree */
+#ifdef __EMBREE__
+	RTCScene scene;
+#  ifndef __KERNEL_64_BIT__
+	int pad1;
+#  endif
+#else
 	int pad1, pad2;
+#endif
 } KernelBVH;
 static_assert_align(KernelBVH, 16);
 
@@ -1458,7 +1489,11 @@ typedef struct KernelObject {
 	uint patch_map_offset;
 	uint attribute_map_offset;
 	uint motion_offset;
-	uint pad;
+	uint pad1;
+
+	float cryptomatte_object;
+	float cryptomatte_asset;
+	float pad2, pad3;
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
@@ -1538,7 +1573,7 @@ static_assert_align(KernelParticle, 16);
 
 typedef struct KernelShader {
 	float constant_emission[3];
-	float pad1;
+	float cryptomatte_id;
 	int flags;
 	int pass_id;
 	int pad2, pad3;
@@ -1670,5 +1705,4 @@ typedef struct WorkTile {
 
 CCL_NAMESPACE_END
 
-#endif /*  __KERNEL_TYPES_H__ */
-
+#endif  /*  __KERNEL_TYPES_H__ */

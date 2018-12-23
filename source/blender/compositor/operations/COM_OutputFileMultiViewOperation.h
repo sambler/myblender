@@ -16,14 +16,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Lukas Tönne
- *		Dalai Felinto
+ *      Jeroen Bakker
+ *      Monique Dewanchand
+ *      Lukas Tönne
+ *      Dalai Felinto
  */
 
-#ifndef _COM_OutputFileMultiViewOperation_h
-#define _COM_OutputFileMultiViewOperation_h
+#ifndef __COM_OUTPUTFILEMULTIVIEWOPERATION_H__
+#define __COM_OUTPUTFILEMULTIVIEWOPERATION_H__
 #include "COM_NodeOperation.h"
 
 #include "BLI_rect.h"

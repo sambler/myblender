@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_BrightnessNode_h_
-#define _COM_BrightnessNode_h_
+#ifndef __COM_BRIGHTNESSNODE_H__
+#define __COM_BRIGHTNESSNODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief BrightnessNode
- * @ingroup Node
+ * \brief BrightnessNode
+ * \ingroup Node
  */
 class BrightnessNode : public Node {
 public:

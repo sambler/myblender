@@ -16,13 +16,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Campbell Barton
+ *      Jeroen Bakker
+ *      Monique Dewanchand
+ *      Campbell Barton
  */
 
-#ifndef _COM_GaussianAlphaYBlurOperation_h
-#define _COM_GaussianAlphaYBlurOperation_h
+#ifndef __COM_GAUSSIANALPHAYBLUROPERATION_H__
+#define __COM_GAUSSIANALPHAYBLUROPERATION_H__
 #include "COM_NodeOperation.h"
 #include "COM_BlurBaseOperation.h"
 
@@ -43,7 +43,7 @@ public:
 	void executePixel(float output[4], int x, int y, void *data);
 
 	/**
-	 * @brief initialize the execution
+	 * \brief initialize the execution
 	 */
 	void initExecution();
 

@@ -420,7 +420,7 @@ static void add_nearest(KDTreeNearest *ptn, uint *found, uint n, int index,
  * Find n nearest returns number of points found, with results in nearest.
  * Normal is optional, but if given will limit results to points in normal direction from co.
  *
- * \param r_nearest  An array of nearest, sized at least \a n.
+ * \param r_nearest: An array of nearest, sized at least \a n.
  */
 int BLI_kdtree_find_nearest_n__normal(
         const KDTree *tree, const float co[3], const float nor[3],
@@ -774,7 +774,12 @@ int BLI_kdtree_calc_duplicates_fast(
 			if (ELEM(duplicates[index], -1, index)) {
 				p.search = index;
 				copy_v3_v3(p.search_co, tree->nodes[node_index].co);
+				int found_prev = found;
 				deduplicate_recursive(&p, tree->root);
+				if (found != found_prev) {
+					/* Prevent chains of doubles. */
+					duplicates[index] = index;
+				}
 			}
 		}
 		MEM_freeN(order);
@@ -786,7 +791,12 @@ int BLI_kdtree_calc_duplicates_fast(
 			if (ELEM(duplicates[index], -1, index)) {
 				p.search = index;
 				copy_v3_v3(p.search_co, tree->nodes[node_index].co);
+				int found_prev = found;
 				deduplicate_recursive(&p, tree->root);
+				if (found != found_prev) {
+					/* Prevent chains of doubles. */
+					duplicates[index] = index;
+				}
 			}
 		}
 	}

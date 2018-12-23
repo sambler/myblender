@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_GlareNode_h_
-#define _COM_GlareNode_h_
+#ifndef __COM_GLARENODE_H__
+#define __COM_GLARENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief GlareNode
- * @ingroup Node
+ * \brief GlareNode
+ * \ingroup Node
  */
 class GlareNode : public Node {
 public:

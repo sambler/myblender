@@ -16,12 +16,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_ScreenLensDistortionOperation_h
-#define _COM_ScreenLensDistortionOperation_h
+#ifndef __COM_SCREENLENSDISTORTIONOPERATION_H__
+#define __COM_SCREENLENSDISTORTIONOPERATION_H__
 #include "COM_NodeOperation.h"
 #include "DNA_node_types.h"
 
@@ -31,6 +31,7 @@ private:
 	 * Cached reference to the inputProgram
 	 */
 	SocketReader *m_inputProgram;
+	struct RNG *m_rng;
 
 	bool m_fit;
 	bool m_jitter;

@@ -16,12 +16,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_ColorBalanceLGGOperation_h
-#define _COM_ColorBalanceLGGOperation_h
+#ifndef __COM_COLORBALANCELGGOPERATION_H__
+#define __COM_COLORBALANCELGGOPERATION_H__
 #include "COM_NodeOperation.h"
 
 

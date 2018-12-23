@@ -16,13 +16,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
 
-#ifndef _COM_TextureOperation_h
-#define _COM_TextureOperation_h
+#ifndef __COM_TEXTUREOPERATION_H__
+#define __COM_TEXTUREOPERATION_H__
 
 #include "COM_NodeOperation.h"
 #include "DNA_texture_types.h"
@@ -37,7 +37,7 @@ extern "C" {
 /**
  * Base class for all renderlayeroperations
  *
- * @todo: rename to operation.
+ * \todo: rename to operation.
  */
 class TextureBaseOperation : public NodeOperation {
 private:

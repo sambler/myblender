@@ -16,17 +16,17 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Dalai Felinto
+ *      Dalai Felinto
  */
 
-#ifndef _COM_NormalizeNode_h_
-#define _COM_NormalizeNode_h_
+#ifndef __COM_NORMALIZENODE_H__
+#define __COM_NORMALIZENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief NormalizeNode
- * @ingroup Node
+ * \brief NormalizeNode
+ * \ingroup Node
  */
 class NormalizeNode : public Node {
 public:

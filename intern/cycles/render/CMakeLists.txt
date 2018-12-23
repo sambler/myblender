@@ -15,6 +15,7 @@ set(SRC
 	buffers.cpp
 	camera.cpp
 	constant_fold.cpp
+	coverage.cpp
 	film.cpp
 	graph.cpp
 	image.cpp
@@ -33,6 +34,7 @@ set(SRC
 	session.cpp
 	shader.cpp
 	sobol.cpp
+	stats.cpp
 	svm.cpp
 	tables.cpp
 	tile.cpp
@@ -45,6 +47,7 @@ set(SRC_HEADERS
 	buffers.h
 	camera.h
 	constant_fold.h
+	coverage.h
 	film.h
 	graph.h
 	image.h
@@ -60,6 +63,7 @@ set(SRC_HEADERS
 	session.h
 	shader.h
 	sobol.h
+	stats.h
 	svm.h
 	tables.h
 	tile.h

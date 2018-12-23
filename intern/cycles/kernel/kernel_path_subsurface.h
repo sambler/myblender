@@ -32,6 +32,8 @@ bool kernel_path_subsurface_scatter(
         ccl_addr_space float3 *throughput,
         ccl_addr_space SubsurfaceIndirectRays *ss_indirect)
 {
+	PROFILING_INIT(kg, PROFILING_SUBSURFACE);
+
 	float bssrdf_u, bssrdf_v;
 	path_state_rng_2D(kg, state, PRNG_BSDF_U, &bssrdf_u, &bssrdf_v);
 
@@ -152,4 +154,3 @@ ccl_device void kernel_path_subsurface_setup_indirect(
 #endif  /* __SUBSURFACE__ */
 
 CCL_NAMESPACE_END
-

@@ -16,13 +16,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Sergey Sharybin
+ *      Jeroen Bakker
+ *      Monique Dewanchand
+ *      Sergey Sharybin
  */
 
-#ifndef _COM_MovieDistortionOperation_h_
-#define _COM_MovieDistortionOperation_h_
+#ifndef __COM_MOVIEDISTORTIONOPERATION_H__
+#define __COM_MOVIEDISTORTIONOPERATION_H__
 
 #include "COM_NodeOperation.h"
 #include "DNA_movieclip_types.h"

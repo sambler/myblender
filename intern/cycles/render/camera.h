@@ -21,6 +21,7 @@
 
 #include "graph/node.h"
 
+#include "util/util_array.h"
 #include "util/util_boundbox.h"
 #include "util/util_projection.h"
 #include "util/util_transform.h"
@@ -181,7 +182,7 @@ public:
 	/* functions */
 	Camera();
 	~Camera();
-	
+
 	void compute_auto_viewplane();
 
 	void update(Scene *scene);
@@ -212,5 +213,4 @@ private:
 
 CCL_NAMESPACE_END
 
-#endif /* __CAMERA_H__ */
-
+#endif  /* __CAMERA_H__ */

@@ -53,6 +53,8 @@ typedef enum ImageDataType {
 	IMAGE_DATA_TYPE_FLOAT = 3,
 	IMAGE_DATA_TYPE_BYTE = 4,
 	IMAGE_DATA_TYPE_HALF = 5,
+	IMAGE_DATA_TYPE_USHORT4 = 6,
+	IMAGE_DATA_TYPE_USHORT = 7,
 
 	IMAGE_DATA_NUM_TYPES
 } ImageDataType;
@@ -87,4 +89,4 @@ typedef struct TextureInfo {
 
 CCL_NAMESPACE_END
 
-#endif /* __UTIL_TEXTURE_H__ */
+#endif  /* __UTIL_TEXTURE_H__ */

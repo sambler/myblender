@@ -12,9 +12,6 @@ if NOT "%1" == "" (
 	if "%1" == "debug" (
 		set BUILD_TYPE=Debug
 	REM Build Configurations
-	) else if "%1" == "noge" (
-		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% -DWITH_GAMEENGINE=OFF -DWITH_PLAYER=OFF
-		set BUILD_NGE=_noge
 	) else if "%1" == "builddir" (
 		set BUILD_DIR_OVERRRIDE="%BLENDER_DIR%..\%2"
 		shift /1
@@ -59,13 +56,13 @@ if NOT "%1" == "" (
 		set VSWHERE_ARGS=-products Microsoft.VisualStudio.Product.BuildTools
 	) else if "%1" == "2015" (
 		set BUILD_VS_YEAR=2015
-	) else if "%1" == "2013" (
-		set BUILD_VS_YEAR=2013
 	) else if "%1" == "packagename" (
 		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% -DCPACK_OVERRIDE_PACKAGENAME="%2"
 		shift /1
 	) else if "%1" == "nobuild" (
 		set NOBUILD=1
+	) else if "%1" == "pydebug" (
+		set WITH_PYDEBUG=1
 	) else if "%1" == "showhash" (
 		SET BUILD_SHOW_HASHES=1
 	REM Non-Build Commands

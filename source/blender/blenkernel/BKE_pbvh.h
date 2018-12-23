@@ -30,6 +30,7 @@
 #include "BLI_ghash.h"
 #include "BLI_utildefines.h"
 
+struct GPUBatch;
 struct CCGElem;
 struct CCGKey;
 struct CCGDerivedMesh;
@@ -74,7 +75,6 @@ void BKE_pbvh_build_grids(PBVH *bvh, struct CCGElem **grid_elems,
                           struct CCGKey *key, void **gridfaces, struct DMFlagMat *flagmats,
                           unsigned int **grid_hidden);
 void BKE_pbvh_build_bmesh(PBVH *bvh, struct BMesh *bm, bool smooth_shading, struct BMLog *log, const int cd_vert_node_offset, const int cd_face_node_offset);
-void BKE_pbvh_set_ccgdm(PBVH *bvh, struct CCGDerivedMesh *ccgdm);
 void BKE_pbvh_free(PBVH *bvh);
 void BKE_pbvh_free_layer_disp(PBVH *bvh);
 
@@ -128,10 +128,9 @@ bool BKE_pbvh_node_find_nearest_to_ray(
 
 /* Drawing */
 
-void BKE_pbvh_node_draw(PBVHNode *node, void *data);
-void BKE_pbvh_draw(PBVH *bvh, float (*planes)[4], float (*face_nors)[3],
-                   int (*setMaterial)(int matnr, void *attribs), bool wireframe, bool fast);
-void BKE_pbvh_draw_BB(PBVH *bvh);
+void BKE_pbvh_draw_cb(
+        PBVH *bvh, float (*planes)[4], float (*fnors)[3], bool fast, bool only_mask,
+        void (*draw_fn)(void *user_data, struct GPUBatch *batch), void *user_data);
 
 /* PBVH Access */
 typedef enum {
@@ -155,7 +154,8 @@ int BKE_pbvh_count_grid_quads(BLI_bitmap **grid_hidden,
 
 /* multires level, only valid for type == PBVH_GRIDS */
 void BKE_pbvh_get_grid_key(const PBVH *pbvh, struct CCGKey *key);
-struct CCGDerivedMesh *BKE_pbvh_get_ccgdm(const PBVH *bvh);
+
+struct CCGElem **BKE_pbvh_get_grids(const PBVH *pbvh, int *num_grids);
 
 /* Only valid for type == PBVH_BMESH */
 struct BMesh *BKE_pbvh_get_bmesh(PBVH *pbvh);
@@ -221,7 +221,7 @@ struct GSet *BKE_pbvh_bmesh_node_faces(PBVHNode *node);
 void BKE_pbvh_bmesh_node_save_orig(PBVHNode *node);
 void BKE_pbvh_bmesh_after_stroke(PBVH *bvh);
 
-/* Update Normals/Bounding Box/Draw Buffers/Redraw and clear flags */
+/* Update Normals/Bounding Box/Redraw and clear flags */
 
 void BKE_pbvh_update(PBVH *bvh, int flags, float (*face_nors)[3]);
 void BKE_pbvh_redraw_BB(PBVH *bvh, float bb_min[3], float bb_max[3]);
@@ -240,7 +240,7 @@ void BKE_pbvh_node_layer_disp_free(PBVHNode *node);
 
 /* vertex deformer */
 float (*BKE_pbvh_get_vertCos(struct PBVH *pbvh))[3];
-void BKE_pbvh_apply_vertCos(struct PBVH *pbvh, float (*vertCos)[3]);
+void BKE_pbvh_apply_vertCos(struct PBVH *pbvh, float (*vertCos)[3], const int totvert);
 bool BKE_pbvh_isDeformed(struct PBVH *pbvh);
 
 /* Vertex Iterator */
@@ -369,6 +369,7 @@ bool BKE_pbvh_node_vert_update_check_any(PBVH *bvh, PBVHNode *node);
 //void BKE_pbvh_node_BB_reset(PBVHNode *node);
 //void BKE_pbvh_node_BB_expand(PBVHNode *node, float co[3]);
 
+bool pbvh_has_mask(PBVH *bvh);
 void pbvh_show_diffuse_color_set(PBVH *bvh, bool show_diffuse_color);
 void pbvh_show_mask_set(PBVH *bvh, bool show_mask);
 

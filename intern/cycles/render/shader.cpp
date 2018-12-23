@@ -30,6 +30,7 @@
 #include "render/tables.h"
 
 #include "util/util_foreach.h"
+#include "util/util_murmurhash.h"
 
 #ifdef WITH_OCIO
 #  include <OpenColorIO/OpenColorIO.h>
@@ -207,6 +208,7 @@ Shader::Shader()
 
 	need_update = true;
 	need_update_mesh = true;
+	need_sync_object = false;
 }
 
 Shader::~Shader()
@@ -313,7 +315,7 @@ void Shader::tag_update(Scene *scene)
 	if(has_displacement && displacement_method == DISPLACE_BOTH) {
 		attributes.add(ATTR_STD_POSITION_UNDISPLACED);
 	}
-	
+
 	/* compare if the attributes changed, mesh manager will check
 	 * need_update_mesh, update the relevant meshes and clear it. */
 	if(attributes.modified(prev_attributes)) {
@@ -387,7 +389,7 @@ ShaderManager *ShaderManager::create(Scene *scene, int shadingsystem)
 {
 	ShaderManager *manager;
 
-	(void)shadingsystem;  /* Ignored when built without OSL. */
+	(void) shadingsystem;  /* Ignored when built without OSL. */
 
 #ifdef WITH_OSL
 	if(shadingsystem == SHADINGSYSTEM_OSL) {
@@ -398,7 +400,7 @@ ShaderManager *ShaderManager::create(Scene *scene, int shadingsystem)
 	{
 		manager = new SVMShaderManager();
 	}
-	
+
 	add_default(scene);
 
 	return manager;
@@ -413,7 +415,7 @@ uint ShaderManager::get_attribute_id(ustring name)
 
 	if(it != unique_attribute_id.end())
 		return it->second;
-	
+
 	uint id = (uint)ATTR_STD_NUM + unique_attribute_id.size();
 	unique_attribute_id[name] = id;
 	return id;
@@ -432,10 +434,10 @@ int ShaderManager::get_shader_id(Shader *shader, bool smooth)
 	/* smooth flag */
 	if(smooth)
 		id |= SHADER_SMOOTH_NORMAL;
-	
+
 	/* default flags */
 	id |= SHADER_CAST_SHADOW|SHADER_AREA_LIGHT;
-	
+
 	return id;
 }
 
@@ -523,12 +525,15 @@ void ShaderManager::device_update_common(Device *device,
 		if(shader->is_constant_emission(&constant_emission))
 			flag |= SD_HAS_CONSTANT_EMISSION;
 
+		uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
+
 		/* regular shader */
 		kshader->flags = flag;
 		kshader->pass_id = shader->pass_id;
 		kshader->constant_emission[0] = constant_emission.x;
 		kshader->constant_emission[1] = constant_emission.y;
 		kshader->constant_emission[2] = constant_emission.z;
+		kshader->cryptomatte_id = util_hash_to_float(cryptomatte_id);
 		kshader++;
 
 		has_transparent_shadow |= (flag & SD_HAS_TRANSPARENT_SHADOW) != 0;
@@ -695,5 +700,20 @@ float ShaderManager::linear_rgb_to_gray(float3 c)
 	return dot(c, rgb_to_y);
 }
 
-CCL_NAMESPACE_END
+string ShaderManager::get_cryptomatte_materials(Scene *scene)
+{
+	string manifest = "{";
+	unordered_set<ustring, ustringHash> materials;
+	foreach(Shader *shader, scene->shaders) {
+		if(materials.count(shader->name)) {
+			continue;
+		}
+		materials.insert(shader->name);
+		uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
+		manifest += string_printf("\"%s\":\"%08x\",", shader->name.c_str(), cryptomatte_id);
+	}
+	manifest[manifest.size()-1] = '}';
+	return manifest;
+}
 
+CCL_NAMESPACE_END

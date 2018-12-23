@@ -45,18 +45,18 @@ class OSLRenderServices : public OSL::RendererServices
 public:
 	OSLRenderServices();
 	~OSLRenderServices();
-	
+
 	void thread_init(KernelGlobals *kernel_globals, OSL::TextureSystem *ts);
 
 	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform, float time);
 	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform, float time);
-	
+
 	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring from, float time);
 	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring to, float time);
-	
+
 	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform);
 	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, OSL::TransformationPtr xform);
-	
+
 	bool get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring from);
 	bool get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring from);
 
@@ -93,6 +93,10 @@ public:
 	bool getmessage(OSL::ShaderGlobals *sg, ustring source, ustring name,
 	                TypeDesc type, void *val, bool derivatives);
 
+	TextureSystem::TextureHandle *get_texture_handle(ustring filename);
+
+	bool good(TextureSystem::TextureHandle *texture_handle);
+
 	bool texture(ustring filename,
 	             TextureSystem::TextureHandle *texture_handle,
 	             TexturePerthread *texture_thread_info,
@@ -103,7 +107,8 @@ public:
 	             int nchannels,
 	             float *result,
 	             float *dresultds,
-	             float *dresultdt);
+	             float *dresultdt,
+	             ustring *errormessage);
 
 	bool texture3d(ustring filename,
 	               TextureHandle *texture_handle,
@@ -194,5 +199,4 @@ private:
 
 CCL_NAMESPACE_END
 
-#endif /* __OSL_SERVICES_H__  */
-
+#endif  /* __OSL_SERVICES_H__  */

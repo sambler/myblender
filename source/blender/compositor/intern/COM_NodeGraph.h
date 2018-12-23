@@ -16,11 +16,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Lukas Toenne
+ *      Lukas Toenne
  */
 
-#ifndef _COM_NodeGraph_h
-#define _COM_NodeGraph_h
+#ifndef __COM_NODEGRAPH_H__
+#define __COM_NODEGRAPH_H__
 
 #include <map>
 #include <set>
@@ -113,4 +113,4 @@ protected:
 #endif
 };
 
-#endif /* _COM_NodeGraph_h */
+#endif /* __COM_NODEGRAPH_H__ */

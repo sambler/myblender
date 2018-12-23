@@ -158,15 +158,15 @@ typedef enum eNodeSocketInOut {
 
 /* sock->flag, first bit is select */
 typedef enum eNodeSocketFlag {
-	SOCK_HIDDEN = 2,					/* hidden is user defined, to hide unused */
-	SOCK_IN_USE = 4,					/* for quick check if socket is linked */
-	SOCK_UNAVAIL = 8,					/* unavailable is for dynamic sockets */
-	// SOCK_DYNAMIC = 16,				/* DEPRECATED  dynamic socket (can be modified by user) */
-	// SOCK_INTERNAL = 32,				/* DEPRECATED  group socket should not be exposed */
-	SOCK_COLLAPSED = 64,				/* socket collapsed in UI */
-	SOCK_HIDE_VALUE = 128,				/* hide socket value, if it gets auto default */
-	SOCK_AUTO_HIDDEN__DEPRECATED = 256,	/* socket hidden automatically, to distinguish from manually hidden */
-	SOCK_NO_INTERNAL_LINK = 512
+	SOCK_HIDDEN = (1 << 1),                     /* hidden is user defined, to hide unused */
+	SOCK_IN_USE = (1 << 2),                     /* for quick check if socket is linked */
+	SOCK_UNAVAIL = (1 << 3),                    /* unavailable is for dynamic sockets */
+	// SOCK_DYNAMIC = (1 << 4),                 /* DEPRECATED  dynamic socket (can be modified by user) */
+	// SOCK_INTERNAL = (1 << 5),                /* DEPRECATED  group socket should not be exposed */
+	SOCK_COLLAPSED = (1 << 6),                  /* socket collapsed in UI */
+	SOCK_HIDE_VALUE = (1 << 7),                 /* hide socket value, if it gets auto default */
+	SOCK_AUTO_HIDDEN__DEPRECATED = (1 << 8),    /* socket hidden automatically, to distinguish from manually hidden */
+	SOCK_NO_INTERNAL_LINK = (1 << 9),
 } eNodeSocketFlag;
 
 /* limit data in bNode to what we want to see saved? */
@@ -221,8 +221,11 @@ typedef struct bNode {
 	 * and replacing all uses with per-instance data.
 	 */
 	short preview_xsize, preview_ysize;	/* reserved size of the preview rect */
-	int pad2;
+	short tmp_flag, pad2;   /* Used at runtime when going through the tree. Initialize before use. */
 	struct uiBlock *block;	/* runtime during drawing */
+
+	float ssr_id; /* XXX: eevee only, id of screen space reflection layer, needs to be a float to feed GPU_uniform. */
+	float sss_id; /* XXX: eevee only, id of screen subsurface scatter layer, needs to be a float to feed GPU_uniform. */
 } bNode;
 
 /* node->flag */
@@ -314,9 +317,9 @@ typedef struct bNodeLink {
 } bNodeLink;
 
 /* link->flag */
-#define NODE_LINKFLAG_HILITE	1		/* link has been successfully validated */
-#define NODE_LINK_VALID			2
-#define NODE_LINK_TEST			4		/* free test flag, undefined */
+#define NODE_LINKFLAG_HILITE	(1 << 0)		/* link has been successfully validated */
+#define NODE_LINK_VALID			(1 << 1)
+#define NODE_LINK_TEST			(1 << 2)		/* free test flag, undefined */
 
 /* tree->edit_quality/tree->render_quality */
 #define NTREE_QUALITY_HIGH    0
@@ -411,28 +414,34 @@ typedef struct bNodeTree {
 #define NTREE_TYPE_INIT		1
 
 /* ntree->flag */
-#define NTREE_DS_EXPAND				1	/* for animation editors */
-#define NTREE_COM_OPENCL			2	/* use opencl */
-#define NTREE_TWO_PASS				4	/* two pass */
-#define NTREE_COM_GROUPNODE_BUFFER	8	/* use groupnode buffers */
-#define NTREE_VIEWER_BORDER			16	/* use a border for viewer nodes */
-#define NTREE_IS_LOCALIZED			32	/* tree is localized copy, free when deleting node groups */
+#define NTREE_DS_EXPAND				(1 << 0)	/* for animation editors */
+#define NTREE_COM_OPENCL			(1 << 1)	/* use opencl */
+#define NTREE_TWO_PASS				(1 << 2)	/* two pass */
+#define NTREE_COM_GROUPNODE_BUFFER	(1 << 3)	/* use groupnode buffers */
+#define NTREE_VIEWER_BORDER			(1 << 4)	/* use a border for viewer nodes */
+/* NOTE: DEPRECATED, use (id->tag & LIB_TAG_LOCALIZED) instead. */
+/* #define NTREE_IS_LOCALIZED			(1 << 5) */	/* tree is localized copy, free when deleting node groups */
 
 /* XXX not nice, but needed as a temporary flags
  * for group updates after library linking.
  */
-#define NTREE_DO_VERSIONS_GROUP_EXPOSE_2_56_2	1024	/* changes from r35033 */
-#define NTREE_DO_VERSIONS_CUSTOMNODES_GROUP		2048	/* custom_nodes branch: remove links to node tree sockets */
-#define NTREE_DO_VERSIONS_CUSTOMNODES_GROUP_CREATE_INTERFACE	4096	/* custom_nodes branch: create group input/output nodes */
+
+/* changes from r35033 */
+#define NTREE_DO_VERSIONS_GROUP_EXPOSE_2_56_2   (1 << 10)
+/* custom_nodes branch: remove links to node tree sockets */
+#define NTREE_DO_VERSIONS_CUSTOMNODES_GROUP     (1 << 11)
+/* custom_nodes branch: create group input/output nodes */
+#define NTREE_DO_VERSIONS_CUSTOMNODES_GROUP_CREATE_INTERFACE    (1 << 12)
 
 /* ntree->update */
 typedef enum eNodeTreeUpdate {
 	NTREE_UPDATE            = 0xFFFF,	/* generic update flag (includes all others) */
-	NTREE_UPDATE_LINKS      = 1,		/* links have been added or removed */
-	NTREE_UPDATE_NODES      = 2,		/* nodes or sockets have been added or removed */
-	NTREE_UPDATE_GROUP_IN   = 16,		/* group inputs have changed */
-	NTREE_UPDATE_GROUP_OUT  = 32,		/* group outputs have changed */
-	NTREE_UPDATE_GROUP      = 48		/* group has changed (generic flag including all other group flags) */
+	NTREE_UPDATE_LINKS      = (1 << 0),		/* links have been added or removed */
+	NTREE_UPDATE_NODES      = (1 << 1),		/* nodes or sockets have been added or removed */
+	NTREE_UPDATE_GROUP_IN   = (1 << 4),		/* group inputs have changed */
+	NTREE_UPDATE_GROUP_OUT  = (1 << 5),		/* group outputs have changed */
+	/* group has changed (generic flag including all other group flags) */
+	NTREE_UPDATE_GROUP      = (NTREE_UPDATE_GROUP_IN | NTREE_UPDATE_GROUP_OUT)
 } eNodeTreeUpdate;
 
 
@@ -482,10 +491,10 @@ enum {
 };
 
 enum {
-	CMP_NODE_LENSFLARE_GHOST   = 1,
-	CMP_NODE_LENSFLARE_GLOW    = 2,
-	CMP_NODE_LENSFLARE_CIRCLE  = 4,
-	CMP_NODE_LENSFLARE_STREAKS = 8
+	CMP_NODE_LENSFLARE_GHOST   = (1 << 0),
+	CMP_NODE_LENSFLARE_GLOW    = (1 << 1),
+	CMP_NODE_LENSFLARE_CIRCLE  = (1 << 2),
+	CMP_NODE_LENSFLARE_STREAKS = (1 << 3)
 };
 
 enum {
@@ -500,7 +509,7 @@ enum {
 };
 
 enum {
-	CMP_NODEFLAG_MASK_AA          = (1 << 0),
+	/* CMP_NODEFLAG_MASK_AA          = (1 << 0), */  /* DEPRECATED */
 	CMP_NODEFLAG_MASK_NO_FEATHER  = (1 << 1),
 	CMP_NODEFLAG_MASK_MOTION_BLUR = (1 << 2),
 
@@ -650,11 +659,6 @@ typedef struct NodeTwoFloats {
 	float x, y;
 } NodeTwoFloats;
 
-typedef struct NodeGeometry {
-	char uvname[64];	/* MAX_CUSTOMDATA_LAYER_NAME */
-	char colname[64];
-} NodeGeometry;
-
 typedef struct NodeVertexCol {
 	char name[64];
 } NodeVertexCol;
@@ -778,6 +782,8 @@ typedef struct NodeTexNoise {
 typedef struct NodeTexVoronoi {
 	NodeTexBase base;
 	int coloring;
+	int distance;
+	int feature;
 	int pad;
 } NodeTexVoronoi;
 
@@ -905,6 +911,14 @@ typedef struct NodeSunBeams {
 	float ray_length;
 } NodeSunBeams;
 
+typedef struct NodeCryptomatte {
+	float add[3];
+	float remove[3];
+	char *matte_id;
+	int num_inputs;
+	int pad;
+} NodeCryptomatte;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL		0
 #define NODE_SCRIPT_EXTERNAL		1
@@ -953,6 +967,11 @@ typedef struct NodeSunBeams {
 #define SHD_HAIR_REFLECTION		0
 #define SHD_HAIR_TRANSMISSION		1
 
+/* principled hair parametrization */
+#define SHD_PRINCIPLED_HAIR_REFLECTANCE				0
+#define SHD_PRINCIPLED_HAIR_PIGMENT_CONCENTRATION	1
+#define SHD_PRINCIPLED_HAIR_DIRECT_ABSORPTION		2
+
 /* blend texture */
 #define SHD_BLEND_LINEAR			0
 #define SHD_BLEND_QUADRATIC			1
@@ -976,16 +995,19 @@ typedef struct NodeSunBeams {
 #define SHD_NOISE_HARD	1
 
 /* voronoi texture */
-#define SHD_VORONOI_DISTANCE_SQUARED	0
-#define SHD_VORONOI_ACTUAL_DISTANCE		1
-#define SHD_VORONOI_MANHATTAN			2
-#define SHD_VORONOI_CHEBYCHEV			3
-#define SHD_VORONOI_MINKOVSKY_H			4
-#define SHD_VORONOI_MINKOVSKY_4			5
-#define SHD_VORONOI_MINKOVSKY			6
+#define SHD_VORONOI_DISTANCE		0
+#define SHD_VORONOI_MANHATTAN		1
+#define SHD_VORONOI_CHEBYCHEV		2
+#define SHD_VORONOI_MINKOWSKI		3
 
 #define SHD_VORONOI_INTENSITY	0
 #define SHD_VORONOI_CELLS		1
+
+#define SHD_VORONOI_F1		0
+#define SHD_VORONOI_F2		1
+#define SHD_VORONOI_F3		2
+#define SHD_VORONOI_F4		3
+#define SHD_VORONOI_F2F1	4
 
 /* musgrave texture */
 #define SHD_MUSGRAVE_MULTIFRACTAL			0
@@ -1073,6 +1095,10 @@ enum {
 	NODE_MATH_MOD     = 17,
 	NODE_MATH_ABS     = 18,
 	NODE_MATH_ATAN2   = 19,
+	NODE_MATH_FLOOR   = 20,
+	NODE_MATH_CEIL    = 21,
+	NODE_MATH_FRACT   = 22,
+	NODE_MATH_SQRT    = 23,
 };
 
 /* mix rgb node flags */
@@ -1102,39 +1128,6 @@ enum {
 #define CMP_NODE_WRAP_XY		3
 
 #define CMP_NODE_MASK_MBLUR_SAMPLES_MAX 64
-
-/* geometry output socket defines */
-#define GEOM_OUT_GLOB	0
-#define GEOM_OUT_LOCAL	1
-#define GEOM_OUT_VIEW	2
-#define GEOM_OUT_ORCO	3
-#define GEOM_OUT_UV		4
-#define GEOM_OUT_NORMAL	5
-#define GEOM_OUT_VCOL	6
-#define GEOM_OUT_VCOL_ALPHA	7
-#define GEOM_OUT_FRONTBACK	8
-
-/* material input socket defines */
-#define MAT_IN_COLOR	0
-#define MAT_IN_SPEC		1
-#define MAT_IN_REFL		2
-#define MAT_IN_NORMAL	3
-#define MAT_IN_MIR		4
-#define MAT_IN_AMB		5
-#define MAT_IN_EMIT	6
-#define MAT_IN_SPECTRA	7
-#define MAT_IN_RAY_MIRROR	8
-#define MAT_IN_ALPHA	9
-#define MAT_IN_TRANSLUCENCY	10
-#define NUM_MAT_IN		11	/* for array size */
-
-/* material output socket defines */
-#define MAT_OUT_COLOR		0
-#define MAT_OUT_ALPHA		1
-#define MAT_OUT_NORMAL	2
-#define MAT_OUT_DIFFUSE	3
-#define MAT_OUT_SPEC		4
-#define MAT_OUT_AO		5
 
 /* image */
 #define CMP_NODE_IMAGE_USE_STRAIGHT_OUTPUT	1
@@ -1177,5 +1170,13 @@ enum {
 	SHD_POINTDENSITY_COLOR_VERTWEIGHT   = 1,
 	SHD_POINTDENSITY_COLOR_VERTNOR      = 2,
 };
+
+/* Output shader node */
+
+typedef enum NodeShaderOutputTarget {
+	SHD_OUTPUT_ALL     = 0,
+	SHD_OUTPUT_EEVEE   = 1,
+	SHD_OUTPUT_CYCLES  = 2,
+} NodeShaderOutputTarget;
 
 #endif

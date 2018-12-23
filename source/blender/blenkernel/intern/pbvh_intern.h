@@ -144,13 +144,6 @@ struct PBVH {
 	const DMFlagMat *grid_flag_mats;
 	int totgrid;
 	BLI_bitmap **grid_hidden;
-	/* index_buf of GPU_PBVH_Buffers can be the same for all 'fully drawn' nodes (same size).
-	 * Previously was stored in a static var in gpu_buffer.c, but this breaks in case we handle several different
-	 * objects in sculpt mode with different sizes at the same time, so now storing that common gpu buffer
-	 * in an opaque pointer per pbvh. See T47637. */
-	struct GridCommonGPUBuffer *grid_common_gpu_buffer;
-	/* The ccgdm is required for CD_ORIGINDEX lookup in vertex paint + multires */
-	struct CCGDerivedMesh *ccgdm;
 
 	/* Only used during BVH build and update,
 	 * don't need to remain valid after */

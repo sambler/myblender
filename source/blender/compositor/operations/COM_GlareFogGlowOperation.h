@@ -16,12 +16,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_GlareFogGlowOperation_h
-#define _COM_GlareFogGlowOperation_h
+#ifndef __COM_GLAREFOGGLOWOPERATION_H__
+#define __COM_GLAREFOGGLOWOPERATION_H__
 #include "COM_NodeOperation.h"
 #include "DNA_node_types.h"
 #include "COM_GlareBaseOperation.h"

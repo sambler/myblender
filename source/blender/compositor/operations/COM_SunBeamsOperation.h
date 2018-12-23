@@ -16,11 +16,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Lukas Toenne
+ *      Lukas Toenne
  */
 
-#ifndef _COM_SunBeamsOperation_h
-#define _COM_SunBeamsOperation_h
+#ifndef __COM_SUNBEAMSOPERATION_H__
+#define __COM_SUNBEAMSOPERATION_H__
 
 #include "COM_NodeOperation.h"
 

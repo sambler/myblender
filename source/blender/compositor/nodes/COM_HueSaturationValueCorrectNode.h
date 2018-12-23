@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_HueSaturationValueCorrectNode_h_
-#define _COM_HueSaturationValueCorrectNode_h_
+#ifndef __COM_HUESATURATIONVALUECORRECTNODE_H__
+#define __COM_HUESATURATIONVALUECORRECTNODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief HueSaturationValueCorrectNode
- * @ingroup Node
+ * \brief HueSaturationValueCorrectNode
+ * \ingroup Node
  */
 class HueSaturationValueCorrectNode : public Node {
 public:

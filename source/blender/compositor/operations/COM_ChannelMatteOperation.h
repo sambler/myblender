@@ -16,11 +16,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Dalai Felinto
+ *      Dalai Felinto
  */
 
-#ifndef _COM_ChannelMatteOperation_h
-#define _COM_ChannelMatteOperation_h
+#ifndef __COM_CHANNELMATTEOPERATION_H__
+#define __COM_CHANNELMATTEOPERATION_H__
 #include "COM_MixOperation.h"
 
 

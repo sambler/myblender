@@ -83,7 +83,10 @@ DeviceScene::DeviceScene(Device *device)
 }
 
 Scene::Scene(const SceneParams& params_, Device *device)
-: device(device), dscene(device), params(params_)
+        : name("Scene"),
+          device(device),
+          dscene(device),
+          params(params_)
 {
 	memset((void *)&dscene.data, 0, sizeof(dscene.data));
 
@@ -216,6 +219,11 @@ void Scene::device_update(Device *device_, Progress& progress)
 
 	if(progress.get_cancel() || device->have_error()) return;
 
+	progress.set_status("Updating Hair Systems");
+	curve_system_manager->device_update(device, &dscene, this, progress);
+
+	if(progress.get_cancel() || device->have_error()) return;
+
 	progress.set_status("Updating Particle Systems");
 	particle_system_manager->device_update(device, &dscene, this, progress);
 
@@ -238,11 +246,6 @@ void Scene::device_update(Device *device_, Progress& progress)
 
 	progress.set_status("Updating Camera Volume");
 	camera->device_update_volume(device, &dscene, this);
-
-	if(progress.get_cancel() || device->have_error()) return;
-
-	progress.set_status("Updating Hair Systems");
-	curve_system_manager->device_update(device, &dscene, this, progress);
 
 	if(progress.get_cancel() || device->have_error()) return;
 
@@ -319,7 +322,7 @@ bool Scene::need_global_attribute(AttributeStandard std)
 		return need_motion() != MOTION_NONE;
 	else if(std == ATTR_STD_MOTION_VERTEX_NORMAL)
 		return need_motion() == MOTION_BLUR;
-	
+
 	return false;
 }
 
@@ -379,5 +382,10 @@ void Scene::device_free()
 	free_memory(false);
 }
 
-CCL_NAMESPACE_END
+void Scene::collect_statistics(RenderStats *stats)
+{
+	mesh_manager->collect_statistics(this, stats);
+	image_manager->collect_statistics(stats);
+}
 
+CCL_NAMESPACE_END

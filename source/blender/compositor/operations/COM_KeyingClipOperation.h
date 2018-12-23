@@ -16,13 +16,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Sergey Sharybin
+ *      Jeroen Bakker
+ *      Monique Dewanchand
+ *      Sergey Sharybin
  */
 
-#ifndef _COM_KeyingClipOperation_h
-#define _COM_KeyingClipOperation_h
+#ifndef __COM_KEYINGCLIPOPERATION_H__
+#define __COM_KEYINGCLIPOPERATION_H__
 
 #include "COM_NodeOperation.h"
 

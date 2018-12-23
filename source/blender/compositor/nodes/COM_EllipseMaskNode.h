@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_EllipseMaskNode_h_
-#define _COM_EllipseMaskNode_h_
+#ifndef __COM_ELLIPSEMASKNODE_H__
+#define __COM_ELLIPSEMASKNODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief EllipseMaskNode
- * @ingroup Node
+ * \brief EllipseMaskNode
+ * \ingroup Node
  */
 class EllipseMaskNode : public Node {
 public:

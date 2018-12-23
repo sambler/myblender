@@ -17,11 +17,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Sergey Sharybin
+ *      Sergey Sharybin
  */
 
-#ifndef _COM_PlaneTrackWarpImageOperation_h
-#define _COM_PlaneTrackWarpImageOperation_h
+#ifndef __COM_PLANETRACKOPERATION_H__
+#define __COM_PLANETRACKOPERATION_H__
 
 #include <string.h>
 

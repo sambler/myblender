@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_TonemapNode_h_
-#define _COM_TonemapNode_h_
+#ifndef __COM_TONEMAPNODE_H__
+#define __COM_TONEMAPNODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief TonemapNode
- * @ingroup Node
+ * \brief TonemapNode
+ * \ingroup Node
  */
 class TonemapNode : public Node {
 public:

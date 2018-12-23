@@ -250,7 +250,7 @@ void xml_read_node(XMLReader& reader, Node *node, xml_node xml_node)
 		}
 	}
 
-	if(node->name)
+	if(!node->name.empty())
 		reader.node_map[node->name] = node;
 }
 
@@ -458,4 +458,3 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
 }
 
 CCL_NAMESPACE_END
-

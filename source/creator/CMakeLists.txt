@@ -76,12 +76,6 @@ if(WITH_HEADLESS)
 	add_definitions(-DWITH_HEADLESS)
 endif()
 
-if(WITH_GAMEENGINE)
-	blender_include_dirs(../gameengine/BlenderRoutines)
-
-	add_definitions(-DWITH_GAMEENGINE)
-endif()
-
 if(WITH_SDL)
 	if(WITH_SDL_DYNLOAD)
 		add_definitions(-DWITH_SDL_DYNLOAD)
@@ -717,7 +711,7 @@ elseif(WIN32)
 			)
 
 			if(WITH_PYTHON_INSTALL_NUMPY)
-				set(PYTHON_NUMPY_VERSION 1.13)
+				set(PYTHON_NUMPY_VERSION 1.15)
 				add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${BLENDER_VERSION}/python/lib/site-packages
 					COMMAND ${CMAKE_COMMAND} -E
 					        make_directory ${CMAKE_CURRENT_BINARY_DIR}/${BLENDER_VERSION}/python/lib/site-packages)
@@ -753,6 +747,19 @@ elseif(WIN32)
 				DESTINATION ${BLENDER_VERSION}/python/bin
 				CONFIGURATIONS Debug
 			)
+			if(WINDOWS_PYTHON_DEBUG)
+				install(
+					FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}.pdb
+					DESTINATION "."
+					CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
+				)
+
+				install(
+					FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}_d.pdb
+					DESTINATION "."
+					CONFIGURATIONS Debug
+				)
+			endif()
 		endif()
 
 		unset(_PYTHON_VERSION_NO_DOTS)
@@ -772,7 +779,7 @@ elseif(WIN32)
 
 	if(MSVC)
 		install(
-			FILES ${LIBDIR}/pthreads/lib/pthreadVC2.dll
+			FILES ${LIBDIR}/pthreads/lib/pthreadVC3.dll
 			DESTINATION "."
 		)
 	endif()
@@ -780,12 +787,12 @@ elseif(WIN32)
 	if(WITH_CODEC_FFMPEG)
 		install(
 			FILES
-				${LIBDIR}/ffmpeg/lib/avcodec-57.dll
-				${LIBDIR}/ffmpeg/lib/avformat-57.dll
-				${LIBDIR}/ffmpeg/lib/avdevice-57.dll
-				${LIBDIR}/ffmpeg/lib/avutil-55.dll
-				${LIBDIR}/ffmpeg/lib/swscale-4.dll
-				${LIBDIR}/ffmpeg/lib/swresample-2.dll
+				${LIBDIR}/ffmpeg/lib/avcodec-58.dll
+				${LIBDIR}/ffmpeg/lib/avformat-58.dll
+				${LIBDIR}/ffmpeg/lib/avdevice-58.dll
+				${LIBDIR}/ffmpeg/lib/avutil-56.dll
+				${LIBDIR}/ffmpeg/lib/swscale-5.dll
+				${LIBDIR}/ffmpeg/lib/swresample-3.dll
 			DESTINATION "."
 		)
 	endif()
@@ -833,15 +840,6 @@ elseif(WIN32)
 		FILES ${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
 		DESTINATION "."
 	)
-
-	if(WITH_OPENCOLORIO)
-		set(OCIOBIN ${LIBDIR}/opencolorio/bin)
-			install(
-				FILES
-					${OCIOBIN}/OpenColorIO.dll
-				DESTINATION "."
-			)
-	endif()
 
 elseif(APPLE)
 
@@ -940,53 +938,6 @@ elseif(APPLE)
 		unset(_py_inc_suffix)
 	endif()
 
-	# install blenderplayer bundle - copy of blender.app above. re-using macros et al
-	# note we are using OSX Bundle as base and copying Blender dummy bundle on top of it
-	if(WITH_GAMEENGINE AND WITH_PLAYER)
-		set(OSX_APP_PLAYER_SOURCEDIR ${CMAKE_SOURCE_DIR}/release/darwin/blenderplayer.app)
-		set(PLAYER_SOURCEINFO ${OSX_APP_PLAYER_SOURCEDIR}/Contents/Info.plist)
-		set(PLAYER_TARGETDIR_VER blenderplayer.app/Contents/Resources/${BLENDER_VERSION})
-
-
-		# important to make a clean  install each time else old scripts get loaded.
-		install(
-			CODE
-			"file(REMOVE_RECURSE ${PLAYER_TARGETDIR_VER})"
-		)
-
-		# Give the bundle actual creation/modification date
-		execute_process(COMMAND SetFile -d ${SETFILE_DATE} -m ${SETFILE_DATE}
-		                ${EXECUTABLE_OUTPUT_PATH}/blenderplayer.app)
-
-		install(
-			FILES ${OSX_APP_PLAYER_SOURCEDIR}/Contents/PkgInfo
-			DESTINATION blenderplayer.app/Contents
-		)
-
-		install_dir(
-			${OSX_APP_PLAYER_SOURCEDIR}/Contents/Resources
-			blenderplayer.app/Contents/
-		)
-
-		if(WITH_OPENMP AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT ${CMAKE_C_COMPILER_VERSION} VERSION_LESS '3.4')
-			install(
-				FILES ${LIBDIR}/openmp/lib/libiomp5.dylib
-				DESTINATION blenderplayer.app/Contents/Resources/lib/
-			)
-		endif()
-
-
-		# python
-		if(WITH_PYTHON AND NOT WITH_PYTHON_FRAMEWORK)
-			# Copy the python libs into the install directory
-			install_dir(
-				${PYTHON_LIBPATH}
-				${PLAYER_TARGETDIR_VER}/python/lib
-			)
-		endif()
-
-	endif()
-
 endif()
 
 # -----------------------------------------------------------------------------
@@ -1022,6 +973,34 @@ unset(BLENDER_TEXT_FILES_DESTINATION)
 
 
 # -----------------------------------------------------------------------------
+# Geometry Icons
+
+# Geometry icons.
+get_property(_icon_names GLOBAL PROPERTY ICON_GEOM_NAMES)
+set(_icon_files)
+foreach(_f ${_icon_names})
+	list(APPEND _icon_files
+		"${CMAKE_SOURCE_DIR}/release/datafiles/icons/${_f}.dat"
+	)
+endforeach()
+install(
+	FILES ${_icon_files}
+	DESTINATION ${TARGETDIR_VER}/datafiles/icons
+)
+
+unset(_icon_names)
+unset(_icon_files)
+unset(_f)
+
+# -----------------------------------------------------------------------------
+# Studio Lights
+install(
+	DIRECTORY
+		${CMAKE_SOURCE_DIR}/release/datafiles/studiolights
+	DESTINATION ${TARGETDIR_VER}/datafiles
+)
+
+# -----------------------------------------------------------------------------
 # Setup link libs
 
 add_dependencies(blender makesdna)
@@ -1039,5 +1018,10 @@ if(WIN32 AND NOT WITH_PYTHON_MODULE)
 		TARGETS blender
 		COMPONENT Blender
 		DESTINATION "."
+	)
+	set_target_properties(
+		blender
+		PROPERTIES
+			VS_USER_PROPS "blender.Cpp.user.props"
 	)
 endif()

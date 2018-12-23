@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_VectorCurveNode_h_
-#define _COM_VectorCurveNode_h_
+#ifndef __COM_VECTORCURVENODE_H__
+#define __COM_VECTORCURVENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief VectorCurveNode
- * @ingroup Node
+ * \brief VectorCurveNode
+ * \ingroup Node
  */
 class VectorCurveNode : public Node {
 public:

@@ -75,7 +75,7 @@ public:
 
 		NUM_METHODS,
 	};
-	
+
 	Method method;
 
 	SamplingPattern sampling_pattern;
@@ -94,5 +94,4 @@ public:
 
 CCL_NAMESPACE_END
 
-#endif /* __INTEGRATOR_H__ */
-
+#endif  /* __INTEGRATOR_H__ */

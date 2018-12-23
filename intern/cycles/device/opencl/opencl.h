@@ -59,19 +59,22 @@ struct OpenCLPlatformDevice {
 	                     cl_device_id device_id,
 	                     cl_device_type device_type,
 	                     const string& device_name,
-	                     const string& hardware_id)
+	                     const string& hardware_id,
+		                 const string& device_extensions)
 	  : platform_id(platform_id),
 	    platform_name(platform_name),
 	    device_id(device_id),
 	    device_type(device_type),
 	    device_name(device_name),
-	    hardware_id(hardware_id) {}
+	    hardware_id(hardware_id),
+	    device_extensions(device_extensions) {}
 	cl_platform_id platform_id;
 	string platform_name;
 	cl_device_id device_id;
 	cl_device_type device_type;
 	string device_name;
 	string hardware_id;
+	string device_extensions;
 };
 
 /* Contains all static OpenCL helper functions. */
@@ -129,6 +132,12 @@ public:
 	                            cl_int* error = NULL);
 
 	static string get_device_name(cl_device_id device_id);
+
+	static bool get_device_extensions(cl_device_id device_id,
+	                                  string *device_extensions,
+	                                  cl_int* error = NULL);
+
+	static string get_device_extensions(cl_device_id device_id);
 
 	static bool get_device_type(cl_device_id device_id,
 	                            cl_device_type *device_type,
@@ -236,7 +245,7 @@ public:
 				(device)->set_error(message); \
 			fprintf(stderr, "%s\n", message.c_str()); \
 		} \
-	} (void)0
+	} (void) 0
 
 #define opencl_assert(stmt) \
 	{ \
@@ -248,7 +257,7 @@ public:
 				error_msg = message; \
 			fprintf(stderr, "%s\n", message.c_str()); \
 		} \
-	} (void)0
+	} (void) 0
 
 class OpenCLDeviceBase : public Device
 {
@@ -262,7 +271,7 @@ public:
 
 	class OpenCLProgram {
 	public:
-		OpenCLProgram() : loaded(false), device(NULL) {}
+		OpenCLProgram() : loaded(false), program(NULL), device(NULL) {}
 		OpenCLProgram(OpenCLDeviceBase *device,
 		              const string& program_name,
 		              const string& kernel_name,
@@ -324,7 +333,7 @@ public:
 	void opencl_error(const string& message);
 	void opencl_assert_err(cl_int err, const char* where);
 
-	OpenCLDeviceBase(DeviceInfo& info, Stats &stats, bool background_);
+	OpenCLDeviceBase(DeviceInfo& info, Stats &stats, Profiler &profiler, bool background_);
 	~OpenCLDeviceBase();
 
 	static void CL_CALLBACK context_notify_callback(const char *err_info,
@@ -362,7 +371,7 @@ public:
 	void film_convert(DeviceTask& task, device_ptr buffer, device_ptr rgba_byte, device_ptr rgba_half);
 	void shader(DeviceTask& task);
 
-	void denoise(RenderTile& tile, DenoisingTask& denoising, const DeviceTask& task);
+	void denoise(RenderTile& tile, DenoisingTask& denoising);
 
 	class OpenCLDeviceTask : public DeviceTask {
 	public:
@@ -436,8 +445,6 @@ protected:
 	                               device_ptr depth_ptr,
 	                               device_ptr output_ptr,
 	                               DenoisingTask *task);
-	bool denoising_set_tiles(device_ptr *buffers,
-	                         DenoisingTask *task);
 
 	device_ptr mem_alloc_sub_ptr(device_memory& mem, int offset, int size);
 	void mem_free_sub_ptr(device_ptr ptr);
@@ -561,8 +568,8 @@ protected:
 	void flush_texture_buffers();
 };
 
-Device *opencl_create_mega_device(DeviceInfo& info, Stats& stats, bool background);
-Device *opencl_create_split_device(DeviceInfo& info, Stats& stats, bool background);
+Device *opencl_create_mega_device(DeviceInfo& info, Stats& stats, Profiler &profiler, bool background);
+Device *opencl_create_split_device(DeviceInfo& info, Stats& stats, Profiler &profiler, bool background);
 
 CCL_NAMESPACE_END
 

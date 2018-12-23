@@ -19,6 +19,9 @@
 
 #ifdef __QBVH__
 #  include "kernel/bvh/qbvh_volume.h"
+#ifdef __KERNEL_AVX2__
+#  include "kernel/bvh/obvh_volume.h"
+#endif
 #endif
 
 #if BVH_FEATURE(BVH_HAIR)
@@ -117,7 +120,7 @@ bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 				                               node_addr,
 				                               visibility,
 				                               dist);
-#else // __KERNEL_SSE2__
+#else  // __KERNEL_SSE2__
 				traverse_mask = NODE_INTERSECT(kg,
 				                               P,
 				                               dir,
@@ -132,7 +135,7 @@ bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 				                               node_addr,
 				                               visibility,
 				                               dist);
-#endif // __KERNEL_SSE2__
+#endif  // __KERNEL_SSE2__
 
 				node_addr = __float_as_int(cnodes.z);
 				node_addr_child1 = __float_as_int(cnodes.w);
@@ -310,6 +313,13 @@ ccl_device_inline bool BVH_FUNCTION_NAME(KernelGlobals *kg,
                                          const uint visibility)
 {
 	switch(kernel_data.bvh.bvh_layout) {
+#ifdef __KERNEL_AVX2__
+		case BVH_LAYOUT_BVH8:
+			return BVH_FUNCTION_FULL_NAME(OBVH)(kg,
+			                                    ray,
+			                                    isect,
+			                                    visibility);
+#endif
 #ifdef __QBVH__
 		case BVH_LAYOUT_BVH4:
 			return BVH_FUNCTION_FULL_NAME(QBVH)(kg,

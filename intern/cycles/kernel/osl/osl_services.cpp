@@ -364,7 +364,7 @@ bool OSLRenderServices::get_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result
 bool OSLRenderServices::get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44 &result, ustring to)
 {
 	KernelGlobals *kg = kernel_globals;
-	
+
 	if(to == u_ndc) {
 		copy_matrix(result, kernel_data.cam.worldtondc);
 		return true;
@@ -381,11 +381,11 @@ bool OSLRenderServices::get_inverse_matrix(OSL::ShaderGlobals *sg, OSL::Matrix44
 		copy_matrix(result, kernel_data.cam.worldtocamera);
 		return true;
 	}
-	
+
 	return false;
 }
 
-bool OSLRenderServices::get_array_attribute(OSL::ShaderGlobals *sg, bool derivatives, 
+bool OSLRenderServices::get_array_attribute(OSL::ShaderGlobals *sg, bool derivatives,
                                             ustring object, TypeDesc type, ustring name,
                                             int index, void *val)
 {
@@ -684,7 +684,7 @@ bool OSLRenderServices::get_object_standard_attribute(KernelGlobals *kg, ShaderD
 		float3 f = particle_angular_velocity(kg, particle_id);
 		return set_attribute_float3(f, type, derivatives, val);
 	}
-	
+
 	/* Geometry Attributes */
 	else if(name == u_geom_numpolyvertices) {
 		return set_attribute_int(3, type, derivatives, val);
@@ -873,7 +873,7 @@ bool OSLRenderServices::get_attribute(ShaderData *sd, bool derivatives, ustring 
 	return false;
 }
 
-bool OSLRenderServices::get_userdata(bool derivatives, ustring name, TypeDesc type, 
+bool OSLRenderServices::get_userdata(bool derivatives, ustring name, TypeDesc type,
                                      OSL::ShaderGlobals *sg, void *val)
 {
 	return false; /* disabled by lockgeom */
@@ -882,6 +882,23 @@ bool OSLRenderServices::get_userdata(bool derivatives, ustring name, TypeDesc ty
 bool OSLRenderServices::has_userdata(ustring name, TypeDesc type, OSL::ShaderGlobals *sg)
 {
 	return false; /* never called by OSL */
+}
+
+TextureSystem::TextureHandle *OSLRenderServices::get_texture_handle(ustring filename)
+{
+	if(filename.length() && filename[0] == '@') {
+		/* Dummy, we don't use texture handles for builtin textures but need
+		 * to tell the OSL runtime optimizer that this is a valid texture. */
+		return NULL;
+	}
+	else {
+		return texturesys()->get_texture_handle(filename);
+	}
+}
+
+bool OSLRenderServices::good(TextureSystem::TextureHandle *texture_handle)
+{
+	return texturesys()->good(texture_handle);
 }
 
 bool OSLRenderServices::texture(ustring filename,
@@ -894,7 +911,8 @@ bool OSLRenderServices::texture(ustring filename,
                                 int nchannels,
                                 float *result,
                                 float *dresultds,
-                                float *dresultdt)
+                                float *dresultdt,
+                                ustring *errormessage)
 {
 	OSL::TextureSystem *ts = osl_ts;
 	ShaderData *sd = (ShaderData *)(sg->renderstate);
@@ -1035,7 +1053,7 @@ bool OSLRenderServices::texture(ustring filename,
 		 * other nasty stuff happening.
 		 */
 		string err = ts->geterror();
-		(void)err;
+		(void) err;
 	}
 
 	return status;
@@ -1114,7 +1132,7 @@ bool OSLRenderServices::texture3d(ustring filename,
 		 * other nasty stuff happening.
 		 */
 		string err = ts->geterror();
-		(void)err;
+		(void) err;
 	}
 
 	return status;
@@ -1156,7 +1174,13 @@ bool OSLRenderServices::get_texture_info(OSL::ShaderGlobals *sg, ustring filenam
                                          TypeDesc datatype, void *data)
 {
 	OSL::TextureSystem *ts = osl_ts;
-	return ts->get_texture_info(filename, subimage, dataname, datatype, data);
+	if(filename.length() && filename[0] == '@') {
+		/* Special builtin textures. */
+		return false;
+	}
+	else {
+		return ts->get_texture_info(filename, subimage, dataname, datatype, data);
+	}
 }
 
 int OSLRenderServices::pointcloud_search(OSL::ShaderGlobals *sg, ustring filename, const OSL::Vec3 &center,

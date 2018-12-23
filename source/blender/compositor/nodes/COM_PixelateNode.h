@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_PixelateNode_h_
-#define _COM_PixelateNode_h_
+#ifndef __COM_PIXELATENODE_H__
+#define __COM_PIXELATENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief PixelateNode
- * @ingroup Node
+ * \brief PixelateNode
+ * \ingroup Node
  */
 class PixelateNode : public Node {
 public:

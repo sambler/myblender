@@ -16,17 +16,17 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Dalai Felinto
+ *      Dalai Felinto
  */
 
-#ifndef _COM_ChromaMatteNode_h_
-#define _COM_ChromaMatteNode_h_
+#ifndef __COM_CHROMAMATTENODE_H__
+#define __COM_CHROMAMATTENODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief ChromaMatteNode
- * @ingroup Node
+ * \brief ChromaMatteNode
+ * \ingroup Node
  */
 class ChromaMatteNode : public Node {
 public:

@@ -16,12 +16,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Dalai Felinto
- *		Daniel Salazar
+ *      Dalai Felinto
+ *      Daniel Salazar
  */
 
-#ifndef _COM_MapRangeOperation_h
-#define _COM_MapRangeOperation_h
+#ifndef __COM_MAPRANGEOPERATION_H__
+#define __COM_MAPRANGEOPERATION_H__
 #include "COM_NodeOperation.h"
 #include "DNA_texture_types.h"
 

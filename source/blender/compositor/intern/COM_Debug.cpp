@@ -16,7 +16,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Lukas Toenne
+ *      Lukas Toenne
  */
 
 #include "COM_Debug.h"
@@ -274,7 +274,8 @@ bool DebugInfo::graphviz_system(const ExecutionSystem *system, char *str, int ma
 
 #if 0
 	for (ExecutionSystem::Operations::const_iterator it = system->m_operations.begin();
-	     it != system->m_operations.end(); ++it) {
+	     it != system->m_operations.end(); ++it)
+	{
 		NodeOperation *op = *it;
 		len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "// OPERATION: %s\r\n", node->getbNode()->typeinfo->ui_name);
 	}

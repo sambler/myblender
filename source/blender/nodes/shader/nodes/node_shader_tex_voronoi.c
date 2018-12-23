@@ -32,6 +32,7 @@
 static bNodeSocketTemplate sh_node_tex_voronoi_in[] = {
 	{	SOCK_VECTOR, 1, N_("Vector"),		0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
 	{	SOCK_FLOAT, 1, N_("Scale"),			5.0f, 0.0f, 0.0f, 0.0f, -1000.0f, 1000.0f},
+	{	SOCK_FLOAT, 1, N_("Exponent"),		0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 32.0f},
 	{	-1, 0, ""	}
 };
 
@@ -47,6 +48,8 @@ static void node_shader_init_tex_voronoi(bNodeTree *UNUSED(ntree), bNode *node)
 	BKE_texture_mapping_default(&tex->base.tex_mapping, TEXMAP_TYPE_POINT);
 	BKE_texture_colormapping_default(&tex->base.color_mapping);
 	tex->coloring = SHD_VORONOI_INTENSITY;
+	tex->distance = SHD_VORONOI_DISTANCE;
+	tex->feature = SHD_VORONOI_F1;
 
 	node->storage = tex;
 }
@@ -55,15 +58,34 @@ static int node_shader_gpu_tex_voronoi(GPUMaterial *mat, bNode *node, bNodeExecD
 {
 	if (!in[0].link) {
 		in[0].link = GPU_attribute(CD_ORCO, "");
-		GPU_link(mat, "generated_from_orco", in[0].link, &in[0].link);
+		GPU_link(mat, "generated_texco", GPU_builtin(GPU_VIEW_POSITION), in[0].link, &in[0].link);
 	}
 
 	node_shader_gpu_tex_mapping(mat, node, in, out);
 
 	NodeTexVoronoi *tex = (NodeTexVoronoi *)node->storage;
 	float coloring = tex->coloring;
+	float metric = tex->distance;
+	float feature = tex->feature;
 
-	return GPU_stack_link(mat, "node_tex_voronoi", in, out, GPU_uniform(&coloring));
+	return GPU_stack_link(mat, node, "node_tex_voronoi", in, out, GPU_constant(&coloring), GPU_constant(&metric), GPU_constant(&feature));
+}
+
+static void node_shader_update_tex_voronoi(bNodeTree *UNUSED(ntree), bNode *node)
+{
+	NodeTexVoronoi *tex = (NodeTexVoronoi *)node->storage;
+	bNodeSocket *sock;
+
+	for (sock = node->inputs.first; sock; sock = sock->next) {
+		if (STREQ(sock->name, "Exponent")) {
+			if (tex->distance == SHD_VORONOI_MINKOWSKI) {
+				sock->flag &= ~SOCK_UNAVAIL;
+			}
+			else {
+				sock->flag |= SOCK_UNAVAIL;
+			}
+		}
+	}
 }
 
 /* node type definition */
@@ -72,11 +94,11 @@ void register_node_type_sh_tex_voronoi(void)
 	static bNodeType ntype;
 
 	sh_node_type_base(&ntype, SH_NODE_TEX_VORONOI, "Voronoi Texture", NODE_CLASS_TEXTURE, 0);
-	node_type_compatibility(&ntype, NODE_NEW_SHADING);
 	node_type_socket_templates(&ntype, sh_node_tex_voronoi_in, sh_node_tex_voronoi_out);
 	node_type_init(&ntype, node_shader_init_tex_voronoi);
 	node_type_storage(&ntype, "NodeTexVoronoi", node_free_standard_storage, node_copy_standard_storage);
 	node_type_gpu(&ntype, node_shader_gpu_tex_voronoi);
+	node_type_update(&ntype, node_shader_update_tex_voronoi, NULL);
 
 	nodeRegisterType(&ntype);
 }

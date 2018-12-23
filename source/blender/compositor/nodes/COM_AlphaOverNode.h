@@ -16,18 +16,18 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ *      Jeroen Bakker
+ *      Monique Dewanchand
  */
 
-#ifndef _COM_AlphaOverNode_h_
-#define _COM_AlphaOverNode_h_
+#ifndef __COM_ALPHAOVERNODE_H__
+#define __COM_ALPHAOVERNODE_H__
 
 #include "COM_Node.h"
 
 /**
- * @brief AlphaOverNode
- * @ingroup Node
+ * \brief AlphaOverNode
+ * \ingroup Node
  */
 class AlphaOverNode : public Node {
 public:

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,12 +12,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/windowmanager/intern/wm_panel_type.c
- *  \ingroup wm
+/** \file
+ * \ingroup wm
  *
  * Panel Registry.
  *
@@ -45,44 +41,46 @@ static GHash *g_paneltypes_hash = NULL;
 
 PanelType *WM_paneltype_find(const char *idname, bool quiet)
 {
-	PanelType *pt;
+  PanelType *pt;
 
-	if (idname[0]) {
-		pt = BLI_ghash_lookup(g_paneltypes_hash, idname);
-		if (pt)
-			return pt;
-	}
+  if (idname[0]) {
+    pt = BLI_ghash_lookup(g_paneltypes_hash, idname);
+    if (pt) {
+      return pt;
+    }
+  }
 
-	if (!quiet)
-		printf("search for unknown paneltype %s\n", idname);
+  if (!quiet) {
+    printf("search for unknown paneltype %s\n", idname);
+  }
 
-	return NULL;
+  return NULL;
 }
 
 bool WM_paneltype_add(PanelType *pt)
 {
-	BLI_ghash_insert(g_paneltypes_hash, pt->idname, pt);
-	return true;
+  BLI_ghash_insert(g_paneltypes_hash, pt->idname, pt);
+  return true;
 }
 
 void WM_paneltype_remove(PanelType *pt)
 {
-	bool ok;
+  bool ok;
 
-	ok = BLI_ghash_remove(g_paneltypes_hash, pt->idname, NULL, NULL);
+  ok = BLI_ghash_remove(g_paneltypes_hash, pt->idname, NULL, NULL);
 
-	BLI_assert(ok);
-	(void)ok;
+  BLI_assert(ok);
+  (void)ok;
 }
 
 /* called on initialize WM_init() */
 void WM_paneltype_init(void)
 {
-	/* reserve size is set based on blender default setup */
-	g_paneltypes_hash = BLI_ghash_str_new_ex("g_paneltypes_hash gh", 512);
+  /* reserve size is set based on blender default setup */
+  g_paneltypes_hash = BLI_ghash_str_new_ex("g_paneltypes_hash gh", 512);
 }
 
 void WM_paneltype_clear(void)
 {
-	BLI_ghash_free(g_paneltypes_hash, NULL, NULL);
+  BLI_ghash_free(g_paneltypes_hash, NULL, NULL);
 }

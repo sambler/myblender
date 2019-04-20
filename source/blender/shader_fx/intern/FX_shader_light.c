@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2018, Blender Foundation
  * This is a new part of Blender
- *
- * Contributor(s): Antonio Vazquez
- *
- * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-/** \file blender/shader_fx/intern/FX_shader_light.c
- *  \ingroup shader_fx
+/** \file
+ * \ingroup shader_fx
  */
 
 #include <stdio.h>
@@ -34,7 +27,6 @@
 #include "DNA_object_types.h"
 #include "DNA_gpencil_types.h"
 
-#include "BLI_math_base.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_library_query.h"
@@ -48,57 +40,57 @@
 
 static void initData(ShaderFxData *fx)
 {
-	LightShaderFxData *gpfx = (LightShaderFxData *)fx;
-	gpfx->energy = 10.0f;
-	gpfx->ambient = 5.0f;
-	gpfx->object = NULL;
+  LightShaderFxData *gpfx = (LightShaderFxData *)fx;
+  gpfx->energy = 10.0f;
+  gpfx->ambient = 5.0f;
+  gpfx->object = NULL;
 }
 
 static void copyData(const ShaderFxData *md, ShaderFxData *target)
 {
-	BKE_shaderfx_copyData_generic(md, target);
+  BKE_shaderfx_copyData_generic(md, target);
 }
 
 static void updateDepsgraph(ShaderFxData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
-	LightShaderFxData *fxd = (LightShaderFxData *)md;
-	if (fxd->object != NULL) {
-		DEG_add_object_relation(ctx->node, fxd->object, DEG_OB_COMP_GEOMETRY, "Light ShaderFx");
-		DEG_add_object_relation(ctx->node, fxd->object, DEG_OB_COMP_TRANSFORM, "Light ShaderFx");
-	}
-	DEG_add_object_relation(ctx->node, ctx->object, DEG_OB_COMP_TRANSFORM, "Light ShaderFx");
+  LightShaderFxData *fxd = (LightShaderFxData *)md;
+  if (fxd->object != NULL) {
+    DEG_add_object_relation(ctx->node, fxd->object, DEG_OB_COMP_TRANSFORM, "Light ShaderFx");
+  }
+  DEG_add_object_relation(ctx->node, ctx->object, DEG_OB_COMP_TRANSFORM, "Light ShaderFx");
 }
 
 static bool isDisabled(ShaderFxData *fx, int UNUSED(userRenderParams))
 {
-	LightShaderFxData *fxd = (LightShaderFxData *)fx;
+  LightShaderFxData *fxd = (LightShaderFxData *)fx;
 
-	return !fxd->object;
+  return !fxd->object;
 }
 
-static void foreachObjectLink(
-	ShaderFxData *fx, Object *ob,
-	ShaderFxObjectWalkFunc walk, void *userData)
+static void foreachObjectLink(ShaderFxData *fx,
+                              Object *ob,
+                              ShaderFxObjectWalkFunc walk,
+                              void *userData)
 {
-	LightShaderFxData *fxd = (LightShaderFxData *)fx;
+  LightShaderFxData *fxd = (LightShaderFxData *)fx;
 
-	walk(userData, ob, &fxd->object, IDWALK_CB_NOP);
+  walk(userData, ob, &fxd->object, IDWALK_CB_NOP);
 }
 
 ShaderFxTypeInfo shaderfx_Type_Light = {
-	/* name */              "Light",
-	/* structName */        "LightShaderFxData",
-	/* structSize */        sizeof(LightShaderFxData),
-	/* type */              eShaderFxType_GpencilType,
-	/* flags */             0,
+    /* name */ "Light",
+    /* structName */ "LightShaderFxData",
+    /* structSize */ sizeof(LightShaderFxData),
+    /* type */ eShaderFxType_GpencilType,
+    /* flags */ 0,
 
-	/* copyData */          copyData,
+    /* copyData */ copyData,
 
-	/* initData */          initData,
-	/* freeData */          NULL,
-	/* isDisabled */        isDisabled,
-	/* updateDepsgraph */   updateDepsgraph,
-	/* dependsOnTime */     NULL,
-	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     NULL,
+    /* initData */ initData,
+    /* freeData */ NULL,
+    /* isDisabled */ isDisabled,
+    /* updateDepsgraph */ updateDepsgraph,
+    /* dependsOnTime */ NULL,
+    /* foreachObjectLink */ foreachObjectLink,
+    /* foreachIDLink */ NULL,
 };

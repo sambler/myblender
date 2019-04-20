@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,14 +12,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s): Chingiz Dyussenov, Arystanbek Dyussenov.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file SceneExporter.h
- *  \ingroup collada
+/** \file
+ * \ingroup collada
  */
 
 #ifndef __SCENEEXPORTER_H__
@@ -91,29 +85,32 @@ extern "C" {
 
 #include "ExportSettings.h"
 
-class SceneExporter: COLLADASW::LibraryVisualScenes, protected TransformWriter, protected InstanceWriter
-{
-public:
+class SceneExporter : COLLADASW::LibraryVisualScenes,
+                      protected TransformWriter,
+                      protected InstanceWriter {
+ public:
+  SceneExporter(BlenderContext &blender_context,
+                COLLADASW::StreamWriter *sw,
+                ArmatureExporter *arm,
+                const ExportSettings *export_settings)
+      : COLLADASW::LibraryVisualScenes(sw),
+        blender_context(blender_context),
+        arm_exporter(arm),
+        export_settings(export_settings)
+  {
+  }
 
-	SceneExporter(BlenderContext &blender_context, COLLADASW::StreamWriter *sw, ArmatureExporter *arm, const ExportSettings *export_settings) :
-		COLLADASW::LibraryVisualScenes(sw),
-		blender_context(blender_context),
-		arm_exporter(arm),
-		export_settings(export_settings)
-	{}
+  void exportScene();
 
-	void exportScene();
+ private:
+  BlenderContext &blender_context;
+  friend class ArmatureExporter;
+  ArmatureExporter *arm_exporter;
+  const ExportSettings *export_settings;
 
-private:
-	BlenderContext &blender_context;
-	friend class ArmatureExporter;
-	ArmatureExporter *arm_exporter;
-	const ExportSettings *export_settings;
-
-	void exportHierarchy();
-	void writeNodeList(std::vector<Object *> &child_objects, Object *parent);
-	void writeNodes(Object *ob);
-
+  void exportHierarchy();
+  void writeNodeList(std::vector<Object *> &child_objects, Object *parent);
+  void writeNodes(Object *ob);
 };
 
 #endif

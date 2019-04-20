@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,9 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *      Jeroen Bakker
- *      Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
 #ifndef __COM_DEFINES_H__
@@ -28,12 +24,12 @@
  * \ingroup Model
  */
 typedef enum DataType {
-	/** \brief Value data type */
-	COM_DT_VALUE   = 1,
-	/** \brief Vector data type */
-	COM_DT_VECTOR  = 2,
-	/** \brief Color data type */
-	COM_DT_COLOR   = 4
+  /** \brief Value data type */
+  COM_DT_VALUE = 1,
+  /** \brief Vector data type */
+  COM_DT_VECTOR = 2,
+  /** \brief Color data type */
+  COM_DT_COLOR = 4,
 } DataType;
 
 /**
@@ -42,12 +38,12 @@ typedef enum DataType {
  * \ingroup Execution
  */
 typedef enum CompositorQuality {
-	/** \brief High quality setting */
-	COM_QUALITY_HIGH   = 0,
-	/** \brief Medium quality setting */
-	COM_QUALITY_MEDIUM = 1,
-	/** \brief Low quality setting */
-	COM_QUALITY_LOW    = 2
+  /** \brief High quality setting */
+  COM_QUALITY_HIGH = 0,
+  /** \brief Medium quality setting */
+  COM_QUALITY_MEDIUM = 1,
+  /** \brief Low quality setting */
+  COM_QUALITY_LOW = 2,
 } CompositorQuality;
 
 /**
@@ -55,12 +51,12 @@ typedef enum CompositorQuality {
  * \ingroup Execution
  */
 typedef enum CompositorPriority {
-	/** \brief High quality setting */
-	COM_PRIORITY_HIGH   = 2,
-	/** \brief Medium quality setting */
-	COM_PRIORITY_MEDIUM = 1,
-	/** \brief Low quality setting */
-	COM_PRIORITY_LOW    = 0
+  /** \brief High quality setting */
+  COM_PRIORITY_HIGH = 2,
+  /** \brief Medium quality setting */
+  COM_PRIORITY_MEDIUM = 1,
+  /** \brief Low quality setting */
+  COM_PRIORITY_LOW = 0,
 } CompositorPriority;
 
 // configurable items
@@ -91,14 +87,14 @@ typedef enum CompositorPriority {
  * \ingroup Execution
  */
 typedef enum OrderOfChunks {
-	/** \brief order from a distance to centerX/centerY */
-	COM_TO_CENTER_OUT = 0,
-	/** \brief order randomly */
-	COM_TO_RANDOM = 1,
-	/** \brief no ordering */
-	COM_TO_TOP_DOWN = 2,
-	/** \brief experimental ordering with 9 hotspots */
-	COM_TO_RULE_OF_THIRDS = 3
+  /** \brief order from a distance to centerX/centerY */
+  COM_TO_CENTER_OUT = 0,
+  /** \brief order randomly */
+  COM_TO_RANDOM = 1,
+  /** \brief no ordering */
+  COM_TO_TOP_DOWN = 2,
+  /** \brief experimental ordering with 9 hotspots */
+  COM_TO_RULE_OF_THIRDS = 3,
 } OrderOfChunks;
 
 #define COM_ORDER_OF_CHUNKS_DEFAULT COM_TO_CENTER_OUT
@@ -111,4 +107,4 @@ typedef enum OrderOfChunks {
 
 #define COM_BLUR_BOKEH_PIXELS 512
 
-#endif  /* __COM_DEFINES_H__ */
+#endif /* __COM_DEFINES_H__ */

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,33 +15,28 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/object/object_intern.h
- *  \ingroup edobj
+/** \file
+ * \ingroup edobj
  */
 
 #ifndef __OBJECT_INTERN_H__
 #define __OBJECT_INTERN_H__
 
-struct wmOperatorType;
 struct Object;
-struct bContext;
 struct StructRNA;
+struct bContext;
 struct wmOperator;
+struct wmOperatorType;
 
 struct ModifierData;
 
 /* add hook menu */
 enum eObject_Hook_Add_Mode {
-	OBJECT_ADDHOOK_NEWOB = 1,
-	OBJECT_ADDHOOK_SELOB,
-	OBJECT_ADDHOOK_SELOB_BONE
+  OBJECT_ADDHOOK_NEWOB = 1,
+  OBJECT_ADDHOOK_SELOB,
+  OBJECT_ADDHOOK_SELOB_BONE,
 };
 
 /* internal exports only */
@@ -65,8 +58,6 @@ void OBJECT_OT_parent_clear(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_parent_set(struct wmOperatorType *ot);
 void OBJECT_OT_track_set(struct wmOperatorType *ot);
 void OBJECT_OT_track_clear(struct wmOperatorType *ot);
-void OBJECT_OT_slow_parent_set(struct wmOperatorType *ot);
-void OBJECT_OT_slow_parent_clear(struct wmOperatorType *ot);
 void OBJECT_OT_make_local(struct wmOperatorType *ot);
 void OBJECT_OT_make_override_static(struct wmOperatorType *ot);
 void OBJECT_OT_make_single_user(struct wmOperatorType *ot);
@@ -99,7 +90,6 @@ void OBJECT_OT_link_to_collection(struct wmOperatorType *ot);
 void OBJECT_OT_select_all(struct wmOperatorType *ot);
 void OBJECT_OT_select_random(struct wmOperatorType *ot);
 void OBJECT_OT_select_by_type(struct wmOperatorType *ot);
-void OBJECT_OT_select_by_layer(struct wmOperatorType *ot);
 void OBJECT_OT_select_linked(struct wmOperatorType *ot);
 void OBJECT_OT_select_grouped(struct wmOperatorType *ot);
 void OBJECT_OT_select_mirror(struct wmOperatorType *ot);
@@ -151,7 +141,9 @@ bool edit_modifier_poll_generic(struct bContext *C, struct StructRNA *rna_type, 
 bool edit_modifier_poll(struct bContext *C);
 void edit_modifier_properties(struct wmOperatorType *ot);
 int edit_modifier_invoke_properties(struct bContext *C, struct wmOperator *op);
-struct ModifierData *edit_modifier_property_get(struct wmOperator *op, struct Object *ob, int type);
+struct ModifierData *edit_modifier_property_get(struct wmOperator *op,
+                                                struct Object *ob,
+                                                int type);
 
 void OBJECT_OT_modifier_add(struct wmOperatorType *ot);
 void OBJECT_OT_modifier_remove(struct wmOperatorType *ot);

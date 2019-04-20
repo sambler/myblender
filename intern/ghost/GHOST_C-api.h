@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,16 +15,9 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
-/** \ingroup GHOST
- *
- * \file GHOST_C-api.h
+/** \file
+ * \ingroup GHOST
  * \brief GHOST C-API function and type declarations.
  */
 
@@ -54,14 +45,12 @@ GHOST_DECLARE_HANDLE(GHOST_RectangleHandle);
 GHOST_DECLARE_HANDLE(GHOST_EventConsumerHandle);
 GHOST_DECLARE_HANDLE(GHOST_ContextHandle);
 
-
 /**
  * Definition of a callback routine that receives events.
  * \param event The event received.
  * \param userdata The callback's user data, supplied to GHOST_CreateSystem.
  */
 typedef int (*GHOST_EventCallbackProcPtr)(GHOST_EventHandle event, GHOST_TUserDataPtr userdata);
-
 
 /**
  * Creates the one and only system.
@@ -76,14 +65,13 @@ extern GHOST_SystemHandle GHOST_CreateSystem(void);
  */
 extern GHOST_TSuccess GHOST_DisposeSystem(GHOST_SystemHandle systemhandle);
 
-
 /**
  * Creates an event consumer object
  * \param eventCallback The event callback routine.
  * \param userdata Pointer to user data returned to the callback routine.
  */
-extern GHOST_EventConsumerHandle GHOST_CreateEventConsumer(GHOST_EventCallbackProcPtr eventCallback,
-                                                           GHOST_TUserDataPtr userdata);
+extern GHOST_EventConsumerHandle GHOST_CreateEventConsumer(
+    GHOST_EventCallbackProcPtr eventCallback, GHOST_TUserDataPtr userdata);
 
 /**
  * Disposes an event consumer object
@@ -159,9 +147,8 @@ extern void GHOST_GetMainDisplayDimensions(GHOST_SystemHandle systemhandle,
  * \return void.
  */
 extern void GHOST_GetAllDisplayDimensions(GHOST_SystemHandle systemhandle,
-                                           GHOST_TUns32 *width,
-                                           GHOST_TUns32 *height);
-
+                                          GHOST_TUns32 *width,
+                                          GHOST_TUns32 *height);
 
 /**
  * Create a new window.
@@ -178,16 +165,15 @@ extern void GHOST_GetAllDisplayDimensions(GHOST_SystemHandle systemhandle,
  * \param glSettings: Misc OpenGL options.
  * \return A handle to the new window ( == NULL if creation failed).
  */
-extern GHOST_WindowHandle GHOST_CreateWindow(
-        GHOST_SystemHandle systemhandle,
-        const char *title,
-        GHOST_TInt32 left,
-        GHOST_TInt32 top,
-        GHOST_TUns32 width,
-        GHOST_TUns32 height,
-        GHOST_TWindowState state,
-        GHOST_TDrawingContextType type,
-        GHOST_GLSettings glSettings);
+extern GHOST_WindowHandle GHOST_CreateWindow(GHOST_SystemHandle systemhandle,
+                                             const char *title,
+                                             GHOST_TInt32 left,
+                                             GHOST_TInt32 top,
+                                             GHOST_TUns32 width,
+                                             GHOST_TUns32 height,
+                                             GHOST_TWindowState state,
+                                             GHOST_TDrawingContextType type,
+                                             GHOST_GLSettings glSettings);
 
 /**
  * Create a new offscreen context.
@@ -204,7 +190,7 @@ extern GHOST_ContextHandle GHOST_CreateOpenGLContext(GHOST_SystemHandle systemha
  * \return Indication of success.
  */
 extern GHOST_TSuccess GHOST_DisposeOpenGLContext(GHOST_SystemHandle systemhandle,
-                                                    GHOST_ContextHandle contexthandle);
+                                                 GHOST_ContextHandle contexthandle);
 
 /**
  * Returns the window user data.
@@ -218,8 +204,7 @@ extern GHOST_TUserDataPtr GHOST_GetWindowUserData(GHOST_WindowHandle windowhandl
  * \param windowhandle The handle to the window
  * \param userdata The window user data.
  */
-extern void GHOST_SetWindowUserData(GHOST_WindowHandle windowhandle,
-                                    GHOST_TUserDataPtr userdata);
+extern void GHOST_SetWindowUserData(GHOST_WindowHandle windowhandle, GHOST_TUserDataPtr userdata);
 
 /**
  * Dispose a window.
@@ -236,8 +221,7 @@ extern GHOST_TSuccess GHOST_DisposeWindow(GHOST_SystemHandle systemhandle,
  * \param windowhandle Handle to the window to be checked.
  * \return Indication of validity.
  */
-extern int GHOST_ValidWindow(GHOST_SystemHandle systemhandle,
-                             GHOST_WindowHandle windowhandle);
+extern int GHOST_ValidWindow(GHOST_SystemHandle systemhandle, GHOST_WindowHandle windowhandle);
 
 /**
  * Begins full screen mode.
@@ -368,9 +352,12 @@ extern GHOST_TSuccess GHOST_SetCustomCursorShape(GHOST_WindowHandle windowhandle
 extern GHOST_TSuccess GHOST_SetCustomCursorShapeEx(GHOST_WindowHandle windowhandle,
                                                    GHOST_TUns8 *bitmap,
                                                    GHOST_TUns8 *mask,
-                                                   int sizex, int sizey,
-                                                   int hotX,  int hotY,
-                                                   int fg_color, int bg_color);
+                                                   int sizex,
+                                                   int sizey,
+                                                   int hotX,
+                                                   int hotY,
+                                                   int fg_color,
+                                                   int bg_color);
 
 /**
  * Returns the visibility state of the cursor.
@@ -385,8 +372,7 @@ extern int GHOST_GetCursorVisibility(GHOST_WindowHandle windowhandle);
  * \param visible The new visibility state of the cursor.
  * \return Indication of success.
  */
-extern GHOST_TSuccess GHOST_SetCursorVisibility(GHOST_WindowHandle windowhandle,
-                                                int visible);
+extern GHOST_TSuccess GHOST_SetCursorVisibility(GHOST_WindowHandle windowhandle, int visible);
 
 /**
  * Returns the current location of the cursor (location in screen coordinates)
@@ -423,7 +409,8 @@ extern GHOST_TSuccess GHOST_SetCursorPosition(GHOST_SystemHandle systemhandle,
  */
 extern GHOST_TSuccess GHOST_SetCursorGrab(GHOST_WindowHandle windowhandle,
                                           GHOST_TGrabCursorMode mode,
-                                          int bounds[4], const int mouse_ungrab_xy[2]);
+                                          int bounds[4],
+                                          const int mouse_ungrab_xy[2]);
 
 /***************************************************************************************
  * Access to mouse button and keyboard states.
@@ -462,7 +449,6 @@ extern GHOST_TSuccess GHOST_GetButtonState(GHOST_SystemHandle systemhandle,
  */
 extern void GHOST_setNDOFDeadZone(float deadzone);
 #endif
-
 
 /***************************************************************************************
  * Drag'n'drop operations
@@ -560,8 +546,7 @@ extern GHOST_TSuccess GHOST_SetDrawingContextType(GHOST_WindowHandle windowhandl
  * \param windowhandle The handle to the window
  * \param title The title to display in the title bar.
  */
-extern void GHOST_SetTitle(GHOST_WindowHandle windowhandle,
-                           const char *title);
+extern void GHOST_SetTitle(GHOST_WindowHandle windowhandle, const char *title);
 
 /**
  * Returns the title displayed in the title bar. The title
@@ -600,8 +585,7 @@ void GHOST_DisposeRectangle(GHOST_RectangleHandle rectanglehandle);
  * \param width The new width of the client area of the window.
  * \return Indication of success.
  */
-extern GHOST_TSuccess GHOST_SetClientWidth(GHOST_WindowHandle windowhandle,
-                                           GHOST_TUns32 width);
+extern GHOST_TSuccess GHOST_SetClientWidth(GHOST_WindowHandle windowhandle, GHOST_TUns32 width);
 
 /**
  * Resizes client rectangle height.
@@ -609,8 +593,7 @@ extern GHOST_TSuccess GHOST_SetClientWidth(GHOST_WindowHandle windowhandle,
  * \param height The new height of the client area of the window.
  * \return Indication of success.
  */
-extern GHOST_TSuccess GHOST_SetClientHeight(GHOST_WindowHandle windowhandle,
-                                            GHOST_TUns32 height);
+extern GHOST_TSuccess GHOST_SetClientHeight(GHOST_WindowHandle windowhandle, GHOST_TUns32 height);
 
 /**
  * Resizes client rectangle.
@@ -667,7 +650,6 @@ extern GHOST_TWindowState GHOST_GetWindowState(GHOST_WindowHandle windowhandle);
 extern GHOST_TSuccess GHOST_SetWindowState(GHOST_WindowHandle windowhandle,
                                            GHOST_TWindowState state);
 
-
 /**
  * Sets the window "modified" status, indicating unsaved changes
  * \param windowhandle The handle to the window
@@ -706,7 +688,7 @@ extern GHOST_TSuccess GHOST_SetSwapInterval(GHOST_WindowHandle windowhandle, int
  * \param intervalOut pointer to location to return swap interval (left untouched if there is an error)
  * \return A boolean success indicator of if swap interval was successfully read.
  */
-extern GHOST_TSuccess GHOST_GetSwapInterval(GHOST_WindowHandle windowhandle, int* intervalOut);
+extern GHOST_TSuccess GHOST_GetSwapInterval(GHOST_WindowHandle windowhandle, int *intervalOut);
 
 /**
  * Gets the current swap interval for swapBuffers.
@@ -741,6 +723,13 @@ extern GHOST_TSuccess GHOST_ActivateOpenGLContext(GHOST_ContextHandle contexthan
  * \return A success indicator.
  */
 extern GHOST_TSuccess GHOST_ReleaseOpenGLContext(GHOST_ContextHandle contexthandle);
+
+/**
+ * Set which tablet API to use. Only affects Windows, other platforms have a single API.
+ * \param systemhandle The handle to the system
+ * \param api Enum indicating which API to use.
+ */
+extern void GHOST_SetTabletAPI(GHOST_SystemHandle systemhandle, GHOST_TTabletAPI api);
 
 /**
  * Returns the status of the tablet
@@ -813,8 +802,7 @@ extern GHOST_TSuccess GHOST_IsValidRectangle(GHOST_RectangleHandle rectanglehand
  * \param rectanglehandle The handle to the rectangle
  * \param i The amount of offset given to each extreme (negative values shrink the rectangle).
  */
-extern void GHOST_InsetRectangle(GHOST_RectangleHandle rectanglehandle,
-                                 GHOST_TInt32 i);
+extern void GHOST_InsetRectangle(GHOST_RectangleHandle rectanglehandle, GHOST_TInt32 i);
 
 /**
  * Does a union of the rectangle given and this rectangle.
@@ -853,8 +841,8 @@ extern GHOST_TSuccess GHOST_IsInsideRectangle(GHOST_RectangleHandle rectanglehan
  * \param anotherrectanglehandle The rectangle to test.
  * \return visibility (not, partially or fully visible).
  */
-extern GHOST_TVisibility GHOST_GetRectangleVisibility(GHOST_RectangleHandle rectanglehandle,
-                                                      GHOST_RectangleHandle anotherrectanglehandle);
+extern GHOST_TVisibility GHOST_GetRectangleVisibility(
+    GHOST_RectangleHandle rectanglehandle, GHOST_RectangleHandle anotherrectanglehandle);
 
 /**
  * Sets rectangle members.
@@ -908,8 +896,6 @@ extern GHOST_TUns8 *GHOST_getClipboard(int selection);
  */
 extern void GHOST_putClipboard(GHOST_TInt8 *buffer, int selection);
 
-
-
 /**
  * Toggles console
  * \param action
@@ -921,7 +907,6 @@ extern void GHOST_putClipboard(GHOST_TInt8 *buffer, int selection);
  * \return current status (1 -visible, 0 - hidden)
  */
 extern int GHOST_toggleConsole(int action);
-
 
 /**
  * Confirms quitting he program when there is just one window left open
@@ -967,11 +952,11 @@ extern GHOST_TUns16 GHOST_GetDPIHint(GHOST_WindowHandle windowhandle);
  * false: Move the IME windows to the given position without finishing it.
  */
 extern void GHOST_BeginIME(GHOST_WindowHandle windowhandle,
-                            GHOST_TInt32 x,
-                            GHOST_TInt32 y,
-                            GHOST_TInt32 w,
-                            GHOST_TInt32 h,
-                            int complete);
+                           GHOST_TInt32 x,
+                           GHOST_TInt32 y,
+                           GHOST_TInt32 w,
+                           GHOST_TInt32 h,
+                           int complete);
 /**
  * Disable the IME attached to the given window, i.e. prohibits any user-input
  * events from being dispatched to the IME.

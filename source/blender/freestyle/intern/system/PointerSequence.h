@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,18 +12,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __FREESTYLE_POINTER_SEQUENCE_H__
 #define __FREESTYLE_POINTER_SEQUENCE_H__
 
-/** \file blender/freestyle/intern/system/PointerSequence.h
- *  \ingroup freestyle
- *  \brief Simple RAII wrappers for std:: sequential containers
- *  \author 22/11/2010
- *  \date 18/03/2003
+/** \file
+ * \ingroup freestyle
+ * \brief Simple RAII wrappers for std:: sequential containers
  *
  *  PointerSequence
  *
@@ -62,40 +56,38 @@
 #include <algorithm>
 
 #ifdef WITH_CXX_GUARDEDALLOC
-#include "MEM_guardedalloc.h"
+#  include "MEM_guardedalloc.h"
 #endif
 
 namespace Freestyle {
 
-template <typename C, typename T>
-class PointerSequence : public C
-{
-	PointerSequence (PointerSequence& other);
-	PointerSequence& operator=(PointerSequence& other);
+template<typename C, typename T> class PointerSequence : public C {
+  PointerSequence(PointerSequence &other);
+  PointerSequence &operator=(PointerSequence &other);
 
-	static void destroyer(T t)
-	{
-		delete t;
-	}
+  static void destroyer(T t)
+  {
+    delete t;
+  }
 
-public:
-	PointerSequence () {};
+ public:
+  PointerSequence(){};
 
-	~PointerSequence ()
-	{
-		destroy();
-	}
+  ~PointerSequence()
+  {
+    destroy();
+  }
 
-	void destroy ()
-	{
-		for_each(this->begin(), this->end(), destroyer);
-	}
+  void destroy()
+  {
+    for_each(this->begin(), this->end(), destroyer);
+  }
 
 #ifdef WITH_CXX_GUARDEDALLOC
-	MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:PointerSequence")
+  MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:PointerSequence")
 #endif
 };
 
 } /* namespace Freestyle */
 
-#endif // __FREESTYLE_POINTER_SEQUENCE_H__
+#endif  // __FREESTYLE_POINTER_SEQUENCE_H__

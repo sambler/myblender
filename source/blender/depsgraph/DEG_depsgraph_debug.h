@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2014 Blender Foundation.
  * All rights reserved.
- *
- * Original Author: Lukas Toenne
- * Contributor(s): None Yet
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/depsgraph/DEG_depsgraph_debug.h
- *  \ingroup depsgraph
+/** \file
+ * \ingroup depsgraph
  *
  * Public API for Querying and Filtering Depsgraph
  */
@@ -63,9 +56,7 @@ void DEG_stats_simple(const struct Depsgraph *graph,
 /* ************************************************ */
 /* Diagram-Based Graph Debugging */
 
-void DEG_debug_relations_graphviz(const struct Depsgraph *graph,
-                                  FILE *stream,
-                                  const char *label);
+void DEG_debug_relations_graphviz(const struct Depsgraph *graph, FILE *stream, const char *label);
 
 void DEG_debug_stats_gnuplot(const struct Depsgraph *graph,
                              FILE *stream,
@@ -75,8 +66,7 @@ void DEG_debug_stats_gnuplot(const struct Depsgraph *graph,
 /* ************************************************ */
 
 /* Compare two dependency graphs. */
-bool DEG_debug_compare(const struct Depsgraph *graph1,
-                       const struct Depsgraph *graph2);
+bool DEG_debug_compare(const struct Depsgraph *graph1, const struct Depsgraph *graph2);
 
 /* Check that dependnecies in the graph are really up to date. */
 bool DEG_debug_graph_relations_validate(struct Depsgraph *graph,
@@ -91,4 +81,4 @@ bool DEG_debug_consistency_check(struct Depsgraph *graph);
 } /* extern "C" */
 #endif
 
-#endif  /* __DEG_DEPSGRAPH_DEBUG_H__ */
+#endif /* __DEG_DEPSGRAPH_DEBUG_H__ */

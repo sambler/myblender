@@ -19,41 +19,18 @@
 
 #ifdef _WIN32
 
-#ifndef NOGDI
-#  define NOGDI
-#endif
-#ifndef NOMINMAX
-#  define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#  define WIN32_LEAN_AND_MEAN
-#endif
+#  ifndef NOGDI
+#    define NOGDI
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
 
-#include <windows.h>
+#  include <windows.h>
 
-CCL_NAMESPACE_BEGIN
+#endif /* _WIN32 */
 
-#if _WIN32_WINNT < 0x0601
-typedef WORD tGetActiveProcessorGroupCount();
-typedef DWORD tGetActiveProcessorCount(WORD GroupNumber);
-typedef BOOL tSetThreadGroupAffinity(HANDLE hThread,
-                                     const GROUP_AFFINITY  *GroupAffinity,
-                                     PGROUP_AFFINITY PreviousGroupAffinity);
-typedef BOOL tGetProcessGroupAffinity(HANDLE  hProcess,
-                                     PUSHORT GroupCount,
-                                     PUSHORT GroupArray);
-
-extern tGetActiveProcessorGroupCount *GetActiveProcessorGroupCount;
-extern tGetActiveProcessorCount *GetActiveProcessorCount;
-extern tSetThreadGroupAffinity *SetThreadGroupAffinity;
-extern tGetProcessGroupAffinity *GetProcessGroupAffinity;
-#endif
-
-/* Make sure NUMA and processor groups API is initialized. */
-void util_windows_init_numa_groups();
-
-CCL_NAMESPACE_END
-
-#endif  /* WIN32 */
-
-#endif  /* __UTIL_WINDOWS_H__ */
+#endif /* __UTIL_WINDOWS_H__ */

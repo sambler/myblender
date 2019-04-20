@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,16 +15,10 @@
  *
  * The Original Code is Copyright (C) 2018 by Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): Sergey Sharybin.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file BKE_subdiv_mesh.h
- *  \ingroup bke
- *  \since September 2018
- *  \author Sergey Sharybin
+/** \file
+ * \ingroup bke
  */
 
 #ifndef __BKE_SUBDIV_MESH_H__
@@ -38,21 +30,20 @@ struct Mesh;
 struct Subdiv;
 
 typedef struct SubdivToMeshSettings {
-	/* Resolution at which regular ptex (created for quad polygon) are being
-	 * evaluated. This defines how many vertices final mesh will have: every
-	 * regular ptex has resolution^2 vertices. Special (irregular, or ptex
-	 * created for a corner of non-quad polygon) will have resolution of
-	 * `resolution - 1`.
-	 */
-	int resolution;
-	/* When true, only edges emitted from coarse ones will be displayed. */
-	bool use_optimal_display;
+  /* Resolution at which regular ptex (created for quad polygon) are being
+   * evaluated. This defines how many vertices final mesh will have: every
+   * regular ptex has resolution^2 vertices. Special (irregular, or ptex
+   * created for a corner of non-quad polygon) will have resolution of
+   * `resolution - 1`.
+   */
+  int resolution;
+  /* When true, only edges emitted from coarse ones will be displayed. */
+  bool use_optimal_display;
 } SubdivToMeshSettings;
 
 /* Create real hi-res mesh from subdivision, all geometry is "real". */
-struct Mesh *BKE_subdiv_to_mesh(
-        struct Subdiv *subdiv,
-        const SubdivToMeshSettings *settings,
-        const struct Mesh *coarse_mesh);
+struct Mesh *BKE_subdiv_to_mesh(struct Subdiv *subdiv,
+                                const SubdivToMeshSettings *settings,
+                                const struct Mesh *coarse_mesh);
 
-#endif  /* __BKE_SUBDIV)MESH_H__ */
+#endif /* __BKE_SUBDIV)MESH_H__ */

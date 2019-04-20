@@ -24,9 +24,6 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -45,17 +42,13 @@
  * All rights reserved.
  *
  * The Original Code is: adapted from jemalloc.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/**
- * \file atomic_ops.h
+/** \file
  * \ingroup Atomic
  *
- * \author Copyright (C) 2016 Blender Foundation, adapted from jemalloc.
- * \brief Provides wrapper around system-specific atomic primitives, and some extensions (faked-atomic operations
- *        over float numbers).
+ * \brief Provides wrapper around system-specific atomic primitives,
+ * and some extensions (faked-atomic operations over float numbers).
  */
 
 #ifndef __ATOMIC_OPS_H__
@@ -120,7 +113,8 @@ ATOMIC_INLINE size_t atomic_sub_and_fetch_z(size_t *p, size_t x);
 ATOMIC_INLINE size_t atomic_fetch_and_add_z(size_t *p, size_t x);
 ATOMIC_INLINE size_t atomic_fetch_and_sub_z(size_t *p, size_t x);
 ATOMIC_INLINE size_t atomic_cas_z(size_t *v, size_t old, size_t _new);
-ATOMIC_INLINE size_t atomic_fetch_and_update_max_z(size_t *p, size_t x); /* Uses CAS loop, see warning below. */
+/* Uses CAS loop, see warning below. */
+ATOMIC_INLINE size_t atomic_fetch_and_update_max_z(size_t *p, size_t x);
 
 ATOMIC_INLINE unsigned int atomic_add_and_fetch_u(unsigned int *p, unsigned int x);
 ATOMIC_INLINE unsigned int atomic_sub_and_fetch_u(unsigned int *p, unsigned int x);
@@ -129,7 +123,6 @@ ATOMIC_INLINE unsigned int atomic_fetch_and_sub_u(unsigned int *p, unsigned int 
 ATOMIC_INLINE unsigned int atomic_cas_u(unsigned int *v, unsigned int old, unsigned int _new);
 
 ATOMIC_INLINE void *atomic_cas_ptr(void **v, void *old, void *_new);
-
 
 ATOMIC_INLINE float atomic_cas_float(float *v, float old, float _new);
 

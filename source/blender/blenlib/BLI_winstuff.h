@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,20 +15,14 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __BLI_WINSTUFF_H__
 #define __BLI_WINSTUFF_H__
 
-/** \file BLI_winstuff.h
- *  \ingroup bli
- *  \brief Compatibility-like things for windows.
+/** \file
+ * \ingroup bli
+ * \brief Compatibility-like things for windows.
  */
 
 #ifndef _WIN32
@@ -41,7 +33,7 @@
 
 #ifndef WIN32_SKIP_HKEY_PROTECTION
 #  undef HKEY
-#  define HKEY WIN32_HKEY  /* prevent competing definitions */
+#  define HKEY WIN32_HKEY /* prevent competing definitions */
 #  include <windows.h>
 #  undef HKEY
 #else
@@ -59,9 +51,6 @@
 #undef rct1
 #undef rct2
 
-#define near clipsta
-#define far clipend
-
 #undef small
 
 // These definitions are also in BLI_math for simplicity
@@ -74,10 +63,10 @@ extern "C" {
 #define MAXPATHLEN MAX_PATH
 
 #ifndef S_ISREG
-#  define S_ISREG(x) (((x) & _S_IFREG) == _S_IFREG)
+#  define S_ISREG(x) (((x)&_S_IFREG) == _S_IFREG)
 #endif
 #ifndef S_ISDIR
-#  define S_ISDIR(x) (((x) & _S_IFDIR) == _S_IFDIR)
+#  define S_ISDIR(x) (((x)&_S_IFDIR) == _S_IFDIR)
 #endif
 
 /* defines for using ISO C++ conformant names */
@@ -86,11 +75,11 @@ extern "C" {
 #endif
 
 #if defined(_MSC_VER)
-#  define	R_OK	4
-#  define	W_OK	2
+#  define R_OK 4
+#  define W_OK 2
 // not accepted by access() on windows
-//#  define	X_OK	1
-#  define	F_OK	0
+//#  define X_OK    1
+#  define F_OK 0
 #endif
 
 typedef unsigned int mode_t;
@@ -102,7 +91,6 @@ typedef unsigned int mode_t;
 #define lseek(fd, offset, origin) _lseeki64(fd, offset, origin)
 #define tell(fd) _telli64(fd)
 
-
 #ifndef _SSIZE_T_
 #  define _SSIZE_T_
 /* python uses HAVE_SSIZE_T */
@@ -113,10 +101,10 @@ typedef long ssize_t;
 #endif
 
 struct dirent {
-	int d_ino;
-	int d_off;
-	unsigned short d_reclen;
-	char *d_name;
+  int d_ino;
+  int d_off;
+  unsigned short d_reclen;
+  char *d_name;
 };
 
 /* intentionally opaque to users */

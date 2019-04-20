@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,14 +15,10 @@
  *
  * The Original Code is Copyright (C) 2016 by Mike Erwin.
  * All rights reserved.
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/gpu/GPU_primitive.h
- *  \ingroup gpu
+/** \file
+ * \ingroup gpu
  *
  * GPU geometric primitives
  */
@@ -35,28 +29,28 @@
 #include "GPU_common.h"
 
 typedef enum {
-	GPU_PRIM_POINTS,
-	GPU_PRIM_LINES,
-	GPU_PRIM_TRIS,
-	GPU_PRIM_LINE_STRIP,
-	GPU_PRIM_LINE_LOOP, /* GL has this, Vulkan does not */
-	GPU_PRIM_TRI_STRIP,
-	GPU_PRIM_TRI_FAN,
+  GPU_PRIM_POINTS,
+  GPU_PRIM_LINES,
+  GPU_PRIM_TRIS,
+  GPU_PRIM_LINE_STRIP,
+  GPU_PRIM_LINE_LOOP, /* GL has this, Vulkan does not */
+  GPU_PRIM_TRI_STRIP,
+  GPU_PRIM_TRI_FAN,
 
-	GPU_PRIM_LINES_ADJ,
-	GPU_PRIM_TRIS_ADJ,
-	GPU_PRIM_LINE_STRIP_ADJ,
+  GPU_PRIM_LINES_ADJ,
+  GPU_PRIM_TRIS_ADJ,
+  GPU_PRIM_LINE_STRIP_ADJ,
 
-	GPU_PRIM_NONE
+  GPU_PRIM_NONE,
 } GPUPrimType;
 
 /* what types of primitives does each shader expect? */
 typedef enum {
-	GPU_PRIM_CLASS_NONE    = 0,
-	GPU_PRIM_CLASS_POINT   = (1 << 0),
-	GPU_PRIM_CLASS_LINE    = (1 << 1),
-	GPU_PRIM_CLASS_SURFACE = (1 << 2),
-	GPU_PRIM_CLASS_ANY     = GPU_PRIM_CLASS_POINT | GPU_PRIM_CLASS_LINE | GPU_PRIM_CLASS_SURFACE
+  GPU_PRIM_CLASS_NONE = 0,
+  GPU_PRIM_CLASS_POINT = (1 << 0),
+  GPU_PRIM_CLASS_LINE = (1 << 1),
+  GPU_PRIM_CLASS_SURFACE = (1 << 2),
+  GPU_PRIM_CLASS_ANY = GPU_PRIM_CLASS_POINT | GPU_PRIM_CLASS_LINE | GPU_PRIM_CLASS_SURFACE,
 } GPUPrimClass;
 
 GPUPrimClass GPU_primtype_class(GPUPrimType);

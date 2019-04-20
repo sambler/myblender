@@ -40,19 +40,22 @@ class SortedNodeCategory(NodeCategory):
 class CompositorNodeCategory(SortedNodeCategory):
     @classmethod
     def poll(cls, context):
-        return (context.space_data.tree_type == 'CompositorNodeTree')
+        return (context.space_data.type == 'NODE_EDITOR' and
+                context.space_data.tree_type == 'CompositorNodeTree')
 
 
 class ShaderNodeCategory(SortedNodeCategory):
     @classmethod
     def poll(cls, context):
-        return (context.space_data.tree_type == 'ShaderNodeTree')
+        return (context.space_data.type == 'NODE_EDITOR' and
+                context.space_data.tree_type == 'ShaderNodeTree')
 
 
 class TextureNodeCategory(SortedNodeCategory):
     @classmethod
     def poll(cls, context):
-        return context.space_data.tree_type == 'TextureNodeTree'
+        return (context.space_data.type == 'NODE_EDITOR' and
+                context.space_data.tree_type == 'TextureNodeTree')
 
 
 # menu entry for node group tools
@@ -99,7 +102,9 @@ def node_group_items(context):
         # filter out recursive groups
         if contains_group(group, ntree):
             continue
-
+        # filter out hidden nodetrees
+        if group.name.startswith('.'):
+            continue
         yield NodeItem(node_tree_group_type[group.bl_idname],
                        group.name,
                        {"node_tree": "bpy.data.node_groups[%r]" % group.name})
@@ -203,7 +208,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeBsdfTransparent", poll=object_eevee_cycles_shader_nodes_poll),
         NodeItem("ShaderNodeBsdfRefraction", poll=object_eevee_cycles_shader_nodes_poll),
         NodeItem("ShaderNodeBsdfGlass", poll=object_eevee_cycles_shader_nodes_poll),
-        NodeItem("ShaderNodeBsdfTranslucent", poll=object_cycles_shader_nodes_poll),
+        NodeItem("ShaderNodeBsdfTranslucent", poll=object_eevee_cycles_shader_nodes_poll),
         NodeItem("ShaderNodeBsdfAnisotropic", poll=object_cycles_shader_nodes_poll),
         NodeItem("ShaderNodeBsdfVelvet", poll=object_cycles_shader_nodes_poll),
         NodeItem("ShaderNodeBsdfToon", poll=object_cycles_shader_nodes_poll),
@@ -216,7 +221,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeVolumeScatter", poll=eevee_cycles_shader_nodes_poll),
         NodeItem("ShaderNodeVolumePrincipled"),
         NodeItem("ShaderNodeEeveeSpecular", poll=object_eevee_shader_nodes_poll),
-        NodeItem("ShaderNodeBsdfHairPrincipled", poll=object_shader_nodes_poll)
+        NodeItem("ShaderNodeBsdfHairPrincipled", poll=object_cycles_shader_nodes_poll)
     ]),
     ShaderNodeCategory("SH_NEW_TEXTURE", "Texture", items=[
         NodeItem("ShaderNodeTexImage"),

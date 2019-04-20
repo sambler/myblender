@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,11 +12,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s):
- *   Mike Erwin
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __GHOST_NDOFMANAGERUNIX_H__
@@ -29,16 +22,15 @@
 /* Event capture is handled within the NDOF manager on Linux,
  * so there's no need for SystemX11 to look for them. */
 
-class GHOST_NDOFManagerUnix : public GHOST_NDOFManager
-{
-public:
-	GHOST_NDOFManagerUnix(GHOST_System&);
-	~GHOST_NDOFManagerUnix();
-	bool available();
-	bool processEvents();
+class GHOST_NDOFManagerUnix : public GHOST_NDOFManager {
+ public:
+  GHOST_NDOFManagerUnix(GHOST_System &);
+  ~GHOST_NDOFManagerUnix();
+  bool available();
+  bool processEvents();
 
-private:
-	bool m_available;
+ private:
+  bool m_available;
 };
 
-#endif  /* __GHOST_NDOFMANAGERUNIX_H__ */
+#endif /* __GHOST_NDOFMANAGERUNIX_H__ */

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2009 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/armature/armature_intern.h
- *  \ingroup edarmature
+/** \file
+ * \ingroup edarmature
  */
 
 #ifndef __ARMATURE_INTERN_H__
@@ -34,19 +27,19 @@
 /* internal exports only */
 struct wmOperatorType;
 
-struct bContext;
-struct Scene;
-struct Object;
 struct Base;
+struct Object;
+struct Scene;
 struct bAction;
+struct bContext;
 struct bPoseChannel;
 
-struct bArmature;
-struct EditBone;
 struct Bone;
+struct EditBone;
+struct bArmature;
 
-struct ListBase;
 struct LinkData;
+struct ListBase;
 
 /* ******************************************************* */
 /* Armature EditMode Operators */
@@ -145,29 +138,37 @@ void POSE_OT_bone_layers(struct wmOperatorType *ot);
 
 /* Temporary data linking PoseChannels with the F-Curves they affect */
 typedef struct tPChanFCurveLink {
-	struct tPChanFCurveLink *next, *prev;
+  struct tPChanFCurveLink *next, *prev;
 
-	struct Object *ob;              /* Object this Pose Channel belongs to. */
+  /** Object this Pose Channel belongs to. */
+  struct Object *ob;
 
-	ListBase fcurves;               /* F-Curves for this PoseChannel (wrapped with LinkData) */
-	struct bPoseChannel *pchan;     /* Pose Channel which data is attached to */
+  /** F-Curves for this PoseChannel (wrapped with LinkData) */
+  ListBase fcurves;
+  /** Pose Channel which data is attached to */
+  struct bPoseChannel *pchan;
 
-	char *pchan_path;               /* RNA Path to this Pose Channel (needs to be freed when we're done) */
+  /** RNA Path to this Pose Channel (needs to be freed when we're done) */
+  char *pchan_path;
 
-	float oldloc[3];                /* transform values at start of operator (to be restored before each modal step) */
-	float oldrot[3];
-	float oldscale[3];
-	float oldquat[4];
-	float oldangle;
-	float oldaxis[3];
+  /** transform values at start of operator (to be restored before each modal step) */
+  float oldloc[3];
+  float oldrot[3];
+  float oldscale[3];
+  float oldquat[4];
+  float oldangle;
+  float oldaxis[3];
 
-	float roll1, roll2;             /* old bbone values (to be restored along with the transform properties) */
-	float curveInX, curveInY;       /* (NOTE: we haven't renamed these this time, as their names are already long enough) */
-	float curveOutX, curveOutY;
-	float ease1, ease2;
-	float scaleIn, scaleOut;
+  /** old bbone values (to be restored along with the transform properties) */
+  float roll1, roll2;
+  /** (NOTE: we haven't renamed these this time, as their names are already long enough) */
+  float curveInX, curveInY;
+  float curveOutX, curveOutY;
+  float ease1, ease2;
+  float scaleIn, scaleOut;
 
-	struct IDProperty *oldprops;    /* copy of custom properties at start of operator (to be restored before each modal step) */
+  /** copy of custom properties at start of operator (to be restored before each modal step) */
+  struct IDProperty *oldprops;
 } tPChanFCurveLink;
 
 /* ----------- */
@@ -178,7 +179,10 @@ void poseAnim_mapping_free(ListBase *pfLinks);
 
 void poseAnim_mapping_refresh(struct bContext *C, struct Scene *scene, struct Object *ob);
 void poseAnim_mapping_reset(ListBase *pfLinks);
-void poseAnim_mapping_autoKeyframe(struct bContext *C, struct Scene *scene, ListBase *pfLinks, float cframe);
+void poseAnim_mapping_autoKeyframe(struct bContext *C,
+                                   struct Scene *scene,
+                                   ListBase *pfLinks,
+                                   float cframe);
 
 LinkData *poseAnim_mapping_getNextFCurve(ListBase *fcuLinks, LinkData *prev, const char *path);
 
@@ -221,15 +225,27 @@ EditBone *make_boneList(struct ListBase *edbo, struct ListBase *bones, struct Bo
 /* duplicate method */
 void preEditBoneDuplicate(struct ListBase *editbones);
 void postEditBoneDuplicate(struct ListBase *editbones, struct Object *ob);
-struct EditBone *duplicateEditBone(struct EditBone *curBone, const char *name, struct ListBase *editbones, struct Object *ob);
-void updateDuplicateSubtarget(struct EditBone *dupBone, struct ListBase *editbones, struct Object *ob);
+struct EditBone *duplicateEditBone(struct EditBone *curBone,
+                                   const char *name,
+                                   struct ListBase *editbones,
+                                   struct Object *ob);
+void updateDuplicateSubtarget(struct EditBone *dupBone,
+                              struct ListBase *editbones,
+                              struct Object *ob);
 
 /* duplicate method (cross objects) */
 /* editbones is the target list */
-struct EditBone *duplicateEditBoneObjects(struct EditBone *curBone, const char *name, struct ListBase *editbones, struct Object *src_ob, struct Object *dst_ob);
+struct EditBone *duplicateEditBoneObjects(struct EditBone *curBone,
+                                          const char *name,
+                                          struct ListBase *editbones,
+                                          struct Object *src_ob,
+                                          struct Object *dst_ob);
 
 /* editbones is the source list */
-void updateDuplicateSubtargetObjects(struct EditBone *dupBone, struct ListBase *editbones, struct Object *src_ob, struct Object *dst_ob);
+void updateDuplicateSubtargetObjects(struct EditBone *dupBone,
+                                     struct ListBase *editbones,
+                                     struct Object *src_ob,
+                                     struct Object *dst_ob);
 
 EditBone *add_points_bone(struct Object *obedit, float head[3], float tail[3]);
 void bone_free(struct bArmature *arm, struct EditBone *bone);
@@ -239,18 +255,20 @@ void armature_select_mirrored_ex(struct bArmature *arm, const int flag);
 void armature_select_mirrored(struct bArmature *arm);
 void armature_tag_unselect(struct bArmature *arm);
 
-void *get_nearest_bone(
-        struct bContext *C, const int xy[2], bool findunsel,
-        struct Base **r_base);
+void *get_nearest_bone(struct bContext *C, const int xy[2], bool findunsel, struct Base **r_base);
 
-void *get_bone_from_selectbuffer(
-        struct Base **bases, uint bases_len,
-        bool is_editmode, const unsigned int *buffer, short hits,
-        bool findunsel, bool do_nearest,
-        struct Base **r_base);
+void *get_bone_from_selectbuffer(struct Base **bases,
+                                 uint bases_len,
+                                 bool is_editmode,
+                                 const unsigned int *buffer,
+                                 short hits,
+                                 bool findunsel,
+                                 bool do_nearest,
+                                 struct Base **r_base);
 
-int bone_looper(struct Object *ob, struct Bone *bone, void *data,
+int bone_looper(struct Object *ob,
+                struct Bone *bone,
+                void *data,
                 int (*bone_func)(struct Object *, struct Bone *, void *));
-
 
 #endif /* __ARMATURE_INTERN_H__ */

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,17 +15,13 @@
  *
  * The Original Code is Copyright (C) 2016 Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): Kevin Dietrich.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __BKE_CACHEFILE_H__
 #define __BKE_CACHEFILE_H__
 
-/** \file BKE_cachefile.h
- *  \ingroup bke
+/** \file
+ * \ingroup bke
  */
 
 #ifdef __cplusplus
@@ -48,21 +42,30 @@ void BKE_cachefile_init(struct CacheFile *cache_file);
 
 void BKE_cachefile_free(struct CacheFile *cache_file);
 
-void BKE_cachefile_copy_data(
-        struct Main *bmain, struct CacheFile *cache_file_dst, const struct CacheFile *cache_file_src, const int flag);
+void BKE_cachefile_copy_data(struct Main *bmain,
+                             struct CacheFile *cache_file_dst,
+                             const struct CacheFile *cache_file_src,
+                             const int flag);
 struct CacheFile *BKE_cachefile_copy(struct Main *bmain, const struct CacheFile *cache_file);
 
-void BKE_cachefile_make_local(struct Main *bmain, struct CacheFile *cache_file, const bool lib_local);
+void BKE_cachefile_make_local(struct Main *bmain,
+                              struct CacheFile *cache_file,
+                              const bool lib_local);
 
 void BKE_cachefile_reload(const struct Main *bmain, struct CacheFile *cache_file);
 
 void BKE_cachefile_ensure_handle(const struct Main *bmain, struct CacheFile *cache_file);
 
-void BKE_cachefile_update_frame(struct Main *bmain, struct Depsgraph *depsgraph, struct Scene *scene, const float ctime, const float fps);
+void BKE_cachefile_update_frame(struct Main *bmain,
+                                struct Depsgraph *depsgraph,
+                                struct Scene *scene,
+                                const float ctime,
+                                const float fps);
 
-bool BKE_cachefile_filepath_get(
-        const struct Main *bmain, const struct CacheFile *cache_file, float frame,
-        char r_filename[1024]);
+bool BKE_cachefile_filepath_get(const struct Main *bmain,
+                                const struct CacheFile *cache_file,
+                                float frame,
+                                char r_filename[1024]);
 
 float BKE_cachefile_time_offset(struct CacheFile *cache_file, const float time, const float fps);
 
@@ -72,4 +75,4 @@ void BKE_cachefile_clean(struct Main *bmain, struct CacheFile *cache_file);
 }
 #endif
 
-#endif  /* __BKE_CACHEFILE_H__ */
+#endif /* __BKE_CACHEFILE_H__ */

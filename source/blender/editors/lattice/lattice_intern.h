@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,14 +15,11 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/lattice/lattice_intern.h
- *  \ingroup edlattice
+/** \file
+ * \ingroup edlattice
  */
-
 
 #ifndef __LATTICE_INTERN_H__
 #define __LATTICE_INTERN_H__
@@ -41,4 +36,4 @@ void LATTICE_OT_select_mirror(struct wmOperatorType *ot);
 void LATTICE_OT_make_regular(struct wmOperatorType *ot);
 void LATTICE_OT_flip(struct wmOperatorType *ot);
 
-#endif  /* __LATTICE_INTERN_H__ */
+#endif /* __LATTICE_INTERN_H__ */

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,17 +15,13 @@
  *
  * The Original Code is Copyright (C) 2015 by Blender Foundation
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * ***** END GPL LICENSE BLOCK *****
  * */
 
 #ifndef __BLI_MATH_STATISTICS_H__
 #define __BLI_MATH_STATISTICS_H__
 
-/** \file BLI_math_statistics.h
- *  \ingroup bli
+/** \file
+ * \ingroup bli
  */
 
 #ifdef __cplusplus
@@ -44,13 +38,17 @@ extern "C" {
 
 /********************************** Covariance Matrices *********************************/
 
-void BLI_covariance_m_vn_ex(
-        const int n, const float *cos_vn, const int nbr_cos_v3, const float *center, const bool use_sample_correction,
-        float *r_covmat);
-void BLI_covariance_m3_v3n(
-        const float (*cos_v3)[3], const int nbr_cos_v3, const bool use_sample_correction,
-        float r_covmat[3][3], float r_center[3]);
-
+void BLI_covariance_m_vn_ex(const int n,
+                            const float *cos_vn,
+                            const int nbr_cos_v3,
+                            const float *center,
+                            const bool use_sample_correction,
+                            float *r_covmat);
+void BLI_covariance_m3_v3n(const float (*cos_v3)[3],
+                           const int nbr_cos_v3,
+                           const bool use_sample_correction,
+                           float r_covmat[3][3],
+                           float r_center[3]);
 
 #ifdef BLI_MATH_GCC_WARN_PRAGMA
 #  pragma GCC diagnostic pop

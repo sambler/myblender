@@ -79,7 +79,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
         split.prop(md, "use_multi_modifier")
 
-    def ARRAY(self, layout, ob, md):
+    def ARRAY(self, layout, _ob, md):
         layout.prop(md, "fit_type")
 
         if md.fit_type == 'FIXED_COUNT':
@@ -136,7 +136,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         split = layout.split()
 
         col = split.column()
-        col.prop(md, "width")
+        if md.offset_type == 'PERCENT':
+            col.prop(md, "width_pct")
+        else:
+            col.prop(md, "width")
         col.prop(md, "segments")
         col.prop(md, "profile")
         col.prop(md, "material")
@@ -147,6 +150,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "loop_slide")
         col.prop(md, "mark_seam")
         col.prop(md, "mark_sharp")
+        col.prop(md, "harden_normals")
 
         layout.label(text="Limit Method:")
         layout.row().prop(md, "limit_method", expand=True)
@@ -159,12 +163,15 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.label(text="Width Method:")
         layout.row().prop(md, "offset_type", expand=True)
 
-        layout.label(text="Normal Mode")
-        layout.row().prop(md, "hnmode", expand=True)
-        layout.prop(md, "hn_strength")
-        layout.prop(md, "set_wn_strength")
+        layout.label(text="Set Face Strength Mode")
+        layout.row().prop(md, "face_strength_mode", expand=True)
 
-    def BOOLEAN(self, layout, ob, md):
+        layout.label(text="Miter Patterns")
+        layout.row().prop(md, "miter_outer")
+        layout.row().prop(md, "miter_inner")
+        layout.row().prop(md, "spread")
+
+    def BOOLEAN(self, layout, _ob, md):
         split = layout.split()
 
         col = split.column()
@@ -180,7 +187,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         if bpy.app.debug:
             layout.prop(md, "debug_options")
 
-    def BUILD(self, layout, ob, md):
+    def BUILD(self, layout, _ob, md):
         split = layout.split()
 
         col = split.column()
@@ -194,7 +201,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         sub.active = md.use_random_order
         sub.prop(md, "seed")
 
-    def MESH_CACHE(self, layout, ob, md):
+    def MESH_CACHE(self, layout, _ob, md):
         layout.prop(md, "cache_format")
         layout.prop(md, "filepath")
 
@@ -281,10 +288,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         if md.object:
             col.prop(md, "use_transform")
 
-    def CLOTH(self, layout, ob, md):
+    def CLOTH(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
-    def COLLISION(self, layout, ob, md):
+    def COLLISION(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
     def CURVE(self, layout, ob, md):
@@ -379,10 +386,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "mid_level")
         row.prop(md, "strength")
 
-    def DYNAMIC_PAINT(self, layout, ob, md):
+    def DYNAMIC_PAINT(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
-    def EDGE_SPLIT(self, layout, ob, md):
+    def EDGE_SPLIT(self, layout, _ob, md):
         split = layout.split()
 
         col = split.column()
@@ -414,7 +421,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
         layout.operator("object.explode_refresh", text="Refresh")
 
-    def FLUID_SIMULATION(self, layout, ob, md):
+    def FLUID_SIMULATION(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
     def HOOK(self, layout, ob, md):
@@ -568,7 +575,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         else:
             layout.operator("object.meshdeform_bind", text="Bind")
 
-    def MIRROR(self, layout, ob, md):
+    def MIRROR(self, layout, _ob, md):
         axis_text = "XYZ"
         split = layout.split(factor=0.33)
 
@@ -615,8 +622,6 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.separator()
         col = layout.column()
 
-        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
-
         col.label(text="Textures:")
         row = layout.row()
         row.prop(md, "use_mirror_u", text="Flip U")
@@ -653,6 +658,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.operator("object.multires_base_apply", text="Apply Base")
         col.prop(md, "uv_smooth", text="")
         col.prop(md, "show_only_control_edges")
+        col.prop(md, "use_creases")
 
         layout.separator()
 
@@ -667,7 +673,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             row.operator("object.multires_external_save", text="Save External...")
             row.label()
 
-    def OCEAN(self, layout, ob, md):
+    def OCEAN(self, layout, _ob, md):
         if not bpy.app.build_options.mod_oceansim:
             layout.label(text="Built without OceanSim modifier")
             return
@@ -730,7 +736,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.separator()
 
         if md.is_cached:
-            layout.operator("object.ocean_bake", text="Free Bake").free = True
+            layout.operator("object.ocean_bake", text="Delete Bake").free = True
         else:
             layout.operator("object.ocean_bake").free = False
 
@@ -803,10 +809,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop_search(md, "index_layer_name", ob.data, "vertex_colors", text="Index Layer")
         col.prop_search(md, "value_layer_name", ob.data, "vertex_colors", text="Value Layer")
 
-    def PARTICLE_SYSTEM(self, layout, ob, md):
+    def PARTICLE_SYSTEM(self, layout, _ob, _md):
         layout.label(text="Settings can be found inside the Particle context")
 
-    def SCREW(self, layout, ob, md):
+    def SCREW(self, layout, _ob, md):
         split = layout.split()
 
         col = split.column()
@@ -926,7 +932,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             col.prop(md, "angle")
         col.prop(md, "limits", slider=True)
 
-    def SMOKE(self, layout, ob, md):
+    def SMOKE(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
     def SMOOTH(self, layout, ob, md):
@@ -944,7 +950,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.label(text="Vertex Group:")
         col.prop_search(md, "vertex_group", ob, "vertex_groups", text="")
 
-    def SOFT_BODY(self, layout, ob, md):
+    def SOFT_BODY(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
     def SOLIDIFY(self, layout, ob, md):
@@ -1030,6 +1036,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         sub.prop(md, "uv_smooth", text="")
 
         col.prop(md, "show_only_control_edges")
+        col.prop(md, "use_creases")
 
         if show_adaptive_options and ob.cycles.use_adaptive_subdivision:
             col = layout.column(align=True)
@@ -1042,10 +1049,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             preview = max(scene.cycles.preview_dicing_rate * ob.cycles.dicing_rate, 0.1)
             col.label(text=f"Render {render:.2f} px, Preview {preview:.2f} px")
 
-    def SURFACE(self, layout, ob, md):
+    def SURFACE(self, layout, _ob, _md):
         layout.label(text="Settings are inside the Physics tab")
 
-    def SURFACE_DEFORM(self, layout, ob, md):
+    def SURFACE_DEFORM(self, layout, _ob, md):
         col = layout.column()
         col.active = not md.is_bound
 
@@ -1183,7 +1190,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "width", slider=True)
         col.prop(md, "narrowness", slider=True)
 
-    def REMESH(self, layout, ob, md):
+    def REMESH(self, layout, _ob, md):
         if not bpy.app.build_options.mod_remesh:
             layout.label(text="Built without Remesh modifier")
             return
@@ -1324,7 +1331,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.separator()
         self.vertex_weight_mask(layout, ob, md)
 
-    def SKIN(self, layout, ob, md):
+    def SKIN(self, layout, _ob, md):
         row = layout.row()
         row.operator("object.skin_armature_create", text="Create Armature")
         row.operator("mesh.customdata_skin_add")
@@ -1353,15 +1360,18 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "use_y_symmetry")
         col.prop(md, "use_z_symmetry")
 
-    def TRIANGULATE(self, layout, ob, md):
+    def TRIANGULATE(self, layout, _ob, md):
         row = layout.row()
 
         col = row.column()
         col.label(text="Quad Method:")
         col.prop(md, "quad_method", text="")
+        col.prop(md, "keep_custom_normals")
         col = row.column()
         col.label(text="Ngon Method:")
         col.prop(md, "ngon_method", text="")
+        col.label(text="Minimum Vertices:")
+        col.prop(md, "min_vertices", text="")
 
     def UV_WARP(self, layout, ob, md):
         split = layout.split()

@@ -28,6 +28,7 @@ StructMetaPropGroup = bpy_types.bpy_struct_meta_idprop
 bpy_types.BlendDataLibraries.load = _bpy._library_load
 bpy_types.BlendDataLibraries.write = _bpy._library_write
 bpy_types.BlendData.user_map = _bpy._rna_id_collection_user_map
+bpy_types.BlendData.batch_remove = _bpy._rna_id_collection_batch_remove
 
 
 class Context(StructRNA):
@@ -119,10 +120,12 @@ class Object(bpy_types.ID):
 
     @property
     def users_collection(self):
-        """The collections this object is in. Warning: takes O(len(bpy.data.collections)) time."""
+        """The collections this object is in. Warning: takes O(len(bpy.data.collections) + len(bpy.data.scenes)) time."""
         import bpy
         return tuple(collection for collection in bpy.data.collections
-                     if self in collection.objects[:])
+                     if self in collection.objects[:]) + \
+               tuple(scene.collection for scene in bpy.data.scenes
+                     if self in scene.collection.objects[:])
 
     @property
     def users_scene(self):
@@ -519,6 +522,15 @@ class Text(bpy_types.ID):
         """Replace text with this string."""
         self.clear()
         self.write(string)
+
+    def as_module(self):
+        from os.path import splitext
+        from types import ModuleType
+        mod = ModuleType(splitext(self.name)[0])
+        # TODO: We could use Text.compiled (C struct member)
+        # if this is called often it will be much faster.
+        exec(self.as_string(), mod.__dict__)
+        return mod
 
 
 class Sound(bpy_types.ID):

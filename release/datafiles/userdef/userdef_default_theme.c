@@ -8,6 +8,8 @@
 
 #include "BLO_readfile.h"
 
+/* clang-format off */
+
 #ifdef __LITTLE_ENDIAN__
 #  define RGBA(c) {((c) >> 24) & 0xff, ((c) >> 16) & 0xff, ((c) >> 8) & 0xff, (c) & 0xff}
 #  define RGB(c)  {((c) >> 16) & 0xff, ((c) >> 8) & 0xff, (c) & 0xff}
@@ -252,7 +254,7 @@ const bTheme U_theme_default = {
 		.icon_modifier = RGBA(0x84b8ffff),
 		.icon_shading = RGBA(0xff6060ff),
 	},
-	.tbuts = {
+	.space_properties = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xd4d4d4ff),
 		.text = RGBA(0xe6e6e6ff),
@@ -278,7 +280,8 @@ const bTheme U_theme_default = {
 		.outline_width = 1,
 		.facedot_size = 4,
 	},
-	.tv3d = {
+	.space_view3d = {
+		.back = RGBA(0x393939ff),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
 		.text_hi = RGBA(0xffffffff),
@@ -298,13 +301,9 @@ const bTheme U_theme_default = {
 			.back = RGBA(0x333333f0),
 			.sub_back = RGBA(0x0000003e),
 		},
-		.gradients = {
-			.gradient = RGBA(0x39393900),
-			.high_gradient = RGBA(0x393939ff),
-		},
 		.grid = RGBA(0xa7a7a733),
 		.wire = RGBA(0x000000ff),
-		.wire_edit = RGBA(0x111111ff),
+		.wire_edit = RGBA(0x000000ff),
 		.select = RGBA(0xed5700ff),
 		.lamp = RGBA(0x00000028),
 		.speaker = RGBA(0x000000ff),
@@ -313,18 +312,18 @@ const bTheme U_theme_default = {
 		.active = RGBA(0xffa028ff),
 		.transform = RGBA(0xffffffff),
 		.vertex = RGBA(0x000000ff),
-		.vertex_select = RGBA(0xff8500ff),
+		.vertex_select = RGBA(0xff7a00ff),
 		.vertex_bevel = RGBA(0x00a5ffff),
 		.edge = RGBA(0x000000ff),
-		.edge_select = RGBA(0xffa000ff),
+		.edge_select = RGBA(0xff7200ff),
 		.edge_seam = RGBA(0xdb2512ff),
 		.edge_sharp = RGBA(0x00ffffff),
 		.edge_facesel = RGBA(0x4b4b4bff),
 		.edge_crease = RGBA(0xcc0099ff),
 		.edge_bevel = RGBA(0x00a5ffff),
 		.face = RGBA(0x00000012),
-		.face_select = RGBA(0xff85004d),
-		.face_dot = RGBA(0xff8500ff),
+		.face_select = RGBA(0xff990056),
+		.face_dot = RGBA(0xff8a00ff),
 		.extra_edge_len = RGBA(0x150806ff),
 		.extra_edge_angle = RGBA(0x4d4d00ff),
 		.extra_face_angle = RGBA(0x0000ccff),
@@ -339,7 +338,7 @@ const bTheme U_theme_default = {
 		.time_keyframe = RGBA(0xddd700ff),
 		.time_gp_keyframe = RGBA(0xb5e61dff),
 		.freestyle_edge_mark = RGBA(0x7fff7fff),
-		.freestyle_face_mark = RGBA(0x7fff7f33),
+		.freestyle_face_mark = RGBA(0x7fff7f4d),
 		.nurb_uline = RGBA(0x909000ff),
 		.nurb_vline = RGBA(0x803060ff),
 		.act_spline = RGBA(0xdb2512ff),
@@ -368,7 +367,7 @@ const bTheme U_theme_default = {
 		.paint_curve_pivot = RGBA(0xff7f7f7f),
 		.paint_curve_handle = RGBA(0x7fff7f7f),
 	},
-	.tfile = {
+	.space_file = {
 		.back = RGBA(0x35353500),
 		.title = RGBA(0xffffffff),
 		.text = RGBA(0xe6e6e6ff),
@@ -394,7 +393,7 @@ const bTheme U_theme_default = {
 		.outline_width = 1,
 		.facedot_size = 4,
 	},
-	.tipo = {
+	.space_graph = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xffffffff),
 		.text = RGBA(0x000000ff),
@@ -445,7 +444,7 @@ const bTheme U_theme_default = {
 		.handle_vertex_size = 5,
 		.anim_preview_range = RGBA(0xa14d0066),
 	},
-	.tinfo = {
+	.space_info = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -475,11 +474,11 @@ const bTheme U_theme_default = {
 		.info_error_text = RGBA(0xffffffff),
 		.info_warning = RGBA(0xb36a00ff),
 		.info_warning_text = RGBA(0xffffffff),
-		.info_info = RGBA(0x668000ff),
+		.info_info = RGBA(0x1d4383ff),
 		.info_info_text = RGBA(0xffffffff),
 		.info_debug = RGBA(0xd3d3d3ff),
 	},
-	.tact = {
+	.space_action = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0x000000ff),
@@ -536,7 +535,7 @@ const bTheme U_theme_default = {
 		.anim_active = RGBA(0x4d250066),
 		.anim_preview_range = RGBA(0xa14d0066),
 	},
-	.tnla = {
+	.space_nla = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xffffffff),
 		.text = RGBA(0x000000ff),
@@ -586,7 +585,7 @@ const bTheme U_theme_default = {
 		.nla_sound = RGBA(0x2b3d3dff),
 		.nla_sound_sel = RGBA(0x1f7a7aff),
 	},
-	.tseq = {
+	.space_sequencer = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0x000000ff),
@@ -628,7 +627,7 @@ const bTheme U_theme_default = {
 		.gp_vertex_select = RGBA(0xff8500ff),
 		.metadatatext = RGBA(0xffffffff),
 	},
-	.tima = {
+	.space_image = {
 		.back = RGBA(0x44444400),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -682,7 +681,7 @@ const bTheme U_theme_default = {
 		.paint_curve_handle = RGBA(0x7fff7f7f),
 		.metadatatext = RGBA(0xffffffff),
 	},
-	.text = {
+	.space_text = {
 		.back = RGBA(0x30303000),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -703,7 +702,7 @@ const bTheme U_theme_default = {
 			.back = RGBA(0x333333b3),
 			.sub_back = RGBA(0x0000003e),
 		},
-		.shade2 = RGBA(0x19191aff),
+		.shade2 = RGBA(0x5680c2e6),
 		.hilite = RGBA(0xff0000ff),
 		.grid = RGBA(0x313133ff),
 		.vertex_size = 3,
@@ -718,7 +717,7 @@ const bTheme U_theme_default = {
 		.syntaxd = RGBA(0xad80ffff),
 		.syntaxr = RGBA(0xc4753bff),
 	},
-	.toops = {
+	.space_outliner = {
 		.back = RGBA(0x28282800),
 		.title = RGBA(0xffffffff),
 		.text = RGBA(0xc3c3c3ff),
@@ -745,12 +744,7 @@ const bTheme U_theme_default = {
 		.match = RGBA(0x337f334c),
 		.selected_highlight = RGBA(0x314e784c),
 	},
-	.ttime = {
-		.vertex_size = 3,
-		.outline_width = 1,
-		.facedot_size = 4,
-	},
-	.tnode = {
+	.space_node = {
 		.back = RGBA(0x23232300),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -789,7 +783,7 @@ const bTheme U_theme_default = {
 		.syntaxb = RGBA(0xccb83dff),
 		.syntaxn = RGBA(0xe64555ff),
 		.syntaxv = RGBA(0x66c4ffff),
-		.syntaxc = RGBA(0x426628ff),
+		.syntaxc = RGBA(0x426628b9),
 		.syntaxd = RGBA(0x749797ff),
 		.syntaxr = RGBA(0x808080ff),
 		.nodeclass_output = RGBA(0xb33641ff),
@@ -805,7 +799,7 @@ const bTheme U_theme_default = {
 		.gp_vertex = RGBA(0x97979700),
 		.gp_vertex_select = RGBA(0xff8500ff),
 	},
-	.tuserpref = {
+	.space_preferences = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -821,7 +815,8 @@ const bTheme U_theme_default = {
 		.button_title = RGBA(0xffffffff),
 		.button_text = RGBA(0xe5e5e5ff),
 		.button_text_hi = RGBA(0xffffffff),
-		.navigation_bar = RGBA(0x373737ff),
+		.navigation_bar = RGBA(0x4b4b4bff),
+		.execution_buts = RGBA(0x4b4b4bff),
 		.panelcolors = {
 			.header = RGBA(0x42424200),
 			.back = RGBA(0x333333b3),
@@ -831,7 +826,7 @@ const bTheme U_theme_default = {
 		.outline_width = 1,
 		.facedot_size = 4,
 	},
-	.tconsole = {
+	.space_console = {
 		.back = RGBA(0x30303000),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -862,7 +857,7 @@ const bTheme U_theme_default = {
 		.outline_width = 1,
 		.facedot_size = 4,
 	},
-	.tclip = {
+	.space_clip = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xeeeeeeff),
 		.text = RGBA(0xe6e6e6ff),
@@ -908,7 +903,7 @@ const bTheme U_theme_default = {
 		.gp_vertex_size = 1,
 		.metadatatext = RGBA(0xffffffff),
 	},
-	.ttopbar = {
+	.space_topbar = {
 		.back = RGBA(0x42424200),
 		.title = RGBA(0xffffffff),
 		.text = RGBA(0xe6e6e6ff),
@@ -934,7 +929,7 @@ const bTheme U_theme_default = {
 		.facedot_size = 4,
 		.gp_vertex_size = 3,
 	},
-	.tstatusbar = {
+	.space_statusbar = {
 		.back = RGBA(0x2e2e2e00),
 		.title = RGBA(0xffffffff),
 		.text = RGBA(0x838383ff),
@@ -1061,3 +1056,5 @@ const bTheme U_theme_default = {
 		},
 	},
 };
+
+/* clang-format on */

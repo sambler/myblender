@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2018, Blender Foundation
  * This is a new part of Blender
- *
- * Contributor(s): Antonio Vazquez
- *
- * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-/** \file blender/shader_fx/intern/FX_shader_colorize.c
- *  \ingroup shader_fx
+/** \file
+ * \ingroup shader_fx
  */
 
 #include <stdio.h>
@@ -38,32 +31,32 @@
 
 static void initData(ShaderFxData *fx)
 {
-	ColorizeShaderFxData *gpfx = (ColorizeShaderFxData *)fx;
-	ARRAY_SET_ITEMS(gpfx->low_color, 0.0f, 0.0f, 0.0f, 1.0f);
-	ARRAY_SET_ITEMS(gpfx->high_color, 1.0f, 1.0f, 1.0f, 1.0f);
-	gpfx->mode = eShaderFxColorizeMode_GrayScale;
-	gpfx->factor = 0.5f;
+  ColorizeShaderFxData *gpfx = (ColorizeShaderFxData *)fx;
+  ARRAY_SET_ITEMS(gpfx->low_color, 0.0f, 0.0f, 0.0f, 1.0f);
+  ARRAY_SET_ITEMS(gpfx->high_color, 1.0f, 1.0f, 1.0f, 1.0f);
+  gpfx->mode = eShaderFxColorizeMode_GrayScale;
+  gpfx->factor = 0.5f;
 }
 
 static void copyData(const ShaderFxData *md, ShaderFxData *target)
 {
-	BKE_shaderfx_copyData_generic(md, target);
+  BKE_shaderfx_copyData_generic(md, target);
 }
 
 ShaderFxTypeInfo shaderfx_Type_Colorize = {
-	/* name */              "Colorize",
-	/* structName */        "ColorizeShaderFxData",
-	/* structSize */        sizeof(ColorizeShaderFxData),
-	/* type */              eShaderFxType_GpencilType,
-	/* flags */             0,
+    /* name */ "Colorize",
+    /* structName */ "ColorizeShaderFxData",
+    /* structSize */ sizeof(ColorizeShaderFxData),
+    /* type */ eShaderFxType_GpencilType,
+    /* flags */ 0,
 
-	/* copyData */          copyData,
+    /* copyData */ copyData,
 
-	/* initData */          initData,
-	/* freeData */          NULL,
-	/* isDisabled */        NULL,
-	/* updateDepsgraph */   NULL,
-	/* dependsOnTime */     NULL,
-	/* foreachObjectLink */ NULL,
-	/* foreachIDLink */     NULL,
+    /* initData */ initData,
+    /* freeData */ NULL,
+    /* isDisabled */ NULL,
+    /* updateDepsgraph */ NULL,
+    /* dependsOnTime */ NULL,
+    /* foreachObjectLink */ NULL,
+    /* foreachIDLink */ NULL,
 };

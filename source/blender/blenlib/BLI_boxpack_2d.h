@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,36 +15,33 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Campbell Barton
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __BLI_BOXPACK_2D_H__
 #define __BLI_BOXPACK_2D_H__
 
-/** \file BLI_boxpack_2d.h
- *  \ingroup bli
+/** \file
+ * \ingroup bli
  */
 
 /* Box Packer */
 
 typedef struct BoxPack {
-	float x;
-	float y;
-	float w;
-	float h;
+  float x;
+  float y;
+  float w;
+  float h;
 
-	/* Verts this box uses
-	 * (BL,TR,TL,BR) / 0,1,2,3 */
-	struct BoxVert *v[4];
+  /* Verts this box uses
+   * (BL,TR,TL,BR) / 0,1,2,3 */
+  struct BoxVert *v[4];
 
-	int index;
+  int index;
 } BoxPack;
 
-void BLI_box_pack_2d(BoxPack *boxarray, const unsigned int len, float *tot_width, float *tot_height);
+void BLI_box_pack_2d(BoxPack *boxarray,
+                     const unsigned int len,
+                     float *tot_width,
+                     float *tot_height);
 
-#endif  /* __BLI_BOXPACK_2D_H__ */
+#endif /* __BLI_BOXPACK_2D_H__ */

@@ -19,61 +19,68 @@
 
 #ifdef WITH_EMBREE
 
-#include <embree3/rtcore.h>
-#include <embree3/rtcore_scene.h>
+#  include <embree3/rtcore.h>
+#  include <embree3/rtcore_scene.h>
 
-#include "bvh/bvh.h"
-#include "bvh/bvh_params.h"
+#  include "bvh/bvh.h"
+#  include "bvh/bvh_params.h"
 
-#include "util/util_thread.h"
-#include "util/util_types.h"
-#include "util/util_vector.h"
+#  include "util/util_thread.h"
+#  include "util/util_types.h"
+#  include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 
 class Mesh;
 
-class BVHEmbree : public BVH
-{
-public:
-	virtual void build(Progress& progress, Stats *stats) override;
-	virtual ~BVHEmbree();
-	RTCScene scene;
-	static void destroy(RTCScene);
-protected:
-	friend class BVH;
-	BVHEmbree(const BVHParams& params, const vector<Object*>& objects);
+class BVHEmbree : public BVH {
+ public:
+  virtual void build(Progress &progress, Stats *stats) override;
+  virtual ~BVHEmbree();
+  RTCScene scene;
+  static void destroy(RTCScene);
 
-	virtual void pack_nodes(const BVHNode*) override;
-	virtual void refit_nodes() override;
+  /* Building process. */
+  virtual BVHNode *widen_children_nodes(const BVHNode *root) override;
 
-	void add_object(Object *ob, int i);
-	void add_instance(Object *ob, int i);
-	void add_curves(Object *ob, int i);
-	void add_triangles(Object *ob, int i);
+ protected:
+  friend class BVH;
+  BVHEmbree(const BVHParams &params, const vector<Object *> &objects);
 
-	ssize_t mem_used;
+  virtual void pack_nodes(const BVHNode *) override;
+  virtual void refit_nodes() override;
 
-	void add_delayed_delete_scene(RTCScene scene) { delayed_delete_scenes.push_back(scene); }
-	BVHEmbree *top_level;
-private:
-	void delete_rtcScene();
-	void update_tri_vertex_buffer(RTCGeometry geom_id, const Mesh* mesh);
-	void update_curve_vertex_buffer(RTCGeometry geom_id, const Mesh* mesh);
+  void add_object(Object *ob, int i);
+  void add_instance(Object *ob, int i);
+  void add_curves(Object *ob, int i);
+  void add_triangles(Object *ob, int i);
 
-	static RTCDevice rtc_shared_device;
-	static int rtc_shared_users;
-	static thread_mutex rtc_shared_mutex;
+  ssize_t mem_used;
 
-	Stats *stats;
-	vector<RTCScene> delayed_delete_scenes;
-	int curve_subdivisions;
-	enum RTCBuildQuality build_quality;
-	bool use_curves, use_ribbons, dynamic_scene;
+  void add_delayed_delete_scene(RTCScene scene)
+  {
+    delayed_delete_scenes.push_back(scene);
+  }
+  BVHEmbree *top_level;
+
+ private:
+  void delete_rtcScene();
+  void update_tri_vertex_buffer(RTCGeometry geom_id, const Mesh *mesh);
+  void update_curve_vertex_buffer(RTCGeometry geom_id, const Mesh *mesh);
+
+  static RTCDevice rtc_shared_device;
+  static int rtc_shared_users;
+  static thread_mutex rtc_shared_mutex;
+
+  Stats *stats;
+  vector<RTCScene> delayed_delete_scenes;
+  int curve_subdivisions;
+  enum RTCBuildQuality build_quality;
+  bool use_curves, use_ribbons, dynamic_scene;
 };
 
 CCL_NAMESPACE_END
 
-#endif  /* WITH_EMBREE */
+#endif /* WITH_EMBREE */
 
-#endif  /* __BVH_EMBREE_H__ */
+#endif /* __BVH_EMBREE_H__ */

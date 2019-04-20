@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,16 +15,12 @@
  *
  * The Original Code is Copyright (C) 2014 Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): Sergey Sharybin
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 struct VertexData {
-	vec4 position;
-	vec3 normal;
-	vec2 uv;
+  vec4 position;
+  vec3 normal;
+  vec2 uv;
 };
 
 in vec3 normal;
@@ -35,12 +29,14 @@ in vec4 position;
 uniform mat4 modelViewMatrix;
 uniform mat3 normalMatrix;
 
-out block {
-	VertexData v;
-} outpt;
+out block
+{
+  VertexData v;
+}
+outpt;
 
 void main()
 {
-	outpt.v.position = modelViewMatrix * position;
-	outpt.v.normal = normalize(normalMatrix * normal);
+  outpt.v.position = modelViewMatrix * position;
+  outpt.v.normal = normalize(normalMatrix * normal);
 }

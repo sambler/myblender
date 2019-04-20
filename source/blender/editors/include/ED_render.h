@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,12 +15,10 @@
  *
  * The Original Code is Copyright (C) 2005 Blender Foundation.
  * All rights reserved.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file ED_render.h
- *  \ingroup editors
+/** \file
+ * \ingroup editors
  */
 
 #ifndef __ED_RENDER_H__
@@ -30,14 +26,15 @@
 
 #include "DNA_vec_types.h"
 
-struct bContext;
 struct DEGEditorUpdateContext;
 struct ID;
-struct Main;
 struct MTex;
+struct Main;
 struct Render;
 struct Scene;
 struct ScrArea;
+struct bContext;
+struct bScreen;
 struct wmWindowManager;
 
 /* render_ops.c */
@@ -48,6 +45,7 @@ void ED_operatortypes_render(void);
 
 void ED_render_engine_changed(struct Main *bmain);
 void ED_render_engine_area_exit(struct Main *bmain, struct ScrArea *sa);
+void ED_render_view_layer_changed(struct Main *bmain, struct bScreen *sc);
 
 /* Callbacks handling data update events coming from depsgraph. */
 
@@ -67,18 +65,35 @@ struct Scene *ED_render_job_get_current_scene(const struct bContext *C);
  */
 
 enum {
-	PR_BUTS_RENDER   = 0,
-	PR_ICON_RENDER   = 1,
-	PR_NODE_RENDER   = 2,
-	PR_ICON_DEFERRED = 3,
+  PR_BUTS_RENDER = 0,
+  PR_ICON_RENDER = 1,
+  PR_NODE_RENDER = 2,
+  PR_ICON_DEFERRED = 3,
 };
 
 void ED_preview_ensure_dbase(void);
 void ED_preview_free_dbase(void);
 
-void ED_preview_shader_job(const struct bContext *C, void *owner, struct ID *id, struct ID *parent, struct MTex *slot, int sizex, int sizey, int method);
-void ED_preview_icon_render(struct Main *bmain, struct Scene *scene, struct ID *id, unsigned int *rect, int sizex, int sizey);
-void ED_preview_icon_job(const struct bContext *C, void *owner, struct ID *id, unsigned int *rect, int sizex, int sizey);
+void ED_preview_shader_job(const struct bContext *C,
+                           void *owner,
+                           struct ID *id,
+                           struct ID *parent,
+                           struct MTex *slot,
+                           int sizex,
+                           int sizey,
+                           int method);
+void ED_preview_icon_render(struct Main *bmain,
+                            struct Scene *scene,
+                            struct ID *id,
+                            unsigned int *rect,
+                            int sizex,
+                            int sizey);
+void ED_preview_icon_job(const struct bContext *C,
+                         void *owner,
+                         struct ID *id,
+                         unsigned int *rect,
+                         int sizex,
+                         int sizey);
 void ED_preview_kill_jobs(struct wmWindowManager *wm, struct Main *bmain);
 
 void ED_preview_draw(const struct bContext *C, void *idp, void *parentp, void *slot, rcti *rect);

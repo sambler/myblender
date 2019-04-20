@@ -62,11 +62,13 @@ class SelectPattern(Operator):
             pattern_match = (lambda a, b:
                              fnmatch.fnmatchcase(a.upper(), b.upper()))
         is_ebone = False
+        is_pbone = False
         obj = context.object
         if obj and obj.mode == 'POSE':
             items = obj.data.bones
             if not self.extend:
                 bpy.ops.pose.select_all(action='DESELECT')
+            is_pbone = True
         elif obj and obj.type == 'ARMATURE' and obj.mode == 'EDIT':
             items = obj.data.edit_bones
             if not self.extend:
@@ -77,7 +79,7 @@ class SelectPattern(Operator):
             if not self.extend:
                 bpy.ops.object.select_all(action='DESELECT')
 
-        # Can be pose bones or objects
+        # Can be pose bones, edit bones or objects
         for item in items:
             if pattern_match(item.name, self.pattern):
 
@@ -90,6 +92,8 @@ class SelectPattern(Operator):
                         item_parent = item.parent
                         if item_parent is not None:
                             item_parent.select_tail = True
+                elif is_pbone:
+                    item.select = True
                 else:
                     item.select_set(True)
 
@@ -106,6 +110,11 @@ class SelectPattern(Operator):
         row = layout.row()
         row.prop(self, "case_sensitive")
         row.prop(self, "extend")
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return (not obj) or (obj.mode == 'OBJECT') or (obj.type == 'ARMATURE')
 
 
 class SelectCamera(Operator):
@@ -124,7 +133,7 @@ class SelectCamera(Operator):
         scene = context.scene
         view_layer = context.view_layer
         view = context.space_data
-        if view.type == 'VIEW_3D' and not view.lock_camera_and_layers:
+        if view.type == 'VIEW_3D' and view.use_local_camera:
             camera = view.camera
         else:
             camera = scene.camera
@@ -152,9 +161,10 @@ class SelectHierarchy(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     direction: EnumProperty(
-        items=(('PARENT', "Parent", ""),
-               ('CHILD', "Child", ""),
-               ),
+        items=(
+            ('PARENT', "Parent", ""),
+            ('CHILD', "Child", ""),
+        ),
         name="Direction",
         description="Direction to select in the hierarchy",
         default='PARENT',
@@ -310,19 +320,20 @@ class ShapeTransfer(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(
-        items=(('OFFSET',
-                "Offset",
-                "Apply the relative positional offset",
-                ),
-               ('RELATIVE_FACE',
-                "Relative Face",
-                "Calculate relative position (using faces)",
-                ),
-               ('RELATIVE_EDGE',
-                "Relative Edge",
-                "Calculate relative position (using edges)",
-                ),
-               ),
+        items=(
+            ('OFFSET',
+             "Offset",
+             "Apply the relative positional offset",
+             ),
+            ('RELATIVE_FACE',
+             "Relative Face",
+             "Calculate relative position (using faces)",
+             ),
+            ('RELATIVE_EDGE',
+             "Relative Edge",
+             "Calculate relative position (using edges)",
+             ),
+        ),
         name="Transformation Mode",
         description="Relative shape positions to the new shape method",
         default='OFFSET',
@@ -583,6 +594,7 @@ class MakeDupliFace(Operator):
     @staticmethod
     def _main(context):
         from mathutils import Vector
+        from collections import defaultdict
 
         SCALE_FAC = 0.01
         offset = 0.5 * SCALE_FAC
@@ -599,11 +611,10 @@ class MakeDupliFace(Operator):
 
             return [(rot @ b) + trans for b in base_tri]
         scene = context.scene
-        linked = {}
+        linked = defaultdict(list)
         for obj in context.selected_objects:
-            data = obj.data
-            if data:
-                linked.setdefault(data, []).append(obj)
+            if obj.type == 'MESH':
+                linked[obj.data].append(obj)
 
         for data, objects in linked.items():
             face_verts = [axis for obj in objects
@@ -626,19 +637,11 @@ class MakeDupliFace(Operator):
             mesh.polygons.foreach_set("loop_total", (4,) * nbr_faces)
             mesh.update()  # generates edge data
 
-            # pick an object to use
-            obj = objects[0]
-
             ob_new = bpy.data.objects.new(mesh.name, mesh)
-            base = scene.objects.link(ob_new)
-            base.layers[:] = obj.layers
+            context.collection.objects.link(ob_new)
 
             ob_inst = bpy.data.objects.new(data.name, data)
-            base = scene.objects.link(ob_inst)
-            base.layers[:] = obj.layers
-
-            for obj in objects:
-                scene.objects.unlink(obj)
+            context.collection.objects.link(ob_inst)
 
             ob_new.instance_type = 'FACES'
             ob_inst.parent = ob_new
@@ -647,6 +650,10 @@ class MakeDupliFace(Operator):
 
             ob_inst.select_set(True)
             ob_new.select_set(True)
+
+            for obj in objects:
+                for collection in obj.users_collection:
+                    collection.objects.unlink(obj)
 
     def execute(self, context):
         self._main(context)
@@ -864,7 +871,7 @@ class DupliOffsetFromCursor(Operator):
         scene = context.scene
         collection = context.collection
 
-        collection.instance_offset = scene.cursor_location
+        collection.instance_offset = scene.cursor.location
 
         return {'FINISHED'}
 
@@ -886,7 +893,7 @@ class LoadImageAsEmpty:
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return context.mode == 'OBJECT'
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
@@ -894,14 +901,13 @@ class LoadImageAsEmpty:
 
     def execute(self, context):
         scene = context.scene
-        space = context.space_data
-        cursor = scene.cursor_location
+        cursor = scene.cursor.location
 
         try:
             image = bpy.data.images.load(self.filepath, check_existing=True)
         except RuntimeError as ex:
-            self.report({"ERROR"}, str(ex))
-            return {"CANCELLED"}
+            self.report({'ERROR'}, str(ex))
+            return {'CANCELLED'}
 
         bpy.ops.object.empty_add(
             'INVOKE_REGION_WIN',
@@ -944,7 +950,8 @@ class LoadReferenceImage(LoadImageAsEmpty, Operator):
 
 
 class OBJECT_OT_assign_property_defaults(Operator):
-    """Assign the current values of custom properties as their defaults, for use as part of the rest pose state in NLA track mixing"""
+    """Assign the current values of custom properties as their defaults, """ \
+    """for use as part of the rest pose state in NLA track mixing"""
     bl_idname = "object.assign_property_defaults"
     bl_label = "Assign Custom Property Values as Default"
     bl_options = {'UNDO', 'REGISTER'}

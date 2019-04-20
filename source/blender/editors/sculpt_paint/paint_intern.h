@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,63 +15,62 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/sculpt_paint/paint_intern.h
- *  \ingroup edsculpt
+/** \file
+ * \ingroup edsculpt
  */
-
 
 #ifndef __PAINT_INTERN_H__
 #define __PAINT_INTERN_H__
 
 struct ARegion;
-struct bContext;
 struct Brush;
-struct ImagePool;
-struct ColorSpace;
 struct ColorManagedDisplay;
+struct ColorSpace;
+struct ImagePool;
 struct ListBase;
 struct MTex;
 struct Object;
-struct PaintStroke;
 struct Paint;
 struct PaintCurve;
+struct PaintStroke;
 struct PointerRNA;
-struct rcti;
-struct Scene;
 struct RegionView3D;
+struct Scene;
+struct UndoStep;
 struct VPaint;
 struct ViewContext;
+struct bContext;
+struct rcti;
 struct wmEvent;
 struct wmOperator;
 struct wmOperatorType;
 struct wmWindowManager;
-struct UndoStep;
 enum ePaintMode;
 
 typedef struct CoNo {
-	float co[3];
-	float no[3];
+  float co[3];
+  float no[3];
 } CoNo;
 
 /* paint_stroke.c */
 typedef bool (*StrokeGetLocation)(struct bContext *C, float location[3], const float mouse[2]);
 typedef bool (*StrokeTestStart)(struct bContext *C, struct wmOperator *op, const float mouse[2]);
-typedef void (*StrokeUpdateStep)(struct bContext *C, struct PaintStroke *stroke, struct PointerRNA *itemptr);
+typedef void (*StrokeUpdateStep)(struct bContext *C,
+                                 struct PaintStroke *stroke,
+                                 struct PointerRNA *itemptr);
 typedef void (*StrokeRedraw)(const struct bContext *C, struct PaintStroke *stroke, bool final);
 typedef void (*StrokeDone)(const struct bContext *C, struct PaintStroke *stroke);
 
-struct PaintStroke *paint_stroke_new(
-        struct bContext *C, struct wmOperator *op,
-        StrokeGetLocation get_location, StrokeTestStart test_start,
-        StrokeUpdateStep update_step, StrokeRedraw redraw,
-        StrokeDone done, int event_type);
+struct PaintStroke *paint_stroke_new(struct bContext *C,
+                                     struct wmOperator *op,
+                                     StrokeGetLocation get_location,
+                                     StrokeTestStart test_start,
+                                     StrokeUpdateStep update_step,
+                                     StrokeRedraw redraw,
+                                     StrokeDone done,
+                                     int event_type);
 void paint_stroke_data_free(struct wmOperator *op);
 
 bool paint_space_stroke_enabled(struct Brush *br, enum ePaintMode mode);
@@ -88,13 +85,16 @@ int paint_stroke_modal(struct bContext *C, struct wmOperator *op, const struct w
 int paint_stroke_exec(struct bContext *C, struct wmOperator *op);
 void paint_stroke_cancel(struct bContext *C, struct wmOperator *op);
 bool paint_stroke_flipped(struct PaintStroke *stroke);
+bool paint_stroke_inverted(struct PaintStroke *stroke);
 struct ViewContext *paint_stroke_view_context(struct PaintStroke *stroke);
 void *paint_stroke_mode_data(struct PaintStroke *stroke);
 float paint_stroke_distance_get(struct PaintStroke *stroke);
 void paint_stroke_set_mode_data(struct PaintStroke *stroke, void *mode_data);
 bool paint_poll(struct bContext *C);
 void paint_cursor_start(struct bContext *C, bool (*poll)(struct bContext *C));
-void paint_cursor_start_explicit(struct Paint *p, struct wmWindowManager *wm, bool (*poll)(struct bContext *C));
+void paint_cursor_start_explicit(struct Paint *p,
+                                 struct wmWindowManager *wm,
+                                 bool (*poll)(struct bContext *C));
 void paint_cursor_delete_textures(void);
 
 /* paint_vertex.c */
@@ -105,15 +105,17 @@ bool vertex_paint_poll(struct bContext *C);
 bool vertex_paint_poll_ignore_tool(struct bContext *C);
 bool vertex_paint_mode_poll(struct bContext *C);
 
-typedef void (*VPaintTransform_Callback)(const float col[3], const void *user_data, float r_col[3]);
+typedef void (*VPaintTransform_Callback)(const float col[3],
+                                         const void *user_data,
+                                         float r_col[3]);
 
 void PAINT_OT_weight_paint_toggle(struct wmOperatorType *ot);
 void PAINT_OT_weight_paint(struct wmOperatorType *ot);
 void PAINT_OT_weight_set(struct wmOperatorType *ot);
 
 enum {
-	WPAINT_GRADIENT_TYPE_LINEAR,
-	WPAINT_GRADIENT_TYPE_RADIAL
+  WPAINT_GRADIENT_TYPE_LINEAR,
+  WPAINT_GRADIENT_TYPE_RADIAL,
 };
 void PAINT_OT_weight_gradient(struct wmOperatorType *ot);
 
@@ -123,28 +125,31 @@ void PAINT_OT_vertex_paint(struct wmOperatorType *ot);
 unsigned int vpaint_get_current_col(struct Scene *scene, struct VPaint *vp, bool secondary);
 
 /* paint_vertex_color_utils.c */
-unsigned int ED_vpaint_blend_tool(
-        const int tool, const uint col,
-        const uint paintcol, const int alpha_i);
-bool ED_vpaint_color_transform(
-        struct Object *ob, VPaintTransform_Callback vpaint_tx_fn, const void *user_data);
+unsigned int ED_vpaint_blend_tool(const int tool,
+                                  const uint col,
+                                  const uint paintcol,
+                                  const int alpha_i);
+bool ED_vpaint_color_transform(struct Object *ob,
+                               VPaintTransform_Callback vpaint_tx_fn,
+                               const void *user_data);
 
 /* paint_vertex_weight_utils.c */
-float ED_wpaint_blend_tool(
-        const int tool,
-        const float weight,
-        const float paintval, const float alpha);
+float ED_wpaint_blend_tool(const int tool,
+                           const float weight,
+                           const float paintval,
+                           const float alpha);
 /* Utility for tools to ensure vertex groups exist before they begin. */
 enum eWPaintFlag {
-	WPAINT_ENSURE_MIRROR = (1 << 0),
+  WPAINT_ENSURE_MIRROR = (1 << 0),
 };
 struct WPaintVGroupIndex {
-	int active;
-	int mirror;
+  int active;
+  int mirror;
 };
-bool ED_wpaint_ensure_data(
-        struct bContext *C, struct ReportList *reports,
-        enum eWPaintFlag flag, struct WPaintVGroupIndex *vgroup_index);
+bool ED_wpaint_ensure_data(struct bContext *C,
+                           struct ReportList *reports,
+                           enum eWPaintFlag flag,
+                           struct WPaintVGroupIndex *vgroup_index);
 int ED_wpaint_mirror_vgroup_ensure(struct Object *ob, const int vgroup_active);
 
 /* paint_vertex_color_ops.c */
@@ -163,55 +168,77 @@ void PAINT_OT_weight_sample_group(struct wmOperatorType *ot);
 
 /* paint_vertex_proj.c */
 struct VertProjHandle;
-struct VertProjHandle *ED_vpaint_proj_handle_create(
-        struct Depsgraph *depsgraph, struct Scene *scene, struct Object *ob,
-        struct CoNo **r_vcosnos);
-void  ED_vpaint_proj_handle_update(
-        struct Depsgraph *depsgraph, struct VertProjHandle *vp_handle,
-        /* runtime vars */
-        struct ARegion *ar, const float mval_fl[2]);
-void  ED_vpaint_proj_handle_free(
-        struct VertProjHandle *vp_handle);
-
+struct VertProjHandle *ED_vpaint_proj_handle_create(struct Depsgraph *depsgraph,
+                                                    struct Scene *scene,
+                                                    struct Object *ob,
+                                                    struct CoNo **r_vcosnos);
+void ED_vpaint_proj_handle_update(struct Depsgraph *depsgraph,
+                                  struct VertProjHandle *vp_handle,
+                                  /* runtime vars */
+                                  struct ARegion *ar,
+                                  const float mval_fl[2]);
+void ED_vpaint_proj_handle_free(struct VertProjHandle *vp_handle);
 
 /* paint_image.c */
 typedef struct ImagePaintPartialRedraw {
-	int x1, y1, x2, y2;  /* XXX, could use 'rcti' */
-	int enabled;
+  int x1, y1, x2, y2; /* XXX, could use 'rcti' */
+  int enabled;
 } ImagePaintPartialRedraw;
 
-#define IMAPAINT_TILE_BITS          6
-#define IMAPAINT_TILE_SIZE          (1 << IMAPAINT_TILE_BITS)
-#define IMAPAINT_TILE_NUMBER(size)  (((size) + IMAPAINT_TILE_SIZE - 1) >> IMAPAINT_TILE_BITS)
+#define IMAPAINT_TILE_BITS 6
+#define IMAPAINT_TILE_SIZE (1 << IMAPAINT_TILE_BITS)
+#define IMAPAINT_TILE_NUMBER(size) (((size) + IMAPAINT_TILE_SIZE - 1) >> IMAPAINT_TILE_BITS)
 
 bool image_texture_paint_poll(struct bContext *C);
-void imapaint_image_update(struct SpaceImage *sima, struct Image *image, struct ImBuf *ibuf, short texpaint);
+void imapaint_image_update(struct SpaceImage *sima,
+                           struct Image *image,
+                           struct ImBuf *ibuf,
+                           short texpaint);
 struct ImagePaintPartialRedraw *get_imapaintpartial(void);
 void set_imapaintpartial(struct ImagePaintPartialRedraw *ippr);
-void imapaint_region_tiles(struct ImBuf *ibuf, int x, int y, int w, int h, int *tx, int *ty, int *tw, int *th);
+void imapaint_region_tiles(
+    struct ImBuf *ibuf, int x, int y, int w, int h, int *tx, int *ty, int *tw, int *th);
 int get_imapaint_zoom(struct bContext *C, float *zoomx, float *zoomy);
 void *paint_2d_new_stroke(struct bContext *, struct wmOperator *, int mode);
 void paint_2d_redraw(const struct bContext *C, void *ps, bool final);
 void paint_2d_stroke_done(void *ps);
-void paint_2d_stroke(
-        void *ps, const float prev_mval[2], const float mval[2],
-        const bool eraser, float pressure, float distance, float size);
-void paint_2d_bucket_fill(
-        const struct bContext *C, const float color[3], struct Brush *br, const float mouse_init[2], void *ps);
-void paint_2d_gradient_fill(
-        const struct bContext *C, struct Brush *br, const float mouse_init[2], const float mouse_final[2], void *ps);
-void *paint_proj_new_stroke(
-        struct bContext *C, struct Object *ob, const float mouse[2], int mode);
-void paint_proj_stroke(
-        const struct bContext *C, void *ps, const float prevmval_i[2], const float mval_i[2],
-        const bool eraser, float pressure, float distance, float size);
+void paint_2d_stroke(void *ps,
+                     const float prev_mval[2],
+                     const float mval[2],
+                     const bool eraser,
+                     float pressure,
+                     float distance,
+                     float size);
+void paint_2d_bucket_fill(const struct bContext *C,
+                          const float color[3],
+                          struct Brush *br,
+                          const float mouse_init[2],
+                          void *ps);
+void paint_2d_gradient_fill(const struct bContext *C,
+                            struct Brush *br,
+                            const float mouse_init[2],
+                            const float mouse_final[2],
+                            void *ps);
+void *paint_proj_new_stroke(struct bContext *C, struct Object *ob, const float mouse[2], int mode);
+void paint_proj_stroke(const struct bContext *C,
+                       void *ps,
+                       const float prevmval_i[2],
+                       const float mval_i[2],
+                       const bool eraser,
+                       float pressure,
+                       float distance,
+                       float size);
 void paint_proj_redraw(const struct bContext *C, void *pps, bool final);
 void paint_proj_stroke_done(void *ps);
 
-void paint_brush_color_get(
-        struct Scene *scene, struct Brush *br,
-        bool color_correction, bool invert, float distance, float pressure, float color[3],
-        struct ColorManagedDisplay *display);
+void paint_brush_color_get(struct Scene *scene,
+                           struct Brush *br,
+                           bool color_correction,
+                           bool invert,
+                           float distance,
+                           float pressure,
+                           float color[3],
+                           struct ColorManagedDisplay *display);
 bool paint_use_opacity_masking(struct Brush *brush);
 void paint_brush_init_tex(struct Brush *brush);
 void paint_brush_exit_tex(struct Brush *brush);
@@ -227,14 +254,23 @@ void PAINT_OT_image_paint(struct wmOperatorType *ot);
 void PAINT_OT_add_simple_uvs(struct wmOperatorType *ot);
 
 /* paint_image_undo.c */
-void *image_undo_find_tile(
-        ListBase *undo_tiles,
-        struct Image *ima, struct ImBuf *ibuf, int x_tile, int y_tile,
-        unsigned short **mask, bool validate);
-void *image_undo_push_tile(
-        ListBase *undo_tiles,
-        struct Image *ima, struct ImBuf *ibuf, struct ImBuf **tmpibuf, int x_tile, int y_tile,
-        unsigned short **, bool **valid, bool proj, bool find_prev);
+void *image_undo_find_tile(ListBase *undo_tiles,
+                           struct Image *ima,
+                           struct ImBuf *ibuf,
+                           int x_tile,
+                           int y_tile,
+                           unsigned short **mask,
+                           bool validate);
+void *image_undo_push_tile(ListBase *undo_tiles,
+                           struct Image *ima,
+                           struct ImBuf *ibuf,
+                           struct ImBuf **tmpibuf,
+                           int x_tile,
+                           int y_tile,
+                           unsigned short **,
+                           bool **valid,
+                           bool proj,
+                           bool find_prev);
 void image_undo_remove_masks(void);
 void image_undo_init_locks(void);
 void image_undo_end_locks(void);
@@ -253,30 +289,37 @@ void SCULPT_OT_uv_sculpt_stroke(struct wmOperatorType *ot);
 /* Convert the object-space axis-aligned bounding box (expressed as
  * its minimum and maximum corners) into a screen-space rectangle,
  * returns zero if the result is empty */
-bool paint_convert_bb_to_rect(
-        struct rcti *rect,
-        const float bb_min[3],
-        const float bb_max[3],
-        const struct ARegion *ar,
-        struct RegionView3D *rv3d,
-        struct Object *ob);
+bool paint_convert_bb_to_rect(struct rcti *rect,
+                              const float bb_min[3],
+                              const float bb_max[3],
+                              const struct ARegion *ar,
+                              struct RegionView3D *rv3d,
+                              struct Object *ob);
 
 /* Get four planes in object-space that describe the projection of
  * screen_rect from screen into object-space (essentially converting a
  * 2D screens-space bounding box into four 3D planes) */
-void paint_calc_redraw_planes(
-        float planes[4][4],
-        const struct ARegion *ar,
-        struct Object *ob,
-        const struct rcti *screen_rect);
+void paint_calc_redraw_planes(float planes[4][4],
+                              const struct ARegion *ar,
+                              struct Object *ob,
+                              const struct rcti *screen_rect);
 
-float paint_calc_object_space_radius(struct ViewContext *vc, const float center[3], float pixel_radius);
-float paint_get_tex_pixel(const struct MTex *mtex, float u, float v, struct ImagePool *pool, int thread);
-void paint_get_tex_pixel_col(
-        const struct MTex *mtex, float u, float v, float rgba[4],
-        struct ImagePool *pool, int thread, bool convert, struct ColorSpace *colorspace);
+float paint_calc_object_space_radius(struct ViewContext *vc,
+                                     const float center[3],
+                                     float pixel_radius);
+float paint_get_tex_pixel(
+    const struct MTex *mtex, float u, float v, struct ImagePool *pool, int thread);
+void paint_get_tex_pixel_col(const struct MTex *mtex,
+                             float u,
+                             float v,
+                             float rgba[4],
+                             struct ImagePool *pool,
+                             int thread,
+                             bool convert,
+                             struct ColorSpace *colorspace);
 
-void paint_sample_color(struct bContext *C, struct ARegion *ar, int x, int y, bool texpaint_proj, bool palette);
+void paint_sample_color(
+    struct bContext *C, struct ARegion *ar, int x, int y, bool texpaint_proj, bool palette);
 
 void paint_stroke_operator_properties(struct wmOperatorType *ot);
 
@@ -301,23 +344,23 @@ void flip_qt_qt(float out[3], const float in[3], const char symm);
 
 /* stroke operator */
 typedef enum BrushStrokeMode {
-	BRUSH_STROKE_NORMAL,
-	BRUSH_STROKE_INVERT,
-	BRUSH_STROKE_SMOOTH
+  BRUSH_STROKE_NORMAL,
+  BRUSH_STROKE_INVERT,
+  BRUSH_STROKE_SMOOTH,
 } BrushStrokeMode;
 
 /* paint_hide.c */
 
 typedef enum {
-	PARTIALVIS_HIDE,
-	PARTIALVIS_SHOW
+  PARTIALVIS_HIDE,
+  PARTIALVIS_SHOW,
 } PartialVisAction;
 
 typedef enum {
-	PARTIALVIS_INSIDE,
-	PARTIALVIS_OUTSIDE,
-	PARTIALVIS_ALL,
-	PARTIALVIS_MASKED
+  PARTIALVIS_INSIDE,
+  PARTIALVIS_OUTSIDE,
+  PARTIALVIS_ALL,
+  PARTIALVIS_MASKED,
 } PartialVisArea;
 
 void PAINT_OT_hide_show(struct wmOperatorType *ot);
@@ -325,9 +368,9 @@ void PAINT_OT_hide_show(struct wmOperatorType *ot);
 /* paint_mask.c */
 
 typedef enum {
-	PAINT_MASK_FLOOD_VALUE,
-	PAINT_MASK_FLOOD_VALUE_INVERSE,
-	PAINT_MASK_INVERT
+  PAINT_MASK_FLOOD_VALUE,
+  PAINT_MASK_FLOOD_VALUE_INVERSE,
+  PAINT_MASK_INVERT,
 } PaintMaskFloodMode;
 
 void PAINT_OT_mask_flood_fill(struct wmOperatorType *ot);
@@ -342,15 +385,12 @@ void PAINTCURVE_OT_slide(struct wmOperatorType *ot);
 void PAINTCURVE_OT_draw(struct wmOperatorType *ot);
 void PAINTCURVE_OT_cursor(struct wmOperatorType *ot);
 
-/* paint_curve_undo.c */
-void ED_paintcurve_undo_push(struct bContext *C, struct wmOperator *op, struct PaintCurve *pc);
-
 /* image painting blur kernel */
 typedef struct {
-	float *wdata; /* actual kernel */
-	int side; /* kernel side */
-	int side_squared; /* data side */
-	int pixel_len; /* pixels around center that kernel is wide */
+  float *wdata;     /* actual kernel */
+  int side;         /* kernel side */
+  int side_squared; /* data side */
+  int pixel_len;    /* pixels around center that kernel is wide */
 } BlurKernel;
 
 enum eBlurKernelType;

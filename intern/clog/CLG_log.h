@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,15 +12,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __CLOG_H__
-#define __CLOG_H__
+#ifndef __CLG_LOG_H__
+#define __CLG_LOG_H__
 
-/** \file clog/CLG_log.h
- *  \ingroup clog
+/** \file
+ * \ingroup clog
  *
  * C Logging Library (clog)
  * ========================
@@ -53,8 +49,6 @@
  * - `WARN`: General warnings (which aren't necessary to show to users).
  * - `ERROR`: An error we can recover from, should not happen.
  * - `FATAL`: Similar to assert. This logs the message, then a stack trace and abort.
- *
- *
  * Verbosity Level
  * ---------------
  *
@@ -79,20 +73,16 @@ extern "C" {
 #endif /* __cplusplus */
 
 #ifdef __GNUC__
-#  define _CLOG_ATTR_NONNULL(args ...) __attribute__((nonnull(args)))
+#  define _CLOG_ATTR_NONNULL(args...) __attribute__((nonnull(args)))
 #else
 #  define _CLOG_ATTR_NONNULL(...)
 #endif
 
 #ifdef __GNUC__
-#  define _CLOG_ATTR_PRINTF_FORMAT(format_param, dots_param) __attribute__((format(printf, format_param, dots_param)))
+#  define _CLOG_ATTR_PRINTF_FORMAT(format_param, dots_param) \
+    __attribute__((format(printf, format_param, dots_param)))
 #else
 #  define _CLOG_ATTR_PRINTF_FORMAT(format_param, dots_param)
-#endif
-
-#if defined(_MSC_VER) && !defined(__func__)
-#  define __func__MSVC
-#  define __func__ __FUNCTION__
 #endif
 
 #define STRINGIFY_ARG(x) "" #x
@@ -103,41 +93,44 @@ struct CLogContext;
 
 /* Don't typedef enums. */
 enum CLG_LogFlag {
-	CLG_FLAG_USE = (1 << 0),
+  CLG_FLAG_USE = (1 << 0),
 };
 
 enum CLG_Severity {
-	CLG_SEVERITY_INFO = 0,
-	CLG_SEVERITY_WARN,
-	CLG_SEVERITY_ERROR,
-	CLG_SEVERITY_FATAL,
+  CLG_SEVERITY_INFO = 0,
+  CLG_SEVERITY_WARN,
+  CLG_SEVERITY_ERROR,
+  CLG_SEVERITY_FATAL,
 };
 #define CLG_SEVERITY_LEN (CLG_SEVERITY_FATAL + 1)
 
 /* Each logger ID has one of these. */
 typedef struct CLG_LogType {
-	struct CLG_LogType *next;
-	char identifier[64];
-	/** FILE output. */
-	struct CLogContext *ctx;
-	/** Control behavior. */
-	int level;
-	enum CLG_LogFlag flag;
+  struct CLG_LogType *next;
+  char identifier[64];
+  /** FILE output. */
+  struct CLogContext *ctx;
+  /** Control behavior. */
+  int level;
+  enum CLG_LogFlag flag;
 } CLG_LogType;
 
 typedef struct CLG_LogRef {
-	const char *identifier;
-	CLG_LogType *type;
+  const char *identifier;
+  CLG_LogType *type;
 } CLG_LogRef;
 
-void CLG_log_str(
-        CLG_LogType *lg, enum CLG_Severity severity, const char *file_line, const char *fn,
-        const char *message)
-	_CLOG_ATTR_NONNULL(1, 3, 4, 5);
-void CLG_logf(
-        CLG_LogType *lg, enum CLG_Severity severity, const char *file_line, const char *fn,
-        const char *format, ...)
-	_CLOG_ATTR_NONNULL(1, 3, 4, 5) _CLOG_ATTR_PRINTF_FORMAT(5, 6);
+void CLG_log_str(CLG_LogType *lg,
+                 enum CLG_Severity severity,
+                 const char *file_line,
+                 const char *fn,
+                 const char *message) _CLOG_ATTR_NONNULL(1, 3, 4, 5);
+void CLG_logf(CLG_LogType *lg,
+              enum CLG_Severity severity,
+              const char *file_line,
+              const char *fn,
+              const char *format,
+              ...) _CLOG_ATTR_NONNULL(1, 3, 4, 5) _CLOG_ATTR_PRINTF_FORMAT(5, 6);
 
 /* Main initializer and distructor (per session, not logger). */
 void CLG_init(void);
@@ -145,6 +138,7 @@ void CLG_exit(void);
 
 void CLG_output_set(void *file_handle);
 void CLG_output_use_basename_set(int value);
+void CLG_output_use_timestamp_set(int value);
 void CLG_fatal_fn_set(void (*fatal_fn)(void *file_handle));
 void CLG_backtrace_fn_set(void (*fatal_fn)(void *file_handle));
 
@@ -157,58 +151,66 @@ void CLG_logref_init(CLG_LogRef *clg_ref);
 
 /** Declare outside function, declare as extern in header. */
 #define CLG_LOGREF_DECLARE_GLOBAL(var, id) \
-	static CLG_LogRef _static_ ## var = {id}; \
-	CLG_LogRef *var = &_static_ ## var
+  static CLG_LogRef _static_##var = {id}; \
+  CLG_LogRef *var = &_static_##var
 
 /** Initialize struct once. */
 #define CLOG_ENSURE(clg_ref) \
-	((clg_ref)->type ? (clg_ref)->type : (CLG_logref_init(clg_ref), (clg_ref)->type))
+  ((clg_ref)->type ? (clg_ref)->type : (CLG_logref_init(clg_ref), (clg_ref)->type))
 
-#define CLOG_AT_SEVERITY(clg_ref, severity, verbose_level, ...) { \
-	CLG_LogType *_lg_ty = CLOG_ENSURE(clg_ref); \
-	if (((_lg_ty->flag & CLG_FLAG_USE) && (_lg_ty->level >= verbose_level)) || (severity >= CLG_SEVERITY_WARN)) { \
-		CLG_logf(_lg_ty, severity, __FILE__ ":" STRINGIFY(__LINE__), __func__, __VA_ARGS__); \
-	} \
-} ((void)0)
+#define CLOG_AT_SEVERITY(clg_ref, severity, verbose_level, ...) \
+  { \
+    CLG_LogType *_lg_ty = CLOG_ENSURE(clg_ref); \
+    if (((_lg_ty->flag & CLG_FLAG_USE) && (_lg_ty->level >= verbose_level)) || \
+        (severity >= CLG_SEVERITY_WARN)) { \
+      CLG_logf(_lg_ty, severity, __FILE__ ":" STRINGIFY(__LINE__), __func__, __VA_ARGS__); \
+    } \
+  } \
+  ((void)0)
 
-#define CLOG_STR_AT_SEVERITY(clg_ref, severity, verbose_level, str) { \
-	CLG_LogType *_lg_ty = CLOG_ENSURE(clg_ref); \
-	if (((_lg_ty->flag & CLG_FLAG_USE) && (_lg_ty->level >= verbose_level)) || (severity >= CLG_SEVERITY_WARN)) { \
-		CLG_log_str(lg, severity, __FILE__ ":" STRINGIFY(__LINE__), __func__, str); \
-	} \
-} ((void)0)
+#define CLOG_STR_AT_SEVERITY(clg_ref, severity, verbose_level, str) \
+  { \
+    CLG_LogType *_lg_ty = CLOG_ENSURE(clg_ref); \
+    if (((_lg_ty->flag & CLG_FLAG_USE) && (_lg_ty->level >= verbose_level)) || \
+        (severity >= CLG_SEVERITY_WARN)) { \
+      CLG_log_str(_lg_ty, severity, __FILE__ ":" STRINGIFY(__LINE__), __func__, str); \
+    } \
+  } \
+  ((void)0)
 
-#define CLOG_STR_AT_SEVERITY_N(clg_ref, severity, verbose_level, str) { \
-	CLG_LogType *_lg_ty = CLOG_ENSURE(clg_ref); \
-	if (((_lg_ty->flag & CLG_FLAG_USE) && (_lg_ty->level >= verbose_level)) || (severity >= CLG_SEVERITY_WARN)) { \
-		const char *_str = str; \
-		CLG_log_str(_lg_ty, severity, __FILE__ ":" STRINGIFY(__LINE__), __func__, _str); \
-		MEM_freeN((void *)_str); \
-	} \
-} ((void)0)
+#define CLOG_STR_AT_SEVERITY_N(clg_ref, severity, verbose_level, str) \
+  { \
+    CLG_LogType *_lg_ty = CLOG_ENSURE(clg_ref); \
+    if (((_lg_ty->flag & CLG_FLAG_USE) && (_lg_ty->level >= verbose_level)) || \
+        (severity >= CLG_SEVERITY_WARN)) { \
+      const char *_str = str; \
+      CLG_log_str(_lg_ty, severity, __FILE__ ":" STRINGIFY(__LINE__), __func__, _str); \
+      MEM_freeN((void *)_str); \
+    } \
+  } \
+  ((void)0)
 
-#define CLOG_INFO(clg_ref, level, ...) CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_INFO, level, __VA_ARGS__)
-#define CLOG_WARN(clg_ref, ...)        CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_WARN, 0, __VA_ARGS__)
-#define CLOG_ERROR(clg_ref, ...)       CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_ERROR, 0, __VA_ARGS__)
-#define CLOG_FATAL(clg_ref, ...)       CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_FATAL, 0, __VA_ARGS__)
+#define CLOG_INFO(clg_ref, level, ...) \
+  CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_INFO, level, __VA_ARGS__)
+#define CLOG_WARN(clg_ref, ...) CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_WARN, 0, __VA_ARGS__)
+#define CLOG_ERROR(clg_ref, ...) CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_ERROR, 0, __VA_ARGS__)
+#define CLOG_FATAL(clg_ref, ...) CLOG_AT_SEVERITY(clg_ref, CLG_SEVERITY_FATAL, 0, __VA_ARGS__)
 
-#define CLOG_STR_INFO(clg_ref, level, ...) CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_INFO, level, __VA_ARGS__)
-#define CLOG_STR_WARN(clg_ref, ...)        CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_WARN, 0, __VA_ARGS__)
-#define CLOG_STR_ERROR(clg_ref, ...)       CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_ERROR, 0, __VA_ARGS__)
-#define CLOG_STR_FATAL(clg_ref, ...)       CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_FATAL, 0, __VA_ARGS__)
+#define CLOG_STR_INFO(clg_ref, level, str) \
+  CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_INFO, level, str)
+#define CLOG_STR_WARN(clg_ref, str) CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_WARN, 0, str)
+#define CLOG_STR_ERROR(clg_ref, str) CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_ERROR, 0, str)
+#define CLOG_STR_FATAL(clg_ref, str) CLOG_STR_AT_SEVERITY(clg_ref, CLG_SEVERITY_FATAL, 0, str)
 
 /* Allocated string which is immediately freed. */
-#define CLOG_STR_INFO_N(clg_ref, level, ...) CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_INFO, level, __VA_ARGS__)
-#define CLOG_STR_WARN_N(clg_ref, ...)        CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_WARN, 0, __VA_ARGS__)
-#define CLOG_STR_ERROR_N(clg_ref, ...)       CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_ERROR, 0, __VA_ARGS__)
-#define CLOG_STR_FATAL_N(clg_ref, ...)       CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_FATAL, 0, __VA_ARGS__)
-
-#ifdef __func__MSVC
-#  undef __func__MSVC
-#endif
+#define CLOG_STR_INFO_N(clg_ref, level, str) \
+  CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_INFO, level, str)
+#define CLOG_STR_WARN_N(clg_ref, str) CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_WARN, 0, str)
+#define CLOG_STR_ERROR_N(clg_ref, str) CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_ERROR, 0, str)
+#define CLOG_STR_FATAL_N(clg_ref, str) CLOG_STR_AT_SEVERITY_N(clg_ref, CLG_SEVERITY_FATAL, 0, str)
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __CLOG_H__ */
+#endif /* __CLG_LOG_H__ */

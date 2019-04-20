@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,29 +15,24 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/space_action/action_intern.h
- *  \ingroup spaction
+/** \file
+ * \ingroup spaction
  */
 
 #ifndef __ACTION_INTERN_H__
 #define __ACTION_INTERN_H__
 
-struct bContext;
-struct bAnimContext;
-struct Scene;
-struct Object;
-struct SpaceAction;
-struct ScrArea;
 struct ARegion;
 struct ARegionType;
+struct Object;
+struct Scene;
+struct ScrArea;
+struct SpaceAction;
 struct View2D;
+struct bAnimContext;
+struct bContext;
 struct wmOperatorType;
 
 /* internal exports only */
@@ -47,10 +40,7 @@ struct wmOperatorType;
 /* **************************************** */
 /* space_action.c / action_buttons.c */
 
-struct ARegion *action_has_buttons_region(struct ScrArea *sa);
-
 void action_buttons_register(struct ARegionType *art);
-void ACTION_OT_properties(struct wmOperatorType *ot);
 
 /* ***************************************** */
 /* action_draw.c */
@@ -75,17 +65,17 @@ void ACTION_OT_clickselect(struct wmOperatorType *ot);
 
 /* defines for left-right select tool */
 enum eActKeys_LeftRightSelect_Mode {
-	ACTKEYS_LRSEL_TEST = 0,
-	ACTKEYS_LRSEL_LEFT,
-	ACTKEYS_LRSEL_RIGHT
+  ACTKEYS_LRSEL_TEST = 0,
+  ACTKEYS_LRSEL_LEFT,
+  ACTKEYS_LRSEL_RIGHT,
 };
 
 /* defines for column-select mode */
 enum eActKeys_ColumnSelect_Mode {
-	ACTKEYS_COLUMNSEL_KEYS = 0,
-	ACTKEYS_COLUMNSEL_CFRA,
-	ACTKEYS_COLUMNSEL_MARKERS_COLUMN,
-	ACTKEYS_COLUMNSEL_MARKERS_BETWEEN,
+  ACTKEYS_COLUMNSEL_KEYS = 0,
+  ACTKEYS_COLUMNSEL_CFRA,
+  ACTKEYS_COLUMNSEL_MARKERS_COLUMN,
+  ACTKEYS_COLUMNSEL_MARKERS_BETWEEN,
 };
 
 /* ***************************************** */
@@ -131,20 +121,20 @@ void ACTION_OT_markers_make_local(struct wmOperatorType *ot);
  * NOTE: keep in sync with eEditKeyframes_Snap (in ED_keyframes_edit.h)
  */
 enum eActKeys_Snap_Mode {
-	ACTKEYS_SNAP_CFRA = 1,
-	ACTKEYS_SNAP_NEAREST_FRAME,
-	ACTKEYS_SNAP_NEAREST_SECOND,
-	ACTKEYS_SNAP_NEAREST_MARKER,
+  ACTKEYS_SNAP_CFRA = 1,
+  ACTKEYS_SNAP_NEAREST_FRAME,
+  ACTKEYS_SNAP_NEAREST_SECOND,
+  ACTKEYS_SNAP_NEAREST_MARKER,
 };
 
 /* defines for mirror keyframes
  * NOTE: keep in sync with eEditKeyframes_Mirror (in ED_keyframes_edit.h)
  */
 enum eActKeys_Mirror_Mode {
-	ACTKEYS_MIRROR_CFRA = 1,
-	ACTKEYS_MIRROR_YAXIS,
-	ACTKEYS_MIRROR_XAXIS,
-	ACTKEYS_MIRROR_MARKER,
+  ACTKEYS_MIRROR_CFRA = 1,
+  ACTKEYS_MIRROR_YAXIS,
+  ACTKEYS_MIRROR_XAXIS,
+  ACTKEYS_MIRROR_MARKER,
 };
 
 /* ***************************************** */

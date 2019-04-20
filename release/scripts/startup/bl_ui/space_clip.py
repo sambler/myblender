@@ -21,7 +21,7 @@
 import bpy
 from bpy.types import Panel, Header, Menu, UIList
 from bpy.app.translations import pgettext_iface as iface_
-from bl_operators.presets import PresetMenu
+from bl_ui.utils import PresetPanel
 from .properties_grease_pencil_common import (
     AnnotationDrawingToolsPanel,
     AnnotationDataPanel,
@@ -29,8 +29,8 @@ from .properties_grease_pencil_common import (
 
 
 class CLIP_UL_tracking_objects(UIList):
-    def draw_item(self, context, layout, data, item, icon,
-                  active_data, active_propname, index):
+    def draw_item(self, _context, layout, _data, item, _icon,
+                  _active_data, _active_propname, _index):
         # assert(isinstance(item, bpy.types.MovieTrackingObject)
         tobj = item
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
@@ -364,7 +364,7 @@ class CLIP_PT_tools_clip(Panel):
 
         return clip and sc.view == 'CLIP' and sc.mode != 'MASK'
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         col = layout.column(align=True)
@@ -380,10 +380,8 @@ class CLIP_PT_tools_marker(CLIP_PT_tracking_panel, Panel):
     bl_label = "Marker"
     bl_category = "Track"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
-
-        sc = context.space_data
 
         col = layout.column(align=True)
         row = col.row(align=True)
@@ -398,7 +396,7 @@ class CLIP_PT_tracking_settings(CLIP_PT_tracking_panel, Panel):
     bl_label = "Tracking Settings"
     bl_category = "Track"
 
-    def draw_header_preset(self, context):
+    def draw_header_preset(self, _context):
         CLIP_PT_tracking_settings_presets.draw_panel_header(self.layout)
 
     def draw(self, context):
@@ -469,7 +467,7 @@ class CLIP_PT_tools_tracking(CLIP_PT_tracking_panel, Panel):
     bl_category = "Track"
     bl_options = {'DEFAULT_CLOSED'}
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         row = layout.row(align=True)
@@ -524,7 +522,7 @@ class CLIP_PT_tools_plane_tracking(CLIP_PT_tracking_panel, Panel):
     bl_options = {'DEFAULT_CLOSED'}
     bl_category = "Solve"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
         layout.operator("clip.create_plane_track")
 
@@ -600,7 +598,7 @@ class CLIP_PT_tools_geometry(CLIP_PT_tracking_panel, Panel):
     bl_options = {'DEFAULT_CLOSED'}
     bl_category = "Solve"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.bundles_to_mesh")
@@ -864,7 +862,7 @@ class CLIP_PT_tracking_camera(Panel):
 
         return False
 
-    def draw_header_preset(self, context):
+    def draw_header_preset(self, _context):
         CLIP_PT_camera_presets.draw_panel_header(self.layout)
 
     def draw(self, context):
@@ -1008,7 +1006,7 @@ class CLIP_PT_stabilization(CLIP_PT_reconstruction_panel, Panel):
             sub.operator("clip.stabilize_2d_add", icon='ADD', text="")
             sub.operator("clip.stabilize_2d_remove", icon='REMOVE', text="")
 
-            sub.menu('CLIP_MT_stabilize_2d_specials', text="",
+            sub.menu('CLIP_MT_stabilize_2d_context_menu', text="",
                      icon='DOWNARROW_HLT')
 
             # Usually we don't hide things from iterface, but here every pixel of
@@ -1025,7 +1023,7 @@ class CLIP_PT_stabilization(CLIP_PT_reconstruction_panel, Panel):
                 sub.operator("clip.stabilize_2d_rotation_add", icon='ADD', text="")
                 sub.operator("clip.stabilize_2d_rotation_remove", icon='REMOVE', text="")
 
-                sub.menu('CLIP_MT_stabilize_2d_rotation_specials', text="",
+                sub.menu('CLIP_MT_stabilize_2d_rotation_context_menu', text="",
                          icon='DOWNARROW_HLT')
 
         col = layout.column()
@@ -1200,7 +1198,7 @@ class CLIP_PT_tools_scenesetup(Panel):
 
         return clip and sc.view == 'CLIP' and sc.mode != 'MASK'
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.set_viewport_background")
@@ -1233,8 +1231,10 @@ class CLIP_MT_view(Menu):
         sc = context.space_data
 
         if sc.view == 'CLIP':
-            layout.operator("clip.properties", icon='MENU_PANEL')
-            layout.operator("clip.tools", icon='MENU_PANEL')
+            layout.prop(sc, "show_region_ui")
+            layout.prop(sc, "show_region_toolbar")
+            layout.prop(sc, "show_region_hud")
+
             layout.separator()
 
             layout.operator("clip.view_selected")
@@ -1292,7 +1292,7 @@ class CLIP_MT_clip(Menu):
 class CLIP_MT_proxy(Menu):
     bl_label = "Proxy"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.rebuild_proxy")
@@ -1302,7 +1302,7 @@ class CLIP_MT_proxy(Menu):
 class CLIP_MT_track(Menu):
     bl_label = "Track"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.clear_solution")
@@ -1363,7 +1363,7 @@ class CLIP_MT_track(Menu):
 class CLIP_MT_reconstruction(Menu):
     bl_label = "Reconstruction"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.set_origin")
@@ -1384,10 +1384,10 @@ class CLIP_MT_reconstruction(Menu):
 class CLIP_MT_track_visibility(Menu):
     bl_label = "Show/Hide"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
-        layout.operator("clip.hide_tracks_clear", text="Show Hidden")
+        layout.operator("clip.hide_tracks_clear")
         layout.operator("clip.hide_tracks", text="Hide Selected").unselected = False
         layout.operator("clip.hide_tracks", text="Hide Unselected").unselected = True
 
@@ -1395,7 +1395,7 @@ class CLIP_MT_track_visibility(Menu):
 class CLIP_MT_track_transform(Menu):
     bl_label = "Transform"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("transform.translate")
@@ -1405,7 +1405,7 @@ class CLIP_MT_track_transform(Menu):
 class CLIP_MT_select(Menu):
     bl_label = "Select"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.select_box")
@@ -1424,20 +1424,20 @@ class CLIP_MT_select(Menu):
 class CLIP_MT_select_grouped(Menu):
     bl_label = "Select Grouped"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator_enum("clip.select_grouped", "group")
 
 
-class CLIP_MT_tracking_specials(Menu):
+class CLIP_MT_tracking_context_menu(Menu):
     bl_label = "Specials"
 
     @classmethod
     def poll(cls, context):
         return context.space_data.clip
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.disable_markers",
@@ -1460,7 +1460,7 @@ class CLIP_MT_tracking_specials(Menu):
                         text="Unlock Tracks").action = 'UNLOCK'
 
 
-class CLIP_PT_camera_presets(PresetMenu):
+class CLIP_PT_camera_presets(PresetPanel, Panel):
     """Predefined tracking camera intrinsics"""
     bl_label = "Camera Presets"
     preset_subdir = "tracking_camera"
@@ -1468,7 +1468,7 @@ class CLIP_PT_camera_presets(PresetMenu):
     preset_add_operator = "clip.camera_preset_add"
 
 
-class CLIP_PT_track_color_presets(PresetMenu):
+class CLIP_PT_track_color_presets(PresetPanel, Panel):
     """Predefined track color"""
     bl_label = "Color Presets"
     preset_subdir = "tracking_track_color"
@@ -1476,7 +1476,7 @@ class CLIP_PT_track_color_presets(PresetMenu):
     preset_add_operator = "clip.track_color_preset_add"
 
 
-class CLIP_PT_tracking_settings_presets(PresetMenu):
+class CLIP_PT_tracking_settings_presets(PresetPanel, Panel):
     """Predefined tracking settings"""
     bl_label = "Tracking Presets"
     preset_subdir = "tracking_settings"
@@ -1484,19 +1484,19 @@ class CLIP_PT_tracking_settings_presets(PresetMenu):
     preset_add_operator = "clip.tracking_settings_preset_add"
 
 
-class CLIP_MT_stabilize_2d_specials(Menu):
+class CLIP_MT_stabilize_2d_context_menu(Menu):
     bl_label = "Translation Track Specials"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.stabilize_2d_select")
 
 
-class CLIP_MT_stabilize_2d_rotation_specials(Menu):
+class CLIP_MT_stabilize_2d_rotation_context_menu(Menu):
     bl_label = "Rotation Track Specials"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("clip.stabilize_2d_rotation_select")
@@ -1563,12 +1563,12 @@ classes = (
     CLIP_MT_track_transform,
     CLIP_MT_select,
     CLIP_MT_select_grouped,
-    CLIP_MT_tracking_specials,
+    CLIP_MT_tracking_context_menu,
     CLIP_PT_camera_presets,
     CLIP_PT_track_color_presets,
     CLIP_PT_tracking_settings_presets,
-    CLIP_MT_stabilize_2d_specials,
-    CLIP_MT_stabilize_2d_rotation_specials,
+    CLIP_MT_stabilize_2d_context_menu,
+    CLIP_MT_stabilize_2d_rotation_context_menu,
     CLIP_MT_pivot_pie,
 )
 

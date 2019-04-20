@@ -13,30 +13,32 @@ out vec4 fillColor;
 out vec4 outlineColor;
 out vec4 radii;
 
-#define VERTEX_SELECT (1 << 0)
-#define VERTEX_PINNED (1 << 1)
+/* TODO: Port drawing to draw manager and
+ * remove constants duplications. */
+#define VERT_UV_SELECT (1 << 3)
+#define VERT_UV_PINNED (1 << 4)
 
 void main()
 {
-	gl_Position = ModelViewProjectionMatrix * vec4(pos, 0.0, 1.0);
-	gl_PointSize = pointSize;
+  gl_Position = ModelViewProjectionMatrix * vec4(pos, 0.0, 1.0);
+  gl_PointSize = pointSize;
 
-	bool is_selected = (flag & VERTEX_SELECT) != 0;
-	bool is_pinned = (flag & VERTEX_PINNED) != 0;
+  bool is_selected = (flag & VERT_UV_SELECT) != 0;
+  bool is_pinned = (flag & VERT_UV_PINNED) != 0;
 
-	vec4 deselect_col = (is_pinned) ? pinnedColor : vertColor;
-	fillColor = (is_selected) ? selectColor : deselect_col;
-	outlineColor = (is_pinned) ? pinnedColor : vec4(fillColor.rgb, 0.0);
+  vec4 deselect_col = (is_pinned) ? pinnedColor : vertColor;
+  fillColor = (is_selected) ? selectColor : deselect_col;
+  outlineColor = (is_pinned) ? pinnedColor : vec4(fillColor.rgb, 0.0);
 
-	// calculate concentric radii in pixels
-	float radius = 0.5 * pointSize;
+  // calculate concentric radii in pixels
+  float radius = 0.5 * pointSize;
 
-	// start at the outside and progress toward the center
-	radii[0] = radius;
-	radii[1] = radius - 1.0;
-	radii[2] = radius - outlineWidth;
-	radii[3] = radius - outlineWidth - 1.0;
+  // start at the outside and progress toward the center
+  radii[0] = radius;
+  radii[1] = radius - 1.0;
+  radii[2] = radius - outlineWidth;
+  radii[3] = radius - outlineWidth - 1.0;
 
-	// convert to PointCoord units
-	radii /= pointSize;
+  // convert to PointCoord units
+  radii /= pointSize;
 }

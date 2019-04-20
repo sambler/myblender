@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,14 +15,10 @@
  *
  * The Original Code is Copyright (C) 2016 Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): Kevin Dietrich.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file DNA_cachefile_types.h
- *  \ingroup DNA
+/** \file
+ * \ingroup DNA
  */
 
 #ifndef __DNA_CACHEFILE_TYPES_H__
@@ -38,53 +32,56 @@ extern "C" {
 
 /* CacheFile::flag */
 enum {
-	CACHEFILE_DS_EXPAND = (1 << 0),
-	CACHEFILE_DIRTY     = (1 << 1),
+  CACHEFILE_DS_EXPAND = (1 << 0),
+  CACHEFILE_DIRTY = (1 << 1),
 };
 
 /* CacheFile::draw_flag */
 enum {
-	CACHEFILE_KEYFRAME_DRAWN = (1 << 0),
+  CACHEFILE_KEYFRAME_DRAWN = (1 << 0),
 };
 
 /* Representation of an object's path inside the Alembic file.
  * Note that this is not a file path. */
 typedef struct AlembicObjectPath {
-	struct AlembicObjectPath *next, *prev;
+  struct AlembicObjectPath *next, *prev;
 
-	char path[4096];
+  char path[4096];
 } AlembicObjectPath;
 
 typedef struct CacheFile {
-	ID id;
-	struct AnimData *adt;
+  ID id;
+  struct AnimData *adt;
 
-	struct AbcArchiveHandle *handle;
-	void *handle_mutex;
+  struct AbcArchiveHandle *handle;
+  void *handle_mutex;
 
-	/* Paths of the objects inside of the Alembic archive referenced by this
-	 * CacheFile. */
-	ListBase object_paths;
+  /** Paths of the objects inside of the Alembic archive referenced by this CacheFile. */
+  ListBase object_paths;
 
-	char filepath[1024];  /* 1024 = FILE_MAX */
+  /** 1024 = FILE_MAX. */
+  char filepath[1024];
 
-	char is_sequence;
-	char forward_axis;
-	char up_axis;
-	char override_frame;
+  char is_sequence;
+  char forward_axis;
+  char up_axis;
+  char override_frame;
 
-	float scale;
-	float frame;  /* The frame/time to lookup in the cache file. */
-	float frame_offset; /* The frame offset to subtract. */
+  float scale;
+  /** The frame/time to lookup in the cache file. */
+  float frame;
+  /** The frame offset to subtract. */
+  float frame_offset;
 
-	short flag;  /* Animation flag. */
-	short draw_flag;
+  /** Animation flag. */
+  short flag;
+  short draw_flag;
 
-	char padding[4];
+  char _pad[4];
 } CacheFile;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* __DNA_CACHEFILE_TYPES_H__ */
+#endif /* __DNA_CACHEFILE_TYPES_H__ */

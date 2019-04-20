@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2017, Blender Foundation
  * This is a new part of Blender
- *
- * Contributor(s): Antonio Vazquez
- *
- * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-/** \file blender/shader_fx/intern/FX_shader_flip.c
- *  \ingroup shader_fx
+/** \file
+ * \ingroup shader_fx
  */
 
 #include <stdio.h>
@@ -34,36 +27,35 @@
 #include "DNA_object_types.h"
 #include "DNA_gpencil_types.h"
 
-#include "BLI_math_base.h"
 #include "BLI_utildefines.h"
 
 #include "FX_shader_types.h"
 
 static void initData(ShaderFxData *fx)
 {
-	FlipShaderFxData *gpfx = (FlipShaderFxData *)fx;
-	gpfx->flag |= FX_FLIP_HORIZONTAL;
+  FlipShaderFxData *gpfx = (FlipShaderFxData *)fx;
+  gpfx->flag |= FX_FLIP_HORIZONTAL;
 }
 
 static void copyData(const ShaderFxData *md, ShaderFxData *target)
 {
-	BKE_shaderfx_copyData_generic(md, target);
+  BKE_shaderfx_copyData_generic(md, target);
 }
 
-ShaderFxTypeInfo  shaderfx_Type_Flip = {
-	/* name */              "Flip",
-	/* structName */        "FlipShaderFxData",
-	/* structSize */        sizeof(FlipShaderFxData),
-	/* type */              eShaderFxType_GpencilType,
-	/* flags */             eShaderFxTypeFlag_Single,
+ShaderFxTypeInfo shaderfx_Type_Flip = {
+    /* name */ "Flip",
+    /* structName */ "FlipShaderFxData",
+    /* structSize */ sizeof(FlipShaderFxData),
+    /* type */ eShaderFxType_GpencilType,
+    /* flags */ eShaderFxTypeFlag_Single,
 
-	/* copyData */          copyData,
+    /* copyData */ copyData,
 
-	/* initData */          initData,
-	/* freeData */          NULL,
-	/* isDisabled */        NULL,
-	/* updateDepsgraph */   NULL,
-	/* dependsOnTime */     NULL,
-	/* foreachObjectLink */ NULL,
-	/* foreachIDLink */     NULL,
+    /* initData */ initData,
+    /* freeData */ NULL,
+    /* isDisabled */ NULL,
+    /* updateDepsgraph */ NULL,
+    /* dependsOnTime */ NULL,
+    /* foreachObjectLink */ NULL,
+    /* foreachIDLink */ NULL,
 };

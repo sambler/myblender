@@ -17,89 +17,111 @@
 CCL_NAMESPACE_BEGIN
 
 ccl_device void kernel_filter_construct_transform(const float *ccl_restrict buffer,
-                                                  int x, int y, int4 rect,
+                                                  CCL_FILTER_TILE_INFO,
+                                                  int x,
+                                                  int y,
+                                                  int4 rect,
                                                   int pass_stride,
-                                                  float *transform, int *rank,
-                                                  int radius, float pca_threshold)
+                                                  int frame_stride,
+                                                  bool use_time,
+                                                  float *transform,
+                                                  int *rank,
+                                                  int radius,
+                                                  float pca_threshold)
 {
-	int buffer_w = align_up(rect.z - rect.x, 4);
+  int buffer_w = align_up(rect.z - rect.x, 4);
 
-	float4 features[DENOISE_FEATURES];
-	const float *ccl_restrict pixel_buffer;
-	int2 pixel;
+  float4 features[DENOISE_FEATURES];
+  const float *ccl_restrict pixel_buffer;
+  int3 pixel;
 
-	int2 low  = make_int2(max(rect.x, x - radius),
-	                      max(rect.y, y - radius));
-	int2 high = make_int2(min(rect.z, x + radius + 1),
-	                      min(rect.w, y + radius + 1));
-	int num_pixels = (high.y - low.y) * (high.x - low.x);
+  int num_features = use_time ? 11 : 10;
 
-	float4 feature_means[DENOISE_FEATURES];
-	math_vector_zero_sse(feature_means, DENOISE_FEATURES);
-	FOR_PIXEL_WINDOW_SSE {
-		filter_get_features_sse(x4, y4, active_pixels, pixel_buffer, features, NULL, pass_stride);
-		math_vector_add_sse(feature_means, DENOISE_FEATURES, features);
-	} END_FOR_PIXEL_WINDOW_SSE
+  /* === Calculate denoising window. === */
+  int2 low = make_int2(max(rect.x, x - radius), max(rect.y, y - radius));
+  int2 high = make_int2(min(rect.z, x + radius + 1), min(rect.w, y + radius + 1));
+  int num_pixels = (high.y - low.y) * (high.x - low.x) * tile_info->num_frames;
 
-	float4 pixel_scale = make_float4(1.0f / num_pixels);
-	for(int i = 0; i < DENOISE_FEATURES; i++) {
-		feature_means[i] = reduce_add(feature_means[i]) * pixel_scale;
-	}
+  /* === Shift feature passes to have mean 0. === */
+  float4 feature_means[DENOISE_FEATURES];
+  math_vector_zero_sse(feature_means, num_features);
+  FOR_PIXEL_WINDOW_SSE
+  {
+    filter_get_features_sse(
+        x4, y4, t4, active_pixels, pixel_buffer, features, use_time, NULL, pass_stride);
+    math_vector_add_sse(feature_means, num_features, features);
+  }
+  END_FOR_PIXEL_WINDOW_SSE
 
-	float4 feature_scale[DENOISE_FEATURES];
-	math_vector_zero_sse(feature_scale, DENOISE_FEATURES);
-	FOR_PIXEL_WINDOW_SSE {
-		filter_get_feature_scales_sse(x4, y4, active_pixels, pixel_buffer, features, feature_means, pass_stride);
-		math_vector_max_sse(feature_scale, features, DENOISE_FEATURES);
-	} END_FOR_PIXEL_WINDOW_SSE
+  float4 pixel_scale = make_float4(1.0f / num_pixels);
+  for (int i = 0; i < num_features; i++) {
+    feature_means[i] = reduce_add(feature_means[i]) * pixel_scale;
+  }
 
-	filter_calculate_scale_sse(feature_scale);
+  /* === Scale the shifted feature passes to a range of [-1; 1], will be baked into the transform later. === */
+  float4 feature_scale[DENOISE_FEATURES];
+  math_vector_zero_sse(feature_scale, num_features);
+  FOR_PIXEL_WINDOW_SSE
+  {
+    filter_get_feature_scales_sse(
+        x4, y4, t4, active_pixels, pixel_buffer, features, use_time, feature_means, pass_stride);
+    math_vector_max_sse(feature_scale, features, num_features);
+  }
+  END_FOR_PIXEL_WINDOW_SSE
 
-	float4 feature_matrix_sse[DENOISE_FEATURES*DENOISE_FEATURES];
-	math_matrix_zero_sse(feature_matrix_sse, DENOISE_FEATURES);
-	FOR_PIXEL_WINDOW_SSE {
-		filter_get_features_sse(x4, y4, active_pixels, pixel_buffer, features, feature_means, pass_stride);
-		math_vector_mul_sse(features, DENOISE_FEATURES, feature_scale);
-		math_matrix_add_gramian_sse(feature_matrix_sse, DENOISE_FEATURES, features, make_float4(1.0f));
-	} END_FOR_PIXEL_WINDOW_SSE
+  filter_calculate_scale_sse(feature_scale, use_time);
 
-	float feature_matrix[DENOISE_FEATURES*DENOISE_FEATURES];
-	math_matrix_hsum(feature_matrix, DENOISE_FEATURES, feature_matrix_sse);
+  /* === Generate the feature transformation. ===
+   * This transformation maps the num_features-dimentional feature space to a reduced feature (r-feature) space
+   * which generally has fewer dimensions. This mainly helps to prevent overfitting. */
+  float4 feature_matrix_sse[DENOISE_FEATURES * DENOISE_FEATURES];
+  math_matrix_zero_sse(feature_matrix_sse, num_features);
+  FOR_PIXEL_WINDOW_SSE
+  {
+    filter_get_features_sse(
+        x4, y4, t4, active_pixels, pixel_buffer, features, use_time, feature_means, pass_stride);
+    math_vector_mul_sse(features, num_features, feature_scale);
+    math_matrix_add_gramian_sse(feature_matrix_sse, num_features, features, make_float4(1.0f));
+  }
+  END_FOR_PIXEL_WINDOW_SSE
 
-	math_matrix_jacobi_eigendecomposition(feature_matrix, transform, DENOISE_FEATURES, 1);
+  float feature_matrix[DENOISE_FEATURES * DENOISE_FEATURES];
+  math_matrix_hsum(feature_matrix, num_features, feature_matrix_sse);
 
-	*rank = 0;
-	/* Prevent overfitting when a small window is used. */
-	int max_rank = min(DENOISE_FEATURES, num_pixels/3);
-	if(pca_threshold < 0.0f) {
-		float threshold_energy = 0.0f;
-		for(int i = 0; i < DENOISE_FEATURES; i++) {
-			threshold_energy += feature_matrix[i*DENOISE_FEATURES+i];
-		}
-		threshold_energy *= 1.0f - (-pca_threshold);
+  math_matrix_jacobi_eigendecomposition(feature_matrix, transform, num_features, 1);
 
-		float reduced_energy = 0.0f;
-		for(int i = 0; i < max_rank; i++, (*rank)++) {
-			if(i >= 2 && reduced_energy >= threshold_energy)
-				break;
-			float s = feature_matrix[i*DENOISE_FEATURES+i];
-			reduced_energy += s;
-		}
-	}
-	else {
-		for(int i = 0; i < max_rank; i++, (*rank)++) {
-			float s = feature_matrix[i*DENOISE_FEATURES+i];
-			if(i >= 2 && sqrtf(s) < pca_threshold)
-				break;
-		}
-	}
+  *rank = 0;
+  /* Prevent overfitting when a small window is used. */
+  int max_rank = min(num_features, num_pixels / 3);
+  if (pca_threshold < 0.0f) {
+    float threshold_energy = 0.0f;
+    for (int i = 0; i < num_features; i++) {
+      threshold_energy += feature_matrix[i * num_features + i];
+    }
+    threshold_energy *= 1.0f - (-pca_threshold);
 
-	math_matrix_transpose(transform, DENOISE_FEATURES, 1);
+    float reduced_energy = 0.0f;
+    for (int i = 0; i < max_rank; i++, (*rank)++) {
+      if (i >= 2 && reduced_energy >= threshold_energy)
+        break;
+      float s = feature_matrix[i * num_features + i];
+      reduced_energy += s;
+    }
+  }
+  else {
+    for (int i = 0; i < max_rank; i++, (*rank)++) {
+      float s = feature_matrix[i * num_features + i];
+      if (i >= 2 && sqrtf(s) < pca_threshold)
+        break;
+    }
+  }
 
-	/* Bake the feature scaling into the transformation matrix. */
-	for(int i = 0; i < DENOISE_FEATURES; i++) {
-		math_vector_scale(transform + i*DENOISE_FEATURES, feature_scale[i][0], *rank);
-	}
+  math_matrix_transpose(transform, num_features, 1);
+
+  /* Bake the feature scaling into the transformation matrix. */
+  for (int i = 0; i < num_features; i++) {
+    math_vector_scale(transform + i * num_features, feature_scale[i][0], *rank);
+  }
 }
 
 CCL_NAMESPACE_END

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,18 +15,11 @@
  *
  * The Original Code is Copyright (C) 2007 by Janne Karhu.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/physics/physics_intern.h
- *  \ingroup edphys
+/** \file
+ * \ingroup edphys
  */
-
 
 #ifndef __PHYSICS_INTERN_H__
 #define __PHYSICS_INTERN_H__
@@ -70,11 +61,15 @@ void PARTICLE_OT_edited_clear(struct wmOperatorType *ot);
 
 void PARTICLE_OT_unify_length(struct wmOperatorType *ot);
 
-void PE_create_particle_edit(
-        struct Depsgraph *depsgraph, struct Scene *scene,
-        struct Object *ob, struct PointCache *cache, struct ParticleSystem *psys);
+void PE_create_particle_edit(struct Depsgraph *depsgraph,
+                             struct Scene *scene,
+                             struct Object *ob,
+                             struct PointCache *cache,
+                             struct ParticleSystem *psys);
 void recalc_lengths(struct PTCacheEdit *edit);
-void recalc_emitter_field(struct Depsgraph *depsgraph, struct Object *ob, struct ParticleSystem *psys);
+void recalc_emitter_field(struct Depsgraph *depsgraph,
+                          struct Object *ob,
+                          struct ParticleSystem *psys);
 void update_world_cos(struct Depsgraph *depsgraph, struct Object *ob, struct PTCacheEdit *edit);
 
 /* particle_object.c */

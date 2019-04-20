@@ -16,16 +16,13 @@
 #
 # The Original Code is Copyright (C) 2014, Blender Foundation
 # All rights reserved.
-#
-# Contributor(s): Sergey Sharybin
-#
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	.
-	..
-	../../../intern/guardedalloc
-	../../../source/blender/blenlib
+  .
+  ..
+  ../../../intern/guardedalloc
+  ../../../source/blender/blenlib
 )
 
 include_directories(${INC})

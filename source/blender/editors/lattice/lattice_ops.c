@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/lattice/lattice_ops.c
- *  \ingroup edlattice
+/** \file
+ * \ingroup edlattice
  */
 
 #include "DNA_scene_types.h"
@@ -44,18 +37,18 @@
 
 void ED_operatortypes_lattice(void)
 {
-	WM_operatortype_append(LATTICE_OT_select_all);
-	WM_operatortype_append(LATTICE_OT_select_more);
-	WM_operatortype_append(LATTICE_OT_select_less);
-	WM_operatortype_append(LATTICE_OT_select_ungrouped);
-	WM_operatortype_append(LATTICE_OT_select_random);
-	WM_operatortype_append(LATTICE_OT_select_mirror);
-	WM_operatortype_append(LATTICE_OT_make_regular);
-	WM_operatortype_append(LATTICE_OT_flip);
+  WM_operatortype_append(LATTICE_OT_select_all);
+  WM_operatortype_append(LATTICE_OT_select_more);
+  WM_operatortype_append(LATTICE_OT_select_less);
+  WM_operatortype_append(LATTICE_OT_select_ungrouped);
+  WM_operatortype_append(LATTICE_OT_select_random);
+  WM_operatortype_append(LATTICE_OT_select_mirror);
+  WM_operatortype_append(LATTICE_OT_make_regular);
+  WM_operatortype_append(LATTICE_OT_flip);
 }
 
 void ED_keymap_lattice(wmKeyConfig *keyconf)
 {
-	wmKeyMap *keymap = WM_keymap_ensure(keyconf, "Lattice", 0, 0);
-	keymap->poll = ED_operator_editlattice;
+  wmKeyMap *keymap = WM_keymap_ensure(keyconf, "Lattice", 0, 0);
+  keymap->poll = ED_operator_editlattice;
 }

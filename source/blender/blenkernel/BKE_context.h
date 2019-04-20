@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,17 +15,13 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * Contributor(s): Blender Foundation (2008).
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __BKE_CONTEXT_H__
 #define __BKE_CONTEXT_H__
 
-/** \file BKE_context.h
- *  \ingroup bke
+/** \file
+ * \ingroup bke
  */
 
 #include "DNA_listBase.h"
@@ -38,41 +32,41 @@ extern "C" {
 #endif
 
 struct ARegion;
-struct bScreen;
+struct Base;
+struct Brush;
 struct CacheFile;
 struct Collection;
 struct Depsgraph;
+struct EditBone;
+struct ID;
+struct Image;
 struct LayerCollection;
 struct ListBase;
 struct Main;
 struct Object;
-struct Base;
 struct PointerRNA;
+struct RegionView3D;
+struct RenderEngineType;
 struct ReportList;
 struct Scene;
-struct ViewLayer;
 struct ScrArea;
+struct SpaceClip;
+struct SpaceImage;
 struct SpaceLink;
-struct View3D;
-struct ViewRender;
-struct RegionView3D;
+struct SpaceText;
 struct StructRNA;
-struct ToolSettings;
-struct Image;
 struct Text;
-struct EditBone;
-struct bPoseChannel;
-struct bGPdata;
-struct bGPDlayer;
+struct ToolSettings;
+struct View3D;
+struct ViewLayer;
+struct ViewRender;
 struct bGPDframe;
-struct Brush;
+struct bGPDlayer;
+struct bGPdata;
+struct bPoseChannel;
+struct bScreen;
 struct wmWindow;
 struct wmWindowManager;
-struct RenderEngineType;
-struct SpaceText;
-struct SpaceImage;
-struct SpaceClip;
-struct ID;
 
 #include "DNA_object_enums.h"
 
@@ -85,43 +79,44 @@ struct bContextDataResult;
 typedef struct bContextDataResult bContextDataResult;
 
 typedef int (*bContextDataCallback)(const bContext *C,
-                                    const char *member, bContextDataResult *result);
+                                    const char *member,
+                                    bContextDataResult *result);
 
 typedef struct bContextStoreEntry {
-	struct bContextStoreEntry *next, *prev;
+  struct bContextStoreEntry *next, *prev;
 
-	char name[128];
-	PointerRNA ptr;
+  char name[128];
+  PointerRNA ptr;
 } bContextStoreEntry;
 
 typedef struct bContextStore {
-	struct bContextStore *next, *prev;
+  struct bContextStore *next, *prev;
 
-	ListBase entries;
-	bool used;
+  ListBase entries;
+  bool used;
 } bContextStore;
 
 /* for the context's rna mode enum
  * keep aligned with data_mode_strings in context.c */
 enum eContextObjectMode {
-	CTX_MODE_EDIT_MESH = 0,
-	CTX_MODE_EDIT_CURVE,
-	CTX_MODE_EDIT_SURFACE,
-	CTX_MODE_EDIT_TEXT,
-	CTX_MODE_EDIT_ARMATURE,
-	CTX_MODE_EDIT_METABALL,
-	CTX_MODE_EDIT_LATTICE,
-	CTX_MODE_POSE,
-	CTX_MODE_SCULPT,
-	CTX_MODE_PAINT_WEIGHT,
-	CTX_MODE_PAINT_VERTEX,
-	CTX_MODE_PAINT_TEXTURE,
-	CTX_MODE_PARTICLE,
-	CTX_MODE_OBJECT,
-	CTX_MODE_PAINT_GPENCIL,
-	CTX_MODE_EDIT_GPENCIL,
-	CTX_MODE_SCULPT_GPENCIL,
-	CTX_MODE_WEIGHT_GPENCIL,
+  CTX_MODE_EDIT_MESH = 0,
+  CTX_MODE_EDIT_CURVE,
+  CTX_MODE_EDIT_SURFACE,
+  CTX_MODE_EDIT_TEXT,
+  CTX_MODE_EDIT_ARMATURE,
+  CTX_MODE_EDIT_METABALL,
+  CTX_MODE_EDIT_LATTICE,
+  CTX_MODE_POSE,
+  CTX_MODE_SCULPT,
+  CTX_MODE_PAINT_WEIGHT,
+  CTX_MODE_PAINT_VERTEX,
+  CTX_MODE_PAINT_TEXTURE,
+  CTX_MODE_PARTICLE,
+  CTX_MODE_OBJECT,
+  CTX_MODE_PAINT_GPENCIL,
+  CTX_MODE_EDIT_GPENCIL,
+  CTX_MODE_SCULPT_GPENCIL,
+  CTX_MODE_WEIGHT_GPENCIL,
 };
 #define CTX_MODE_NUM (CTX_MODE_WEIGHT_GPENCIL + 1)
 
@@ -168,13 +163,13 @@ struct RegionView3D *CTX_wm_region_view3d(const bContext *C);
 struct SpaceText *CTX_wm_space_text(const bContext *C);
 struct SpaceImage *CTX_wm_space_image(const bContext *C);
 struct SpaceConsole *CTX_wm_space_console(const bContext *C);
-struct SpaceButs *CTX_wm_space_buts(const bContext *C);
+struct SpaceProperties *CTX_wm_space_properties(const bContext *C);
 struct SpaceFile *CTX_wm_space_file(const bContext *C);
 struct SpaceSeq *CTX_wm_space_seq(const bContext *C);
-struct SpaceOops *CTX_wm_space_outliner(const bContext *C);
+struct SpaceOutliner *CTX_wm_space_outliner(const bContext *C);
 struct SpaceNla *CTX_wm_space_nla(const bContext *C);
 struct SpaceNode *CTX_wm_space_node(const bContext *C);
-struct SpaceIpo *CTX_wm_space_graph(const bContext *C);
+struct SpaceGraph *CTX_wm_space_graph(const bContext *C);
 struct SpaceAction *CTX_wm_space_action(const bContext *C);
 struct SpaceInfo *CTX_wm_space_info(const bContext *C);
 struct SpaceUserPref *CTX_wm_space_userpref(const bContext *C);
@@ -199,16 +194,20 @@ void CTX_wm_operator_poll_msg_set(struct bContext *C, const char *msg);
 
 /* data type, needed so we can tell between a NULL pointer and an empty list */
 enum {
-	CTX_DATA_TYPE_POINTER = 0,
-	CTX_DATA_TYPE_COLLECTION
+  CTX_DATA_TYPE_POINTER = 0,
+  CTX_DATA_TYPE_COLLECTION,
 };
 
 PointerRNA CTX_data_pointer_get(const bContext *C, const char *member);
 PointerRNA CTX_data_pointer_get_type(const bContext *C, const char *member, StructRNA *type);
 ListBase CTX_data_collection_get(const bContext *C, const char *member);
-ListBase CTX_data_dir_get_ex(const bContext *C, const bool use_store, const bool use_rna, const bool use_all);
+ListBase CTX_data_dir_get_ex(const bContext *C,
+                             const bool use_store,
+                             const bool use_rna,
+                             const bool use_all);
 ListBase CTX_data_dir_get(const bContext *C);
-int CTX_data_get(const bContext *C, const char *member, PointerRNA *r_ptr, ListBase *r_lb, short *r_type);
+int CTX_data_get(
+    const bContext *C, const char *member, PointerRNA *r_ptr, ListBase *r_lb, short *r_type);
 
 void CTX_data_id_pointer_set(bContextDataResult *result, struct ID *id);
 void CTX_data_pointer_set(bContextDataResult *result, struct ID *id, StructRNA *type, void *data);
@@ -224,30 +223,27 @@ short CTX_data_type_get(struct bContextDataResult *result);
 bool CTX_data_equals(const char *member, const char *str);
 bool CTX_data_dir(const char *member);
 
-#define CTX_DATA_BEGIN(C, Type, instance, member)                             \
-	{                                                                         \
-		ListBase ctx_data_list;                                               \
-		CollectionPointerLink *ctx_link;                                      \
-		CTX_data_##member(C, &ctx_data_list);                                 \
-		for (ctx_link = ctx_data_list.first;                                  \
-		     ctx_link;                                                        \
-		     ctx_link = ctx_link->next)                                       \
-		{                                                                     \
-			Type instance = ctx_link->ptr.data;
+#define CTX_DATA_BEGIN(C, Type, instance, member) \
+  { \
+    ListBase ctx_data_list; \
+    CollectionPointerLink *ctx_link; \
+    CTX_data_##member(C, &ctx_data_list); \
+    for (ctx_link = ctx_data_list.first; ctx_link; ctx_link = ctx_link->next) { \
+      Type instance = ctx_link->ptr.data;
 
-#define CTX_DATA_END                                                          \
-		}                                                                     \
-		BLI_freelistN(&ctx_data_list);                                        \
-} (void)0
+#define CTX_DATA_END \
+  } \
+  BLI_freelistN(&ctx_data_list); \
+  } \
+  (void)0
 
-#define CTX_DATA_BEGIN_WITH_ID(C, Type, instance, member, Type_id, instance_id)      \
-	CTX_DATA_BEGIN(C, Type, instance, member) \
-	Type_id instance_id = ctx_link->ptr.id.data; \
+#define CTX_DATA_BEGIN_WITH_ID(C, Type, instance, member, Type_id, instance_id) \
+  CTX_DATA_BEGIN (C, Type, instance, member) \
+    Type_id instance_id = ctx_link->ptr.id.data;
 
 int ctx_data_list_count(const bContext *C, int (*func)(const bContext *, ListBase *));
 
-#define CTX_DATA_COUNT(C, member) \
-	ctx_data_list_count(C, CTX_data_##member)
+#define CTX_DATA_COUNT(C, member) ctx_data_list_count(C, CTX_data_##member)
 
 /* Data Context Members */
 
@@ -260,10 +256,10 @@ struct RenderEngineType *CTX_data_engine_type(const bContext *C);
 struct ToolSettings *CTX_data_tool_settings(const bContext *C);
 
 const char *CTX_data_mode_string(const bContext *C);
-int CTX_data_mode_enum_ex(
-        const struct Object *obedit, const struct Object *ob,
-        const eObjectMode object_mode);
-int CTX_data_mode_enum(const bContext *C);
+enum eContextObjectMode CTX_data_mode_enum_ex(const struct Object *obedit,
+                                              const struct Object *ob,
+                                              const eObjectMode object_mode);
+enum eContextObjectMode CTX_data_mode_enum(const bContext *C);
 
 void CTX_data_main_set(bContext *C, struct Main *bmain);
 void CTX_data_scene_set(bContext *C, struct Scene *bmain);

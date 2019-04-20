@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/python/intern/stubs.c
- *  \ingroup pythonintern
+/** \file
+ * \ingroup pythonintern
  */
 
 #include "BLI_utildefines.h"
@@ -40,8 +33,18 @@
 /* python, will come back */
 //void BPY_script_exec(void) {}
 //void BPY_python_start(void) {}
-//void BPY_text_free_code(void) {}
-void BPY_pyconstraint_exec(struct bPythonConstraint *con, struct bConstraintOb *cob, struct ListBase *targets) {}
-void BPY_pyconstraint_target(struct bPythonConstraint *con, struct bConstraintTarget *ct) {}
-int BPY_is_pyconstraint(struct Text *text) { return 0;}
-void BPY_pyconstraint_update(struct Object *owner, struct bConstraint *con) {}
+void BPY_pyconstraint_exec(struct bPythonConstraint *con,
+                           struct bConstraintOb *cob,
+                           struct ListBase *targets)
+{
+}
+void BPY_pyconstraint_target(struct bPythonConstraint *con, struct bConstraintTarget *ct)
+{
+}
+int BPY_is_pyconstraint(struct Text *text)
+{
+  return 0;
+}
+void BPY_pyconstraint_update(struct Object *owner, struct bConstraint *con)
+{
+}

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,14 +15,10 @@
  *
  * The Original Code is Copyright (C) 2016 by Mike Erwin.
  * All rights reserved.
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/gpu/GPU_common.h
- *  \ingroup gpu
+/** \file
+ * \ingroup gpu
  */
 
 #ifndef __GPU_COMMON_H__
@@ -35,7 +29,7 @@
 #if defined(NDEBUG)
 #  define TRUST_NO_ONE 0
 #else
-  /* strict error checking, enabled for debug builds during early development */
+/* strict error checking, enabled for debug builds during early development */
 #  define TRUST_NO_ONE 1
 #endif
 

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,18 +15,11 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file creator/buildinfo.c
- *  \ingroup creator
+/** \file
+ * \ingroup creator
  */
-
 
 #ifdef WITH_BUILDINFO_HEADER
 #  include "buildinfo.h"
@@ -48,16 +39,16 @@ char build_branch[] = BUILD_BRANCH;
 char build_platform[] = BUILD_PLATFORM;
 char build_type[] = BUILD_TYPE;
 
-#ifdef BUILD_CFLAGS
+#  ifdef BUILD_CFLAGS
 char build_cflags[] = BUILD_CFLAGS;
 char build_cxxflags[] = BUILD_CXXFLAGS;
 char build_linkflags[] = BUILD_LINKFLAGS;
 char build_system[] = BUILD_SYSTEM;
-#else
+#  else
 char build_cflags[] = "unmaintained buildsystem alert!";
 char build_cxxflags[] = "unmaintained buildsystem alert!";
 char build_linkflags[] = "unmaintained buildsystem alert!";
 char build_system[] = "unmaintained buildsystem alert!";
-#endif
+#  endif
 
-#endif // BUILD_DATE
+#endif  // BUILD_DATE

@@ -16,15 +16,10 @@
 #
 # The Original Code is Copyright (C) 2006, Blender Foundation
 # All rights reserved.
-#
-# The Original Code is: all of this file.
-#
-# Contributor(s): Jacques Beaurain.
-#
 # ***** END GPL LICENSE BLOCK *****
 
 if(WITH_LEGACY_OPENGL)
-	add_definitions(-DWITH_LEGACY_OPENGL)
+  add_definitions(-DWITH_LEGACY_OPENGL)
 endif()
 
 add_subdirectory(blender)

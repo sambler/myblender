@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,9 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *      Jeroen Bakker
- *      Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
 #ifndef __COM_COMPOSITOR_H__
@@ -68,8 +64,6 @@ extern "C" {
  * The main issue is the type of memory model to use. Blender is used by consumers and professionals.
  * Ranging from low-end machines to very high-end machines.
  * The system should work on high-end machines and on low-end machines.
- *
- *
  * \page executing Executing
  * \section prepare Prepare execution
  *
@@ -315,8 +309,12 @@ extern "C" {
  *            should be checked further, probably it'll be also needed for preview
  *            generation in display space
  */
-void COM_execute(RenderData *rd, Scene *scene, bNodeTree *editingtree, int rendering,
-                 const ColorManagedViewSettings *viewSettings, const ColorManagedDisplaySettings *displaySettings,
+void COM_execute(RenderData *rd,
+                 Scene *scene,
+                 bNodeTree *editingtree,
+                 int rendering,
+                 const ColorManagedViewSettings *viewSettings,
+                 const ColorManagedDisplaySettings *displaySettings,
                  const char *viewName);
 
 /**
@@ -335,4 +333,4 @@ void COM_deinitialize(void);
 }
 #endif
 
-#endif  /* __COM_COMPOSITOR_H__ */
+#endif /* __COM_COMPOSITOR_H__ */

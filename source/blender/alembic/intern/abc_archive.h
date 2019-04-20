@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,9 +15,10 @@
  *
  * The Original Code is Copyright (C) 2016 Kévin Dietrich.
  * All rights reserved.
- *
- * ***** END GPL LICENSE BLOCK *****
- *
+ */
+
+/** \file
+ * \ingroup balembic
  */
 
 #ifndef __ABC_ARCHIVE_H__
@@ -41,35 +40,38 @@
  */
 
 class ArchiveReader {
-	Alembic::Abc::IArchive m_archive;
-	std::ifstream m_infile;
-	std::vector<std::istream *> m_streams;
-	bool m_is_hdf5;
+  Alembic::Abc::IArchive m_archive;
+  std::ifstream m_infile;
+  std::vector<std::istream *> m_streams;
+  bool m_is_hdf5;
 
-public:
-	explicit ArchiveReader(const char *filename);
+ public:
+  explicit ArchiveReader(const char *filename);
 
-	bool valid() const;
+  bool valid() const;
 
-	/**
-	 * Returns true when either Blender is compiled with HDF5 support and
-	 * the archive was successfully opened (valid() will also return true),
-	 * or when Blender was built without HDF5 support but a HDF5 file was
-	 * detected (valid() will return false).
-	 */
-	bool is_hdf5() const;
+  /**
+   * Returns true when either Blender is compiled with HDF5 support and
+   * the archive was successfully opened (valid() will also return true),
+   * or when Blender was built without HDF5 support but a HDF5 file was
+   * detected (valid() will return false).
+   */
+  bool is_hdf5() const;
 
-	Alembic::Abc::IObject getTop();
+  Alembic::Abc::IObject getTop();
 };
 
 class ArchiveWriter {
-	std::ofstream m_outfile;
-	Alembic::Abc::OArchive m_archive;
+  std::ofstream m_outfile;
+  Alembic::Abc::OArchive m_archive;
 
-public:
-	explicit ArchiveWriter(const char *filename, const char *scene, bool do_ogawa, Alembic::Abc::MetaData &md);
+ public:
+  explicit ArchiveWriter(const char *filename,
+                         const char *scene,
+                         bool do_ogawa,
+                         Alembic::Abc::MetaData &md);
 
-	Alembic::Abc::OArchive &archive();
+  Alembic::Abc::OArchive &archive();
 };
 
 #endif /* __ABC_ARCHIVE_H__ */

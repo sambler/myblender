@@ -18,7 +18,6 @@
 
 # <pep8 compliant>
 
-import bpy
 from bpy.types import (
     Panel,
 )
@@ -113,7 +112,7 @@ class PHYSICS_PT_softbody_cache(PhysicButtonsPanel, Panel):
 
     def draw(self, context):
         md = context.soft_body
-        point_cache_ui(self, context, md.point_cache, softbody_panel_enabled(md), 'SOFTBODY')
+        point_cache_ui(self, md.point_cache, softbody_panel_enabled(md), 'SOFTBODY')
 
 
 class PHYSICS_PT_softbody_goal(PhysicButtonsPanel, Panel):
@@ -141,7 +140,7 @@ class PHYSICS_PT_softbody_goal(PhysicButtonsPanel, Panel):
         layout.prop_search(softbody, "vertex_group_goal", ob, "vertex_groups", text="Vertex Group")
 
 
-class PHYSICS_PT_softbody_goal_strenghts(PhysicButtonsPanel, Panel):
+class PHYSICS_PT_softbody_goal_strengths(PhysicButtonsPanel, Panel):
     bl_label = "Strengths"
     bl_parent_id = 'PHYSICS_PT_softbody_goal'
     bl_options = {'DEFAULT_CLOSED'}
@@ -396,7 +395,7 @@ class PHYSICS_PT_softbody_field_weights(PhysicButtonsPanel, Panel):
         md = context.soft_body
         softbody = md.settings
 
-        effector_weights_ui(self, context, softbody.effector_weights, 'SOFTBODY')
+        effector_weights_ui(self, softbody.effector_weights, 'SOFTBODY')
 
 
 classes = (
@@ -406,7 +405,7 @@ classes = (
     PHYSICS_PT_softbody_cache,
     PHYSICS_PT_softbody_goal,
     PHYSICS_PT_softbody_goal_settings,
-    PHYSICS_PT_softbody_goal_strenghts,
+    PHYSICS_PT_softbody_goal_strengths,
     PHYSICS_PT_softbody_edge,
     PHYSICS_PT_softbody_edge_aerodynamics,
     PHYSICS_PT_softbody_edge_stiffness,

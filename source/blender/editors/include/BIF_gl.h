@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,17 +15,11 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  * os dependent include locations of gl.h
  */
 
-/** \file BIF_gl.h
- *  \ingroup editorui
+/** \file
+ * \ingroup editorui
  */
 
 #ifndef __BIF_GL_H__
@@ -38,12 +30,14 @@
 
 /* hacking pointsize and linewidth */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-#  define glPointSize(f)  glPointSize(U.pixelsize * _Generic((f), double: (float)(f), default: (f)))
-#  define glLineWidth(f)  glLineWidth(U.pixelsize * _Generic((f), double: (float)(f), default: (f)))
+#  define glPointSize(f) \
+    glPointSize(U.pixelsize *_Generic((f), double : (float)(f), default : (f)))
+#  define glLineWidth(f) \
+    glLineWidth(U.pixelsize *_Generic((f), double : (float)(f), default : (f)))
 #else
-#  define glPointSize(f)  glPointSize(U.pixelsize * (f))
-#  define glLineWidth(f)  glLineWidth(U.pixelsize * (f))
-#endif  /* C11 */
+#  define glPointSize(f) glPointSize(U.pixelsize *(f))
+#  define glLineWidth(f) glLineWidth(U.pixelsize *(f))
+#endif /* C11 */
 
 #define GLA_PIXEL_OFS 0.375f
 

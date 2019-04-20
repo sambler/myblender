@@ -26,7 +26,7 @@
 #include <opensubdiv/far/topologyRefiner.h>
 #include <opensubdiv/far/patchTable.h>
 
-#include <vector>
+#include "internal/opensubdiv_util.h"
 
 namespace opensubdiv_capi {
 
@@ -37,20 +37,20 @@ class GLMeshFVarData {
   ~GLMeshFVarData();
 
   void release();
-  void create(const OpenSubdiv::Far::TopologyRefiner* refiner,
-              const OpenSubdiv::Far::PatchTable* patch_table,
+  void create(const OpenSubdiv::Far::TopologyRefiner *refiner,
+              const OpenSubdiv::Far::PatchTable *patch_table,
               int fvar_width,
-              const float* fvar_src_data);
+              const float *fvar_src_data);
 
   unsigned int texture_buffer;
   unsigned int offset_buffer;
-  std::vector<int> channel_offsets;
+  vector<int> channel_offsets;
   int fvar_width;
 };
 
-void interpolateFVarData(const OpenSubdiv::Far::TopologyRefiner& refiner,
-                         const std::vector<float>& uvs,
-                         std::vector<float>* fvar_data);
+void interpolateFVarData(const OpenSubdiv::Far::TopologyRefiner &refiner,
+                         const vector<float> &uvs,
+                         vector<float> *fvar_data);
 
 }  // namespace opensubdiv_capi
 

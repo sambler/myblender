@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,15 +15,10 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- *
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/metaball/mball_ops.c
- *  \ingroup edmeta
+/** \file
+ * \ingroup edmeta
  */
 
 #include "DNA_scene_types.h"
@@ -44,32 +37,33 @@
 
 void ED_operatortypes_metaball(void)
 {
-	WM_operatortype_append(MBALL_OT_delete_metaelems);
-	WM_operatortype_append(MBALL_OT_duplicate_metaelems);
+  WM_operatortype_append(MBALL_OT_delete_metaelems);
+  WM_operatortype_append(MBALL_OT_duplicate_metaelems);
 
-	WM_operatortype_append(MBALL_OT_hide_metaelems);
-	WM_operatortype_append(MBALL_OT_reveal_metaelems);
+  WM_operatortype_append(MBALL_OT_hide_metaelems);
+  WM_operatortype_append(MBALL_OT_reveal_metaelems);
 
-	WM_operatortype_append(MBALL_OT_select_all);
-	WM_operatortype_append(MBALL_OT_select_similar);
-	WM_operatortype_append(MBALL_OT_select_random_metaelems);
+  WM_operatortype_append(MBALL_OT_select_all);
+  WM_operatortype_append(MBALL_OT_select_similar);
+  WM_operatortype_append(MBALL_OT_select_random_metaelems);
 }
 
 void ED_operatormacros_metaball(void)
 {
-	wmOperatorType *ot;
-	wmOperatorTypeMacro *otmacro;
+  wmOperatorType *ot;
+  wmOperatorTypeMacro *otmacro;
 
-	ot = WM_operatortype_append_macro("MBALL_OT_duplicate_move", "Duplicate",
-	                                  "Make copies of the selected metaelements and move them",
-	                                  OPTYPE_UNDO | OPTYPE_REGISTER);
-	WM_operatortype_macro_define(ot, "MBALL_OT_duplicate_metaelems");
-	otmacro = WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
-	RNA_enum_set(otmacro->ptr, "proportional", 0);
+  ot = WM_operatortype_append_macro("MBALL_OT_duplicate_move",
+                                    "Duplicate",
+                                    "Make copies of the selected metaelements and move them",
+                                    OPTYPE_UNDO | OPTYPE_REGISTER);
+  WM_operatortype_macro_define(ot, "MBALL_OT_duplicate_metaelems");
+  otmacro = WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
+  RNA_enum_set(otmacro->ptr, "proportional", 0);
 }
 
 void ED_keymap_metaball(wmKeyConfig *keyconf)
 {
-	wmKeyMap *keymap = WM_keymap_ensure(keyconf, "Metaball", 0, 0);
-	keymap->poll = ED_operator_editmball;
+  wmKeyMap *keymap = WM_keymap_ensure(keyconf, "Metaball", 0, 0);
+  keymap->poll = ED_operator_editmball;
 }

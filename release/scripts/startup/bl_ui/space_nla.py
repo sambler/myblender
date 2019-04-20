@@ -18,7 +18,6 @@
 
 # <pep8 compliant>
 
-import bpy
 from bpy.types import Header, Menu, Panel
 from .space_dopesheet import (
     DopesheetFilterPopoverBase,
@@ -71,7 +70,7 @@ class NLA_MT_editor_menus(Menu):
     bl_idname = "NLA_MT_editor_menus"
     bl_label = ""
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
         layout.menu("NLA_MT_view")
         layout.menu("NLA_MT_select")
@@ -88,8 +87,7 @@ class NLA_MT_view(Menu):
 
         st = context.space_data
 
-        layout.operator("nla.properties", icon='MENU_PANEL')
-
+        layout.prop(st, "show_region_ui")
         layout.separator()
 
         layout.prop(st, "use_realtime_update")
@@ -100,6 +98,7 @@ class NLA_MT_view(Menu):
 
         layout.prop(st, "show_strip_curves")
         layout.prop(st, "show_local_markers")
+        layout.prop(st, "show_marker_lines")
 
         layout.separator()
         layout.operator("anim.previewrange_set")
@@ -118,7 +117,7 @@ class NLA_MT_view(Menu):
 class NLA_MT_select(Menu):
     bl_label = "Select"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("nla.select_all", text="All").action = 'SELECT'
@@ -145,7 +144,7 @@ class NLA_MT_marker(Menu):
         layout = self.layout
 
         from .space_time import marker_menu_generic
-        marker_menu_generic(layout)
+        marker_menu_generic(layout, context)
 
 
 class NLA_MT_edit(Menu):
@@ -200,7 +199,7 @@ class NLA_MT_edit(Menu):
 class NLA_MT_add(Menu):
     bl_label = "Add"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("nla.actionclip_add")
@@ -222,7 +221,7 @@ class NLA_MT_add(Menu):
 class NLA_MT_edit_transform(Menu):
     bl_label = "Transform"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("transform.translate", text="Move")
@@ -233,7 +232,7 @@ class NLA_MT_edit_transform(Menu):
 class NLA_MT_snap_pie(Menu):
     bl_label = "Snap"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
         pie = layout.menu_pie()
 

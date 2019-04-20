@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,8 +12,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
 #ifndef __BLI_SYSTEM_H__
@@ -23,13 +19,12 @@
 
 #include <stdio.h>
 
-/** \file BLI_system.h
- *  \ingroup bli
+/** \file
+ * \ingroup bli
  */
 
 int BLI_cpu_support_sse2(void);
 void BLI_system_backtrace(FILE *fp);
-
 
 /* Get CPU brand, result is to be MEM_freeN()-ed. */
 char *BLI_cpu_brand_string(void);
@@ -53,4 +48,4 @@ void BLI_hostname_get(char *buffer, size_t bufsize);
 #  define BLI_SYSTEM_PID_H <unistd.h>
 #endif
 
-#endif  /* __BLI_SYSTEM_H__ */
+#endif /* __BLI_SYSTEM_H__ */

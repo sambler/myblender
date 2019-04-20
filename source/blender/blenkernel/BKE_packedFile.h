@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,53 +15,52 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 #ifndef __BKE_PACKEDFILE_H__
 #define __BKE_PACKEDFILE_H__
 
-/** \file BKE_packedFile.h
- *  \ingroup bke
- *  \since March 2001
- *  \author nzc
+/** \file
+ * \ingroup bke
  */
-#define RET_OK      0
-#define RET_ERROR   1
+#define RET_OK 0
+#define RET_ERROR 1
 
 struct ID;
-struct bSound;
 struct Image;
 struct Main;
 struct PackedFile;
 struct ReportList;
 struct VFont;
+struct bSound;
 
 /* pack */
 struct PackedFile *dupPackedFile(const struct PackedFile *pf_src);
-struct PackedFile *newPackedFile(struct ReportList *reports, const char *filename, const char *relabase);
+struct PackedFile *newPackedFile(struct ReportList *reports,
+                                 const char *filename,
+                                 const char *relabase);
 struct PackedFile *newPackedFileMemory(void *mem, int memlen);
 
 void packAll(struct Main *bmain, struct ReportList *reports, bool verbose);
 void packLibraries(struct Main *bmain, struct ReportList *reports);
 
 /* unpack */
-char *unpackFile(
-        struct ReportList *reports, const char *ref_file_name,
-        const char *abs_name, const char *local_name, struct PackedFile *pf, int how);
+char *unpackFile(struct ReportList *reports,
+                 const char *ref_file_name,
+                 const char *abs_name,
+                 const char *local_name,
+                 struct PackedFile *pf,
+                 int how);
 int unpackVFont(struct Main *bmain, struct ReportList *reports, struct VFont *vfont, int how);
 int unpackSound(struct Main *bmain, struct ReportList *reports, struct bSound *sound, int how);
 int unpackImage(struct Main *bmain, struct ReportList *reports, struct Image *ima, int how);
 void unpackAll(struct Main *bmain, struct ReportList *reports, int how);
 int unpackLibraries(struct Main *bmain, struct ReportList *reports);
 
-int writePackedFile(
-        struct ReportList *reports, const char *ref_file_name,
-        const char *filename, struct PackedFile *pf, const bool guimode);
+int writePackedFile(struct ReportList *reports,
+                    const char *ref_file_name,
+                    const char *filename,
+                    struct PackedFile *pf,
+                    const bool guimode);
 
 /* free */
 void freePackedFile(struct PackedFile *pf);

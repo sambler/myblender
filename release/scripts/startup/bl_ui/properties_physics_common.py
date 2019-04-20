@@ -35,21 +35,29 @@ class PhysicButtonsPanel:
         return (context.object) and context.engine in cls.COMPAT_ENGINES
 
 
-def physics_add(self, layout, md, name, type, typeicon, toggles):
+def physics_add(layout, md, name, type, _typeicon, toggles):
     row = layout.row(align=True)
     if md:
         row.context_pointer_set("modifier", md)
-        row.operator("object.modifier_remove", text=name, text_ctxt=i18n_contexts.default, icon='X')
+        row.operator(
+            "object.modifier_remove",
+            text=name,
+            text_ctxt=i18n_contexts.default,
+            icon='X',
+        )
         if toggles:
             row.prop(md, "show_render", text="")
             row.prop(md, "show_viewport", text="")
     else:
         row.operator(
-            "object.modifier_add", text=name, text_ctxt=i18n_contexts.default, icon='BLANK1'
+            "object.modifier_add",
+            text=name,
+            text_ctxt=i18n_contexts.default,
+            icon='BLANK1',
         ).type = type
 
 
-def physics_add_special(self, layout, data, name, addop, removeop, typeicon):
+def physics_add_special(layout, data, name, addop, removeop, _typeicon):
     row = layout.row(align=True)
     if data:
         row.operator(removeop, text=name, text_ctxt=i18n_contexts.default, icon='X')
@@ -66,7 +74,7 @@ class PHYSICS_PT_add(PhysicButtonsPanel, Panel):
         layout = self.layout
 
         row = layout.row(align=True)
-        row.alignment = 'RIGHT'
+        row.alignment = 'LEFT'
         row.label(text="Enable physics for:")
 
         flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=True)
@@ -81,23 +89,21 @@ class PHYSICS_PT_add(PhysicButtonsPanel, Panel):
             col.operator("object.forcefield_toggle", text="Force Field", icon='X')
 
         if obj.type == 'MESH':
-            physics_add(self, col, context.collision, "Collision", 'COLLISION', 'MOD_PHYSICS', False)
-            physics_add(self, col, context.cloth, "Cloth", 'CLOTH', 'MOD_CLOTH', True)
-            physics_add(
-                self, col, context.dynamic_paint, "Dynamic Paint", 'DYNAMIC_PAINT', 'MOD_DYNAMICPAINT', True
-            )
+            physics_add(col, context.collision, "Collision", 'COLLISION', 'MOD_PHYSICS', False)
+            physics_add(col, context.cloth, "Cloth", 'CLOTH', 'MOD_CLOTH', True)
+            physics_add(col, context.dynamic_paint, "Dynamic Paint", 'DYNAMIC_PAINT', 'MOD_DYNAMICPAINT', True)
 
         col = flow.column()
 
         if obj.type in {'MESH', 'LATTICE', 'CURVE', 'SURFACE', 'FONT'}:
-            physics_add(self, col, context.soft_body, "Soft Body", 'SOFT_BODY', 'MOD_SOFT', True)
+            physics_add(col, context.soft_body, "Soft Body", 'SOFT_BODY', 'MOD_SOFT', True)
 
         if obj.type == 'MESH':
-            physics_add(self, col, context.fluid, "Fluid", 'FLUID_SIMULATION', 'MOD_FLUIDSIM', True)
-            physics_add(self, col, context.smoke, "Smoke", 'SMOKE', 'MOD_SMOKE', True)
+            physics_add(col, context.fluid, "Fluid", 'FLUID_SIMULATION', 'MOD_FLUIDSIM', True)
+            physics_add(col, context.smoke, "Smoke", 'SMOKE', 'MOD_SMOKE', True)
 
             physics_add_special(
-                self, col, obj.rigid_body, "Rigid Body",
+                col, obj.rigid_body, "Rigid Body",
                 "rigidbody.object_add",
                 "rigidbody.object_remove",
                 'MESH_ICOSPHERE'
@@ -105,7 +111,7 @@ class PHYSICS_PT_add(PhysicButtonsPanel, Panel):
 
         # all types of objects can have rigid body constraint.
         physics_add_special(
-            self, col, obj.rigid_body_constraint, "Rigid Body Constraint",
+            col, obj.rigid_body_constraint, "Rigid Body Constraint",
             "rigidbody.constraint_add",
             "rigidbody.constraint_remove",
             'CONSTRAINT'
@@ -114,7 +120,7 @@ class PHYSICS_PT_add(PhysicButtonsPanel, Panel):
 
 # cache-type can be 'PSYS' 'HAIR' 'SMOKE' etc.
 
-def point_cache_ui(self, context, cache, enabled, cachetype):
+def point_cache_ui(self, cache, enabled, cachetype):
     layout = self.layout
     layout.use_property_split = True
 
@@ -189,12 +195,12 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
             flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=True)
             flow.enabled = enabled and is_saved
 
-            col = flow.column()
+            col = flow.column(align=True)
             col.prop(cache, "use_disk_cache")
 
             subcol = col.column()
             subcol.active = cache.use_disk_cache
-            subcol.prop(cache, "use_library_path", text="Use Lib Path")
+            subcol.prop(cache, "use_library_path", text="Use Library Path")
 
             col = flow.column()
             col.active = cache.use_disk_cache
@@ -217,7 +223,7 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
         col.active = can_bake
 
         if cache.is_baked is True:
-            col.operator("ptcache.free_bake", text="Free Bake")
+            col.operator("ptcache.free_bake", text="Delete Bake")
         else:
             col.operator("ptcache.bake", text="Bake").bake = True
 
@@ -231,11 +237,11 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
 
         col = flow.column()
         col.operator("ptcache.bake_all", text="Bake All Dynamics").bake = True
-        col.operator("ptcache.free_bake_all", text="Free All Bakes")
+        col.operator("ptcache.free_bake_all", text="Delete All Bakes")
         col.operator("ptcache.bake_all", text="Update All To Frame").bake = False
 
 
-def effector_weights_ui(self, context, weights, weight_type):
+def effector_weights_ui(self, weights, weight_type):
     layout = self.layout
     layout.use_property_split = True
 
@@ -272,7 +278,7 @@ def effector_weights_ui(self, context, weights, weight_type):
     col.prop(weights, "boid", slider=True)
 
 
-def basic_force_field_settings_ui(self, context, field):
+def basic_force_field_settings_ui(self, field):
     layout = self.layout
     layout.use_property_split = True
 
@@ -306,7 +312,7 @@ def basic_force_field_settings_ui(self, context, field):
         col.prop(field, "flow")
 
     col.prop(field, "apply_to_location", text="Affect Location")
-    col.prop(field, "apply_to_rotation", text="Rotation")
+    col.prop(field, "apply_to_rotation", text="Affect Rotation")
 
     col = flow.column()
     sub = col.column(align=True)
@@ -325,7 +331,7 @@ def basic_force_field_settings_ui(self, context, field):
     col.prop(field, "use_absorption")
 
 
-def basic_force_field_falloff_ui(self, context, field):
+def basic_force_field_falloff_ui(self, field):
     layout = self.layout
 
     if not field or field.type == 'NONE':

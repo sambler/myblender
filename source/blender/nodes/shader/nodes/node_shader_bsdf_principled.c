@@ -114,10 +114,9 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat,
     GPU_link(mat, "tangent_orco_z", orco, &in[19].link);
     GPU_link(mat,
              "node_tangent",
-             GPU_builtin(GPU_VIEW_NORMAL),
+             GPU_builtin(GPU_WORLD_NORMAL),
              in[19].link,
              GPU_builtin(GPU_OBJECT_MATRIX),
-             GPU_builtin(GPU_INVERSE_VIEW_MATRIX),
              &in[19].link);
   }
 
@@ -196,10 +195,12 @@ static void node_shader_update_principled(bNodeTree *UNUSED(ntree), bNode *node)
 
   for (sock = node->inputs.first; sock; sock = sock->next) {
     if (STREQ(sock->name, "Transmission Roughness")) {
-      if (distribution == SHD_GLOSSY_GGX)
+      if (distribution == SHD_GLOSSY_GGX) {
         sock->flag &= ~SOCK_UNAVAIL;
-      else
+      }
+      else {
         sock->flag |= SOCK_UNAVAIL;
+      }
     }
   }
 }
@@ -215,7 +216,7 @@ void register_node_type_sh_bsdf_principled(void)
   node_type_init(&ntype, node_shader_init_principled);
   node_type_storage(&ntype, "", NULL, NULL);
   node_type_gpu(&ntype, node_shader_gpu_bsdf_principled);
-  node_type_update(&ntype, node_shader_update_principled, NULL);
+  node_type_update(&ntype, node_shader_update_principled);
 
   nodeRegisterType(&ntype);
 }

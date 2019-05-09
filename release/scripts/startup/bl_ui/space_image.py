@@ -41,18 +41,37 @@ from bpy.app.translations import pgettext_iface as iface_
 
 
 class ImagePaintPanel(UnifiedPaintPanel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
 
 
 class BrushButtonsPanel(UnifiedPaintPanel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
 
     @classmethod
     def poll(cls, context):
         tool_settings = context.tool_settings.image_paint
         return tool_settings.brush
+
+
+class IMAGE_PT_active_tool(Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Active Tool"
+    bl_category = "Tool"
+
+    def draw(self, context):
+        layout = self.layout
+
+        # Panel display of topbar tool settings.
+        # currently displays in tool settings, keep here since the same functionality is used for the topbar.
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        from .space_toolsystem_common import ToolSelectPanelHelper
+        ToolSelectPanelHelper.draw_active_tool_header(context, layout, show_tool_name=True)
 
 
 class IMAGE_MT_view(Menu):
@@ -160,7 +179,7 @@ class IMAGE_MT_select(Menu):
         layout.separator()
 
         layout.operator("uv.select_pinned")
-        layout.operator("uv.select_linked").extend = False
+        layout.operator("uv.select_linked")
 
         layout.separator()
 
@@ -265,20 +284,6 @@ class IMAGE_MT_uvs_showhide(Menu):
         layout.operator("uv.hide", text="Hide Unselected").unselected = True
 
 
-class IMAGE_MT_uvs_proportional(Menu):
-    bl_label = "Proportional Editing"
-
-    def draw(self, context):
-        layout = self.layout
-
-        layout.props_enum(context.tool_settings, "proportional_edit")
-
-        layout.separator()
-
-        layout.label(text="Falloff:")
-        layout.props_enum(context.tool_settings, "proportional_edit_falloff")
-
-
 class IMAGE_MT_uvs_transform(Menu):
     bl_label = "Transform"
 
@@ -356,10 +361,6 @@ class IMAGE_MT_uvs(Menu):
 
         layout.prop_menu_enum(uv, "pixel_snap_mode")
         layout.prop(uv, "lock_bounds")
-
-        layout.separator()
-
-        layout.prop(tool_settings, "use_uv_sculpt")
 
         layout.separator()
 
@@ -513,36 +514,15 @@ class IMAGE_HT_tool_header(Header):
     def draw(self, context):
         layout = self.layout
 
-        layout.row(align=True).template_header()
+        layout.template_header()
 
         self.draw_tool_settings(context)
 
         sima = context.space_data
-        show_uvedit = sima.show_uvedit
-        show_maskedit = sima.show_maskedit
 
         layout.separator_spacer()
 
-        if show_uvedit or show_maskedit:
-            layout.prop(sima, "pivot_point", icon_only=True)
-
-        if show_uvedit:
-            tool_settings = context.tool_settings
-
-            # Snap.
-            row = layout.row(align=True)
-            row.prop(tool_settings, "use_snap", text="")
-            row.prop(tool_settings, "snap_uv_element", icon_only=True)
-            if tool_settings.snap_uv_element != 'INCREMENT':
-                row.prop(tool_settings, "snap_target", text="")
-
-            # Proportional Editing
-            row = layout.row(align=True)
-            row.prop(tool_settings, "proportional_edit", icon_only=True)
-            # if tool_settings.proportional_edit != 'DISABLED':
-            sub = row.row(align=True)
-            sub.active = tool_settings.proportional_edit != 'DISABLED'
-            sub.prop(tool_settings, "proportional_edit_falloff", icon_only=True)
+        IMAGE_HT_header.draw_xform_template(layout, context)
 
         layout.separator_spacer()
 
@@ -570,9 +550,10 @@ class IMAGE_HT_tool_header(Header):
 
         if tool_mode == 'PAINT':
             if (tool is not None) and tool.has_datablock:
-                layout.popover_group(space_type='PROPERTIES', region_type='WINDOW', context=".paint_common_2d", category="")
-        elif context.uv_sculpt_object is not None:
-            layout.popover_group(space_type='PROPERTIES', region_type='WINDOW', context=".uv_sculpt", category="")
+                layout.popover_group(space_type='IMAGE_EDITOR', region_type='UI', context=".paint_common_2d", category="")
+        elif tool_mode == 'UV':
+            if (tool is not None) and tool.has_datablock:
+                layout.popover_group(space_type='IMAGE_EDITOR', region_type='UI', context=".uv_sculpt", category="")
 
     def draw_mode_settings(self, context):
         layout = self.layout
@@ -584,15 +565,15 @@ class IMAGE_HT_tool_header(Header):
         tool_mode = context.mode if tool is None else tool.mode
 
         if tool_mode == 'PAINT':
-            layout.popover_group(space_type='PROPERTIES', region_type='WINDOW', context=".imagepaint_2d", category="")
+            layout.popover_group(space_type='IMAGE_EDITOR', region_type='UI', context=".imagepaint_2d", category="")
 
 
 class _draw_tool_settings_context_mode:
     @staticmethod
-    def VIEW(context, layout, _tool):
-        tool_settings = context.tool_settings
-        if tool_settings.use_uv_sculpt:
+    def UV(context, layout, tool):
+        if tool and tool.has_datablock:
             if context.mode == 'EDIT_MESH':
+                tool_settings = context.tool_settings
                 uv_sculpt = tool_settings.uv_sculpt
                 brush = uv_sculpt.brush
                 if brush:
@@ -631,6 +612,32 @@ class _draw_tool_settings_context_mode:
 class IMAGE_HT_header(Header):
     bl_space_type = 'IMAGE_EDITOR'
 
+    @staticmethod
+    def draw_xform_template(layout, context):
+        sima = context.space_data
+        show_uvedit = sima.show_uvedit
+        show_maskedit = sima.show_maskedit
+
+        if show_uvedit or show_maskedit:
+            layout.prop(sima, "pivot_point", icon_only=True)
+
+        if show_uvedit:
+            tool_settings = context.tool_settings
+
+            # Snap.
+            row = layout.row(align=True)
+            row.prop(tool_settings, "use_snap", text="")
+            row.prop(tool_settings, "snap_uv_element", icon_only=True)
+            if tool_settings.snap_uv_element != 'INCREMENT':
+                row.prop(tool_settings, "snap_target", text="")
+
+            # Proportional Editing
+            row = layout.row(align=True)
+            row.prop(tool_settings, "use_proportional_edit", icon_only=True)
+            sub = row.row(align=True)
+            sub.active = tool_settings.use_proportional_edit
+            sub.prop(tool_settings, "proportional_edit_falloff", icon_only=True)
+
     def draw(self, context):
         layout = self.layout
 
@@ -638,13 +645,14 @@ class IMAGE_HT_header(Header):
         ima = sima.image
         iuser = sima.image_user
         tool_settings = context.tool_settings
+        show_region_tool_header = sima.show_region_tool_header
 
         show_render = sima.show_render
         show_uvedit = sima.show_uvedit
         show_maskedit = sima.show_maskedit
 
-        if not sima.show_region_tool_header:
-            layout.row(align=True).template_header()
+        if not show_region_tool_header:
+            layout.template_header()
 
         if sima.mode != 'UV':
             layout.prop(sima, "ui_mode", text="")
@@ -665,6 +673,9 @@ class IMAGE_HT_header(Header):
 
         layout.separator_spacer()
 
+        if not show_region_tool_header:
+            IMAGE_HT_header.draw_xform_template(layout, context)
+
         layout.template_ID(sima, "image", new="image.new", open="image.open")
 
         if show_maskedit:
@@ -681,12 +692,6 @@ class IMAGE_HT_header(Header):
 
             mesh = context.edit_object.data
             layout.prop_search(mesh.uv_layers, "active", mesh, "uv_layers", text="")
-
-        row = layout.row()
-        row.popover(
-            panel="IMAGE_PT_view_display",
-            text="Display"
-        )
 
         if ima:
             if ima.is_stereo_3d:
@@ -809,8 +814,9 @@ class IMAGE_PT_image_properties(Panel):
 
 class IMAGE_PT_view_display(Panel):
     bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'HEADER'
+    bl_region_type = 'UI'
     bl_label = "Display"
+    bl_category = "View"
 
     @classmethod
     def poll(cls, context):
@@ -839,9 +845,10 @@ class IMAGE_PT_view_display(Panel):
 
 class IMAGE_PT_view_display_uv_edit_overlays(Panel):
     bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'HEADER'
+    bl_region_type = 'UI'
     bl_label = "Overlays"
     bl_parent_id = 'IMAGE_PT_view_display'
+    bl_category = "View"
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
@@ -852,16 +859,15 @@ class IMAGE_PT_view_display_uv_edit_overlays(Panel):
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
+        layout.use_property_decorate = False
 
         sima = context.space_data
         uvedit = sima.uv_editor
 
         col = layout.column()
 
-        split = col.split(factor=0.6)
-        split.prop(uvedit, "show_edges", text="Edges")
-        split.prop(uvedit, "edge_display_type", text="")
-
+        col.prop(uvedit, "edge_display_type", text="Display As")
+        col.prop(uvedit, "show_edges", text="Edges")
         col.prop(uvedit, "show_faces", text="Faces")
 
         col = layout.column()
@@ -869,17 +875,23 @@ class IMAGE_PT_view_display_uv_edit_overlays(Panel):
         col.prop(uvedit, "show_modified_edges", text="Modified")
 
 
-class IMAGE_PT_view_display_uv_edit_overlays_advanced(Panel):
+class IMAGE_PT_view_display_uv_edit_overlays_stretch(Panel):
     bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'HEADER'
-    bl_label = "Advanced"
+    bl_region_type = 'UI'
+    bl_label = "Stretching"
     bl_parent_id = 'IMAGE_PT_view_display_uv_edit_overlays'
+    bl_category = "View"
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
         sima = context.space_data
         return (sima and (sima.show_uvedit))
+
+    def draw_header(self, context):
+        sima = context.space_data
+        uvedit = sima.uv_editor
+        self.layout.prop(uvedit, "show_stretch", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -888,12 +900,8 @@ class IMAGE_PT_view_display_uv_edit_overlays_advanced(Panel):
         sima = context.space_data
         uvedit = sima.uv_editor
 
-        col = layout.column()
-        col.prop(uvedit, "show_stretch", text="Stretch")
-
-        sub = col.column()
-        sub.active = uvedit.show_stretch
-        sub.prop(uvedit, "display_stretch_type", text="Type")
+        layout.active = uvedit.show_stretch
+        layout.prop(uvedit, "display_stretch_type", text="Type")
 
 
 class IMAGE_UL_render_slots(UIList):
@@ -939,7 +947,7 @@ class IMAGE_PT_render_slots(Panel):
 class IMAGE_PT_paint(Panel, ImagePaintPanel):
     bl_label = "Brush"
     bl_context = ".paint_common_2d"
-    bl_category = "Tools"
+    bl_category = "Tool"
 
     def draw(self, context):
         layout = self.layout
@@ -958,6 +966,7 @@ class IMAGE_PT_paint(Panel, ImagePaintPanel):
 
 
 class IMAGE_PT_paint_color(Panel, ImagePaintPanel):
+    bl_category = "Tool"
     bl_context = ".paint_common_2d"
     bl_parent_id = "IMAGE_PT_paint"
     bl_label = "Color Picker"
@@ -981,6 +990,7 @@ class IMAGE_PT_paint_color(Panel, ImagePaintPanel):
 
 
 class IMAGE_PT_paint_swatches(Panel, ImagePaintPanel):
+    bl_category = "Tool"
     bl_context = ".paint_common_2d"
     bl_parent_id = "IMAGE_PT_paint"
     bl_label = "Color Palette"
@@ -1004,6 +1014,7 @@ class IMAGE_PT_paint_swatches(Panel, ImagePaintPanel):
 
 
 class IMAGE_PT_paint_gradient(Panel, ImagePaintPanel):
+    bl_category = "Tool"
     bl_context = ".paint_common_2d"
     bl_parent_id = "IMAGE_PT_paint"
     bl_label = "Gradient"
@@ -1035,6 +1046,7 @@ class IMAGE_PT_paint_gradient(Panel, ImagePaintPanel):
 
 
 class IMAGE_PT_paint_clone(Panel, ImagePaintPanel):
+    bl_category = "Tool"
     bl_context = ".paint_common_2d"
     bl_parent_id = "IMAGE_PT_paint"
     bl_label = "Clone from Image/UV Map"
@@ -1062,6 +1074,7 @@ class IMAGE_PT_paint_clone(Panel, ImagePaintPanel):
 
 
 class IMAGE_PT_paint_options(Panel, ImagePaintPanel):
+    bl_category = "Tool"
     bl_context = ".paint_common_2d"
     bl_parent_id = "IMAGE_PT_paint"
     bl_label = "Options"
@@ -1090,7 +1103,7 @@ class IMAGE_PT_tools_brush_display(BrushButtonsPanel, Panel):
     bl_label = "Display"
     bl_context = ".paint_common_2d"
     bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Options"
+    bl_category = "Tool"
 
     def draw(self, context):
         layout = self.layout
@@ -1144,6 +1157,7 @@ class IMAGE_PT_tools_brush_display_show_brush(BrushButtonsPanel, Panel):
     bl_context = ".paint_common_2d"  # dot on purpose (access from topbar)
     bl_label = "Show Brush"
     bl_parent_id = "IMAGE_PT_tools_brush_display"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
@@ -1177,6 +1191,7 @@ class IMAGE_PT_tools_brush_display_custom_icon(BrushButtonsPanel, Panel):
     bl_context = ".paint_common_2d"  # dot on purpose (access from topbar)
     bl_label = "Custom Icon"
     bl_parent_id = "IMAGE_PT_tools_brush_display"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
@@ -1202,8 +1217,8 @@ class IMAGE_PT_tools_brush_display_custom_icon(BrushButtonsPanel, Panel):
 class IMAGE_PT_tools_brush_texture(BrushButtonsPanel, Panel):
     bl_label = "Texture"
     bl_context = ".paint_common_2d"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Tools"
 
     def draw(self, context):
         layout = self.layout
@@ -1220,8 +1235,8 @@ class IMAGE_PT_tools_brush_texture(BrushButtonsPanel, Panel):
 class IMAGE_PT_tools_mask_texture(BrushButtonsPanel, Panel):
     bl_label = "Texture Mask"
     bl_context = ".paint_common_2d"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Tools"
 
     def draw(self, context):
         layout = self.layout
@@ -1238,8 +1253,8 @@ class IMAGE_PT_tools_mask_texture(BrushButtonsPanel, Panel):
 class IMAGE_PT_paint_stroke(BrushButtonsPanel, Panel):
     bl_label = "Stroke"
     bl_context = ".paint_common_2d"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Tools"
 
     def draw(self, context):
         layout = self.layout
@@ -1288,6 +1303,7 @@ class IMAGE_PT_paint_stroke_smooth_stroke(BrushButtonsPanel, Panel):
     bl_context = ".paint_common_2d"  # dot on purpose (access from topbar)
     bl_label = "Smooth Stroke"
     bl_parent_id = "IMAGE_PT_paint_stroke"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
@@ -1320,8 +1336,8 @@ class IMAGE_PT_paint_stroke_smooth_stroke(BrushButtonsPanel, Panel):
 class IMAGE_PT_paint_curve(BrushButtonsPanel, Panel):
     bl_label = "Falloff"
     bl_context = ".paint_common_2d"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
-    bl_category = "Tools"
 
     def draw(self, context):
         layout = self.layout
@@ -1342,9 +1358,9 @@ class IMAGE_PT_paint_curve(BrushButtonsPanel, Panel):
 
 
 class IMAGE_PT_tools_imagepaint_symmetry(BrushButtonsPanel, Panel):
-    bl_category = "Tools"
     bl_context = ".imagepaint_2d"
     bl_label = "Tiling"
+    bl_category = "Tool"
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -1359,46 +1375,23 @@ class IMAGE_PT_tools_imagepaint_symmetry(BrushButtonsPanel, Panel):
         row.prop(ipaint, "tile_y", text="Y", toggle=True)
 
 
-class IMAGE_PT_uv_sculpt_curve(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
+class IMAGE_PT_uv_sculpt_brush(Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
     bl_context = ".uv_sculpt"  # dot on purpose (access from topbar)
-    bl_category = "Options"
-    bl_label = "UV Sculpt Curve"
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_category = "Tool"
+    bl_label = "Brush"
 
     @classmethod
     def poll(cls, context):
-        return (context.uv_sculpt_object is not None)
-
-    def draw(self, context):
-        layout = self.layout
-
-        tool_settings = context.tool_settings
-        uvsculpt = tool_settings.uv_sculpt
-        brush = uvsculpt.brush
-
-        layout.template_curve_mapping(brush, "curve")
-
-        row = layout.row(align=True)
-        row.operator("brush.curve_preset", icon='SMOOTHCURVE', text="").shape = 'SMOOTH'
-        row.operator("brush.curve_preset", icon='SPHERECURVE', text="").shape = 'ROUND'
-        row.operator("brush.curve_preset", icon='ROOTCURVE', text="").shape = 'ROOT'
-        row.operator("brush.curve_preset", icon='SHARPCURVE', text="").shape = 'SHARP'
-        row.operator("brush.curve_preset", icon='LINCURVE', text="").shape = 'LINE'
-        row.operator("brush.curve_preset", icon='NOCURVE', text="").shape = 'MAX'
-
-
-class IMAGE_PT_uv_sculpt(Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = ".uv_sculpt"  # dot on purpose (access from topbar)
-    bl_category = "Options"
-    bl_label = "UV Sculpt"
-
-    @classmethod
-    def poll(cls, context):
-        return (context.uv_sculpt_object is not None)
+        sima = context.space_data
+        # TODO(campbell): nicer way to check if we're in uv sculpt mode.
+        if sima and sima.show_uvedit:
+            from .space_toolsystem_common import ToolSelectPanelHelper
+            tool = ToolSelectPanelHelper.tool_active_from_context(context)
+            if tool.has_datablock:
+                return True
+        return False
 
     def draw(self, context):
         from .properties_paint_common import UnifiedPaintPanel
@@ -1406,6 +1399,9 @@ class IMAGE_PT_uv_sculpt(Panel):
 
         tool_settings = context.tool_settings
         uvsculpt = tool_settings.uv_sculpt
+
+        layout.template_ID(uvsculpt, "brush")
+
         brush = uvsculpt.brush
 
         if not self.is_popover:
@@ -1424,11 +1420,41 @@ class IMAGE_PT_uv_sculpt(Panel):
         col.prop(tool_settings, "uv_sculpt_lock_borders")
         col.prop(tool_settings, "uv_sculpt_all_islands")
 
-        col.prop(tool_settings, "uv_sculpt_tool")
-        if tool_settings.uv_sculpt_tool == 'RELAX':
-            col.prop(tool_settings, "uv_relax_method")
+        if brush:
+            if brush.uv_sculpt_tool == 'RELAX':
+                col.prop(tool_settings, "uv_relax_method")
 
         col.prop(uvsculpt, "show_brush")
+
+
+class IMAGE_PT_uv_sculpt_curve(Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_context = ".uv_sculpt"  # dot on purpose (access from topbar)
+    bl_category = "Tool"
+    bl_label = "Falloff"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    poll = IMAGE_PT_uv_sculpt_brush.poll
+
+    def draw(self, context):
+        layout = self.layout
+
+        tool_settings = context.tool_settings
+        uvsculpt = tool_settings.uv_sculpt
+        brush = uvsculpt.brush
+
+        if brush is not None:
+            layout.template_curve_mapping(brush, "curve")
+
+            row = layout.row(align=True)
+            row.operator("brush.curve_preset", icon='SMOOTHCURVE', text="").shape = 'SMOOTH'
+            row.operator("brush.curve_preset", icon='SPHERECURVE', text="").shape = 'ROUND'
+            row.operator("brush.curve_preset", icon='ROOTCURVE', text="").shape = 'ROOT'
+            row.operator("brush.curve_preset", icon='SHARPCURVE', text="").shape = 'SHARP'
+            row.operator("brush.curve_preset", icon='LINCURVE', text="").shape = 'LINE'
+            row.operator("brush.curve_preset", icon='NOCURVE', text="").shape = 'MAX'
+
 
 
 class ImageScopesPanel:
@@ -1548,7 +1574,7 @@ class IMAGE_PT_scope_sample(ImageScopesPanel, Panel):
 class IMAGE_PT_uv_cursor(Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Image"
+    bl_category = "View"
     bl_label = "2D Cursor"
 
     @classmethod
@@ -1572,7 +1598,7 @@ class IMAGE_PT_uv_cursor(Panel):
 class IMAGE_PT_grease_pencil(AnnotationDataPanel, Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Image"
+    bl_category = "View"
 
     # NOTE: this is just a wrapper around the generic GP Panel.
 
@@ -1588,7 +1614,6 @@ classes = (
     IMAGE_MT_image_invert,
     IMAGE_MT_uvs,
     IMAGE_MT_uvs_showhide,
-    IMAGE_MT_uvs_proportional,
     IMAGE_MT_uvs_transform,
     IMAGE_MT_uvs_snap,
     IMAGE_MT_uvs_mirror,
@@ -1600,6 +1625,7 @@ classes = (
     IMAGE_HT_tool_header,
     IMAGE_HT_header,
     MASK_MT_editor_menus,
+    IMAGE_PT_active_tool,
     IMAGE_PT_mask,
     IMAGE_PT_mask_layers,
     IMAGE_PT_mask_display,
@@ -1610,7 +1636,7 @@ classes = (
     IMAGE_PT_render_slots,
     IMAGE_PT_view_display,
     IMAGE_PT_view_display_uv_edit_overlays,
-    IMAGE_PT_view_display_uv_edit_overlays_advanced,
+    IMAGE_PT_view_display_uv_edit_overlays_stretch,
     IMAGE_PT_paint,
     IMAGE_PT_paint_color,
     IMAGE_PT_paint_swatches,
@@ -1626,7 +1652,7 @@ classes = (
     IMAGE_PT_tools_brush_display_show_brush,
     IMAGE_PT_tools_brush_display_custom_icon,
     IMAGE_PT_tools_imagepaint_symmetry,
-    IMAGE_PT_uv_sculpt,
+    IMAGE_PT_uv_sculpt_brush,
     IMAGE_PT_uv_sculpt_curve,
     IMAGE_PT_view_histogram,
     IMAGE_PT_view_waveform,

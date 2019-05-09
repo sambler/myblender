@@ -2787,8 +2787,8 @@ static void widget_menu_back(uiWidgetColors *wcol, rcti *rect, int flag, int dir
 
   /* menu is 2nd level or deeper */
   if (flag & UI_BLOCK_POPUP) {
-    //rect->ymin -= 4.0;
-    //rect->ymax += 4.0;
+    // rect->ymin -= 4.0;
+    // rect->ymax += 4.0;
   }
   else if (direction == UI_DIR_DOWN) {
     roundboxalign = (UI_CNR_BOTTOM_RIGHT | UI_CNR_BOTTOM_LEFT);
@@ -3494,8 +3494,11 @@ void UI_draw_widget_scroll(uiWidgetColors *wcol, const rcti *rect, const rcti *s
       wcol->item[3] = 255;
 
       if (horizontal) {
-        shape_preset_init_scroll_circle(&wtb.tria1, slider, 0.6f, 'l');
-        shape_preset_init_scroll_circle(&wtb.tria2, slider, 0.6f, 'r');
+        rcti slider_inset = *slider;
+        slider_inset.xmin += 0.05 * U.widget_unit;
+        slider_inset.xmax -= 0.05 * U.widget_unit;
+        shape_preset_init_scroll_circle(&wtb.tria1, &slider_inset, 0.6f, 'l');
+        shape_preset_init_scroll_circle(&wtb.tria2, &slider_inset, 0.6f, 'r');
       }
       else {
         shape_preset_init_scroll_circle(&wtb.tria1, slider, 0.6f, 'b');
@@ -4686,7 +4689,7 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
   }
 
   if (wt) {
-    //rcti disablerect = *rect; /* rect gets clipped smaller for text */
+    // rcti disablerect = *rect; /* rect gets clipped smaller for text */
     int roundboxalign, state, drawflag;
     bool disabled = false;
 

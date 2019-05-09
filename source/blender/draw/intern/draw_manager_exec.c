@@ -23,7 +23,7 @@
 #include "draw_manager.h"
 
 #include "BLI_math_bits.h"
-#include "BLI_mempool.h"
+#include "BLI_memblock.h"
 
 #include "BKE_global.h"
 
@@ -205,7 +205,7 @@ void drw_state_set(DRWState state)
     int test;
     if (CHANGED_ANY_STORE_VAR(DRW_STATE_BLEND | DRW_STATE_BLEND_PREMUL | DRW_STATE_ADDITIVE |
                                   DRW_STATE_MULTIPLY | DRW_STATE_ADDITIVE_FULL |
-                                  DRW_STATE_BLEND_OIT,
+                                  DRW_STATE_BLEND_OIT | DRW_STATE_BLEND_PREMUL_UNDER,
                               test)) {
       if (test) {
         glEnable(GL_BLEND);
@@ -215,6 +215,9 @@ void drw_state_set(DRWState state)
                               GL_ONE_MINUS_SRC_ALPHA, /* RGB */
                               GL_ONE,
                               GL_ONE_MINUS_SRC_ALPHA); /* Alpha */
+        }
+        else if ((state & DRW_STATE_BLEND_PREMUL_UNDER) != 0) {
+          glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
         }
         else if ((state & DRW_STATE_BLEND_PREMUL) != 0) {
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -401,13 +404,6 @@ void DRW_state_reset(void)
   glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-/* NOTE : Make sure to reset after use! */
-void DRW_state_invert_facing(void)
-{
-  SWAP(GLenum, DST.backface, DST.frontface);
-  glFrontFace(DST.frontface);
-}
-
 /**
  * This only works if DRWPasses have been tagged with DRW_STATE_CLIP_PLANES,
  * and if the shaders have support for it (see usage of gl_ClipDistance).
@@ -445,8 +441,9 @@ void DRW_state_clip_planes_set_from_rv3d(RegionView3D *rv3d)
 
 /* Extract the 8 corners from a Projection Matrix.
  * Although less accurate, this solution can be simplified as follows:
- * BKE_boundbox_init_from_minmax(&bbox, (const float[3]){-1.0f, -1.0f, -1.0f}, (const float[3]){1.0f, 1.0f, 1.0f});
- * for (int i = 0; i < 8; i++) {mul_project_m4_v3(projinv, bbox.vec[i]);}
+ * BKE_boundbox_init_from_minmax(&bbox, (const float[3]){-1.0f, -1.0f, -1.0f}, (const
+ * float[3]){1.0f, 1.0f, 1.0f}); for (int i = 0; i < 8; i++) {mul_project_m4_v3(projinv,
+ * bbox.vec[i]);}
  */
 static void draw_frustum_boundbox_calc(const float (*projmat)[4], BoundBox *r_bbox)
 {
@@ -617,9 +614,9 @@ static void draw_clipping_setup_from_view(void)
     float F = -1.0f, N;          /* square distance of far and near point to origin */
     float f, n; /* distance of far and near point to z axis. f is always > 0 but n can be < 0 */
     float e, s; /* far and near clipping distance (<0) */
-    float
-        c; /* slope of center line = distance of far clipping center to z axis / far clipping distance */
-    float z; /* projection of sphere center on z axis (<0) */
+    float c;    /* slope of center line = distance of far clipping center
+                 * to z axis / far clipping distance. */
+    float z;    /* projection of sphere center on z axis (<0) */
 
     /* Find farthest corner and center of far clip plane. */
     float corner[3] = {1.0f, 1.0f, 1.0f}; /* in clip space */
@@ -683,12 +680,16 @@ bool DRW_culling_sphere_test(BoundSphere *bsphere)
 
   /* Do a rough test first: Sphere VS Sphere intersect. */
   BoundSphere *frustum_bsphere = &DST.clipping.frustum_bsphere;
-  float center_dist = len_squared_v3v3(bsphere->center, frustum_bsphere->center);
-  if (center_dist > SQUARE(bsphere->radius + frustum_bsphere->radius)) {
+  float center_dist_sq = len_squared_v3v3(bsphere->center, frustum_bsphere->center);
+  float radius_sum = bsphere->radius + frustum_bsphere->radius;
+  if (center_dist_sq > SQUARE(radius_sum)) {
     return false;
   }
+  /* TODO we could test against the inscribed sphere of the frustum to early out positively. */
 
   /* Test against the 6 frustum planes. */
+  /* TODO order planes with sides first then far then near clip. Should be better culling heuristic
+   * when sculpting. */
   for (int p = 0; p < 6; p++) {
     float dist = plane_point_side_v3(DST.clipping.frustum_planes[p], bsphere->center);
     if (dist < -bsphere->radius) {
@@ -791,8 +792,7 @@ static void draw_matrices_model_prepare(DRWCallState *st)
     return;
   }
   /* Order matters */
-  if (st->matflag &
-      (DRW_CALL_MODELVIEW | DRW_CALL_MODELVIEWINVERSE | DRW_CALL_NORMALVIEW | DRW_CALL_EYEVEC)) {
+  if (st->matflag & (DRW_CALL_MODELVIEW | DRW_CALL_MODELVIEWINVERSE)) {
     mul_m4_m4m4(st->modelview, DST.view_data.matstate.mat[DRW_MAT_VIEW], st->model);
   }
   if (st->matflag & DRW_CALL_MODELVIEWINVERSE) {
@@ -801,32 +801,6 @@ static void draw_matrices_model_prepare(DRWCallState *st)
   if (st->matflag & DRW_CALL_MODELVIEWPROJECTION) {
     mul_m4_m4m4(st->modelviewprojection, DST.view_data.matstate.mat[DRW_MAT_PERS], st->model);
   }
-  if (st->matflag & (DRW_CALL_NORMALVIEW | DRW_CALL_NORMALVIEWINVERSE | DRW_CALL_EYEVEC)) {
-    copy_m3_m4(st->normalview, st->modelview);
-    invert_m3(st->normalview);
-    transpose_m3(st->normalview);
-  }
-  if (st->matflag & (DRW_CALL_NORMALVIEWINVERSE | DRW_CALL_EYEVEC)) {
-    invert_m3_m3(st->normalviewinverse, st->normalview);
-  }
-  /* TODO remove eye vec (unused) */
-  if (st->matflag & DRW_CALL_EYEVEC) {
-    /* Used by orthographic wires */
-    copy_v3_fl3(st->eyevec, 0.0f, 0.0f, 1.0f);
-    /* set eye vector, transformed to object coords */
-    mul_m3_v3(st->normalviewinverse, st->eyevec);
-  }
-  /* Non view dependent */
-  if (st->matflag & DRW_CALL_MODELINVERSE) {
-    invert_m4_m4(st->modelinverse, st->model);
-    st->matflag &= ~DRW_CALL_MODELINVERSE;
-  }
-  if (st->matflag & DRW_CALL_NORMALWORLD) {
-    copy_m3_m4(st->normalworld, st->model);
-    invert_m3(st->normalworld);
-    transpose_m3(st->normalworld);
-    st->matflag &= ~DRW_CALL_NORMALWORLD;
-  }
 }
 
 static void draw_geometry_prepare(DRWShadingGroup *shgroup, DRWCall *call)
@@ -834,58 +808,81 @@ static void draw_geometry_prepare(DRWShadingGroup *shgroup, DRWCall *call)
   /* step 1 : bind object dependent matrices */
   if (call != NULL) {
     DRWCallState *state = call->state;
-    float objectinfo[4];
-    objectinfo[0] = state->objectinfo[0];
-    objectinfo[1] = call->single.ma_index; /* WATCH this is only valid for single drawcalls. */
-    objectinfo[2] = state->objectinfo[1];
-    objectinfo[3] = (state->flag & DRW_CALL_NEGSCALE) ? -1.0f : 1.0f;
 
-    GPU_shader_uniform_vector(shgroup->shader, shgroup->model, 16, 1, (float *)state->model);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->modelinverse, 16, 1, (float *)state->modelinverse);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->modelview, 16, 1, (float *)state->modelview);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->modelviewinverse, 16, 1, (float *)state->modelviewinverse);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->modelviewprojection, 16, 1, (float *)state->modelviewprojection);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->normalview, 9, 1, (float *)state->normalview);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->normalviewinverse, 9, 1, (float *)state->normalviewinverse);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->normalworld, 9, 1, (float *)state->normalworld);
-    GPU_shader_uniform_vector(shgroup->shader, shgroup->objectinfo, 4, 1, (float *)objectinfo);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->orcotexfac, 3, 2, (float *)state->orcotexfac);
-    GPU_shader_uniform_vector(shgroup->shader, shgroup->eye, 3, 1, (float *)state->eyevec);
+    if (shgroup->model != -1) {
+      GPU_shader_uniform_vector(shgroup->shader, shgroup->model, 16, 1, (float *)state->model);
+    }
+    if (shgroup->modelinverse != -1) {
+      GPU_shader_uniform_vector(
+          shgroup->shader, shgroup->modelinverse, 16, 1, (float *)state->modelinverse);
+    }
+    if (shgroup->modelview != -1) {
+      GPU_shader_uniform_vector(
+          shgroup->shader, shgroup->modelview, 16, 1, (float *)state->modelview);
+    }
+    if (shgroup->modelviewinverse != -1) {
+      GPU_shader_uniform_vector(
+          shgroup->shader, shgroup->modelviewinverse, 16, 1, (float *)state->modelviewinverse);
+    }
+    if (shgroup->modelviewprojection != -1) {
+      GPU_shader_uniform_vector(shgroup->shader,
+                                shgroup->modelviewprojection,
+                                16,
+                                1,
+                                (float *)state->modelviewprojection);
+    }
+    if (shgroup->objectinfo != -1) {
+      float objectinfo[4];
+      objectinfo[0] = state->objectinfo[0];
+      objectinfo[1] = call->single.ma_index; /* WATCH this is only valid for single drawcalls. */
+      objectinfo[2] = state->objectinfo[1];
+      objectinfo[3] = (state->flag & DRW_CALL_NEGSCALE) ? -1.0f : 1.0f;
+      GPU_shader_uniform_vector(shgroup->shader, shgroup->objectinfo, 4, 1, (float *)objectinfo);
+    }
+    if (shgroup->orcotexfac != -1) {
+      GPU_shader_uniform_vector(
+          shgroup->shader, shgroup->orcotexfac, 3, 2, (float *)state->orcotexfac);
+    }
   }
   else {
-    BLI_assert((shgroup->normalview == -1) && (shgroup->normalworld == -1) &&
-               (shgroup->eye == -1));
     /* For instancing and batching. */
     float unitmat[4][4];
     unit_m4(unitmat);
-    GPU_shader_uniform_vector(shgroup->shader, shgroup->model, 16, 1, (float *)unitmat);
-    GPU_shader_uniform_vector(shgroup->shader, shgroup->modelinverse, 16, 1, (float *)unitmat);
-    GPU_shader_uniform_vector(shgroup->shader,
-                              shgroup->modelview,
-                              16,
-                              1,
-                              (float *)DST.view_data.matstate.mat[DRW_MAT_VIEW]);
-    GPU_shader_uniform_vector(shgroup->shader,
-                              shgroup->modelviewinverse,
-                              16,
-                              1,
-                              (float *)DST.view_data.matstate.mat[DRW_MAT_VIEWINV]);
-    GPU_shader_uniform_vector(shgroup->shader,
-                              shgroup->modelviewprojection,
-                              16,
-                              1,
-                              (float *)DST.view_data.matstate.mat[DRW_MAT_PERS]);
-    GPU_shader_uniform_vector(shgroup->shader, shgroup->objectinfo, 4, 1, (float *)unitmat);
-    GPU_shader_uniform_vector(
-        shgroup->shader, shgroup->orcotexfac, 3, 2, (float *)shgroup->instance_orcofac);
+
+    if (shgroup->model != -1) {
+      GPU_shader_uniform_vector(shgroup->shader, shgroup->model, 16, 1, (float *)unitmat);
+    }
+    if (shgroup->modelinverse != -1) {
+      GPU_shader_uniform_vector(shgroup->shader, shgroup->modelinverse, 16, 1, (float *)unitmat);
+    }
+    if (shgroup->modelview != -1) {
+      GPU_shader_uniform_vector(shgroup->shader,
+                                shgroup->modelview,
+                                16,
+                                1,
+                                (float *)DST.view_data.matstate.mat[DRW_MAT_VIEW]);
+    }
+    if (shgroup->modelviewinverse != -1) {
+      GPU_shader_uniform_vector(shgroup->shader,
+                                shgroup->modelviewinverse,
+                                16,
+                                1,
+                                (float *)DST.view_data.matstate.mat[DRW_MAT_VIEWINV]);
+    }
+    if (shgroup->modelviewprojection != -1) {
+      GPU_shader_uniform_vector(shgroup->shader,
+                                shgroup->modelviewprojection,
+                                16,
+                                1,
+                                (float *)DST.view_data.matstate.mat[DRW_MAT_PERS]);
+    }
+    if (shgroup->objectinfo != -1) {
+      GPU_shader_uniform_vector(shgroup->shader, shgroup->objectinfo, 4, 1, (float *)unitmat);
+    }
+    if (shgroup->orcotexfac != -1) {
+      GPU_shader_uniform_vector(
+          shgroup->shader, shgroup->orcotexfac, 3, 2, (float *)shgroup->instance_orcofac);
+    }
   }
 }
 
@@ -1231,12 +1228,13 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
 
 #  define GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(_start, _count) \
     _start += _count; \
-    }
+    } \
+    ((void)0)
 
 #else
 #  define GPU_SELECT_LOAD_IF_PICKSEL(select_id)
 #  define GPU_SELECT_LOAD_IF_PICKSEL_CALL(call)
-#  define GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(start, count)
+#  define GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(start, count) ((void)0)
 #  define GPU_SELECT_LOAD_IF_PICKSEL_LIST(_shgroup, _start, _count) \
     _start = 0; \
     _count = _shgroup->instance_count;
@@ -1260,11 +1258,10 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
         if (shgroup->instance_count > 0) {
           uint count, start;
           draw_geometry_prepare(shgroup, NULL);
-          GPU_SELECT_LOAD_IF_PICKSEL_LIST(shgroup, start, count)
-          {
+          GPU_SELECT_LOAD_IF_PICKSEL_LIST (shgroup, start, count) {
             draw_geometry_execute_ex(shgroup, shgroup->instance_geom, start, count, true);
           }
-          GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(start, count)
+          GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(start, count);
         }
       }
     }
@@ -1273,11 +1270,10 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
       if (shgroup->instance_count > 0) {
         uint count, start;
         draw_geometry_prepare(shgroup, NULL);
-        GPU_SELECT_LOAD_IF_PICKSEL_LIST(shgroup, start, count)
-        {
+        GPU_SELECT_LOAD_IF_PICKSEL_LIST (shgroup, start, count) {
           draw_geometry_execute_ex(shgroup, shgroup->batch_geom, start, count, false);
         }
-        GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(start, count)
+        GPU_SELECT_LOAD_IF_PICKSEL_LIST_END(start, count);
       }
     }
   }
@@ -1323,9 +1319,6 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
           draw_geometry_execute_ex(
               shgroup, call->instances.geometry, 0, *call->instances.count, true);
           break;
-        case DRW_CALL_GENERATE:
-          call->generate.geometry_fn(shgroup, draw_geometry_execute, call->generate.user_data);
-          break;
         case DRW_CALL_PROCEDURAL:
           GPU_draw_primitive(call->procedural.prim_type, call->procedural.vert_count);
           break;
@@ -1355,10 +1348,10 @@ static void drw_update_view(void)
       DST.state_cache_id = 1;
       /* We must reset all CallStates to ensure that not
        * a single one stayed with cache_id equal to 1. */
-      BLI_mempool_iter iter;
+      BLI_memblock_iter iter;
       DRWCallState *state;
-      BLI_mempool_iternew(DST.vmempool->states, &iter);
-      while ((state = BLI_mempool_iterstep(&iter))) {
+      BLI_memblock_iternew(DST.vmempool->states, &iter);
+      while ((state = BLI_memblock_iterstep(&iter))) {
         state->cache_id = 0;
       }
     }

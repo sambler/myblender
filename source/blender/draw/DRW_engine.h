@@ -133,7 +133,6 @@ void DRW_draw_depth_loop_gpencil(struct Depsgraph *depsgraph,
                                  struct View3D *v3d,
                                  struct GPUViewport *viewport);
 void DRW_draw_depth_object(struct ARegion *ar,
-                           struct View3D *v3d,
                            struct GPUViewport *viewport,
                            struct Object *object);
 
@@ -147,7 +146,6 @@ void DRW_render_gpencil(struct RenderEngine *engine, struct Depsgraph *depsgraph
 void DRW_gpencil_freecache(struct Object *ob);
 
 /* This is here because GPUViewport needs it */
-void DRW_pass_free(struct DRWPass *pass);
 struct DRWInstanceDataList *DRW_instance_data_list_create(void);
 void DRW_instance_data_list_free(struct DRWInstanceDataList *idatalist);
 

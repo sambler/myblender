@@ -72,15 +72,19 @@ static int draw_uvs_face_check(const ToolSettings *ts)
 {
   /* checks if we are selecting only faces */
   if (ts->uv_flag & UV_SYNC_SELECTION) {
-    if (ts->selectmode == SCE_SELECT_FACE)
+    if (ts->selectmode == SCE_SELECT_FACE) {
       return 2;
-    else if (ts->selectmode & SCE_SELECT_FACE)
+    }
+    else if (ts->selectmode & SCE_SELECT_FACE) {
       return 1;
-    else
+    }
+    else {
       return 0;
+    }
   }
-  else
+  else {
     return (ts->uv_selectmode == UV_SELECT_FACE);
+  }
 }
 
 /* ------------------------- */
@@ -166,6 +170,7 @@ static void uvedit_get_batches(Object *ob,
   const bool draw_stretch = (sima->flag & SI_DRAW_STRETCH) != 0;
   const bool draw_faces = (sima->flag & SI_NO_DRAWFACES) == 0;
 
+  DRW_mesh_batch_cache_validate(ob->data);
   *edges = DRW_mesh_batch_cache_get_edituv_edges(ob->data);
   *verts = DRW_mesh_batch_cache_get_edituv_verts(ob->data);
 
@@ -461,8 +466,9 @@ static void draw_uv_shadows_get(
 {
   *show_shadow = *show_texpaint = false;
 
-  if (ED_space_image_show_render(sima) || (sima->flag & SI_NO_DRAW_TEXPAINT))
+  if (ED_space_image_show_render(sima) || (sima->flag & SI_NO_DRAW_TEXPAINT)) {
     return;
+  }
 
   if ((sima->mode == SI_MODE_PAINT) && obedit && obedit->type == OB_MESH) {
     struct BMEditMesh *em = BKE_editmesh_from_object(obedit);
@@ -474,14 +480,12 @@ static void draw_uv_shadows_get(
 }
 
 void ED_uvedit_draw_main(SpaceImage *sima,
-                         ARegion *ar,
                          Scene *scene,
                          ViewLayer *view_layer,
                          Object *obedit,
                          Object *obact,
                          Depsgraph *depsgraph)
 {
-  ToolSettings *toolsettings = scene->toolsettings;
   bool show_uvedit, show_uvshadow, show_texpaint_uvshadow;
 
   show_uvedit = ED_space_image_show_uvedit(sima, obedit);
@@ -504,8 +508,5 @@ void ED_uvedit_draw_main(SpaceImage *sima,
     else {
       draw_uvs_texpaint(scene, obact, depsgraph);
     }
-
-    if (show_uvedit && !(toolsettings->use_uv_sculpt))
-      ED_image_draw_cursor(ar, sima->cursor);
   }
 }

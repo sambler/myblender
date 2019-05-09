@@ -262,6 +262,10 @@ static SpaceLink *view3d_new(const ScrArea *UNUSED(sa), const Scene *scene)
   v3d->overlay.texture_paint_mode_opacity = 1.0f;
   v3d->overlay.weight_paint_mode_opacity = 1.0f;
   v3d->overlay.vertex_paint_mode_opacity = 1.0f;
+  /* Intentionally different to vertex/paint mode,
+   * we typically want to see shading too. */
+  v3d->overlay.sculpt_mode_mask_opacity = 0.75f;
+
   v3d->overlay.edit_flag = V3D_OVERLAY_EDIT_FACES | V3D_OVERLAY_EDIT_SEAMS |
                            V3D_OVERLAY_EDIT_SHARP | V3D_OVERLAY_EDIT_FREESTYLE_EDGE |
                            V3D_OVERLAY_EDIT_FREESTYLE_FACE | V3D_OVERLAY_EDIT_EDGES |
@@ -299,6 +303,7 @@ static SpaceLink *view3d_new(const ScrArea *UNUSED(sa), const Scene *scene)
   BLI_addtail(&v3d->regionbase, ar);
   ar->regiontype = RGN_TYPE_TOOL_HEADER;
   ar->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+  ar->flag = RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER;
 
   /* header */
   ar = MEM_callocN(sizeof(ARegion), "header for view3d");
@@ -1128,8 +1133,8 @@ static void view3d_header_region_listener(wmWindow *UNUSED(win),
       break;
   }
 
-  /* From topbar, which ones are needed? split per header? */
-  /* Disable for now, re-enable if neede, or remove - campbell. */
+    /* From topbar, which ones are needed? split per header? */
+    /* Disable for now, re-enable if neede, or remove - campbell. */
 #if 0
   /* context changes */
   switch (wmn->category) {
@@ -1505,6 +1510,7 @@ void ED_spacetype_view3d(void)
   art->prefsizex = 180; /* XXX */
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
   art->listener = view3d_buttons_region_listener;
+  art->message_subscribe = ED_area_do_mgs_subscribe_for_tool_ui;
   art->init = view3d_buttons_region_init;
   art->draw = view3d_buttons_region_draw;
   BLI_addhead(&st->regiontypes, art);
@@ -1530,9 +1536,9 @@ void ED_spacetype_view3d(void)
   art->prefsizey = HEADERY;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES | ED_KEYMAP_HEADER;
   art->listener = view3d_header_region_listener;
+  art->message_subscribe = ED_area_do_mgs_subscribe_for_tool_header;
   art->init = view3d_header_region_init;
   art->draw = view3d_header_region_draw;
-  art->message_subscribe = view3d_header_region_message_subscribe;
   BLI_addhead(&st->regiontypes, art);
 
   /* regions: header */
@@ -1541,9 +1547,9 @@ void ED_spacetype_view3d(void)
   art->prefsizey = HEADERY;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES | ED_KEYMAP_HEADER;
   art->listener = view3d_header_region_listener;
+  art->message_subscribe = view3d_header_region_message_subscribe;
   art->init = view3d_header_region_init;
   art->draw = view3d_header_region_draw;
-  art->message_subscribe = ED_area_do_mgs_subscribe_for_tool_header;
   BLI_addhead(&st->regiontypes, art);
 
   /* regions: hud */

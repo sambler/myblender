@@ -312,7 +312,9 @@ class _defs_view3d_select:
     def box():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("view3d.select_box")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
         return dict(
             idname="builtin.select_box",
             label="Select Box",
@@ -326,7 +328,9 @@ class _defs_view3d_select:
     def lasso():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("view3d.select_lasso")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
         return dict(
             idname="builtin.select_lasso",
             label="Select Lasso",
@@ -340,7 +344,9 @@ class _defs_view3d_select:
     def circle():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("view3d.select_circle")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
 
         def draw_cursor(_context, tool, xy):
@@ -1127,7 +1133,9 @@ class _defs_image_uv_select:
     def box():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("uv.select_box")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
         return dict(
             idname="builtin.select_box",
             label="Select Box",
@@ -1141,7 +1149,9 @@ class _defs_image_uv_select:
     def lasso():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("uv.select_lasso")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
         return dict(
             idname="builtin.select_lasso",
             label="Select Lasso",
@@ -1155,7 +1165,9 @@ class _defs_image_uv_select:
     def circle():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("uv.select_circle")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
         return dict(
             idname="builtin.select_circle",
@@ -1171,12 +1183,33 @@ class _defs_image_uv_sculpt:
 
     @staticmethod
     def generate_from_brushes(context):
+        def draw_cursor(context, _tool, xy):
+            from gpu_extras.presets import draw_circle_2d
+            tool_settings = context.tool_settings
+            uv_sculpt = tool_settings.uv_sculpt
+            if not uv_sculpt.show_brush:
+                return
+            ups = tool_settings.unified_paint_settings
+            if ups.use_unified_size:
+                radius = ups.size
+            else:
+                brush = tool_settings.uv_sculpt.brush
+                if brush is None:
+                    return
+                radius = brush.size
+            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+
         return generate_from_enum_ex(
             context,
             idname_prefix="builtin_brush.",
             icon_prefix="brush.uv_sculpt.",
-            type=bpy.types.ToolSettings,
+            type=bpy.types.Brush,
             attr="uv_sculpt_tool",
+            tooldef_keywords=dict(
+                operator="sculpt.uv_sculpt_stroke",
+                keymap="Image Editor Tool: Uv, Sculpt Stroke",
+                draw_cursor=draw_cursor,
+            ),
         )
 
 
@@ -1290,7 +1323,9 @@ class _defs_gpencil_edit:
     def box_select():
         def draw_settings(context, layout, tool):
             props = tool.operator_properties("gpencil.select_box")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(context.tool_settings.gpencil_sculpt, "intersection_threshold")
         return dict(
             idname="builtin.select_box",
@@ -1305,7 +1340,9 @@ class _defs_gpencil_edit:
     def lasso_select():
         def draw_settings(context, layout, tool):
             props = tool.operator_properties("gpencil.select_lasso")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(context.tool_settings.gpencil_sculpt, "intersection_threshold")
         return dict(
             idname="builtin.select_lasso",
@@ -1320,7 +1357,9 @@ class _defs_gpencil_edit:
     def circle_select():
         def draw_settings(context, layout, tool):
             props = tool.operator_properties("gpencil.select_circle")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
             layout.prop(context.tool_settings.gpencil_sculpt, "intersection_threshold")
         return dict(
@@ -1423,7 +1462,9 @@ class _defs_node_select:
     def box():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("node.select_box")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             pass
         return dict(
             idname="builtin.select_box",
@@ -1438,7 +1479,9 @@ class _defs_node_select:
     def lasso():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("node.select_lasso")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
         return dict(
             idname="builtin.select_lasso",
             label="Select Lasso",
@@ -1452,7 +1495,9 @@ class _defs_node_select:
     def circle():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("node.select_circle")
-            layout.prop(props, "mode", text="")
+            row = layout.row()
+            row.use_property_split = False
+            row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
         return dict(
             idname="builtin.select_circle",
@@ -1664,7 +1709,6 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             _defs_annotate.poly,
             _defs_annotate.eraser,
         ),
-        _defs_view3d_generic.ruler,
     )
 
     _tools_gpencil_select = (
@@ -1683,6 +1727,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
         *_tools_transform,
         None,
         *_tools_annotate,
+        _defs_view3d_generic.ruler,
     )
 
     _tools = {
@@ -1791,6 +1836,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             _defs_view3d_generic.cursor,
             None,
             *_tools_annotate,
+            _defs_view3d_generic.ruler,
         ],
         'PARTICLE': [
             *_tools_select,
@@ -1803,6 +1849,8 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             None,
             _defs_sculpt.hide_border,
             _defs_sculpt.mask_border,
+            None,
+            *_tools_annotate,
         ],
         'PAINT_TEXTURE': [
             _defs_texture_paint.generate_from_brushes,
@@ -1812,6 +1860,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
                 if _defs_texture_paint.poll_select_mask(context)
                 else ()
             ),
+            *_tools_annotate,
         ],
         'PAINT_VERTEX': [
             _defs_vertex_paint.generate_from_brushes,
@@ -1821,6 +1870,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
                 if _defs_vertex_paint.poll_select_mask(context)
                 else ()
             ),
+            *_tools_annotate,
         ],
         'PAINT_WEIGHT': [
             _defs_weight_paint.generate_from_brushes,
@@ -1842,6 +1892,7 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
                 if _defs_weight_paint.poll_select_mask(context)
                 else ()
             ),
+            *_tools_annotate,
         ],
         'PAINT_GPENCIL': [
             _defs_view3d_generic.cursor,

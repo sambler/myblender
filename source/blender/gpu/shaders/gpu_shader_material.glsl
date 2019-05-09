@@ -1,8 +1,6 @@
 
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelViewMatrixInverse;
-uniform mat3 NormalMatrix;
-uniform mat3 NormalMatrixInverse;
 
 #ifndef USE_ATTR
 uniform mat4 ModelMatrix;
@@ -204,9 +202,9 @@ void direction_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
   vout = (mat * vec4(vin, 0.0)).xyz;
 }
 
-void mat3_mul(vec3 vin, mat3 mat, out vec3 vout)
+void normal_transform_transposed_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 {
-  vout = mat * vin;
+  vout = transpose(mat3(mat)) * vin;
 }
 
 void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
@@ -1162,8 +1160,9 @@ vec3 cellnoise_color(vec3 p)
 
 float floorfrac(float x, out int i)
 {
-  i = floor_to_int(x);
-  return x - i;
+  float x_floor = floor(x);
+  i = int(x_floor);
+  return x - x_floor;
 }
 
 /* bsdfs */
@@ -1190,7 +1189,8 @@ void convert_metallic_to_specular_tinted(vec3 basecol,
 vec3 principled_sheen(float NV, vec3 basecol_tint, float sheen_tint)
 {
   float f = 1.0 - NV;
-  /* Temporary fix for T59784. Normal map seems to contain NaNs for tangent space normal maps, therefore we need to clamp value. */
+  /* Temporary fix for T59784. Normal map seems to contain NaNs for tangent space normal maps,
+   * therefore we need to clamp value. */
   f = clamp(f, 0.0, 1.0);
   /* Empirical approximation (manual curve fitting). Can be refined. */
   float sheen = f * f * f * 0.077 + f * 0.01 + 0.00026;
@@ -2013,18 +2013,13 @@ void tangent_orco_z(vec3 orco_in, out vec3 orco_out)
   orco_out = orco_in.yxz * vec3(-0.5, 0.5, 0.0) + vec3(0.25, -0.25, 0.0);
 }
 
-void node_tangentmap(vec4 attr_tangent, mat4 toworld, out vec3 tangent)
+void node_tangentmap(vec4 attr_tangent, out vec3 tangent)
 {
-  tangent = normalize((toworld * vec4(attr_tangent.xyz, 0.0)).xyz);
+  tangent = normalize(attr_tangent.xyz);
 }
 
-void node_tangent(vec3 N, vec3 orco, mat4 objmat, mat4 toworld, out vec3 T)
+void node_tangent(vec3 N, vec3 orco, mat4 objmat, out vec3 T)
 {
-#ifndef VOLUMETRICS
-  N = normalize(gl_FrontFacing ? worldNormal : -worldNormal);
-#else
-  N = (toworld * vec4(N, 0.0)).xyz;
-#endif
   T = (objmat * vec4(orco, 0.0)).xyz;
   T = cross(N, normalize(cross(T, N)));
 }
@@ -2068,7 +2063,7 @@ void node_geometry(vec3 I,
   true_normal = normal;
 #  endif
   tangent_orco_z(orco, orco);
-  node_tangent(N, orco, objmat, toworld, tangent);
+  node_tangent(N, orco, objmat, tangent);
 
   parametric = vec3(barycentric, 0.0);
   backfacing = (gl_FrontFacing) ? 0.0 : 1.0;
@@ -2090,9 +2085,7 @@ void generated_texco(vec3 I, vec3 attr_orco, out vec3 generated)
 }
 
 void node_tex_coord(vec3 I,
-                    vec3 N,
-                    mat4 viewinvmat,
-                    mat4 obinvmat,
+                    vec3 wN,
                     vec4 camerafac,
                     vec3 attr_orco,
                     vec3 attr_uv,
@@ -2105,22 +2098,17 @@ void node_tex_coord(vec3 I,
                     out vec3 reflection)
 {
   generated = attr_orco;
-  normal = normalize(NormalMatrixInverse * N);
+  normal = normalize(transform_normal_world_to_object(wN));
   uv = attr_uv;
-  object = (obinvmat * (viewinvmat * vec4(I, 1.0))).xyz;
+  object = transform_point_view_to_object(I);
   camera = vec3(I.xy, -I.z);
   vec4 projvec = ProjectionMatrix * vec4(I, 1.0);
   window = vec3(mtex_2d_mapping(projvec.xyz / projvec.w).xy * camerafac.xy + camerafac.zw, 0.0);
-
-  vec3 shade_I = (ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
-  vec3 view_reflection = reflect(shade_I, normalize(N));
-  reflection = (viewinvmat * vec4(view_reflection, 0.0)).xyz;
+  reflection = reflect(cameraVec, normalize(wN));
 }
 
 void node_tex_coord_background(vec3 I,
                                vec3 N,
-                               mat4 viewinvmat,
-                               mat4 obinvmat,
                                vec4 camerafac,
                                vec3 attr_orco,
                                vec3 attr_uv,
@@ -2139,11 +2127,7 @@ void node_tex_coord_background(vec3 I,
 
   co = normalize(co);
 
-#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
   vec3 coords = (ViewMatrixInverse * co).xyz;
-#else
-  vec3 coords = (ModelViewMatrixInverse * co).xyz;
-#endif
 
   generated = coords;
   normal = -coords;
@@ -2770,7 +2754,9 @@ float noise_perlin(float x, float y, float z)
 
   noise_v[1] = noise_nerp(v, noise_u[0], noise_u[1]);
 
-  return noise_scale3(noise_nerp(w, noise_v[0], noise_v[1]));
+  float r = noise_scale3(noise_nerp(w, noise_v[0], noise_v[1]));
+
+  return (isinf(r)) ? 0.0 : r;
 }
 
 float noise(vec3 p)
@@ -3343,6 +3329,7 @@ void node_vector_displacement_tangent(vec4 vector,
                                       mat4 viewmat,
                                       out vec3 result)
 {
+  /* TODO(fclem) this is broken. revisit latter. */
   vec3 N_object = normalize(((vec4(normal, 0.0) * viewmat) * obmat).xyz);
   vec3 T_object = normalize(((vec4(tangent.xyz, 0.0) * viewmat) * obmat).xyz);
   vec3 B_object = tangent.w * normalize(cross(N_object, T_object));
@@ -3404,7 +3391,7 @@ void world_normals_get(out vec3 N)
     /* Shade as a cylinder. */
     cos_theta = hairThickTime / hairThickness;
   }
-  float sin_theta = sqrt(max(0.0, 1.0f - cos_theta * cos_theta));
+  float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
   N = normalize(worldNormal * sin_theta + B * cos_theta);
 #  else
   N = gl_FrontFacing ? worldNormal : -worldNormal;
@@ -3425,15 +3412,18 @@ void node_eevee_specular(vec4 diffuse,
                          out Closure result)
 {
   vec3 out_diff, out_spec, ssr_spec;
-  eevee_closure_default(normal,
-                        diffuse.rgb,
-                        specular.rgb,
-                        int(ssr_id),
-                        roughness,
-                        occlusion,
-                        out_diff,
-                        out_spec,
-                        ssr_spec);
+  eevee_closure_default_clearcoat(normal,
+                                  diffuse.rgb,
+                                  specular.rgb,
+                                  int(ssr_id),
+                                  roughness,
+                                  clearcoat_normal,
+                                  clearcoat * 0.25,
+                                  clearcoat_roughness,
+                                  occlusion,
+                                  out_diff,
+                                  out_spec,
+                                  ssr_spec);
 
   vec3 vN = normalize(mat3(ViewMatrix) * normal);
   result = CLOSURE_DEFAULT;

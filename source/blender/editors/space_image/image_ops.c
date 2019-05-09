@@ -65,6 +65,7 @@
 #include "DEG_depsgraph.h"
 
 #include "GPU_draw.h"
+#include "GPU_state.h"
 #include "GPU_immediate.h"
 
 #include "IMB_colormanagement.h"
@@ -290,7 +291,8 @@ static bool image_sample_poll(bContext *C)
   if (sima) {
     Object *obedit = CTX_data_edit_object(C);
     if (obedit) {
-      /* Disable when UV editing so it doesn't swallow all click events (use for setting cursor). */
+      /* Disable when UV editing so it doesn't swallow all click events
+       * (use for setting cursor). */
       if (ED_space_image_show_uvedit(sima, obedit)) {
         return false;
       }
@@ -579,7 +581,7 @@ static void image_zoom_apply(ViewZoomData *vpd,
     zfac = 1.0f + ((fac / 20.0f) * time_step);
     vpd->timer_lastdraw = time;
     /* this is the final zoom, but instead make it into a factor */
-    //zoom = vpd->sima->zoom * zfac;
+    // zoom = vpd->sima->zoom * zfac;
     factor = (vpd->sima->zoom * zfac) / vpd->zoom;
   }
   else {
@@ -1117,9 +1119,10 @@ static void image_open_cancel(bContext *UNUSED(C), wmOperator *op)
 }
 
 /**
- * \brief Get a list of frames from the list of image files matching the first file name sequence pattern
- * \param ptr: [in] the RNA pointer containing the "directory" entry and "files" collection
- * \param frames_all: [out] the list of frame numbers found in the files matching the first one by name
+ * Get a list of frames from the list of image files matching the first file name sequence pattern.
+ * \param ptr[in]: The RNA pointer containing the "directory" entry and "files" collection.
+ * \param frames_all[out]: the list of frame numbers found in the files matching
+ * the first one by name.
  */
 static void image_sequence_get_frame_ranges(PointerRNA *ptr, ListBase *frames_all)
 {
@@ -1174,7 +1177,8 @@ static int image_cmp_frame(const void *a, const void *b)
 }
 
 /**
- * Return the start (offset) and the length of the sequence of continuous frames in the list of frames
+ * Return the start (offset) and the length of the sequence of
+ * continuous frames in the list of frames.
  *
  * \param frames: [in] the list of frame numbers, as a side-effect the list is sorted.
  * \param ofs: [out] offset the first frame number in the sequence.
@@ -1732,7 +1736,7 @@ static int image_save_options_init(Main *bmain,
     }
 
     ///* XXX - this is lame, we need to make these available too! */
-    //opts->subimtype = scene->r.subimtype;
+    // opts->subimtype = scene->r.subimtype;
 
     BLI_strncpy(opts->filepath, ibuf->name, sizeof(opts->filepath));
 
@@ -2757,6 +2761,7 @@ static void image_sample_draw(const bContext *C, ARegion *ar, void *arg_info)
 
     glEnable(GL_COLOR_LOGIC_OP);
     glLogicOp(GL_XOR);
+    GPU_line_width(1.0f);
     imm_draw_box_wire_2d(pos,
                          (float)sample_rect_fl.xmin,
                          (float)sample_rect_fl.ymin,

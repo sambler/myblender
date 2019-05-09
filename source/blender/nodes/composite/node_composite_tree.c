@@ -89,8 +89,9 @@ static void free_node_cache(bNodeTree *UNUSED(ntree), bNode *node)
 static void free_cache(bNodeTree *ntree)
 {
   bNode *node;
-  for (node = ntree->nodes.first; node; node = node->next)
+  for (node = ntree->nodes.first; node; node = node->next) {
     free_node_cache(ntree, node);
+  }
 }
 
 /* local tree then owns all compbufs */
@@ -109,10 +110,12 @@ static void localize(bNodeTree *UNUSED(localtree), bNodeTree *ntree)
 
     if (ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER)) {
       if (node->id) {
-        if (node->flag & NODE_DO_OUTPUT)
+        if (node->flag & NODE_DO_OUTPUT) {
           node->new_node->id = (ID *)node->id;
-        else
+        }
+        else {
           node->new_node->id = NULL;
+        }
       }
     }
 
@@ -150,8 +153,9 @@ static void local_merge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
          * and to achieve much better performance on further calls this context should be
          * copied back to original node */
         if (lnode->storage) {
-          if (lnode->new_node->storage)
+          if (lnode->new_node->storage) {
             BKE_tracking_distortion_free(lnode->new_node->storage);
+          }
 
           lnode->new_node->storage = BKE_tracking_distortion_copy(lnode->storage);
         }
@@ -243,22 +247,25 @@ void ntreeCompositExecTree(Scene *scene,
 
 /* Update the outputs of the render layer nodes.
  * Since the outputs depend on the render engine, this part is a bit complex:
- * - ntreeCompositUpdateRLayers is called and loops over all render layer nodes
- * - Each render layer node calls the update function of the render engine that's used for its scene
- * - The render engine calls RE_engine_register_pass for each pass
- * - RE_engine_register_pass calls ntreeCompositRegisterPass,
- *   which calls node_cmp_rlayers_register_pass for every render layer node
+ * - ntreeCompositUpdateRLayers is called and loops over all render layer nodes.
+ * - Each render layer node calls the update function of the
+ *   render engine that's used for its scene.
+ * - The render engine calls RE_engine_register_pass for each pass.
+ * - RE_engine_register_pass calls ntreeCompositRegisterPass,.
+ *   which calls node_cmp_rlayers_register_pass for every render layer node.
  */
 void ntreeCompositUpdateRLayers(bNodeTree *ntree)
 {
   bNode *node;
 
-  if (ntree == NULL)
+  if (ntree == NULL) {
     return;
+  }
 
   for (node = ntree->nodes.first; node; node = node->next) {
-    if (node->type == CMP_NODE_R_LAYERS)
+    if (node->type == CMP_NODE_R_LAYERS) {
       node_cmp_rlayers_outputs(ntree, node);
+    }
   }
 }
 
@@ -267,12 +274,14 @@ void ntreeCompositRegisterPass(
 {
   bNode *node;
 
-  if (ntree == NULL)
+  if (ntree == NULL) {
     return;
+  }
 
   for (node = ntree->nodes.first; node; node = node->next) {
-    if (node->type == CMP_NODE_R_LAYERS)
+    if (node->type == CMP_NODE_R_LAYERS) {
       node_cmp_rlayers_register_pass(ntree, node, scene, view_layer, name, type);
+    }
   }
 }
 
@@ -284,16 +293,20 @@ void ntreeCompositTagRender(Scene *curscene)
 
   /* XXX Think using G_MAIN here is valid, since you want to update current file's scene nodes,
    * not the ones in temp main generated for rendering?
-   * This is still rather weak though, ideally render struct would store own main AND original G_MAIN... */
+   * This is still rather weak though,
+   * ideally render struct would store own main AND original G_MAIN. */
+
   for (sce = G_MAIN->scenes.first; sce; sce = sce->id.next) {
     if (sce->nodetree) {
       bNode *node;
 
       for (node = sce->nodetree->nodes.first; node; node = node->next) {
-        if (node->id == (ID *)curscene || node->type == CMP_NODE_COMPOSITE)
+        if (node->id == (ID *)curscene || node->type == CMP_NODE_COMPOSITE) {
           nodeUpdate(sce->nodetree, node);
-        else if (node->type == CMP_NODE_TEXTURE) /* uses scene sizex/sizey */
+        }
+        else if (node->type == CMP_NODE_TEXTURE) /* uses scene sizex/sizey */ {
           nodeUpdate(sce->nodetree, node);
+        }
       }
     }
   }
@@ -304,12 +317,14 @@ void ntreeCompositClearTags(bNodeTree *ntree)
 {
   bNode *node;
 
-  if (ntree == NULL)
+  if (ntree == NULL) {
     return;
+  }
 
   for (node = ntree->nodes.first; node; node = node->next) {
     node->need_exec = 0;
-    if (node->type == NODE_GROUP)
+    if (node->type == NODE_GROUP) {
       ntreeCompositClearTags((bNodeTree *)node->id);
+    }
   }
 }

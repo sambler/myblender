@@ -176,16 +176,20 @@ void DRW_gpencil_get_point_geom(GpencilBatchCacheElem *be,
 
     /* use previous point to determine stroke direction */
     bGPDspoint *pt2 = NULL;
+    float fpt[3];
     if (i == 0) {
       if (gps->totpoints > 1) {
         /* extrapolate a point before first point */
-        float fpt[3];
         pt2 = &gps->points[1];
         interp_v3_v3v3(fpt, &pt2->x, &pt->x, 1.5f);
         GPU_vertbuf_attr_set(be->vbo, be->prev_pos_id, be->vbo_len, fpt);
       }
       else {
-        GPU_vertbuf_attr_set(be->vbo, be->prev_pos_id, be->vbo_len, &pt->x);
+        /* add small offset to get a vector */
+        copy_v3_v3(fpt, &pt->x);
+        fpt[0] += 0.00001f;
+        fpt[1] += 0.00001f;
+        GPU_vertbuf_attr_set(be->vbo, be->prev_pos_id, be->vbo_len, fpt);
       }
     }
     else {
@@ -630,8 +634,9 @@ GPUBatch *DRW_gpencil_get_buffer_fill_geom(bGPdata *gpd)
   float(*points2d)[2] = MEM_mallocN(sizeof(*points2d) * totpoints, __func__);
 
   /* Convert points to array and triangulate
-   * Here a cache is not used because while drawing the information changes all the time, so the cache
-   * would be recalculated constantly, so it is better to do direct calculation for each function call
+   * Here a cache is not used because while drawing the information changes all the time, so the
+   * cache would be recalculated constantly, so it is better to do direct calculation for each
+   * function call
    */
   for (int i = 0; i < totpoints; i++) {
     const tGPspoint *pt = &points[i];

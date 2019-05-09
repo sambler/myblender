@@ -34,8 +34,7 @@ class GRAPH_HT_header(Header):
 
         st = context.space_data
 
-        row = layout.row(align=True)
-        row.template_header()
+        layout.template_header()
 
         # Now a exposed as a sub-space type
         # layout.prop(st, "mode", text="")
@@ -329,9 +328,9 @@ class GRAPH_MT_context_menu(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("graph.copy", text="Copy")
-        layout.operator("graph.paste", text="Paste")
-        layout.operator("graph.paste", text="Paste Flipped").flipped = True
+        layout.operator("graph.copy", text="Copy", icon='COPYDOWN')
+        layout.operator("graph.paste", text="Paste", icon='PASTEDOWN')
+        layout.operator("graph.paste", text="Paste Flipped", icon='PASTEFLIPDOWN').flipped = True
 
         layout.separator()
 

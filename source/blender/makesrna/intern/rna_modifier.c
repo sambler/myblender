@@ -719,7 +719,8 @@ static void modifier_object_set(Object *self, Object **ob_p, int type, PointerRN
 }
 
 #  define RNA_MOD_OBJECT_SET(_type, _prop, _obtype) \
-    static void rna_##_type##Modifier_##_prop##_set(PointerRNA *ptr, PointerRNA value) \
+    static void rna_##_type##Modifier_##_prop##_set( \
+        PointerRNA *ptr, PointerRNA value, struct ReportList *UNUSED(reports)) \
     { \
       _type##ModifierData *tmd = (_type##ModifierData *)ptr->data; \
       modifier_object_set(ptr->id.data, &tmd->_prop, _obtype, value); \
@@ -741,7 +742,9 @@ RNA_MOD_OBJECT_SET(Shrinkwrap, target, OB_MESH);
 RNA_MOD_OBJECT_SET(Shrinkwrap, auxTarget, OB_MESH);
 RNA_MOD_OBJECT_SET(SurfaceDeform, target, OB_MESH);
 
-static void rna_HookModifier_object_set(PointerRNA *ptr, PointerRNA value)
+static void rna_HookModifier_object_set(PointerRNA *ptr,
+                                        PointerRNA value,
+                                        struct ReportList *UNUSED(reports))
 {
   Object *owner = (Object *)ptr->id.data;
   HookModifierData *hmd = ptr->data;
@@ -824,7 +827,9 @@ static PointerRNA rna_UVProjector_object_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_Object, *ob);
 }
 
-static void rna_UVProjector_object_set(PointerRNA *ptr, PointerRNA value)
+static void rna_UVProjector_object_set(PointerRNA *ptr,
+                                       PointerRNA value,
+                                       struct ReportList *UNUSED(reports))
 {
   Object **ob_p = (Object **)ptr->data;
   Object *ob = (Object *)value.data;
@@ -1397,7 +1402,8 @@ static PointerRNA rna_ParticleInstanceModifier_particle_system_get(PointerRNA *p
 }
 
 static void rna_ParticleInstanceModifier_particle_system_set(PointerRNA *ptr,
-                                                             const PointerRNA value)
+                                                             const PointerRNA value,
+                                                             struct ReportList *UNUSED(reports))
 {
   ParticleInstanceModifierData *psmd = ptr->data;
 
@@ -3193,6 +3199,7 @@ static void rna_def_modifier_particleinstance(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_children", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Children);
   RNA_def_property_ui_text(prop, "Children", "Create instances from child particles");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_PARTICLESETTINGS);
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "use_path", PROP_BOOLEAN, PROP_NONE);

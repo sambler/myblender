@@ -52,7 +52,7 @@ void workbench_material_update_data(WORKBENCH_PrivateData *wpd,
   copy_v3_v3(data->base_color, data->diffuse_color);
   copy_v3_fl3(data->specular_color, 0.05f, 0.05f, 0.05f); /* Dielectric: 5% reflective. */
   data->metallic = 0.0f;
-  data->roughness = 0.5f; /* sqrtf(0.25f); */
+  data->roughness = 0.632455532f; /* sqrtf(0.4f); */
 
   if (color_type == V3D_SHADING_SINGLE_COLOR) {
     copy_v3_v3(data->diffuse_color, wpd->shading.single_color);
@@ -294,15 +294,8 @@ void workbench_material_shgroup_uniform(WORKBENCH_PrivateData *wpd,
 
   if (workbench_material_determine_color_type(wpd, material->ima, ob, false) ==
       V3D_SHADING_TEXTURE_COLOR) {
-    ImBuf *ibuf = BKE_image_acquire_ibuf(material->ima, material->iuser, NULL);
-    const bool do_color_correction = wpd->use_color_management &&
-                                     (ibuf &&
-                                      (ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA) == 0);
-    BKE_image_release_ibuf(material->ima, ibuf, NULL);
-    GPUTexture *tex = GPU_texture_from_blender(
-        material->ima, material->iuser, GL_TEXTURE_2D, false);
+    GPUTexture *tex = GPU_texture_from_blender(material->ima, material->iuser, GL_TEXTURE_2D);
     DRW_shgroup_uniform_texture(grp, "image", tex);
-    DRW_shgroup_uniform_bool_copy(grp, "imageSrgb", do_color_correction);
     DRW_shgroup_uniform_bool_copy(grp, "imageNearest", (interp == SHD_INTERP_CLOSEST));
   }
   else {

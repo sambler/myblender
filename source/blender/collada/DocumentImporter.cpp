@@ -859,7 +859,7 @@ bool DocumentImporter::writeCamera(const COLLADAFW::Camera *camera)
   if (et && et->isProfile("blender")) {
     et->setData("shiftx", &(cam->shiftx));
     et->setData("shifty", &(cam->shifty));
-    et->setData("dof_distance", &(cam->dof_distance));
+    et->setData("dof_distance", &(cam->dof.focus_distance));
   }
   cam->clip_start = camera->getNearClippingPlane().getValue();
   cam->clip_end = camera->getFarClippingPlane().getValue();
@@ -1125,7 +1125,6 @@ bool DocumentImporter::writeAnimation(const COLLADAFW::Animation *anim)
   if (mImportStage == Fetching_Controller_data)
     return true;
 
-  /* return true; */
   return anim_importer.write_animation(anim);
 }
 

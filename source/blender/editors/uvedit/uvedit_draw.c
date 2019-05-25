@@ -207,6 +207,7 @@ static void draw_uvs_shadow(SpaceImage *UNUSED(sima),
   float col[4];
   UI_GetThemeColor4fv(TH_UV_SHADOW, col);
 
+  DRW_mesh_batch_cache_validate(me);
   GPUBatch *edges = DRW_mesh_batch_cache_get_uv_edges(me);
   DRW_mesh_batch_cache_create_requested(eval_ob, me, scene->toolsettings, false, false);
 
@@ -229,6 +230,7 @@ static void draw_uvs_texpaint(Scene *scene, Object *ob, Depsgraph *depsgraph)
     return;
   }
 
+  DRW_mesh_batch_cache_validate(me);
   GPUBatch *geom = DRW_mesh_batch_cache_get_uv_edges(me);
   DRW_mesh_batch_cache_create_requested(eval_ob, me, scene->toolsettings, false, false);
 
@@ -244,6 +246,7 @@ static void draw_uvs_texpaint(Scene *scene, Object *ob, Depsgraph *depsgraph)
     bool prev_ma_match = (mpoly->mat_nr == (eval_ob->actcol - 1));
 
     GPU_matrix_bind(geom->interface);
+    GPU_batch_bind(geom);
 
     /* TODO(fclem): If drawcall count becomes a problem in the future
      * we can use multi draw indirect drawcalls for this.
@@ -252,7 +255,7 @@ static void draw_uvs_texpaint(Scene *scene, Object *ob, Depsgraph *depsgraph)
       bool ma_match = (mpoly->mat_nr == (eval_ob->actcol - 1));
       if (ma_match != prev_ma_match) {
         if (ma_match == false) {
-          GPU_batch_draw_range_ex(geom, draw_start, idx - draw_start, false);
+          GPU_batch_draw_advanced(geom, draw_start, idx - draw_start, 0, 0);
         }
         else {
           draw_start = idx;
@@ -262,7 +265,7 @@ static void draw_uvs_texpaint(Scene *scene, Object *ob, Depsgraph *depsgraph)
       prev_ma_match = ma_match;
     }
     if (prev_ma_match == true) {
-      GPU_batch_draw_range_ex(geom, draw_start, idx - draw_start, false);
+      GPU_batch_draw_advanced(geom, draw_start, idx - draw_start, 0, 0);
     }
 
     GPU_batch_program_use_end(geom);

@@ -96,18 +96,14 @@ static void basic_cache_init(void *vedata)
   BASIC_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
   const RegionView3D *rv3d = draw_ctx->rv3d;
 
-  if (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) {
-    DRW_state_clip_planes_set_from_rv3d(draw_ctx->rv3d);
-  }
-
   if (!stl->g_data) {
     /* Alloc transient pointers */
     stl->g_data = MEM_mallocN(sizeof(*stl->g_data), __func__);
   }
 
   {
-    psl->depth_pass = DRW_pass_create(
-        "Depth Pass", DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_WIRE);
+    psl->depth_pass = DRW_pass_create("Depth Pass",
+                                      DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL);
     stl->g_data->depth_shgrp = DRW_shgroup_create(sh_data->depth, psl->depth_pass);
     if (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) {
       DRW_shgroup_world_clip_planes_from_rv3d(stl->g_data->depth_shgrp, rv3d);
@@ -143,7 +139,7 @@ static void basic_cache_populate(void *vedata, Object *ob)
       const int draw_as = (part->draw_as == PART_DRAW_REND) ? part->ren_as : part->draw_as;
       if (draw_as == PART_DRAW_PATH) {
         struct GPUBatch *hairs = DRW_cache_particles_get_hair(ob, psys, NULL);
-        DRW_shgroup_call_add(stl->g_data->depth_shgrp, hairs, NULL);
+        DRW_shgroup_call(stl->g_data->depth_shgrp, hairs, NULL);
       }
     }
   }
@@ -159,7 +155,7 @@ static void basic_cache_populate(void *vedata, Object *ob)
     if (is_flat_object_viewed_from_side) {
       /* Avoid losing flat objects when in ortho views (see T56549) */
       struct GPUBatch *geom = DRW_cache_object_all_edges_get(ob);
-      DRW_shgroup_call_object_add(stl->g_data->depth_shgrp, geom, ob);
+      DRW_shgroup_call_object(stl->g_data->depth_shgrp, geom, ob);
       return;
     }
   }
@@ -169,7 +165,7 @@ static void basic_cache_populate(void *vedata, Object *ob)
     const bool do_cull = (draw_ctx->v3d &&
                           (draw_ctx->v3d->shading.flag & V3D_SHADING_BACKFACE_CULLING));
     /* Depth Prepass */
-    DRW_shgroup_call_object_add(
+    DRW_shgroup_call_object(
         (do_cull) ? stl->g_data->depth_shgrp_cull : stl->g_data->depth_shgrp, geom, ob);
   }
 }

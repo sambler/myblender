@@ -53,7 +53,7 @@ static std::string getActiveUVLayerName(Object *ob)
 }
 
 EffectsExporter::EffectsExporter(COLLADASW::StreamWriter *sw,
-                                 const ExportSettings *export_settings,
+                                 BCExportSettings &export_settings,
                                  KeyImageMap &key_image_map)
     : COLLADASW::LibraryEffects(sw), export_settings(export_settings), key_image_map(key_image_map)
 {
@@ -84,7 +84,8 @@ void EffectsExporter::exportEffects(bContext *C, Scene *sce)
     this->scene = sce;
     openLibrary();
     MaterialFunctor mf;
-    mf.forEachMaterialInExportSet<EffectsExporter>(sce, *this, this->export_settings->export_set);
+    mf.forEachMaterialInExportSet<EffectsExporter>(
+        sce, *this, this->export_settings.get_export_set());
 
     closeLibrary();
   }
@@ -243,20 +244,9 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 
   // performs the actual writing
   ep.addProfileElements();
-  bool twoSided = false;
-  if (ob->type == OB_MESH && ob->data) {
-    Mesh *me = (Mesh *)ob->data;
-    if (me->flag & ME_TWOSIDED)
-      twoSided = true;
-  }
-  if (twoSided)
-    ep.addExtraTechniqueParameter("GOOGLEEARTH", "double_sided", 1);
   ep.addExtraTechniques(mSW);
 
   ep.closeProfile();
-  if (twoSided)
-    mSW->appendTextBlock(
-        "<extra><technique profile=\"MAX3D\"><double_sided>1</double_sided></technique></extra>");
   closeEffect();
 }
 

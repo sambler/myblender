@@ -273,12 +273,10 @@ typedef struct WORKBENCH_PrivateData {
 } WORKBENCH_PrivateData; /* Transient data */
 
 typedef struct WORKBENCH_EffectInfo {
-  float override_persmat[4][4];
-  float override_persinv[4][4];
-  float override_winmat[4][4];
-  float override_wininv[4][4];
+  /** View */
+  struct DRWView *view;
+  /** Last projection matrix to see if view is still valid. */
   float last_mat[4][4];
-  float curr_mat[4][4];
   int jitter_index;
   float taa_mix_factor;
   bool view_updated;
@@ -319,28 +317,39 @@ typedef struct WORKBENCH_ObjectData {
 BLI_INLINE bool workbench_is_taa_enabled(WORKBENCH_PrivateData *wpd)
 {
   if (DRW_state_is_image_render()) {
-    return DRW_context_state_get()->scene->display.render_aa > SCE_DISPLAY_AA_FXAA;
+    const DRWContextState *draw_ctx = DRW_context_state_get();
+    if (draw_ctx->v3d) {
+      return draw_ctx->scene->display.viewport_aa > SCE_DISPLAY_AA_FXAA;
+    }
+    else {
+      return draw_ctx->scene->display.render_aa > SCE_DISPLAY_AA_FXAA;
+    }
   }
   else {
-    return DRW_context_state_get()->scene->display.viewport_aa > SCE_DISPLAY_AA_FXAA &&
-           wpd->preferences->gpu_viewport_quality >= GPU_VIEWPORT_QUALITY_TAA8 &&
-           !wpd->is_playback;
+    return !(IS_NAVIGATING(wpd) || wpd->is_playback) &&
+           wpd->preferences->viewport_aa > SCE_DISPLAY_AA_FXAA;
   }
 }
 
 BLI_INLINE bool workbench_is_fxaa_enabled(WORKBENCH_PrivateData *wpd)
 {
   if (DRW_state_is_image_render()) {
-    return DRW_context_state_get()->scene->display.render_aa == SCE_DISPLAY_AA_FXAA;
+    const DRWContextState *draw_ctx = DRW_context_state_get();
+    if (draw_ctx->v3d) {
+      return draw_ctx->scene->display.viewport_aa == SCE_DISPLAY_AA_FXAA;
+    }
+    else {
+      return draw_ctx->scene->display.render_aa == SCE_DISPLAY_AA_FXAA;
+    }
   }
   else {
-    if (wpd->preferences->gpu_viewport_quality >= GPU_VIEWPORT_QUALITY_FXAA &&
-        DRW_context_state_get()->scene->display.viewport_aa == SCE_DISPLAY_AA_FXAA) {
+    if (wpd->preferences->viewport_aa == SCE_DISPLAY_AA_FXAA) {
       return true;
     }
 
-    /* when navigating or animation playback use FXAA. */
-    return (IS_NAVIGATING(wpd) || wpd->is_playback) && workbench_is_taa_enabled(wpd);
+    /* when navigating or animation playback use FXAA if scene uses TAA. */
+    return (IS_NAVIGATING(wpd) || wpd->is_playback) &&
+           wpd->preferences->viewport_aa > SCE_DISPLAY_AA_FXAA;
   }
 }
 

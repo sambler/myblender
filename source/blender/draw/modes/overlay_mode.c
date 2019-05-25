@@ -111,10 +111,6 @@ static void overlay_engine_init(void *vedata)
   const DRWContextState *draw_ctx = DRW_context_state_get();
   OVERLAY_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
 
-  if (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) {
-    DRW_state_clip_planes_set_from_rv3d(draw_ctx->rv3d);
-  }
-
   if (!stl->g_data) {
     /* Alloc transient pointers */
     stl->g_data = MEM_callocN(sizeof(*stl->g_data), __func__);
@@ -126,8 +122,10 @@ static void overlay_engine_init(void *vedata)
   if (!sh_data->face_orientation) {
     /* Face orientation */
     sh_data->face_orientation = GPU_shader_create_from_arrays({
-        .vert =
-            (const char *[]){sh_cfg_data->lib, datatoc_overlay_face_orientation_vert_glsl, NULL},
+        .vert = (const char *[]){sh_cfg_data->lib,
+                                 datatoc_common_view_lib_glsl,
+                                 datatoc_overlay_face_orientation_vert_glsl,
+                                 NULL},
         .frag = (const char *[]){datatoc_overlay_face_orientation_frag_glsl, NULL},
         .defs = (const char *[]){sh_cfg_data->def, NULL},
     });
@@ -221,7 +219,7 @@ static void overlay_cache_init(void *vedata)
 
     float winmat[4][4];
     float viewdist = rv3d->dist;
-    DRW_viewport_matrix_get(winmat, DRW_MAT_WIN);
+    DRW_view_winmat_get(NULL, winmat, false);
     /* special exception for ortho camera (viewdist isnt used for perspective cameras) */
     if (rv3d->persp == RV3D_CAMOB && rv3d->is_persp == false) {
       viewdist = 1.0f / max_ff(fabsf(rv3d->winmat[0][0]), fabsf(rv3d->winmat[1][1]));
@@ -353,7 +351,7 @@ static void overlay_cache_populate(void *vedata, Object *ob)
   if (DRW_object_is_renderable(ob) && pd->overlay.flag & V3D_OVERLAY_FACE_ORIENTATION) {
     struct GPUBatch *geom = DRW_cache_object_surface_get(ob);
     if (geom) {
-      DRW_shgroup_call_object_add(pd->face_orientation_shgrp, geom, ob);
+      DRW_shgroup_call_object(pd->face_orientation_shgrp, geom, ob);
     }
   }
 
@@ -367,7 +365,9 @@ static void overlay_cache_populate(void *vedata, Object *ob)
         *dupli_data = MEM_callocN(sizeof(OVERLAY_DupliData), "OVERLAY_DupliData");
       }
       else {
-        DRW_shgroup_call_object_add((*dupli_data)->shgrp, (*dupli_data)->geom, ob);
+        if ((*dupli_data)->shgrp && (*dupli_data)->geom) {
+          DRW_shgroup_call_object((*dupli_data)->shgrp, (*dupli_data)->geom, ob);
+        }
         return;
       }
     }
@@ -418,10 +418,10 @@ static void overlay_cache_populate(void *vedata, Object *ob)
         }
 
         if (is_sculpt_mode) {
-          DRW_shgroup_call_sculpt_add(shgrp, ob, true, false, false);
+          DRW_shgroup_call_sculpt(shgrp, ob, true, false, false);
         }
         else {
-          DRW_shgroup_call_object_add(shgrp, geom, ob);
+          DRW_shgroup_call_object(shgrp, geom, ob);
         }
       }
 

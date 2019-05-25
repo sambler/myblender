@@ -60,7 +60,7 @@
 #include "ED_mask.h"
 #include "ED_sequencer.h"
 #include "ED_screen.h"
-#include "ED_scrubbing.h"
+#include "ED_time_scrub_ui.h"
 #include "ED_space_api.h"
 
 #include "BIF_glutil.h"
@@ -1121,8 +1121,7 @@ static void sequencer_display_size(Scene *scene, float r_viewrect[2])
   r_viewrect[0] = (float)scene->r.xsch;
   r_viewrect[1] = (float)scene->r.ysch;
 
-  /* Aspect ratio seems to have no effect on output image*/
-  /* r_viewrect[0] *= scene->r.xasp / scene->r.yasp; */
+  r_viewrect[0] *= scene->r.xasp / scene->r.yasp;
 }
 
 static void sequencer_draw_gpencil(const bContext *C)
@@ -1822,7 +1821,7 @@ typedef struct CacheDrawData {
 
 /* Called as a callback */
 static bool draw_cache_view_cb(
-    void *userdata, struct Sequence *seq, int cfra, int cache_type, float UNUSED(cost))
+    void *userdata, struct Sequence *seq, int nfra, int cache_type, float UNUSED(cost))
 {
   CacheDrawData *drawdata = userdata;
   const bContext *C = drawdata->C;
@@ -1902,6 +1901,7 @@ static bool draw_cache_view_cb(
       }
   }
 
+  int cfra = seq->start + nfra;
   immUniformColor4f(color[0], color[1], color[2], color[3]);
   immRectf(pos, cfra, stripe_bot, cfra + 1, stripe_top);
 
@@ -1922,9 +1922,13 @@ static void draw_cache_view(const bContext *C)
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
-  float stripe_bot, stripe_top, stripe_offs;
+  float stripe_bot, stripe_top;
+  float stripe_offs = UI_view2d_region_to_view_y(v2d, 1.0f) - v2d->cur.ymin;
   float stripe_ht = UI_view2d_region_to_view_y(v2d, 4.0f * UI_DPI_FAC * U.pixelsize) -
                     v2d->cur.ymin;
+
+  CLAMP_MAX(stripe_ht, 0.2f);
+  CLAMP_MIN(stripe_offs, stripe_ht / 2);
 
   if (scene->ed->cache_flag & SEQ_CACHE_VIEW_FINAL_OUT) {
     stripe_bot = UI_view2d_region_to_view_y(v2d, V2D_SCROLL_HEIGHT_HANDLES);
@@ -1943,10 +1947,6 @@ static void draw_cache_view(const bContext *C)
     if (seq->startdisp > v2d->cur.xmax || seq->enddisp < v2d->cur.xmin) {
       continue;
     }
-
-    CLAMP_MAX(stripe_ht, 0.2f);
-    stripe_offs = UI_view2d_region_to_view_y(v2d, 1.0f) - v2d->cur.ymin;
-    CLAMP_MIN(stripe_offs, stripe_ht / 2);
 
     stripe_bot = seq->machine + SEQ_STRIP_OFSBOTTOM + stripe_offs;
     stripe_top = stripe_bot + stripe_ht;

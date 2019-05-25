@@ -1,7 +1,4 @@
 
-uniform mat4 ModelMatrix;
-uniform mat4 ModelMatrixInverse;
-
 uniform float wireStepParam;
 uniform float ofs;
 
@@ -39,7 +36,7 @@ void main()
   vec4 wpos = ModelMatrix * vec4(pos, 1.0);
   gl_Position = projmat * (ViewMatrix * wpos);
 
-  vec3 wnor = normalize(transform_normal_object_to_world(nor));
+  vec3 wnor = normalize(normal_object_to_world(nor));
   facing_g = dot(wnor, ViewMatrixInverse[2].xyz);
   edgeSharpness_g = get_edge_sharpness(wd);
 

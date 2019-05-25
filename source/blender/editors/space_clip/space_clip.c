@@ -47,7 +47,7 @@
 #include "ED_mask.h"
 #include "ED_space_api.h"
 #include "ED_screen.h"
-#include "ED_scrubbing.h"
+#include "ED_time_scrub_ui.h"
 #include "ED_select_utils.h"
 #include "ED_clip.h"
 #include "ED_transform.h"
@@ -926,7 +926,8 @@ static void clip_main_region_draw(const bContext *C, ARegion *ar)
       ScrArea *sa = CTX_wm_area(C);
       int mask_width, mask_height;
       ED_mask_get_size(sa, &mask_width, &mask_height);
-      ED_mask_draw_region(mask,
+      ED_mask_draw_region(CTX_data_depsgraph(C),
+                          mask,
                           ar,
                           sc->mask_info.draw_flag,
                           sc->mask_info.draw_type,
@@ -1371,7 +1372,7 @@ void ED_spacetype_clip(void)
   /* regions: properties */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip region properties");
   art->regionid = RGN_TYPE_UI;
-  art->prefsizex = UI_COMPACT_PANEL_WIDTH;
+  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
   art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
   art->init = clip_properties_region_init;
   art->draw = clip_properties_region_draw;
@@ -1382,7 +1383,7 @@ void ED_spacetype_clip(void)
   /* regions: tools */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip region tools");
   art->regionid = RGN_TYPE_TOOLS;
-  art->prefsizex = UI_COMPACT_PANEL_WIDTH;
+  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
   art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
   art->listener = clip_props_region_listener;
   art->init = clip_tools_region_init;

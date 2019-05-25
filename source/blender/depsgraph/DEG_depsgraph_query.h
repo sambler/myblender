@@ -29,6 +29,9 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
+/* Needed for the instance iterator. */
+#include "DNA_object_types.h"
+
 struct ID;
 
 struct BLI_Iterator;
@@ -99,6 +102,19 @@ struct Object *DEG_get_original_object(struct Object *object);
 
 /* Get original version of given evaluated ID datablock. */
 struct ID *DEG_get_original_id(struct ID *id);
+
+/* Check whether given ID is an original,
+ *
+ * Original IDs are considered all the IDs which are not covered by copy-on-write system and are
+ * not out-of-main localized datablocks. */
+bool DEG_is_original_id(struct ID *id);
+bool DEG_is_original_object(struct Object *object);
+
+/* Opposite of the above.
+ *
+ * If the datablock is not original it must be evaluated, and vice versa. */
+bool DEG_is_evaluated_id(struct ID *id);
+bool DEG_is_evaluated_object(struct Object *object);
 
 /* ************************ DEG object iterators ********************* */
 

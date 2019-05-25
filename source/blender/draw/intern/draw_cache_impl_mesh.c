@@ -1142,11 +1142,12 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
                  rdata->cd.layers.tangent_len);
 
       int i_dst = 0;
+      int act_tan = rdata->cd.layers.tangent_active;
       for (int i_src = 0; i_src < cd_layers_src.uv_len; i_src++, i_dst++) {
         if ((cd_used->tan & (1 << i_src)) == 0) {
           i_dst--;
           if (rdata->cd.layers.tangent_active >= i_src) {
-            rdata->cd.layers.tangent_active--;
+            act_tan--;
           }
         }
         else {
@@ -1170,6 +1171,11 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
           }
         }
       }
+      if (rdata->cd.layers.tangent_active != -1) {
+        /* Actual active UV slot inside uv layers used for shading. */
+        rdata->cd.layers.tangent_active = act_tan;
+      }
+
       if (cd_used->tan_orco != 0) {
         const char *name = CustomData_get_layer_name(&rdata->cd.output.ldata, CD_TANGENT, i_dst);
         uint hash = BLI_ghashutil_strhash_p(name);
@@ -2078,14 +2084,7 @@ static bool mesh_batch_cache_valid(Mesh *me)
     return false;
   }
 
-  if (cache->is_editmode) {
-    return false;
-  }
-  else if ((cache->vert_len != mesh_render_verts_len_get(me)) ||
-           (cache->edge_len != mesh_render_edges_len_get(me)) ||
-           (cache->tri_len != mesh_render_looptri_len_get(me)) ||
-           (cache->poly_len != mesh_render_polys_len_get(me)) ||
-           (cache->mat_len != mesh_render_mat_len_get(me))) {
+  if (cache->mat_len != mesh_render_mat_len_get(me)) {
     return false;
   }
 
@@ -2215,9 +2214,11 @@ void DRW_mesh_batch_cache_dirty_tag(Mesh *me, int mode)
       GPU_BATCH_DISCARD_SAFE(cache->batch.edit_vertices);
       GPU_BATCH_DISCARD_SAFE(cache->batch.edit_edges);
       GPU_BATCH_DISCARD_SAFE(cache->batch.edit_facedots);
+      GPU_BATCH_DISCARD_SAFE(cache->batch.edit_selection_facedots);
       GPU_BATCH_DISCARD_SAFE(cache->batch.edit_mesh_analysis);
       cache->batch_ready &= ~(MBC_EDIT_TRIANGLES | MBC_EDIT_VERTICES | MBC_EDIT_EDGES |
-                              MBC_EDIT_FACEDOTS | MBC_EDIT_MESH_ANALYSIS);
+                              MBC_EDIT_FACEDOTS | MBC_EDIT_SELECTION_FACEDOTS |
+                              MBC_EDIT_MESH_ANALYSIS);
       /* Because visible UVs depends on edit mode selection, discard everything. */
       mesh_batch_cache_discard_uvedit(cache);
       break;
@@ -4296,7 +4297,7 @@ GPUBatch *DRW_mesh_batch_cache_get_loose_edges(Mesh *me)
 GPUBatch *DRW_mesh_batch_cache_get_surface_weights(Mesh *me)
 {
   MeshBatchCache *cache = mesh_batch_cache_get(me);
-  mesh_batch_cache_add_request(cache, MBC_LOOSE_EDGES);
+  mesh_batch_cache_add_request(cache, MBC_SURFACE_WEIGHTS);
   return DRW_batch_request(&cache->batch.surface_weights);
 }
 
@@ -4740,14 +4741,18 @@ static void uvedit_fill_buffer_data(MeshRenderData *rdata,
           GPU_indexbuf_add_generic_vert(elb_face, vidx);
           GPU_indexbuf_add_primitive_restart(elb_face);
         }
-        if (elb_edge && e_origindex[l[i].e] != ORIGINDEX_NONE) {
+        if (elb_edge) {
           for (i = 0; i < mpoly->totloop; ++i) {
-            GPU_indexbuf_add_line_verts(elb_edge, vidx + i, vidx + (i + 1) % mpoly->totloop);
+            if (e_origindex[l[i].e] != ORIGINDEX_NONE) {
+              GPU_indexbuf_add_line_verts(elb_edge, vidx + i, vidx + (i + 1) % mpoly->totloop);
+            }
           }
         }
-        if (elb_vert && v_origindex[l[i].v] != ORIGINDEX_NONE) {
+        if (elb_vert) {
           for (i = 0; i < mpoly->totloop; ++i) {
-            GPU_indexbuf_add_generic_vert(elb_vert, vidx + i);
+            if (v_origindex[l[i].v] != ORIGINDEX_NONE) {
+              GPU_indexbuf_add_generic_vert(elb_vert, vidx + i);
+            }
           }
         }
       }
@@ -4910,9 +4915,12 @@ void DRW_mesh_batch_cache_create_requested(
     return;
   }
 
-  if (cache->batch_requested & MBC_SURFACE_WEIGHTS) {
+  DRWBatchFlag batch_requested = cache->batch_requested;
+  cache->batch_requested = 0;
+
+  if (batch_requested & MBC_SURFACE_WEIGHTS) {
     /* Check vertex weights. */
-    if ((cache->batch.surface_weights != 0) && (ts != NULL)) {
+    if ((cache->batch.surface_weights != NULL) && (ts != NULL)) {
       struct DRW_MeshWeightState wstate;
       BLI_assert(ob->type == OB_MESH);
       drw_mesh_weight_state_extract(ob, me, ts, is_paint_mode, &wstate);
@@ -4922,7 +4930,7 @@ void DRW_mesh_batch_cache_create_requested(
     }
   }
 
-  if (cache->batch_requested & (MBC_SURFACE | MBC_SURF_PER_MAT)) {
+  if (batch_requested & (MBC_SURFACE | MBC_SURF_PER_MAT | MBC_WIRE_LOOPS_UVS)) {
     /* Optimization : Only create orco layer if mesh is deformed. */
     if (cache->cd_needed.orco != 0) {
       CustomData *cd_vdata = (me->edit_mesh) ? &me->edit_mesh->bm->vdata : &me->vdata;
@@ -4967,7 +4975,7 @@ void DRW_mesh_batch_cache_create_requested(
     mesh_cd_layers_type_clear(&cache->cd_needed);
   }
 
-  if (cache->batch_requested & MBC_EDITUV) {
+  if (batch_requested & MBC_EDITUV) {
     /* Discard UV batches if sync_selection changes */
     if (ts != NULL) {
       const bool is_uvsyncsel = (ts->uv_flag & UV_SYNC_SELECTION);
@@ -4995,15 +5003,14 @@ void DRW_mesh_batch_cache_create_requested(
   }
 
   /* Second chance to early out */
-  if ((cache->batch_requested & ~cache->batch_ready) == 0) {
+  if ((batch_requested & ~cache->batch_ready) == 0) {
 #ifdef DEBUG
     goto check;
 #endif
     return;
   }
 
-  cache->batch_ready |= cache->batch_requested;
-  cache->batch_requested = 0;
+  cache->batch_ready |= batch_requested;
 
   /* Init batches and request VBOs & IBOs */
   if (DRW_batch_requested(cache->batch.surface, GPU_PRIM_TRIS)) {

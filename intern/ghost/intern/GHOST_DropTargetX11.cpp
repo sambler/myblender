@@ -26,6 +26,7 @@
 
 #include <ctype.h>
 #include <assert.h>
+#include <stdio.h>
 
 bool GHOST_DropTargetX11::m_xdndInitialized = false;
 DndClass GHOST_DropTargetX11::m_dndClass;

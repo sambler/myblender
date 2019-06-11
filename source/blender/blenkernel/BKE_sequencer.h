@@ -398,6 +398,8 @@ void BKE_sequence_invalidate_cache_raw(struct Scene *scene, struct Sequence *seq
 void BKE_sequence_invalidate_cache_preprocessed(struct Scene *scene, struct Sequence *seq);
 void BKE_sequence_invalidate_cache_composite(struct Scene *scene, struct Sequence *seq);
 void BKE_sequence_invalidate_dependent(struct Scene *scene, struct Sequence *seq);
+void BKE_sequence_invalidate_scene_strips(struct Main *bmain, struct Scene *scene_target);
+void BKE_sequence_invalidate_movieclip_strips(struct Main *bmain, struct MovieClip *clip_target);
 
 void BKE_sequencer_update_sound_bounds_all(struct Scene *scene);
 void BKE_sequencer_update_sound_bounds(struct Scene *scene, struct Sequence *seq);
@@ -459,7 +461,7 @@ typedef struct SeqLoadInfo {
 /* use as an api function */
 typedef struct Sequence *(*SeqLoadFunc)(struct bContext *, ListBase *, struct SeqLoadInfo *);
 
-struct Sequence *BKE_sequence_alloc(ListBase *lb, int cfra, int machine);
+struct Sequence *BKE_sequence_alloc(ListBase *lb, int cfra, int machine, int type);
 
 void BKE_sequence_alpha_mode_from_extension(struct Sequence *seq);
 void BKE_sequence_init_colorspace(struct Sequence *seq);

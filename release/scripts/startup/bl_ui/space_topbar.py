@@ -171,9 +171,8 @@ class TOPBAR_MT_editor_menus(Menu):
 class TOPBAR_MT_app(Menu):
     bl_label = "Blender"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
-        prefs = context.preferences
 
         layout.operator("wm.splash")
 
@@ -235,9 +234,6 @@ class TOPBAR_MT_file(Menu):
 
         layout.separator()
 
-        layout.operator_context = 'EXEC_AREA'
-        if bpy.data.is_dirty:
-            layout.operator_context = 'INVOKE_SCREEN'  # quit dialog
         layout.operator("wm.quit_blender", text="Quit", icon='QUIT')
 
 
@@ -309,7 +305,7 @@ class TOPBAR_MT_file_new(Menu):
 class TOPBAR_MT_file_recover(Menu):
     bl_label = "Recover"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("wm.recover_last_session", text="Last Session")
@@ -351,7 +347,7 @@ class TOPBAR_MT_file_defaults(Menu):
 class TOPBAR_MT_app_about(Menu):
     bl_label = "About"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator(
@@ -377,7 +373,7 @@ class TOPBAR_MT_app_about(Menu):
 class TOPBAR_MT_app_support(Menu):
     bl_label = "Support Blender"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator(

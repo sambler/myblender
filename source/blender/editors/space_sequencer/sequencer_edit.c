@@ -64,6 +64,9 @@
 #include "UI_view2d.h"
 #include "UI_interface.h"
 
+#include "DEG_depsgraph.h"
+#include "DEG_depsgraph_build.h"
+
 /* own include */
 #include "sequencer_intern.h"
 
@@ -231,23 +234,12 @@ static void seq_proxy_build_job(const bContext *C)
 
 /* ********************************************************************** */
 
-void seq_rectf(Sequence *seq, rctf *rectf)
+void seq_rectf(Sequence *seq, rctf *rect)
 {
-  if (seq->startstill) {
-    rectf->xmin = seq->start;
-  }
-  else {
-    rectf->xmin = seq->startdisp;
-  }
-
-  rectf->ymin = seq->machine + SEQ_STRIP_OFSBOTTOM;
-  if (seq->endstill) {
-    rectf->xmax = seq->start + seq->len;
-  }
-  else {
-    rectf->xmax = seq->enddisp;
-  }
-  rectf->ymax = seq->machine + SEQ_STRIP_OFSTOP;
+  rect->xmin = seq->startdisp;
+  rect->xmax = seq->enddisp;
+  rect->ymin = seq->machine + SEQ_STRIP_OFSBOTTOM;
+  rect->ymax = seq->machine + SEQ_STRIP_OFSTOP;
 }
 
 void boundbox_seq(Scene *scene, rctf *rect)
@@ -1036,11 +1028,13 @@ static void set_filter_seq(Scene *scene)
   Sequence *seq;
   Editing *ed = BKE_sequencer_editing_get(scene, false);
 
-  if (ed == NULL)
+  if (ed == NULL) {
     return;
+  }
 
-  if (okee("Set Deinterlace") == 0)
+  if (okee("Set Deinterlace") == 0) {
     return;
+  }
 
   SEQP_BEGIN (ed, seq) {
     if (seq->flag & SELECT) {
@@ -1818,7 +1812,7 @@ static int sequencer_mute_exec(bContext *C, wmOperator *op)
     }
   }
 
-  BKE_sequencer_update_muting(ed);
+  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 
   return OPERATOR_FINISHED;
@@ -1869,7 +1863,7 @@ static int sequencer_unmute_exec(bContext *C, wmOperator *op)
     }
   }
 
-  BKE_sequencer_update_muting(ed);
+  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 
   return OPERATOR_FINISHED;
@@ -2327,6 +2321,7 @@ void SEQUENCER_OT_duplicate(wmOperatorType *ot)
 /* delete operator */
 static int sequencer_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
+  Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   Editing *ed = BKE_sequencer_editing_get(scene, false);
   Sequence *seq;
@@ -2379,6 +2374,8 @@ static int sequencer_delete_exec(bContext *C, wmOperator *UNUSED(op))
     ms = ms->prev;
   }
 
+  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
+  DEG_relations_tag_update(bmain);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 
   return OPERATOR_FINISHED;
@@ -2634,7 +2631,7 @@ static int sequencer_meta_toggle_exec(bContext *C, wmOperator *UNUSED(op))
     MEM_freeN(ms);
   }
 
-  BKE_sequencer_update_muting(ed);
+  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 
   return OPERATOR_FINISHED;
@@ -2671,16 +2668,15 @@ static int sequencer_meta_make_exec(bContext *C, wmOperator *op)
 
   /* remove all selected from main list, and put in meta */
 
-  seqm = BKE_sequence_alloc(ed->seqbasep, 1, 1); /* channel number set later */
+  seqm = BKE_sequence_alloc(ed->seqbasep, 1, 1, SEQ_TYPE_META); /* channel number set later */
   strcpy(seqm->name + 2, "MetaStrip");
-  seqm->type = SEQ_TYPE_META;
   seqm->flag = SELECT;
 
   seq = ed->seqbasep->first;
   while (seq) {
     next = seq->next;
     if (seq != seqm && (seq->flag & SELECT)) {
-      BKE_sequence_invalidate_dependent(scene, seq);
+      BKE_sequence_invalidate_cache_composite(scene, seq);
       channel_max = max_ii(seq->machine, channel_max);
       BLI_remlink(ed->seqbasep, seq);
       BLI_addtail(&seqm->seqbase, seq);
@@ -2690,19 +2686,16 @@ static int sequencer_meta_make_exec(bContext *C, wmOperator *op)
   seqm->machine = last_seq ? last_seq->machine : channel_max;
   BKE_sequence_calc(scene, seqm);
 
-  seqm->strip = MEM_callocN(sizeof(Strip), "metastrip");
-  seqm->strip->us = 1;
-
   BKE_sequencer_active_set(scene, seqm);
 
   if (BKE_sequence_test_overlap(ed->seqbasep, seqm)) {
     BKE_sequence_base_shuffle(ed->seqbasep, seqm, scene);
   }
 
-  BKE_sequencer_update_muting(ed);
+  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
 
   BKE_sequence_base_unique_name_recursive(&scene->ed->seqbase, seqm);
-
+  BKE_sequence_invalidate_cache_composite(scene, seq);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 
   return OPERATOR_FINISHED;
@@ -2755,7 +2748,7 @@ static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
   }
 
   for (seq = last_seq->seqbase.first; seq != NULL; seq = seq->next) {
-    BKE_sequence_invalidate_dependent(scene, seq);
+    BKE_sequence_invalidate_cache_composite(scene, seq);
   }
 
   BLI_movelisttolist(ed->seqbasep, &last_seq->seqbase);
@@ -2786,7 +2779,7 @@ static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
   }
 
   BKE_sequencer_sort(scene);
-  BKE_sequencer_update_muting(ed);
+  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
 
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 
@@ -3174,8 +3167,9 @@ static Sequence *sequence_find_parent(Scene *scene, Sequence *child)
   Sequence *parent = NULL;
   Sequence *seq;
 
-  if (ed == NULL)
+  if (ed == NULL) {
     return NULL;
+  }
 
   for (seq = ed->seqbasep->first; seq; seq = seq->next) {
     if ((seq != child) && seq_is_parent(seq, child)) {

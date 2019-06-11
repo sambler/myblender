@@ -718,8 +718,9 @@ static void view_editmove(unsigned short UNUSED(event))
   /* only work in 3D window for now
    * In the end, will have to send to event to a 2D window handler instead
    */
-  if (Trans.flag & T_2D_EDIT)
+  if (Trans.flag & T_2D_EDIT) {
     return;
+  }
 
   switch (event) {
     case WHEELUPMOUSE:
@@ -743,10 +744,12 @@ static void view_editmove(unsigned short UNUSED(event))
           persptoetsen(PAD4);
         }
       }
-      else if (U.uiflag & USER_WHEELZOOMDIR)
+      else if (U.uiflag & USER_WHEELZOOMDIR) {
         persptoetsen(PADMINUS);
-      else
+      }
+      else {
         persptoetsen(PADPLUSKEY);
+      }
 
       refresh = 1;
       break;
@@ -771,17 +774,20 @@ static void view_editmove(unsigned short UNUSED(event))
           persptoetsen(PAD6);
         }
       }
-      else if (U.uiflag & USER_WHEELZOOMDIR)
+      else if (U.uiflag & USER_WHEELZOOMDIR) {
         persptoetsen(PADPLUSKEY);
-      else
+      }
+      else {
         persptoetsen(PADMINUS);
+      }
 
       refresh = 1;
       break;
   }
 
-  if (refresh)
+  if (refresh) {
     setTransformViewMatrices(&Trans);
+  }
 #endif
 }
 
@@ -1040,6 +1046,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
   char cmode = constraintModeToChar(t);
   bool handled = false;
   const int modifiers_prev = t->modifiers;
+  const int mode_prev = t->mode;
 
   t->redraw |= handleMouseInput(t, &t->mouse, event);
 
@@ -1095,7 +1102,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
           initTranslation(t);
           initSnapping(t, NULL);  // need to reinit after mode change
           t->redraw |= TREDRAW_HARD;
-          WM_event_add_mousemove(t->context);
           handled = true;
         }
         else if (t->mode == TFM_SEQ_SLIDE) {
@@ -1130,7 +1136,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
               initSnapping(t, NULL);  // need to reinit after mode change
               t->redraw |= TREDRAW_HARD;
               handled = true;
-              WM_event_add_mousemove(t->context);
             }
           }
           else if (t->options & (CTX_MOVIECLIP | CTX_MASK)) {
@@ -1597,8 +1602,8 @@ int transformEvent(TransInfo *t, const wmEvent *event)
   }
 
   /* if we change snap options, get the unsnapped values back */
-  if ((t->modifiers & (MOD_SNAP | MOD_SNAP_INVERT)) !=
-      (modifiers_prev & (MOD_SNAP | MOD_SNAP_INVERT))) {
+  if ((mode_prev != t->mode) || ((t->modifiers & (MOD_SNAP | MOD_SNAP_INVERT)) !=
+                                 (modifiers_prev & (MOD_SNAP | MOD_SNAP_INVERT)))) {
     applyMouseInput(t, &t->mouse, t->mval, t->values);
   }
 
@@ -2659,7 +2664,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   /* Constraint init from operator */
   if ((t->flag & T_MODAL) ||
       /* For mirror operator the constraint axes are effectively the values. */
-      (RNA_struct_find_property(op->ptr, "values") == NULL)) {
+      (RNA_struct_find_property(op->ptr, "value") == NULL)) {
     if ((prop = RNA_struct_find_property(op->ptr, "constraint_axis")) &&
         RNA_property_is_set(op->ptr, prop)) {
       bool constraint_axis[3];

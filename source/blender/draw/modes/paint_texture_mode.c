@@ -47,6 +47,7 @@ extern char datatoc_paint_texture_frag_glsl[];
 extern char datatoc_paint_wire_vert_glsl[];
 extern char datatoc_paint_wire_frag_glsl[];
 extern char datatoc_paint_face_vert_glsl[];
+extern char datatoc_paint_face_selection_vert_glsl[];
 
 extern char datatoc_gpu_shader_uniform_color_frag_glsl[];
 
@@ -128,21 +129,30 @@ typedef struct PAINT_TEXTURE_PrivateData {
   /* face-mask  */
   DRWShadingGroup *lwire_select_shgrp;
   DRWShadingGroup *face_select_shgrp;
+
+  DRWView *view_wires;
 } PAINT_TEXTURE_PrivateData; /* Transient data */
 
 /* *********** FUNCTIONS *********** */
 
 /* Init Textures, Framebuffers, Storage and Shaders.
  * It is called for every frames. */
-static void PAINT_TEXTURE_engine_init(void *UNUSED(vedata))
+static void PAINT_TEXTURE_engine_init(void *vedata)
 {
+  PAINT_TEXTURE_StorageList *stl = ((PAINT_TEXTURE_Data *)vedata)->stl;
   const DRWContextState *draw_ctx = DRW_context_state_get();
   PAINT_TEXTURE_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
 
   if (!sh_data->fallback) {
     const GPUShaderConfigData *sh_cfg_data = &GPU_shader_cfg_data[draw_ctx->sh_cfg];
-    sh_data->fallback = GPU_shader_get_builtin_shader_with_config(GPU_SHADER_3D_UNIFORM_COLOR,
-                                                                  draw_ctx->sh_cfg);
+    sh_data->fallback = GPU_shader_create_from_arrays({
+        .vert = (const char *[]){sh_cfg_data->lib,
+                                 datatoc_common_view_lib_glsl,
+                                 datatoc_paint_face_vert_glsl,
+                                 NULL},
+        .frag = (const char *[]){datatoc_gpu_shader_uniform_color_frag_glsl, NULL},
+        .defs = (const char *[]){sh_cfg_data->def, NULL},
+    });
 
     sh_data->image = GPU_shader_create_from_arrays({
         .vert = (const char *[]){sh_cfg_data->lib,
@@ -177,7 +187,7 @@ static void PAINT_TEXTURE_engine_init(void *UNUSED(vedata))
     sh_data->face_select_overlay = GPU_shader_create_from_arrays({
         .vert = (const char *[]){sh_cfg_data->lib,
                                  datatoc_common_view_lib_glsl,
-                                 datatoc_paint_face_vert_glsl,
+                                 datatoc_paint_face_selection_vert_glsl,
                                  NULL},
         .frag = (const char *[]){datatoc_common_view_lib_glsl,
                                  datatoc_gpu_shader_uniform_color_frag_glsl,
@@ -185,9 +195,18 @@ static void PAINT_TEXTURE_engine_init(void *UNUSED(vedata))
         .defs = (const char *[]){sh_cfg_data->def, NULL},
     });
   }
+
+  if (!stl->g_data) {
+    /* Alloc transient pointers */
+    stl->g_data = MEM_mallocN(sizeof(*stl->g_data), __func__);
+    stl->g_data->shgroup_image_array = NULL;
+  }
+
+  stl->g_data->view_wires = DRW_view_create_with_zoffset(draw_ctx->rv3d, 1.0f);
 }
 
 static DRWShadingGroup *create_texture_paint_shading_group(PAINT_TEXTURE_PassList *psl,
+                                                           const Image *image,
                                                            const struct GPUTexture *texture,
                                                            const DRWContextState *draw_ctx,
                                                            const bool nearest_interp)
@@ -201,6 +220,8 @@ static DRWShadingGroup *create_texture_paint_shading_group(PAINT_TEXTURE_PassLis
   DRWShadingGroup *grp = DRW_shgroup_create(masking_enabled ? sh_data->image_mask : sh_data->image,
                                             psl->image_faces);
   DRW_shgroup_uniform_texture(grp, "image", texture);
+  DRW_shgroup_uniform_bool_copy(
+      grp, "imagePremultiplied", (image->alpha_mode == IMA_ALPHA_PREMUL));
   DRW_shgroup_uniform_float(grp, "alpha", &draw_ctx->v3d->overlay.texture_paint_mode_opacity, 1);
   DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
   DRW_shgroup_uniform_bool_copy(grp, "nearestInterp", nearest_interp);
@@ -209,6 +230,8 @@ static DRWShadingGroup *create_texture_paint_shading_group(PAINT_TEXTURE_PassLis
     const bool masking_inverted = (imapaint->flag & IMAGEPAINT_PROJECT_LAYER_STENCIL_INV) > 0;
     GPUTexture *stencil = GPU_texture_from_blender(imapaint->stencil, NULL, GL_TEXTURE_2D);
     DRW_shgroup_uniform_texture(grp, "maskingImage", stencil);
+    DRW_shgroup_uniform_bool_copy(
+        grp, "maskingImagePremultiplied", (imapaint->stencil->alpha_mode == IMA_ALPHA_PREMUL));
     DRW_shgroup_uniform_vec3(grp, "maskingColor", imapaint->stencil_col, 1);
     DRW_shgroup_uniform_bool_copy(grp, "maskingInvertStencil", masking_inverted);
   }
@@ -222,28 +245,22 @@ static void PAINT_TEXTURE_cache_init(void *vedata)
   PAINT_TEXTURE_PassList *psl = ((PAINT_TEXTURE_Data *)vedata)->psl;
   PAINT_TEXTURE_StorageList *stl = ((PAINT_TEXTURE_Data *)vedata)->stl;
 
-  if (!stl->g_data) {
-    /* Alloc transient pointers */
-    stl->g_data = MEM_mallocN(sizeof(*stl->g_data), __func__);
-    stl->g_data->shgroup_image_array = NULL;
-  }
-
   const DRWContextState *draw_ctx = DRW_context_state_get();
   PAINT_TEXTURE_Shaders *sh_data = &e_data.sh_data[draw_ctx->sh_cfg];
 
   /* Create a pass */
   {
     DRWPass *pass = DRW_pass_create(
-        "Image Color Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_EQUAL | DRW_STATE_BLEND);
+        "Image Color Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_EQUAL | DRW_STATE_BLEND_ALPHA);
     DRWShadingGroup *shgrp = DRW_shgroup_create(sh_data->fallback, pass);
 
     /* Uniforms need a pointer to it's value so be sure it's accessible at
      * any given time (i.e. use static vars) */
-    static float color[4] = {1.0f, 0.0f, 1.0f, 1.0};
+    static const float color[4] = {1.0f, 0.0f, 1.0f, 1.0};
     DRW_shgroup_uniform_vec4(shgrp, "color", color, 1);
 
     if (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) {
-      DRW_shgroup_world_clip_planes_from_rv3d(shgrp, draw_ctx->rv3d);
+      DRW_shgroup_state_enable(shgrp, DRW_STATE_CLIP_PLANES);
     }
     psl->image_faces = pass;
     stl->g_data->shgroup_fallback = shgrp;
@@ -271,7 +288,7 @@ static void PAINT_TEXTURE_cache_init(void *vedata)
 
         if (tex) {
           DRWShadingGroup *grp = create_texture_paint_shading_group(
-              psl, tex, draw_ctx, interp == SHD_INTERP_CLOSEST);
+              psl, ima, tex, draw_ctx, interp == SHD_INTERP_CLOSEST);
           stl->g_data->shgroup_image_array[i] = grp;
         }
         else {
@@ -285,7 +302,7 @@ static void PAINT_TEXTURE_cache_init(void *vedata)
 
       if (tex) {
         DRWShadingGroup *grp = create_texture_paint_shading_group(
-            psl, tex, draw_ctx, imapaint->interp == IMAGEPAINT_INTERP_CLOSEST);
+            psl, ima, tex, draw_ctx, imapaint->interp == IMAGEPAINT_INTERP_CLOSEST);
         stl->g_data->shgroup_image_array[0] = grp;
       }
       else {
@@ -296,31 +313,29 @@ static void PAINT_TEXTURE_cache_init(void *vedata)
 
   /* Face Mask */
   {
-    DRWPass *pass = DRW_pass_create("Wire Mask Pass",
-                                    (DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
-                                     DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_OFFSET_NEGATIVE));
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL;
+    DRWPass *pass = DRW_pass_create("Wire Mask Pass", state);
     DRWShadingGroup *shgrp = DRW_shgroup_create(sh_data->wire_select_overlay, pass);
 
     DRW_shgroup_uniform_block(shgrp, "globalsBlock", G_draw.block_ubo);
 
     if (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) {
-      DRW_shgroup_world_clip_planes_from_rv3d(shgrp, draw_ctx->rv3d);
+      DRW_shgroup_state_enable(shgrp, DRW_STATE_CLIP_PLANES);
     }
     psl->wire_select_overlay = pass;
     stl->g_data->lwire_select_shgrp = shgrp;
   }
 
   {
-
-    DRWPass *pass = DRW_pass_create("Face Mask Pass",
-                                    DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH |
-                                        DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_BLEND);
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL |
+                     DRW_STATE_BLEND_ALPHA;
+    DRWPass *pass = DRW_pass_create("Face Mask Pass", state);
     DRWShadingGroup *shgrp = DRW_shgroup_create(sh_data->face_select_overlay, pass);
-    static float col[4] = {1.0f, 1.0f, 1.0f, 0.2f};
+    static const float col[4] = {1.0f, 1.0f, 1.0f, 0.2f};
     DRW_shgroup_uniform_vec4(shgrp, "color", col, 1);
 
     if (draw_ctx->sh_cfg == GPU_SHADER_CFG_CLIPPED) {
-      DRW_shgroup_world_clip_planes_from_rv3d(shgrp, draw_ctx->rv3d);
+      DRW_shgroup_state_enable(shgrp, DRW_STATE_CLIP_PLANES);
     }
     psl->face_select_overlay = pass;
     stl->g_data->face_select_shgrp = shgrp;
@@ -356,23 +371,23 @@ static void PAINT_TEXTURE_cache_populate(void *vedata, Object *ob)
           for (int i = 0; i < mat_nr; i++) {
             const int index = use_material_slots ? i : 0;
             if ((i < me->totcol) && stl->g_data->shgroup_image_array[index]) {
-              DRW_shgroup_call(stl->g_data->shgroup_image_array[index], geom_array[i], ob->obmat);
+              DRW_shgroup_call(stl->g_data->shgroup_image_array[index], geom_array[i], ob);
             }
             else {
-              DRW_shgroup_call(stl->g_data->shgroup_fallback, geom_array[i], ob->obmat);
+              DRW_shgroup_call(stl->g_data->shgroup_fallback, geom_array[i], ob);
             }
           }
         }
         else {
           if (stl->g_data->shgroup_image_array[0]) {
             struct GPUBatch *geom = DRW_cache_mesh_surface_texpaint_single_get(ob);
-            DRW_shgroup_call(stl->g_data->shgroup_image_array[0], geom, ob->obmat);
+            DRW_shgroup_call(stl->g_data->shgroup_image_array[0], geom, ob);
           }
         }
       }
       else {
         struct GPUBatch *geom = DRW_cache_mesh_surface_get(ob);
-        DRW_shgroup_call(stl->g_data->shgroup_fallback, geom, ob->obmat);
+        DRW_shgroup_call(stl->g_data->shgroup_fallback, geom, ob);
       }
     }
 
@@ -380,10 +395,10 @@ static void PAINT_TEXTURE_cache_populate(void *vedata, Object *ob)
     if (use_face_sel) {
       struct GPUBatch *geom;
       geom = DRW_cache_mesh_surface_edges_get(ob);
-      DRW_shgroup_call(stl->g_data->lwire_select_shgrp, geom, ob->obmat);
+      DRW_shgroup_call(stl->g_data->lwire_select_shgrp, geom, ob);
 
       geom = DRW_cache_mesh_surface_get(ob);
-      DRW_shgroup_call(stl->g_data->face_select_shgrp, geom, ob->obmat);
+      DRW_shgroup_call(stl->g_data->face_select_shgrp, geom, ob);
     }
   }
 }
@@ -405,6 +420,7 @@ static void PAINT_TEXTURE_draw_scene(void *vedata)
 {
   PAINT_TEXTURE_PassList *psl = ((PAINT_TEXTURE_Data *)vedata)->psl;
   PAINT_TEXTURE_FramebufferList *fbl = ((PAINT_TEXTURE_Data *)vedata)->fbl;
+  PAINT_TEXTURE_StorageList *stl = ((PAINT_TEXTURE_Data *)vedata)->stl;
 
   /* Default framebuffer and texture */
   DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
@@ -415,7 +431,11 @@ static void PAINT_TEXTURE_draw_scene(void *vedata)
   DRW_draw_pass(psl->image_faces);
 
   DRW_draw_pass(psl->face_select_overlay);
+
+  DRW_view_set_active(stl->g_data->view_wires);
   DRW_draw_pass(psl->wire_select_overlay);
+
+  DRW_view_set_active(NULL);
 }
 
 /* Cleanup when destroying the engine.
@@ -425,8 +445,6 @@ static void PAINT_TEXTURE_engine_free(void)
 {
   for (int sh_data_index = 0; sh_data_index < ARRAY_SIZE(e_data.sh_data); sh_data_index++) {
     PAINT_TEXTURE_Shaders *sh_data = &e_data.sh_data[sh_data_index];
-    /* Don't free builtins. */
-    sh_data->fallback = NULL;
     GPUShader **sh_data_as_array = (GPUShader **)sh_data;
     for (int i = 0; i < (sizeof(PAINT_TEXTURE_Shaders) / sizeof(GPUShader *)); i++) {
       DRW_SHADER_FREE_SAFE(sh_data_as_array[i]);

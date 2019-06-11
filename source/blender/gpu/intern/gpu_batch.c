@@ -56,7 +56,7 @@ void GPU_batch_vao_cache_clear(GPUBatch *batch)
             (GPUShaderInterface *)batch->dynamic_vaos.interfaces[i], batch);
       }
     }
-    MEM_freeN(batch->dynamic_vaos.interfaces);
+    MEM_freeN((void *)batch->dynamic_vaos.interfaces);
     MEM_freeN(batch->dynamic_vaos.vao_ids);
   }
   else {
@@ -285,7 +285,7 @@ static GLuint batch_vao_get(GPUBatch *batch)
       /* Not enough place, realloc the array. */
       i = batch->dynamic_vaos.count;
       batch->dynamic_vaos.count += GPU_BATCH_VAO_DYN_ALLOC_COUNT;
-      batch->dynamic_vaos.interfaces = MEM_recallocN(batch->dynamic_vaos.interfaces,
+      batch->dynamic_vaos.interfaces = MEM_recallocN((void *)batch->dynamic_vaos.interfaces,
                                                      sizeof(GPUShaderInterface *) *
                                                          batch->dynamic_vaos.count);
       batch->dynamic_vaos.vao_ids = MEM_recallocN(batch->dynamic_vaos.vao_ids,
@@ -545,36 +545,10 @@ void GPU_batch_uniform_mat4(GPUBatch *batch, const char *name, const float data[
   glUniformMatrix4fv(uniform->location, 1, GL_FALSE, (const float *)data);
 }
 
-static void primitive_restart_enable(const GPUIndexBuf *el)
-{
-  // TODO(fclem) Replace by GL_PRIMITIVE_RESTART_FIXED_INDEX when we have ogl 4.3
-  glEnable(GL_PRIMITIVE_RESTART);
-  GLuint restart_index = (GLuint)0xFFFFFFFF;
-
-#if GPU_TRACK_INDEX_RANGE
-  if (el->index_type == GPU_INDEX_U8) {
-    restart_index = (GLuint)0xFF;
-  }
-  else if (el->index_type == GPU_INDEX_U16) {
-    restart_index = (GLuint)0xFFFF;
-  }
-#endif
-
-  glPrimitiveRestartIndex(restart_index);
-}
-
-static void primitive_restart_disable(void)
-{
-  glDisable(GL_PRIMITIVE_RESTART);
-}
-
 static void *elem_offset(const GPUIndexBuf *el, int v_first)
 {
 #if GPU_TRACK_INDEX_RANGE
-  if (el->index_type == GPU_INDEX_U8) {
-    return (GLubyte *)0 + v_first;
-  }
-  else if (el->index_type == GPU_INDEX_U16) {
+  if (el->index_type == GPU_INDEX_U16) {
     return (GLushort *)0 + v_first;
   }
 #endif
@@ -585,6 +559,15 @@ static void *elem_offset(const GPUIndexBuf *el, int v_first)
 void GPU_batch_bind(GPUBatch *batch)
 {
   glBindVertexArray(batch->vao_id);
+
+#if GPU_TRACK_INDEX_RANGE
+  /* Can be removed if GL 4.3 is required. */
+  if (!GLEW_ARB_ES3_compatibility && batch->elem != NULL) {
+    GLuint restart_index = (batch->elem->index_type == GPU_INDEX_U16) ? (GLuint)0xFFFF :
+                                                                        (GLuint)0xFFFFFFFF;
+    glPrimitiveRestartIndex(restart_index);
+  }
+#endif
 }
 
 void GPU_batch_draw(GPUBatch *batch)
@@ -621,7 +604,7 @@ void GPU_batch_draw_advanced(GPUBatch *batch, int v_first, int v_count, int i_fi
       /* If using offset drawing with instancing, we must
        * use the default VAO and redo bindings. */
       glBindVertexArray(GPU_vao_default());
-      batch_update_program_bindings(batch, v_first);
+      batch_update_program_bindings(batch, i_first);
     }
     else {
       /* Previous call could have bind the default vao
@@ -641,10 +624,6 @@ void GPU_batch_draw_advanced(GPUBatch *batch, int v_first, int v_count, int i_fi
 #endif
     void *v_first_ofs = elem_offset(el, v_first);
 
-    if (el->use_prim_restart) {
-      primitive_restart_enable(el);
-    }
-
     if (GLEW_ARB_base_instance) {
       glDrawElementsInstancedBaseVertexBaseInstance(
           batch->gl_prim_type, v_count, index_type, v_first_ofs, i_count, base_index, i_first);
@@ -653,18 +632,20 @@ void GPU_batch_draw_advanced(GPUBatch *batch, int v_first, int v_count, int i_fi
       glDrawElementsInstancedBaseVertex(
           batch->gl_prim_type, v_count, index_type, v_first_ofs, i_count, base_index);
     }
-
-    if (el->use_prim_restart) {
-      primitive_restart_disable();
-    }
   }
   else {
+#ifdef __APPLE__
+    glDisable(GL_PRIMITIVE_RESTART);
+#endif
     if (GLEW_ARB_base_instance) {
       glDrawArraysInstancedBaseInstance(batch->gl_prim_type, v_first, v_count, i_count, i_first);
     }
     else {
       glDrawArraysInstanced(batch->gl_prim_type, v_first, v_count, i_count);
     }
+#ifdef __APPLE__
+    glEnable(GL_PRIMITIVE_RESTART);
+#endif
   }
 }
 

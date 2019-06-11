@@ -241,7 +241,7 @@ class GreasePencilStrokeSculptPanel:
         layout.template_icon_view(settings, "sculpt_tool", show_labels=True)
 
         if not self.is_popover:
-            from .properties_paint_common import (
+            from bl_ui.properties_paint_common import (
                 brush_basic_gpencil_sculpt_settings,
             )
             brush_basic_gpencil_sculpt_settings(layout, context, brush)
@@ -793,8 +793,6 @@ class GreasePencilToolsPanel:
 
     def draw(self, context):
         layout = self.layout
-
-        gpd = context.gpencil_data
 
         gpencil_active_brush_settings_simple(context, layout)
 

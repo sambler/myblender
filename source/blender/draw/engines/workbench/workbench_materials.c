@@ -237,12 +237,12 @@ int workbench_material_get_accum_shader_index(WORKBENCH_PrivateData *wpd,
 int workbench_material_determine_color_type(WORKBENCH_PrivateData *wpd,
                                             Image *ima,
                                             Object *ob,
-                                            bool is_sculpt_mode)
+                                            bool use_sculpt_pbvh)
 {
   int color_type = wpd->shading.color_type;
   const Mesh *me = (ob->type == OB_MESH) ? ob->data : NULL;
 
-  if ((color_type == V3D_SHADING_TEXTURE_COLOR && (ima == NULL || is_sculpt_mode)) ||
+  if ((color_type == V3D_SHADING_TEXTURE_COLOR && (ima == NULL || use_sculpt_pbvh)) ||
       (ob->dt < OB_TEXTURE)) {
     color_type = V3D_SHADING_MATERIAL_COLOR;
   }
@@ -296,6 +296,8 @@ void workbench_material_shgroup_uniform(WORKBENCH_PrivateData *wpd,
       V3D_SHADING_TEXTURE_COLOR) {
     GPUTexture *tex = GPU_texture_from_blender(material->ima, material->iuser, GL_TEXTURE_2D);
     DRW_shgroup_uniform_texture(grp, "image", tex);
+    DRW_shgroup_uniform_bool_copy(
+        grp, "imagePremultiplied", (material->ima->alpha_mode == IMA_ALPHA_PREMUL));
     DRW_shgroup_uniform_bool_copy(grp, "imageNearest", (interp == SHD_INTERP_CLOSEST));
   }
   else {
@@ -316,7 +318,6 @@ void workbench_material_shgroup_uniform(WORKBENCH_PrivateData *wpd,
   }
 
   if (WORLD_CLIPPING_ENABLED(wpd)) {
-    DRW_shgroup_uniform_vec4(grp, "WorldClipPlanes", wpd->world_clip_planes[0], 6);
     DRW_shgroup_state_enable(grp, DRW_STATE_CLIP_PLANES);
   }
 }

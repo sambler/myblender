@@ -27,7 +27,7 @@
 import bpy
 from bpy.types import Panel
 
-from .space_toolsystem_common import (
+from bl_ui.space_toolsystem_common import (
     ToolSelectPanelHelper,
     ToolDef,
 )
@@ -60,6 +60,7 @@ def generate_from_enum_ex(
                     idname=idname_prefix + name,
                     label=name,
                     icon=icon_prefix + idname.lower(),
+					cursor='PAINT_CROSSHAIR',
                     data_block=idname,
                     **tooldef_keywords,
                 )
@@ -199,7 +200,7 @@ class _defs_annotate:
             idname="builtin.annotate_line",
             label="Annotate Line",
             icon="ops.gpencil.draw.line",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             keymap="Generic Tool: Annotate Line",
             draw_settings=draw_settings,
         )
@@ -210,7 +211,7 @@ class _defs_annotate:
             idname="builtin.annotate_polygon",
             label="Annotate Polygon",
             icon="ops.gpencil.draw.poly",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             keymap="Generic Tool: Annotate Polygon",
             draw_settings=draw_settings,
         )
@@ -225,7 +226,7 @@ class _defs_annotate:
             idname="builtin.annotate_eraser",
             label="Annotate Eraser",
             icon="ops.gpencil.draw.eraser",
-            cursor='CROSSHAIR',  # XXX: Always show brush circle when enabled
+            cursor='PAINT_CROSSHAIR',  # XXX: Always show brush circle when enabled
             keymap="Generic Tool: Annotate Eraser",
             draw_settings=draw_settings,
         )
@@ -297,7 +298,6 @@ class _defs_transform:
         def draw_settings(context, layout, tool):
             if not layout.use_property_split:
                 layout.label(text="Gizmos:")
-            tool_settings = context.tool_settings
 
             props = tool.gizmo_group_properties("VIEW3D_GGT_xform_gizmo")
             layout.prop(props, "drag_action")
@@ -810,7 +810,7 @@ class _defs_edit_curve:
             tool_settings = context.tool_settings
             cps = tool_settings.curve_paint_settings
 
-            col = layout.row()
+            col = layout.column()
 
             col.prop(cps, "curve_type")
 
@@ -972,6 +972,16 @@ class _defs_sculpt:
             keymap=(),
         )
 
+    @ToolDef.from_fn
+    def mask_lasso():
+        return dict(
+            idname="builtin.lasso_mask",
+            label="Lasso Mask",
+            icon="ops.sculpt.lasso_mask",
+            widget=None,
+            keymap=(),
+        )
+
 
 class _defs_vertex_paint:
 
@@ -1062,7 +1072,7 @@ class _defs_weight_paint:
         def draw_settings(context, layout, tool):
             brush = context.tool_settings.weight_paint.brush
             if brush is not None:
-                from .properties_paint_common import UnifiedPaintPanel
+                from bl_ui.properties_paint_common import UnifiedPaintPanel
                 UnifiedPaintPanel.prop_unified_weight(layout, context, brush, "weight", slider=True)
                 UnifiedPaintPanel.prop_unified_strength(layout, context, brush, "strength", slider=True)
             props = tool.operator_properties("paint.weight_gradient")
@@ -1193,6 +1203,13 @@ class _defs_image_uv_select:
             row.use_property_split = False
             row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
+
+        def draw_cursor(_context, tool, xy):
+            from gpu_extras.presets import draw_circle_2d
+            props = tool.operator_properties("uv.select_circle")
+            radius = props.radius
+            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+
         return dict(
             idname="builtin.select_circle",
             label="Select Circle",
@@ -1200,6 +1217,7 @@ class _defs_image_uv_select:
             widget=None,
             keymap=(),
             draw_settings=draw_settings,
+            draw_cursor=draw_cursor,
         )
 
 
@@ -1269,7 +1287,7 @@ class _defs_gpencil_paint:
             idname="builtin.line",
             label="Line",
             icon="ops.gpencil.primitive_line",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1280,7 +1298,7 @@ class _defs_gpencil_paint:
             idname="builtin.box",
             label="Box",
             icon="ops.gpencil.primitive_box",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1291,7 +1309,7 @@ class _defs_gpencil_paint:
             idname="builtin.circle",
             label="Circle",
             icon="ops.gpencil.primitive_circle",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1302,7 +1320,7 @@ class _defs_gpencil_paint:
             idname="builtin.arc",
             label="Arc",
             icon="ops.gpencil.primitive_arc",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1313,7 +1331,7 @@ class _defs_gpencil_paint:
             idname="builtin.curve",
             label="Curve",
             icon="ops.gpencil.primitive_curve",
-            cursor='CROSSHAIR',
+            cursor='PAINT_CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1386,6 +1404,13 @@ class _defs_gpencil_edit:
             row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
             layout.prop(context.tool_settings.gpencil_sculpt, "intersection_threshold")
+
+        def draw_cursor(_context, tool, xy):
+            from gpu_extras.presets import draw_circle_2d
+            props = tool.operator_properties("gpencil.select_circle")
+            radius = props.radius
+            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+
         return dict(
             idname="builtin.select_circle",
             label="Select Circle",
@@ -1393,6 +1418,7 @@ class _defs_gpencil_edit:
             widget=None,
             keymap=(),
             draw_settings=draw_settings,
+            draw_cursor=draw_cursor,
         )
 
     @ToolDef.from_fn
@@ -1451,6 +1477,10 @@ class _defs_gpencil_sculpt:
             icon_prefix="ops.gpencil.sculpt_",
             type=bpy.types.GPencilSculptSettings,
             attr="sculpt_tool",
+            tooldef_keywords=dict(
+                operator="gpencil.sculpt_paint",
+                keymap="3D View Tool: Sculpt Gpencil, Paint",
+            ),
         )
 
 
@@ -1464,6 +1494,10 @@ class _defs_gpencil_weight:
             icon_prefix="ops.gpencil.sculpt_",
             type=bpy.types.GPencilSculptSettings,
             attr="weight_tool",
+            tooldef_keywords=dict(
+                operator="gpencil.sculpt_paint",
+                keymap="3D View Tool: Sculpt Gpencil, Paint",
+            ),
         )
 
 
@@ -1523,6 +1557,13 @@ class _defs_node_select:
             row.use_property_split = False
             row.prop(props, "mode", text="", expand=True, icon_only=True)
             layout.prop(props, "radius")
+
+        def draw_cursor(_context, tool, xy):
+            from gpu_extras.presets import draw_circle_2d
+            props = tool.operator_properties("node.select_circle")
+            radius = props.radius
+            draw_circle_2d(xy, (1.0,) * 4, radius, 32)
+
         return dict(
             idname="builtin.select_circle",
             label="Select Circle",
@@ -1530,6 +1571,7 @@ class _defs_node_select:
             widget=None,
             keymap="Node Tool: Select Circle",
             draw_settings=draw_settings,
+            draw_cursor=draw_cursor,
         )
 
 
@@ -1870,8 +1912,11 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
         'SCULPT': [
             _defs_sculpt.generate_from_brushes,
             None,
+            (
+                _defs_sculpt.mask_border,
+                _defs_sculpt.mask_lasso,
+            ),
             _defs_sculpt.hide_border,
-            _defs_sculpt.mask_border,
             None,
             *_tools_annotate,
         ],

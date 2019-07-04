@@ -116,7 +116,7 @@ class AnnotationDrawingToolsPanel:
         col.separator()
         col.separator()
 
-        if context.space_data.type in {'CLIP_EDITOR'}:
+        if context.space_data.type == 'CLIP_EDITOR':
             col.separator()
             col.label(text="Data Source:")
             row = col.row(align=True)
@@ -902,8 +902,8 @@ class GPENCIL_UL_layer(UIList):
             row.prop(gpl, "info", text="", emboss=False)
 
             row = layout.row(align=True)
-            row.prop(gpl, "clamp_layer", text="",
-                     icon='MOD_MASK' if gpl.clamp_layer else 'LAYER_ACTIVE',
+            row.prop(gpl, "mask_layer", text="",
+                     icon='MOD_MASK' if gpl.mask_layer else 'LAYER_ACTIVE',
                      emboss=False)
 
             row.prop(gpl, "lock", text="", emboss=False)

@@ -247,8 +247,7 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
           cp = ts->header;
           break;
         case TH_HEADERDESEL:
-          /* we calculate a dynamic builtin header deselect color,
-           * also for pulldowns... */
+          /* We calculate a dynamic builtin header deselect color, also for pull-downs. */
           cp = ts->header;
           headerdesel[0] = cp[0] > 10 ? cp[0] - 10 : 0;
           headerdesel[1] = cp[1] > 10 ? cp[1] - 10 : 0;
@@ -1240,7 +1239,7 @@ void UI_GetThemeColorShadeAlpha4fv(int colorid, int coloffset, int alphaoffset, 
   b = coloffset + (int)cp[2];
   CLAMP(b, 0, 255);
   a = alphaoffset + (int)cp[3];
-  CLAMP(b, 0, 255);
+  CLAMP(a, 0, 255);
 
   col[0] = ((float)r) / 255.0f;
   col[1] = ((float)g) / 255.0f;

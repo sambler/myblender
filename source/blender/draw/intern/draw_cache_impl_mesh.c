@@ -25,6 +25,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_bitmap.h"
 #include "BLI_buffer.h"
 #include "BLI_utildefines.h"
 #include "BLI_math_vector.h"
@@ -1985,6 +1986,7 @@ typedef struct MeshBatchCache {
     /* Indices to vloops. */
     GPUIndexBuf *loops_tris;
     GPUIndexBuf *loops_lines;
+    GPUIndexBuf *loops_lines_paint_mask;
     GPUIndexBuf *loops_line_strips;
     /* Edit mode. */
     GPUIndexBuf *edit_loops_points; /* verts */
@@ -2025,7 +2027,7 @@ typedef struct MeshBatchCache {
     GPUBatch *loose_edges;
     GPUBatch *edge_detection;
     GPUBatch *wire_edges;     /* Individual edges with face normals. */
-    GPUBatch *wire_loops;     /* Loops around faces. */
+    GPUBatch *wire_loops;     /* Loops around faces. no edges between selected faces */
     GPUBatch *wire_loops_uvs; /* Same as wire_loops but only has uvs. */
   } batch;
 
@@ -2059,6 +2061,8 @@ typedef struct MeshBatchCache {
 
   /* Valid only if edge_detection is up to date. */
   bool is_manifold;
+
+  bool no_loose_wire;
 } MeshBatchCache;
 
 BLI_INLINE void mesh_batch_cache_add_request(MeshBatchCache *cache, DRWBatchFlag new_flag)
@@ -2225,6 +2229,7 @@ void DRW_mesh_batch_cache_dirty_tag(Mesh *me, int mode)
     case BKE_MESH_BATCH_DIRTY_SELECT_PAINT:
       /* Paint mode selection flag is packed inside the nor attrib.
        * Note that it can be slow if auto smooth is enabled. (see T63946) */
+      GPU_INDEXBUF_DISCARD_SAFE(cache->ibo.loops_lines_paint_mask);
       GPU_VERTBUF_DISCARD_SAFE(cache->ordered.loop_pos_nor);
       GPU_BATCH_DISCARD_SAFE(cache->batch.surface);
       GPU_BATCH_DISCARD_SAFE(cache->batch.wire_loops);
@@ -3786,9 +3791,71 @@ static void mesh_create_loops_lines(MeshRenderData *rdata, GPUIndexBuf *ibo, con
       }
     }
   }
-  else {
-    /* Implement ... eventually if needed. */
+
+  GPU_indexbuf_build_in_place(&elb, ibo);
+}
+
+static void mesh_create_loops_lines_paint_mask(MeshRenderData *rdata, GPUIndexBuf *ibo)
+{
+  const int loop_len = mesh_render_data_loops_len_get(rdata);
+  const int poly_len = mesh_render_data_polys_len_get(rdata);
+  const int edge_len = mesh_render_data_edges_len_get(rdata);
+
+  GPUIndexBufBuilder elb;
+  GPU_indexbuf_init(&elb, GPU_PRIM_LINES, loop_len, loop_len);
+
+  if (rdata->edit_bmesh) {
+    /* painting does not use the edit_bmesh */
     BLI_assert(0);
+  }
+  else {
+    /* Each edge has two bits used to count selected edges as 0, 1, 2+. */
+    BLI_bitmap *edges_used = BLI_BITMAP_NEW(edge_len * 2, __func__);
+
+    /* Fill the EdgeHash tables. */
+    for (int poly = 0; poly < poly_len; poly++) {
+      const MPoly *mpoly = &rdata->mpoly[poly];
+
+      /* Do not check faces that are hidden and faces that aren't selected */
+      if (mpoly->flag & ME_HIDE || ((mpoly->flag & ME_FACE_SEL) == 0)) {
+        continue;
+      }
+
+      for (int loop_index = mpoly->loopstart, loop_index_end = mpoly->loopstart + mpoly->totloop;
+           loop_index < loop_index_end;
+           loop_index++) {
+        const MLoop *mloop = &rdata->mloop[loop_index];
+        const int e_a = mloop->e * 2;
+        const int e_b = e_a + 1;
+        if (!BLI_BITMAP_TEST(edges_used, e_a)) {
+          BLI_BITMAP_ENABLE(edges_used, e_a);
+        }
+        else {
+          BLI_BITMAP_ENABLE(edges_used, e_b);
+        }
+      }
+    }
+
+    for (int poly = 0; poly < poly_len; poly++) {
+      const MPoly *mpoly = &rdata->mpoly[poly];
+      if (!(mpoly->flag & ME_HIDE)) {
+
+        for (int loop_index_next = mpoly->loopstart,
+                 loop_index_end = mpoly->loopstart + mpoly->totloop,
+                 loop_index_curr = loop_index_end - 1;
+             loop_index_next < loop_index_end;
+             loop_index_curr = loop_index_next++) {
+          const MLoop *mloop = &rdata->mloop[loop_index_curr];
+          const int e_a = mloop->e * 2;
+          const int e_b = e_a + 1;
+          if (BLI_BITMAP_TEST(edges_used, e_a) && !BLI_BITMAP_TEST(edges_used, e_b)) {
+            GPU_indexbuf_add_line_verts(&elb, loop_index_curr, loop_index_next);
+          }
+        }
+      }
+    }
+
+    MEM_freeN(edges_used);
   }
 
   GPU_indexbuf_build_in_place(&elb, ibo);
@@ -3850,6 +3917,7 @@ static void mesh_create_loops_line_strips(MeshRenderData *rdata,
 
 static void mesh_create_loose_edges_lines(MeshRenderData *rdata,
                                           GPUIndexBuf *ibo,
+                                          bool *r_no_loose_wire,
                                           const bool use_hide)
 {
   const int vert_len = mesh_render_data_verts_len_get_maybe_mapped(rdata);
@@ -3891,6 +3959,8 @@ static void mesh_create_loose_edges_lines(MeshRenderData *rdata,
       GPU_indexbuf_add_line_verts(&elb, medge->v1, medge->v2);
     }
   }
+
+  *r_no_loose_wire = (elb.index_len == 0);
 
   GPU_indexbuf_build_in_place(&elb, ibo);
 }
@@ -4291,7 +4361,12 @@ GPUBatch *DRW_mesh_batch_cache_get_loose_edges(Mesh *me)
 {
   MeshBatchCache *cache = mesh_batch_cache_get(me);
   mesh_batch_cache_add_request(cache, MBC_LOOSE_EDGES);
-  return DRW_batch_request(&cache->batch.loose_edges);
+  if (cache->no_loose_wire) {
+    return NULL;
+  }
+  else {
+    return DRW_batch_request(&cache->batch.loose_edges);
+  }
 }
 
 GPUBatch *DRW_mesh_batch_cache_get_surface_weights(Mesh *me)
@@ -4931,10 +5006,9 @@ void DRW_mesh_batch_cache_create_requested(
   }
 
   if (batch_requested & (MBC_SURFACE | MBC_SURF_PER_MAT | MBC_WIRE_LOOPS_UVS)) {
-    /* Optimization : Only create orco layer if mesh is deformed. */
+    /* Modifiers will only generate an orco layer if the mesh is deformed. */
     if (cache->cd_needed.orco != 0) {
-      CustomData *cd_vdata = (me->edit_mesh) ? &me->edit_mesh->bm->vdata : &me->vdata;
-      if (CustomData_get_layer(cd_vdata, CD_ORCO) != NULL && ob->modifiers.first != NULL) {
+      if (CustomData_get_layer(&me->vdata, CD_ORCO) != NULL) {
         /* Orco layer is needed. */
       }
       else if (cache->cd_needed.tan_orco == 0) {
@@ -5044,8 +5118,8 @@ void DRW_mesh_batch_cache_create_requested(
     DRW_vbo_request(cache->batch.surface_weights, &cache->ordered.pos_nor);
     DRW_vbo_request(cache->batch.surface_weights, &cache->ordered.weights);
   }
-  if (DRW_batch_requested(cache->batch.wire_loops, GPU_PRIM_LINE_STRIP)) {
-    DRW_ibo_request(cache->batch.wire_loops, &cache->ibo.loops_line_strips);
+  if (DRW_batch_requested(cache->batch.wire_loops, GPU_PRIM_LINES)) {
+    DRW_ibo_request(cache->batch.wire_loops, &cache->ibo.loops_lines_paint_mask);
     DRW_vbo_request(cache->batch.wire_loops, &cache->ordered.loop_pos_nor);
   }
   if (DRW_batch_requested(cache->batch.wire_edges, GPU_PRIM_LINES)) {
@@ -5198,6 +5272,9 @@ void DRW_mesh_batch_cache_create_requested(
       mr_flag, cache->ibo.loops_tris, MR_DATATYPE_LOOP | MR_DATATYPE_POLY | MR_DATATYPE_LOOPTRI);
   DRW_ADD_FLAG_FROM_IBO_REQUEST(
       mr_flag, cache->ibo.loops_lines, MR_DATATYPE_LOOP | MR_DATATYPE_EDGE | MR_DATATYPE_POLY);
+  DRW_ADD_FLAG_FROM_IBO_REQUEST(mr_flag,
+                                cache->ibo.loops_lines_paint_mask,
+                                MR_DATATYPE_LOOP | MR_DATATYPE_EDGE | MR_DATATYPE_POLY);
   DRW_ADD_FLAG_FROM_IBO_REQUEST(
       mr_flag, cache->ibo.loops_line_strips, MR_DATATYPE_LOOP | MR_DATATYPE_POLY);
   DRW_ADD_FLAG_FROM_IBO_REQUEST(
@@ -5305,13 +5382,17 @@ void DRW_mesh_batch_cache_create_requested(
         rdata, cache->ibo.edges_adj_lines, &cache->is_manifold, use_hide);
   }
   if (DRW_ibo_requested(cache->ibo.loose_edges_lines)) {
-    mesh_create_loose_edges_lines(rdata, cache->ibo.loose_edges_lines, use_hide);
+    mesh_create_loose_edges_lines(
+        rdata, cache->ibo.loose_edges_lines, &cache->no_loose_wire, use_hide);
   }
   if (DRW_ibo_requested(cache->ibo.surf_tris)) {
     mesh_create_surf_tris(rdata, cache->ibo.surf_tris, use_hide);
   }
   if (DRW_ibo_requested(cache->ibo.loops_lines)) {
     mesh_create_loops_lines(rdata, cache->ibo.loops_lines, use_hide);
+  }
+  if (DRW_ibo_requested(cache->ibo.loops_lines_paint_mask)) {
+    mesh_create_loops_lines_paint_mask(rdata, cache->ibo.loops_lines_paint_mask);
   }
   if (DRW_ibo_requested(cache->ibo.loops_line_strips)) {
     mesh_create_loops_line_strips(rdata, cache->ibo.loops_line_strips, use_hide);

@@ -1835,7 +1835,12 @@ static void calc_distanceCurveVerts(TransData *head, TransData *tail)
     }
     else if (td_near) {
       float dist;
-      dist = len_v3v3(td_near->center, td->center);
+      float vec[3];
+
+      sub_v3_v3v3(vec, td_near->center, td->center);
+      mul_m3_v3(head->mtx, vec);
+      dist = len_v3(vec);
+
       if (dist < (td - 1)->dist) {
         td->dist = (td - 1)->dist;
       }
@@ -1856,7 +1861,12 @@ static void calc_distanceCurveVerts(TransData *head, TransData *tail)
     }
     else if (td_near) {
       float dist;
-      dist = len_v3v3(td_near->center, td->center);
+      float vec[3];
+
+      sub_v3_v3v3(vec, td_near->center, td->center);
+      mul_m3_v3(head->mtx, vec);
+      dist = len_v3(vec);
+
       if (td->flag & TD_NOTCONNECTED || dist < td->dist || (td + 1)->dist < td->dist) {
         td->flag &= ~TD_NOTCONNECTED;
         if (dist < (td + 1)->dist) {
@@ -2925,11 +2935,16 @@ static void VertsToTransData(TransInfo *t,
   }
   else if (t->mode == TFM_SKIN_RESIZE) {
     MVertSkin *vs = CustomData_bmesh_get(&em->bm->vdata, eve->head.data, CD_MVERT_SKIN);
-    /* skin node size */
-    td->ext = tx;
-    copy_v3_v3(tx->isize, vs->radius);
-    tx->size = vs->radius;
-    td->val = vs->radius;
+    if (vs) {
+      /* skin node size */
+      td->ext = tx;
+      copy_v3_v3(tx->isize, vs->radius);
+      tx->size = vs->radius;
+      td->val = vs->radius;
+    }
+    else {
+      td->flag |= TD_SKIP;
+    }
   }
   else if (t->mode == TFM_SHRINKFATTEN) {
     td->ext = tx;

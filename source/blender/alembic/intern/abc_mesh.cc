@@ -830,6 +830,8 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
   const Int32ArraySamplePtr &face_indices = mesh_data.face_indices;
   const Int32ArraySamplePtr &face_counts = mesh_data.face_counts;
   const V2fArraySamplePtr &uvs = mesh_data.uvs;
+  const size_t uvs_size = uvs == nullptr ? 0 : uvs->size();
+
   const UInt32ArraySamplePtr &uvs_indices = mesh_data.uvs_indices;
   const N3fArraySamplePtr &normals = mesh_data.face_normals;
 
@@ -861,6 +863,12 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
         MLoopUV &loopuv = mloopuvs[rev_loop_index];
 
         uv_index = (*uvs_indices)[loop_index];
+
+        /* Some Alembic files are broken (or at least export UVs in a way we don't expect). */
+        if (uv_index >= uvs_size) {
+          continue;
+        }
+
         loopuv.uv[0] = (*uvs)[uv_index][0];
         loopuv.uv[1] = (*uvs)[uv_index][1];
       }
@@ -965,8 +973,7 @@ static void *add_customdata_cb(void *user_data, const char *name, int data_type)
     return cd_ptr;
   }
 
-  /* create a new layer, taking care to construct the hopefully-soon-to-be-removed
-   * CD_MTEXPOLY layer too, with the same name. */
+  /* Create a new layer. */
   numloops = mesh->totloop;
   cd_ptr = CustomData_add_layer_named(loopdata, cd_data_type, CD_DEFAULT, NULL, numloops, name);
   return cd_ptr;

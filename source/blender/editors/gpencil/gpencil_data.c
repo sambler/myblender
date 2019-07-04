@@ -15,11 +15,12 @@
  *
  * The Original Code is Copyright (C) 2008, Blender Foundation
  * This is a new part of Blender
- * Operators for dealing with GP datablocks and layers
  */
 
 /** \file
  * \ingroup edgpencil
+ *
+ * Operators for dealing with GP data-blocks and layers.
  */
 
 #include <stdio.h>
@@ -539,7 +540,7 @@ static int gp_layer_duplicate_object_exec(bContext *C, wmOperator *op)
       Material *ma_src = give_current_material(ob_src, gps_src->mat_nr + 1);
       int idx = BKE_gpencil_object_material_ensure(bmain, ob_dst, ma_src);
 
-      /* reasign the stroke material to the right slot in destination object */
+      /* Reassign the stroke material to the right slot in destination object. */
       gps_dst->mat_nr = idx;
 
       /* add new stroke to frame */
@@ -1077,7 +1078,7 @@ static int gp_isolate_layer_exec(bContext *C, wmOperator *op)
   }
 
   /* Set/Clear flags as appropriate */
-  /* TODO: Include onionskinning on this list? */
+  /* TODO: Include onion-skinning on this list? */
   if (isolate) {
     /* Set flags on all "other" layers */
     for (gpl = gpd->layers.first; gpl; gpl = gpl->next) {
@@ -2322,7 +2323,7 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
           for (bGPDframe *gpf = gpl_new->frames.first; gpf; gpf = gpf->next) {
             for (bGPDstroke *gps = gpf->strokes.first; gps; gps = gps->next) {
 
-              /* reasign material. Look old material and try to find in dst */
+              /* Reassign material. Look old material and try to find in destination. */
               ma_src = give_current_material(ob_src, gps->mat_nr + 1);
               gps->mat_nr = BKE_gpencil_object_material_ensure(bmain, ob_dst, ma_src);
 
@@ -2893,4 +2894,46 @@ void GPENCIL_OT_color_select(wmOperatorType *ot)
   /* props */
   ot->prop = RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "Unselect strokes");
   RNA_def_property_flag(ot->prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+}
+
+/* Parent GPencil object to Lattice */
+bool ED_gpencil_add_lattice_modifier(const bContext *C,
+                                     ReportList *reports,
+                                     Object *ob,
+                                     Object *ob_latt)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+
+  if (ob == NULL) {
+    return false;
+  }
+
+  /* if no lattice modifier, add a new one */
+  GpencilModifierData *md = BKE_gpencil_modifiers_findByType(ob, eGpencilModifierType_Lattice);
+  if (md == NULL) {
+    md = ED_object_gpencil_modifier_add(
+        reports, bmain, scene, ob, "Lattice", eGpencilModifierType_Lattice);
+    if (md == NULL) {
+      BKE_report(reports, RPT_ERROR, "Unable to add a new Lattice modifier to object");
+      return false;
+    }
+    DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+  }
+
+  /* verify lattice */
+  LatticeGpencilModifierData *mmd = (LatticeGpencilModifierData *)md;
+  if (mmd->object == NULL) {
+    mmd->object = ob_latt;
+  }
+  else {
+    if (ob_latt != mmd->object) {
+      BKE_report(reports,
+                 RPT_ERROR,
+                 "The existing Lattice modifier is already using a different Lattice object");
+      return false;
+    }
+  }
+
+  return true;
 }

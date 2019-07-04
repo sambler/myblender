@@ -784,7 +784,7 @@ void do_versions_after_linking_280(Main *bmain)
     }
 
     /* We need to assign lib pointer to generated hidden collections *after* all have been created,
-     * otherwise we'll end up with several datablocks sharing same name/library,
+     * otherwise we'll end up with several data-blocks sharing same name/library,
      * which is FORBIDDEN!
      * Note: we need this to be recursive,
      * since a child collection may be sorted before its parent in bmain. */
@@ -1180,12 +1180,11 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
     /* MTexPoly now removed. */
     if (DNA_struct_find(fd->filesdna, "MTexPoly")) {
-      const int cd_mtexpoly = 15; /* CD_MTEXPOLY, deprecated */
       for (Mesh *me = bmain->meshes.first; me; me = me->id.next) {
         /* If we have UV's, so this file will have MTexPoly layers too! */
         if (me->mloopuv != NULL) {
           CustomData_update_typemap(&me->pdata);
-          CustomData_free_layers(&me->pdata, cd_mtexpoly, me->totpoly);
+          CustomData_free_layers(&me->pdata, CD_MTEXPOLY, me->totpoly);
           BKE_mesh_update_customdata_pointers(me, false);
         }
       }
@@ -2354,7 +2353,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
           for (SpaceLink *sl = sa->spacedata.first; sl; sl = sl->next) {
             if (sl->spacetype == SPACE_VIEW3D) {
               View3D *v3d = (View3D *)sl;
-              v3d->shading.flag |= V3D_SHADING_XRAY_BONE;
+              v3d->shading.flag |= V3D_SHADING_XRAY_WIREFRAME;
             }
           }
         }

@@ -699,7 +699,7 @@ class VIEW3D_HT_header(Header):
         sub.popover(panel="VIEW3D_PT_overlay", text="")
 
         row = layout.row()
-        row.active = (shading.type in {'WIREFRAME', 'SOLID'}) or object_mode in {'EDIT'}
+        row.active = (object_mode == 'EDIT') or (shading.type in {'WIREFRAME', 'SOLID'})
 
         if shading.type == 'WIREFRAME':
             row.prop(shading, "show_xray_wireframe", text="", icon='XRAY')
@@ -1113,7 +1113,7 @@ class VIEW3D_MT_view_navigation(Menu):
 
         layout.operator("view3d.zoom", text="Zoom In").delta = 1
         layout.operator("view3d.zoom", text="Zoom Out").delta = -1
-        layout.operator("view3d.zoom_border", text="Zoom Border...")
+        layout.operator("view3d.zoom_border", text="Zoom Region...")
         layout.operator("view3d.zoom_camera_1_to_1", text="Zoom Camera 1:1")
 
         layout.separator()
@@ -1593,6 +1593,11 @@ class VIEW3D_MT_select_edit_text(Menu):
         layout.separator()
 
         layout.operator("font.select_all")
+
+        layout.separator()
+
+        layout.operator("font.case_set", text="To Uppercase").case = 'UPPER'
+        layout.operator("font.case_set", text="To Lowercase").case = 'LOWER'
 
         layout.separator()
 
@@ -3866,10 +3871,10 @@ class VIEW3D_MT_edit_mesh_normals(Menu):
         layout.operator("mesh.set_normals_from_faces", text="Set From Faces")
 
         layout.operator_context = 'INVOKE_DEFAULT'
-        layout.operator("transform.rotate_normal", text="Rotate")
+        layout.operator("transform.rotate_normal", text="Rotate...")
+        layout.operator("mesh.point_normals", text="Point to Target...")
         layout.operator_context = 'EXEC_DEFAULT'
 
-        layout.operator("mesh.point_normals", text="Point to Target")
         layout.operator("mesh.merge_normals", text="Merge")
         layout.operator("mesh.split_normals", text="Split")
         layout.menu("VIEW3D_MT_edit_mesh_normals_average", text="Average")
@@ -4537,6 +4542,9 @@ class VIEW3D_MT_edit_gpencil(Menu):
         layout.operator_menu_enum("gpencil.stroke_separate", "mode", text="Separate...")
         layout.operator("gpencil.stroke_split", text="Split")
         layout.operator("gpencil.stroke_merge", text="Merge")
+        op = layout.operator("gpencil.stroke_cyclical_set", text="Close")
+        op.type = 'CLOSE'
+        op.geometry = True
         layout.operator_menu_enum("gpencil.stroke_join", "type", text="Join...")
         layout.operator("gpencil.stroke_flip", text="Flip Direction")
 
@@ -4611,10 +4619,6 @@ class VIEW3D_MT_edit_gpencil_transform(Menu):
         layout.operator("transform.shear", text="Shear")
         layout.operator("transform.tosphere", text="To Sphere")
         layout.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
-
-        layout.separator()
-
-        layout.operator("gpencil.reproject")
 
 
 class VIEW3D_MT_edit_gpencil_interpolate(Menu):
@@ -4995,7 +4999,7 @@ class VIEW3D_PT_object_type_visibility(Panel):
             ("curve", "Curve"),
             ("surf", "Surface"),
             ("meta", "Meta"),
-            ("font", "Font"),
+            ("font", "Text"),
             ("grease_pencil", "Grease Pencil"),
             (None, None),
             # Other
@@ -5546,6 +5550,10 @@ class VIEW3D_PT_overlay_edit_mesh(Panel):
         row.prop(overlay, "show_edge_bevel_weight", text="Bevel", toggle=True)
         row.prop(overlay, "show_edge_seams", text="Seams", toggle=True)
 
+        if context.preferences.view.show_developer_ui:
+            col.label(text="Developer")
+            col.prop(overlay, "show_extra_indices", text="Indices")
+
 
 class VIEW3D_PT_overlay_edit_mesh_shading(Panel):
     bl_space_type = 'VIEW_3D'
@@ -5704,29 +5712,6 @@ class VIEW3D_PT_overlay_edit_mesh_freestyle(Panel):
         row = col.row()
         row.prop(overlay, "show_freestyle_edge_marks", text="Edge Marks")
         row.prop(overlay, "show_freestyle_face_marks", text="Face Marks")
-
-
-class VIEW3D_PT_overlay_edit_mesh_developer(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'HEADER'
-    bl_parent_id = 'VIEW3D_PT_overlay_edit_mesh'
-    bl_label = "Developer"
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and context.preferences.view.show_developer_ui
-
-    def draw(self, context):
-        layout = self.layout
-
-        view = context.space_data
-        overlay = view.overlay
-        display_all = overlay.show_overlays
-
-        col = layout.column()
-        col.active = display_all
-
-        col.prop(overlay, "show_extra_indices", text="Indices")
 
 
 class VIEW3D_PT_overlay_edit_curve(Panel):
@@ -6039,14 +6024,14 @@ class VIEW3D_PT_gpencil_guide(Panel):
         col.active = settings.use_guide
         col.prop(settings, "type", expand=True)
 
-        if settings.type in {'PARALLEL'}:
+        if settings.type == 'PARALLEL':
             col.prop(settings, "angle")
             row = col.row(align=True)
 
         col.prop(settings, "use_snapping")
         if settings.use_snapping:
 
-            if settings.type in {'RADIAL'}:
+            if settings.type == 'RADIAL':
                 col.prop(settings, "angle_snap")
             else:
                 col.prop(settings, "spacing")
@@ -6054,9 +6039,9 @@ class VIEW3D_PT_gpencil_guide(Panel):
         col.label(text="Reference Point")
         row = col.row(align=True)
         row.prop(settings, "reference_point", expand=True)
-        if settings.reference_point in {'CUSTOM'}:
+        if settings.reference_point == 'CUSTOM':
             col.prop(settings, "location", text="Custom Location")
-        if settings.reference_point in {'OBJECT'}:
+        elif settings.reference_point == 'OBJECT':
             col.prop(settings, "reference_object", text="Object Location")
             if not settings.reference_object:
                 col.label(text="No object selected, using cursor")
@@ -6313,6 +6298,9 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
         layout.operator("gpencil.stroke_join", text="Join & Copy").type = 'JOINCOPY'
         layout.menu("GPENCIL_MT_separate", text="Separate")
         layout.operator("gpencil.stroke_split", text="Split")
+        op = layout.operator("gpencil.stroke_cyclical_set", text="Close")
+        op.type = 'CLOSE'
+        op.geometry = True
 
         layout.separator()
 
@@ -6686,7 +6674,6 @@ classes = (
     VIEW3D_PT_overlay_edit_mesh_measurement,
     VIEW3D_PT_overlay_edit_mesh_normals,
     VIEW3D_PT_overlay_edit_mesh_freestyle,
-    VIEW3D_PT_overlay_edit_mesh_developer,
     VIEW3D_PT_overlay_edit_curve,
     VIEW3D_PT_overlay_paint,
     VIEW3D_PT_overlay_pose,

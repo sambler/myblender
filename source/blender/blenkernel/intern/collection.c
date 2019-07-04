@@ -43,6 +43,7 @@
 #include "DNA_collection_types.h"
 #include "DNA_layer_types.h"
 #include "DNA_object_types.h"
+#include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 
 #include "DEG_depsgraph.h"
@@ -286,6 +287,16 @@ static Collection *collection_duplicate_recursive(Main *bmain,
 
       collection_object_add(bmain, collection_new, ob_new, 0, true);
       collection_object_remove(bmain, collection_new, ob_old, false);
+
+      if (ob_new->rigidbody_object != NULL) {
+        BLI_assert(ob_old->rigidbody_object != NULL);
+        for (Scene *scene = bmain->scenes.first; scene != NULL; scene = scene->id.next) {
+          if (scene->rigidbody_world != NULL &&
+              BKE_collection_has_object(scene->rigidbody_world->group, ob_old)) {
+            collection_object_add(bmain, scene->rigidbody_world->group, ob_new, 0, true);
+          }
+        }
+      }
     }
   }
 
@@ -432,15 +443,13 @@ static void collection_object_cache_fill(ListBase *lb, Collection *collection, i
       BLI_addtail(lb, base);
     }
 
-    int object_restrict = base->object->restrictflag;
-
-    if (((child_restrict & COLLECTION_RESTRICT_VIEWPORT) == 0) &&
-        ((object_restrict & OB_RESTRICT_VIEWPORT) == 0)) {
+    /* Only collection flags are checked here currently, object restrict flag is checked
+     * in FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN since it can be animated
+     * without updating the cache. */
+    if (((child_restrict & COLLECTION_RESTRICT_VIEWPORT) == 0)) {
       base->flag |= BASE_ENABLED_VIEWPORT;
     }
-
-    if (((child_restrict & COLLECTION_RESTRICT_RENDER) == 0) &&
-        ((object_restrict & OB_RESTRICT_RENDER) == 0)) {
+    if (((child_restrict & COLLECTION_RESTRICT_RENDER) == 0)) {
       base->flag |= BASE_ENABLED_RENDER;
     }
   }
@@ -624,6 +633,26 @@ bool BKE_collection_is_empty(Collection *collection)
 
 /********************** Collection Objects *********************/
 
+static void collection_tag_update_parent_recursive(Main *bmain,
+                                                   Collection *collection,
+                                                   const int flag)
+{
+  if (collection->flag & COLLECTION_IS_MASTER) {
+    return;
+  }
+
+  DEG_id_tag_update_ex(bmain, &collection->id, flag);
+
+  for (CollectionParent *collection_parent = collection->parents.first; collection_parent;
+       collection_parent = collection_parent->next) {
+    if (collection_parent->collection->flag & COLLECTION_IS_MASTER) {
+      /* We don't care about scene/master collection here. */
+      continue;
+    }
+    collection_tag_update_parent_recursive(bmain, collection_parent->collection, flag);
+  }
+}
+
 static bool collection_object_add(
     Main *bmain, Collection *collection, Object *ob, int flag, const bool add_us)
 {
@@ -649,7 +678,7 @@ static bool collection_object_add(
   }
 
   if ((flag & LIB_ID_CREATE_NO_MAIN) == 0) {
-    DEG_id_tag_update_ex(bmain, &collection->id, ID_RECALC_COPY_ON_WRITE);
+    collection_tag_update_parent_recursive(bmain, collection, ID_RECALC_COPY_ON_WRITE);
   }
 
   if ((flag & LIB_ID_CREATE_NO_MAIN) == 0) {
@@ -679,7 +708,7 @@ static bool collection_object_remove(Main *bmain,
     id_us_min(&ob->id);
   }
 
-  DEG_id_tag_update_ex(bmain, &collection->id, ID_RECALC_COPY_ON_WRITE);
+  collection_tag_update_parent_recursive(bmain, collection, ID_RECALC_COPY_ON_WRITE);
 
   return true;
 }

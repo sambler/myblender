@@ -988,6 +988,7 @@ context_type_map = {
     "active_object": ("Object", False),
     "active_operator": ("Operator", False),
     "active_pose_bone": ("PoseBone", False),
+    "active_editable_fcurve": ("FCurve", False),
     "armature": ("Armature", False),
     "bone": ("Bone", False),
     "brush": ("Brush", False),
@@ -1007,6 +1008,7 @@ context_type_map = {
     "editable_gpencil_layers": ("GPencilLayer", True),
     "editable_gpencil_strokes": ("GPencilStroke", True),
     "editable_objects": ("Object", True),
+    "editable_fcurves": ("FCurve", True),
     "fluid": ("FluidSimulationModifier", False),
     "gpencil": ("GreasePencil", False),
     "gpencil_data": ("GreasePencil", False),
@@ -1042,6 +1044,7 @@ context_type_map = {
     "selected_pose_bones": ("PoseBone", True),
     "selected_pose_bones_from_active_object": ("PoseBone", True),
     "selected_sequences": ("Sequence", True),
+    "selected_visible_fcurves": ("FCurve", True),
     "sequences": ("Sequence", True),
     "smoke": ("SmokeModifier", False),
     "soft_body": ("SoftBodyModifier", False),
@@ -1056,6 +1059,7 @@ context_type_map = {
     "visible_gpencil_layers": ("GPencilLayer", True),
     "visible_objects": ("Object", True),
     "visible_pose_bones": ("PoseBone", True),
+    "visible_fcurves": ("FCurve", True),
     "weight_paint_object": ("Object", False),
     "world": ("World", False),
 }
@@ -1619,6 +1623,16 @@ def write_sphinx_conf_py(basepath):
 
     fw("html_title = 'Blender %s Python API'\n" % BLENDER_VERSION_DOTS)
     fw("html_theme = 'sphinx_rtd_theme'\n")
+    fw("html_theme_options = {\n")
+    fw("    'canonical_url': 'https://docs.blender.org/api/current/',\n")
+    # fw("    'analytics_id': '',\n")
+    # fw("    'collapse_navigation': True,\n")
+    fw("    'sticky_navigation': False,\n")
+    fw("    'navigation_depth': 1,\n")
+    # fw("    'includehidden': True,\n")
+    # fw("    'titles_only': False\n")
+    fw("    }\n\n")
+
     # not helpful since the source is generated, adds to upload size.
     fw("html_copy_source = False\n")
     fw("html_show_sphinx = False\n")

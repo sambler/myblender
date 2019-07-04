@@ -98,7 +98,7 @@
  * Without tools using press events which would prevent click/drag events getting to the gizmos.
  *
  * This is not a fool proof solution since since it's possible the gizmo operators would pass
- * through thse events when called, see: T65479.
+ * through these events when called, see: T65479.
  */
 #define USE_GIZMO_MOUSE_PRIORITY_HACK
 
@@ -1033,11 +1033,7 @@ static void wm_operator_finished(bContext *C, wmOperator *op, const bool repeat,
 }
 
 /* if repeat is true, it doesn't register again, nor does it free */
-static int wm_operator_exec(bContext *C,
-                            wmOperator *op,
-                            const bool repeat,
-                            const bool use_repeat_op_flag,
-                            const bool store)
+static int wm_operator_exec(bContext *C, wmOperator *op, const bool repeat, const bool store)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   int retval = OPERATOR_CANCELLED;
@@ -1057,14 +1053,8 @@ static int wm_operator_exec(bContext *C,
       wm->op_undo_depth++;
     }
 
-    if (repeat && use_repeat_op_flag) {
-      op->flag |= OP_IS_REPEAT;
-    }
     retval = op->type->exec(C, op);
     OPERATOR_RETVAL_CHECK(retval);
-    if (repeat && use_repeat_op_flag) {
-      op->flag &= ~OP_IS_REPEAT;
-    }
 
     if (op->type->flag & OPTYPE_UNDO && CTX_wm_manager(C) == wm) {
       wm->op_undo_depth--;
@@ -1114,7 +1104,7 @@ static int wm_operator_exec_notest(bContext *C, wmOperator *op)
  * warning: do not use this within an operator to call its self! [#29537] */
 int WM_operator_call_ex(bContext *C, wmOperator *op, const bool store)
 {
-  return wm_operator_exec(C, op, false, false, store);
+  return wm_operator_exec(C, op, false, store);
 }
 
 int WM_operator_call(bContext *C, wmOperator *op)
@@ -1137,11 +1127,19 @@ int WM_operator_call_notest(bContext *C, wmOperator *op)
  */
 int WM_operator_repeat(bContext *C, wmOperator *op)
 {
-  return wm_operator_exec(C, op, true, true, true);
+  const int op_flag = OP_IS_REPEAT;
+  op->flag |= op_flag;
+  const int ret = wm_operator_exec(C, op, true, true);
+  op->flag &= ~op_flag;
+  return ret;
 }
-int WM_operator_repeat_interactive(bContext *C, wmOperator *op)
+int WM_operator_repeat_last(bContext *C, wmOperator *op)
 {
-  return wm_operator_exec(C, op, true, false, true);
+  const int op_flag = OP_IS_REPEAT_LAST;
+  op->flag |= op_flag;
+  const int ret = wm_operator_exec(C, op, true, true);
+  op->flag &= ~op_flag;
+  return ret;
 }
 /**
  * \return true if #WM_operator_repeat can run
@@ -2794,8 +2792,11 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
           int part = -1;
           gz = wm_gizmomap_highlight_find(gzmap, C, event, &part);
 
-          if ((gz == NULL) || (prev.gz != gz) || (prev.part != part)) {
-            WM_tooltip_clear(C, CTX_wm_window(C));
+          /* If no gizmos are/were active, don't clear tool-tips. */
+          if (gz || prev.gz) {
+            if ((prev.gz != gz) || (prev.part != part)) {
+              WM_tooltip_clear(C, CTX_wm_window(C));
+            }
           }
 
           if (wm_gizmomap_highlight_set(gzmap, C, gz, part)) {
@@ -3227,14 +3228,11 @@ void wm_event_do_handlers(bContext *C)
     }
     else {
       Scene *scene = WM_window_get_active_scene(win);
+      ViewLayer *view_layer = WM_window_get_active_view_layer(win);
+      Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer, false);
+      Scene *scene_eval = (depsgraph != NULL) ? DEG_get_evaluated_scene(depsgraph) : NULL;
 
-      CTX_wm_window_set(C, win);
-      CTX_data_scene_set(C, scene);
-
-      Depsgraph *depsgraph = CTX_data_depsgraph(C);
-      Scene *scene_eval = DEG_get_evaluated_scene_if_exists(depsgraph);
-
-      if (scene_eval) {
+      if (scene_eval != NULL) {
         const int is_playing_sound = BKE_sound_scene_playing(scene_eval);
 
         if (is_playing_sound != -1) {
@@ -3260,10 +3258,6 @@ void wm_event_do_handlers(bContext *C)
           }
         }
       }
-
-      CTX_data_scene_set(C, NULL);
-      CTX_wm_screen_set(C, NULL);
-      CTX_wm_window_set(C, NULL);
     }
 
     while ((event = win->queue.first)) {
@@ -3485,7 +3479,7 @@ void WM_event_fileselect_event(wmWindowManager *wm, void *ophandle, int eventval
 
 /**
  * The idea here is to keep a handler alive on window queue, owning the operator.
- * The filewindow can send event to make it execute, thus ensuring
+ * The file window can send event to make it execute, thus ensuring
  * executing happens outside of lower level queues, with UI refreshed.
  * Should also allow multiwin solutions
  */
@@ -4131,14 +4125,15 @@ static int convert_key(GHOST_TKey key)
 
 static void wm_eventemulation(wmEvent *event, bool test_only)
 {
-  /* Store last mmb/rmb event value to make emulation work when modifier keys
-   * are released first. This really should be in a data structure somewhere. */
+  /* Store last middle-mouse event value to make emulation work
+   * when modifier keys are released first.
+   * This really should be in a data structure somewhere. */
   static int emulating_event = EVENT_NONE;
 
-  /* middlemouse and rightmouse emulation */
+  /* Middle-mouse emulation. */
   if (U.flag & USER_TWOBUTTONMOUSE) {
-    if (event->type == LEFTMOUSE) {
 
+    if (event->type == LEFTMOUSE) {
       if (event->val == KM_PRESS && event->alt) {
         event->type = MIDDLEMOUSE;
         event->alt = 0;
@@ -4147,25 +4142,11 @@ static void wm_eventemulation(wmEvent *event, bool test_only)
           emulating_event = MIDDLEMOUSE;
         }
       }
-#ifdef __APPLE__
-      else if (event->val == KM_PRESS && event->oskey) {
-        event->type = RIGHTMOUSE;
-        event->oskey = 0;
-
-        if (!test_only) {
-          emulating_event = RIGHTMOUSE;
-        }
-      }
-#endif
       else if (event->val == KM_RELEASE) {
         /* only send middle-mouse release if emulated */
         if (emulating_event == MIDDLEMOUSE) {
           event->type = MIDDLEMOUSE;
           event->alt = 0;
-        }
-        else if (emulating_event == RIGHTMOUSE) {
-          event->type = RIGHTMOUSE;
-          event->oskey = 0;
         }
 
         if (!test_only) {
@@ -5019,7 +5000,7 @@ const char *WM_window_cursor_keymap_status_get(const wmWindow *win,
 
 /**
  * Similar to #BKE_screen_area_map_find_area_xy and related functions,
- * use here since the ara is stored in the window manager.
+ * use here since the area is stored in the window manager.
  */
 ScrArea *WM_window_status_area_find(wmWindow *win, bScreen *screen)
 {

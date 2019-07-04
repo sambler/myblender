@@ -178,7 +178,7 @@ WORKBENCH_MaterialData *workbench_forward_get_or_create_material_data(WORKBENCH_
                                  wpd->transparent_accum_uniform_sh,
                              psl->transparent_accum_pass);
     DRW_shgroup_uniform_block(grp, "world_block", wpd->world_ubo);
-    DRW_shgroup_uniform_float_copy(grp, "alpha", wpd->shading.xray_alpha);
+    DRW_shgroup_uniform_float_copy(grp, "alpha", material_template.alpha);
     DRW_shgroup_uniform_vec4(grp, "viewvecs[0]", (float *)wpd->viewvecs, 3);
     workbench_material_copy(material, &material_template);
     if (STUDIOLIGHT_TYPE_MATCAP_ENABLED(wpd)) {
@@ -674,7 +674,7 @@ void workbench_forward_draw_background(WORKBENCH_Data *UNUSED(vedata))
   DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
   DRW_stats_group_start("Clear depth");
   GPU_framebuffer_bind(dfbl->default_fb);
-  GPU_framebuffer_clear_depth(dfbl->default_fb, clear_depth);
+  GPU_framebuffer_clear_depth_stencil(dfbl->default_fb, clear_depth, 0xFF);
   DRW_stats_group_end();
 }
 

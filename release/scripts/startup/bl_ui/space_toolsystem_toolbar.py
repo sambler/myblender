@@ -60,7 +60,6 @@ def generate_from_enum_ex(
                     idname=idname_prefix + name,
                     label=name,
                     icon=icon_prefix + idname.lower(),
-					cursor='PAINT_CROSSHAIR',
                     data_block=idname,
                     **tooldef_keywords,
                 )
@@ -200,7 +199,7 @@ class _defs_annotate:
             idname="builtin.annotate_line",
             label="Annotate Line",
             icon="ops.gpencil.draw.line",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             keymap="Generic Tool: Annotate Line",
             draw_settings=draw_settings,
         )
@@ -211,7 +210,7 @@ class _defs_annotate:
             idname="builtin.annotate_polygon",
             label="Annotate Polygon",
             icon="ops.gpencil.draw.poly",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             keymap="Generic Tool: Annotate Polygon",
             draw_settings=draw_settings,
         )
@@ -226,7 +225,7 @@ class _defs_annotate:
             idname="builtin.annotate_eraser",
             label="Annotate Eraser",
             icon="ops.gpencil.draw.eraser",
-            cursor='PAINT_CROSSHAIR',  # XXX: Always show brush circle when enabled
+            cursor='CROSSHAIR',  # XXX: Always show brush circle when enabled
             keymap="Generic Tool: Annotate Eraser",
             draw_settings=draw_settings,
         )
@@ -296,7 +295,7 @@ class _defs_transform:
     @ToolDef.from_fn
     def transform():
         def draw_settings(context, layout, tool):
-            if not layout.use_property_split:
+            if layout.use_property_split:
                 layout.label(text="Gizmos:")
 
             props = tool.gizmo_group_properties("VIEW3D_GGT_xform_gizmo")
@@ -1135,6 +1134,39 @@ class _defs_image_generic:
 class _defs_image_uv_transform:
 
     @ToolDef.from_fn
+    def translate():
+        return dict(
+            idname="builtin.move",
+            label="Move",
+            icon="ops.transform.translate",
+            # widget="VIEW3D_GGT_xform_gizmo",
+            operator="transform.translate",
+            keymap="Image Editor Tool: Uv, Move",
+        )
+
+    @ToolDef.from_fn
+    def rotate():
+        return dict(
+            idname="builtin.rotate",
+            label="Rotate",
+            icon="ops.transform.rotate",
+            # widget="VIEW3D_GGT_xform_gizmo",
+            operator="transform.rotate",
+            keymap="Image Editor Tool: Uv, Rotate",
+        )
+
+    @ToolDef.from_fn
+    def scale():
+        return dict(
+            idname="builtin.scale",
+            label="Scale",
+            icon="ops.transform.resize",
+            # widget="VIEW3D_GGT_xform_gizmo",
+            operator="transform.resize",
+            keymap="Image Editor Tool: Uv, Scale",
+        )
+
+    @ToolDef.from_fn
     def transform():
         return dict(
             idname="builtin.transform",
@@ -1287,7 +1319,7 @@ class _defs_gpencil_paint:
             idname="builtin.line",
             label="Line",
             icon="ops.gpencil.primitive_line",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1298,7 +1330,7 @@ class _defs_gpencil_paint:
             idname="builtin.box",
             label="Box",
             icon="ops.gpencil.primitive_box",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1309,7 +1341,7 @@ class _defs_gpencil_paint:
             idname="builtin.circle",
             label="Circle",
             icon="ops.gpencil.primitive_circle",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1320,7 +1352,7 @@ class _defs_gpencil_paint:
             idname="builtin.arc",
             label="Arc",
             icon="ops.gpencil.primitive_arc",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1331,7 +1363,7 @@ class _defs_gpencil_paint:
             idname="builtin.curve",
             label="Curve",
             icon="ops.gpencil.primitive_curve",
-            cursor='PAINT_CROSSHAIR',
+            cursor='CROSSHAIR',
             widget=None,
             keymap=(),
         )
@@ -1617,6 +1649,9 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
 
     # for reuse
     _tools_transform = (
+        _defs_image_uv_transform.translate,
+        _defs_image_uv_transform.rotate,
+        _defs_image_uv_transform.scale,
         _defs_image_uv_transform.transform,
     )
 

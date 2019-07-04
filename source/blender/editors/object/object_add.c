@@ -423,6 +423,8 @@ bool ED_object_add_generic_get_opts(bContext *C,
 
     if (RNA_struct_property_is_set(op->ptr, "rotation")) {
       *is_view_aligned = false;
+      RNA_property_enum_set(op->ptr, prop, ALIGN_WORLD);
+      alignment = ALIGN_WORLD;
     }
     else if (alignment_set) {
       *is_view_aligned = alignment == ALIGN_VIEW;
@@ -1417,6 +1419,7 @@ void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
 
 static int object_speaker_add_exec(bContext *C, wmOperator *op)
 {
+  Main *bmain = CTX_data_main(C);
   Object *ob;
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1434,7 +1437,7 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
     /* create new data for NLA hierarchy */
     AnimData *adt = BKE_animdata_add_id(&ob->id);
     NlaTrack *nlt = BKE_nlatrack_add(adt, NULL);
-    NlaStrip *strip = BKE_nla_add_soundstrip(scene, ob->data);
+    NlaStrip *strip = BKE_nla_add_soundstrip(bmain, scene, ob->data);
     strip->start = CFRA;
     strip->end += strip->start;
 
@@ -1918,8 +1921,8 @@ static int object_duplicates_make_real_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_duplicates_make_real(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Make Duplicates Real";
-  ot->description = "Make dupli objects attached to this object real";
+  ot->name = "Make Instances Real";
+  ot->description = "Make instanced objects attached to this object real";
   ot->idname = "OBJECT_OT_duplicates_make_real";
 
   /* api callbacks */
@@ -2026,6 +2029,18 @@ static Base *duplibase_for_convert(
   ED_object_base_select(basen, BA_SELECT);
   ED_object_base_select(base, BA_DESELECT);
 
+  /* XXX An ugly hack needed because if we re-run depsgraph with some new MBall objects
+   * having same 'family name' as orig ones, they will affect end result of MBall computation...
+   * For until we get rid of that name-based thingy in MBalls, that should do the trick
+   * (this is weak, but other solution (to change name of obn) is even worse imho).
+   * See T65996. */
+  const bool is_meta_ball = (obn->type == OB_MBALL);
+  void *obdata = obn->data;
+  if (is_meta_ball) {
+    obn->type = OB_EMPTY;
+    obn->data = NULL;
+  }
+
   /* XXX Doing that here is stupid, it means we update and re-evaluate the whole depsgraph every
    * time we need to duplicate an object to convert it. Even worse, this is not 100% correct, since
    * we do not yet have duplicated obdata.
@@ -2039,6 +2054,11 @@ static Base *duplibase_for_convert(
   CustomData_MeshMasks_update(&scene->customdata_mask, &CD_MASK_MESH);
   BKE_scene_graph_update_tagged(depsgraph, bmain);
   scene->customdata_mask = customdata_mask_prev;
+
+  if (is_meta_ball) {
+    obn->type = OB_MBALL;
+    obn->data = obdata;
+  }
 
   return basen;
 }
@@ -2309,8 +2329,6 @@ static int convert_exec(bContext *C, wmOperator *op)
       }
 
       if (!(baseob->flag & OB_DONE)) {
-        baseob->flag |= OB_DONE;
-
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, baseob);
         newob = basen->object;
 
@@ -2336,6 +2354,7 @@ static int convert_exec(bContext *C, wmOperator *op)
           basact = basen;
         }
 
+        baseob->flag |= OB_DONE;
         mballConverted = 1;
       }
     }
@@ -2807,7 +2826,7 @@ void OBJECT_OT_join_shapes(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Join as Shapes";
-  ot->description = "Merge selected objects to shapes of active object";
+  ot->description = "Copy the current resulting shape of another selected object to this one";
   ot->idname = "OBJECT_OT_join_shapes";
 
   /* api callbacks */

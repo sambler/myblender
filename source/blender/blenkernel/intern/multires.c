@@ -634,20 +634,20 @@ static void multires_del_higher(MultiresModifierData *mmd, Object *ob, int lvl)
 
           disps = MEM_calloc_arrayN(totdisp, 3 * sizeof(float), "multires disps");
 
-          ndisps = disps;
-          hdisps = mdisp->disps;
+          if (mdisp->disps != NULL) {
+            ndisps = disps;
+            hdisps = mdisp->disps;
 
-          multires_copy_grid(ndisps, hdisps, nsize, hsize);
-          if (mdisp->hidden) {
-            BLI_bitmap *gh = multires_mdisps_downsample_hidden(mdisp->hidden, mdisp->level, lvl);
-            MEM_freeN(mdisp->hidden);
-            mdisp->hidden = gh;
+            multires_copy_grid(ndisps, hdisps, nsize, hsize);
+            if (mdisp->hidden) {
+              BLI_bitmap *gh = multires_mdisps_downsample_hidden(mdisp->hidden, mdisp->level, lvl);
+              MEM_freeN(mdisp->hidden);
+              mdisp->hidden = gh;
+            }
+
+            MEM_freeN(mdisp->disps);
           }
 
-          ndisps += nsize * nsize;
-          hdisps += hsize * hsize;
-
-          MEM_freeN(mdisp->disps);
           mdisp->disps = disps;
           mdisp->totdisp = totdisp;
           mdisp->level = lvl;
@@ -2314,7 +2314,7 @@ static void multires_sync_levels(Scene *scene, Object *ob_src, Object *ob_dst)
   if (!mmd_src) {
     /* object could have MDISP even when there is no multires modifier
      * this could lead to troubles due to i've got no idea how mdisp could be
-     * upsampled correct without modifier data.
+     * up-sampled correct without modifier data.
      * just remove mdisps if no multires present (nazgul) */
 
     multires_customdata_delete(ob_src->data);

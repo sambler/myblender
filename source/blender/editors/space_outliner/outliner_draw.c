@@ -116,6 +116,10 @@ static void outliner_tree_dimensions(SpaceOutliner *soops, int *r_width, int *r_
  */
 static bool is_object_data_in_editmode(const ID *id, const Object *obact)
 {
+  if (id == NULL) {
+    return false;
+  }
+
   const short id_type = GS(id->name);
 
   if (id_type == ID_GD && obact && obact->data == id) {
@@ -1443,7 +1447,8 @@ static void outliner_draw_restrictbuts(uiBlock *block,
                               layer_collection,
                               (char *)"indirect_only");
               UI_but_flag_enable(bt, UI_BUT_DRAG_LOCK);
-              if (!props_active.layer_collection_indirect_only) {
+              if (props_active.layer_collection_holdout ||
+                  !props_active.layer_collection_indirect_only) {
                 UI_but_flag_enable(bt, UI_BUT_INACTIVE);
               }
             }
@@ -2202,7 +2207,7 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
           data.icon = ICON_OUTLINER_OB_LIGHTPROBE;
           break;
         case OB_EMPTY:
-          if (ob->instance_collection) {
+          if (ob->instance_collection && (ob->transflag & OB_DUPLICOLLECTION)) {
             data.icon = ICON_OUTLINER_OB_GROUP_INSTANCE;
           }
           else if (ob->empty_drawtype == OB_EMPTY_IMAGE) {

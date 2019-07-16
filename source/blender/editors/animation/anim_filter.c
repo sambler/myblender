@@ -2231,7 +2231,7 @@ static size_t animdata_filter_ds_textures(
     }
   }
 
-  /* Firstly check that we actuallly have some textures,
+  /* Firstly check that we actually have some textures,
    * by gathering all textures in a temp list. */
   for (a = 0; a < MAX_MTEX; a++) {
     Tex *tex = (mtex[a]) ? mtex[a]->tex : NULL;
@@ -3151,7 +3151,9 @@ static size_t animdata_filter_dopesheet(bAnimContext *ac,
   }
 
   /* movie clip's animation */
-  items += animdata_filter_dopesheet_movieclips(ac, anim_data, ads, filter_mode);
+  if (!(ads->filterflag2 & ADS_FILTER_NOMOVIECLIPS) && !(ads->filterflag & ADS_FILTER_ONLYSEL)) {
+    items += animdata_filter_dopesheet_movieclips(ac, anim_data, ads, filter_mode);
+  }
 
   /* Scene-linked animation - e.g. world, compositing nodes, scene anim
    * (including sequencer currently). */

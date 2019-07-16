@@ -99,6 +99,10 @@ void ED_undo_push(bContext *C, const char *str)
     BKE_undosys_stack_limit_steps_and_memory(wm->undo_stack, 0, memory_limit);
   }
 
+  if (CLOG_CHECK(&LOG, 1)) {
+    BKE_undosys_print(wm->undo_stack);
+  }
+
   WM_file_tag_modified();
 }
 
@@ -236,6 +240,10 @@ static int ed_undo_step_impl(
   Main *bmain = CTX_data_main(C);
   WM_toolsystem_refresh_screen_all(bmain);
 
+  if (CLOG_CHECK(&LOG, 1)) {
+    BKE_undosys_print(wm->undo_stack);
+  }
+
   return OPERATOR_FINISHED;
 }
 
@@ -315,6 +323,39 @@ bool ED_undo_is_memfile_compatible(const bContext *C)
     if (obact != NULL) {
       if (obact->mode & (OB_MODE_SCULPT | OB_MODE_EDIT)) {
         return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * When a property of ID changes, return false.
+ *
+ * This is to avoid changes to a property making undo pushes
+ * which are ignored by the undo-system.
+ * For example, changing a brush property isn't stored by sculpt-mode undo steps.
+ * This workaround is needed until the limitation is removed, see: T61948.
+ */
+bool ED_undo_is_legacy_compatible_for_property(struct bContext *C, ID *id)
+{
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  if (view_layer != NULL) {
+    Object *obact = OBACT(view_layer);
+    if (obact != NULL) {
+      if (obact->mode & OB_MODE_ALL_PAINT) {
+        /* Don't store property changes when painting
+         * (only do undo pushes on brush strokes which each paint operator handles on it's own). */
+        CLOG_INFO(&LOG, 1, "skipping undo for paint-mode");
+        return false;
+      }
+      else if (obact->mode & OB_MODE_EDIT) {
+        if ((id == NULL) || (obact->data == NULL) ||
+            (GS(id->name) != GS(((ID *)obact->data)->name))) {
+          /* No undo push on id type mismatch in edit-mode. */
+          CLOG_INFO(&LOG, 1, "skipping undo for edit-mode");
+          return false;
+        }
       }
     }
   }

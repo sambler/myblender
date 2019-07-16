@@ -756,6 +756,14 @@ static void ui_apply_but_undo(uiBut *but)
       str = "Unknown Action";
     }
 
+    /* Optionally override undo when undo system doesn't support storing properties. */
+    if (but->rnapoin.id.data) {
+      ID *id = but->rnapoin.id.data;
+      if (!ED_undo_is_legacy_compatible_for_property(but->block->evil_C, id)) {
+        str = "";
+      }
+    }
+
     /* delayed, after all other funcs run, popups are closed, etc */
     after = ui_afterfunc_new();
     BLI_strncpy(after->undostr, str, sizeof(after->undostr));
@@ -7293,7 +7301,11 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
     button_tooltip_timer_reset(C, but);
 
     /* automatic open pulldown block timer */
-    if (ELEM(but->type, UI_BTYPE_BLOCK, UI_BTYPE_PULLDOWN, UI_BTYPE_POPOVER, UI_BTYPE_MENU)) {
+    if (ELEM(but->type, UI_BTYPE_BLOCK, UI_BTYPE_PULLDOWN, UI_BTYPE_POPOVER) ||
+        /* Menu button types may draw as popovers, check for this case
+         * ignoring other kinds of menus (mainly enums). (see T66538). */
+        ((but->type == UI_BTYPE_MENU) &&
+         (UI_but_paneltype_get(but) || ui_but_menu_draw_as_popover(but)))) {
       if (data->used_mouse && !data->autoopentimer) {
         int time;
 

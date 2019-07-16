@@ -47,6 +47,7 @@
 #include "BKE_mesh.h"
 #include "BKE_mesh_tangent.h"
 #include "BKE_mesh_runtime.h"
+#include "BKE_modifier.h"
 #include "BKE_object_deform.h"
 
 #include "atomic_ops.h"
@@ -245,17 +246,21 @@ typedef struct MeshRenderData {
   struct {
     struct {
       MLoopUV **uv;
+      MLoopCol **vcol;
+      float (**tangent)[4];
+
       int uv_len;
       int uv_active;
+      int uv_render;
       int uv_mask_active;
 
-      MLoopCol **vcol;
       int vcol_len;
       int vcol_active;
+      int vcol_render;
 
-      float (**tangent)[4];
       int tangent_len;
       int tangent_active;
+      int tangent_render;
 
       bool *auto_vcol;
     } layers;
@@ -470,7 +475,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
           case CD_MTFACE: {
             if (layer == -1) {
               layer = (name[0] != '\0') ? CustomData_get_named_layer(cd_ldata, CD_MLOOPUV, name) :
-                                          CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
+                                          CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
             }
             if (layer != -1) {
               cd_used.uv |= (1 << layer);
@@ -480,11 +485,11 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
           case CD_TANGENT: {
             if (layer == -1) {
               layer = (name[0] != '\0') ? CustomData_get_named_layer(cd_ldata, CD_MLOOPUV, name) :
-                                          CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
+                                          CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
 
               /* Only fallback to orco (below) when we have no UV layers, see: T56545 */
               if (layer == -1 && name[0] != '\0') {
-                layer = CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
+                layer = CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
               }
             }
             if (layer != -1) {
@@ -500,7 +505,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
           case CD_MCOL: {
             if (layer == -1) {
               layer = (name[0] != '\0') ? CustomData_get_named_layer(cd_ldata, CD_MLOOPCOL, name) :
-                                          CustomData_get_active_layer(cd_ldata, CD_MLOOPCOL);
+                                          CustomData_get_render_layer(cd_ldata, CD_MLOOPCOL);
             }
             if (layer != -1) {
               cd_used.vcol |= (1 << layer);
@@ -884,9 +889,12 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
     }
 
     rdata->cd.layers.uv_active = CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
+    rdata->cd.layers.uv_render = CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
     rdata->cd.layers.uv_mask_active = CustomData_get_stencil_layer(cd_ldata, CD_MLOOPUV);
     rdata->cd.layers.vcol_active = CustomData_get_active_layer(cd_ldata, CD_MLOOPCOL);
+    rdata->cd.layers.vcol_render = CustomData_get_render_layer(cd_ldata, CD_MLOOPCOL);
     rdata->cd.layers.tangent_active = rdata->cd.layers.uv_active;
+    rdata->cd.layers.tangent_render = rdata->cd.layers.uv_render;
 
 #define CD_VALIDATE_ACTIVE_LAYER(active_index, used) \
   if ((active_index != -1) && (used & (1 << active_index)) == 0) { \
@@ -895,9 +903,12 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
   ((void)0)
 
     CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.uv_active, cd_used->uv);
+    CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.uv_render, cd_used->uv);
     CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.uv_mask_active, cd_used->uv);
     CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.tangent_active, cd_used->tan);
+    CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.tangent_render, cd_used->tan);
     CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.vcol_active, cd_used->vcol);
+    CD_VALIDATE_ACTIVE_LAYER(rdata->cd.layers.vcol_render, cd_used->vcol);
 
 #undef CD_VALIDATE_ACTIVE_LAYER
 
@@ -981,12 +992,16 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
      * NOTE 2 : Replicate changes to code_generate_vertex_new() in gpu_codegen.c */
     if (rdata->cd.layers.vcol_len != 0) {
       int act_vcol = rdata->cd.layers.vcol_active;
+      int ren_vcol = rdata->cd.layers.vcol_render;
       for (int i_src = 0, i_dst = 0; i_src < cd_layers_src.vcol_len; i_src++, i_dst++) {
         if ((cd_used->vcol & (1 << i_src)) == 0) {
           /* This is a non-used VCol slot. Skip. */
           i_dst--;
           if (rdata->cd.layers.vcol_active >= i_src) {
             act_vcol--;
+          }
+          if (rdata->cd.layers.vcol_render >= i_src) {
+            ren_vcol--;
           }
         }
         else {
@@ -1010,9 +1025,12 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
           }
         }
       }
+      /* Actual active Vcol slot inside vcol layers used for shading. */
       if (rdata->cd.layers.vcol_active != -1) {
-        /* Actual active Vcol slot inside vcol layers used for shading. */
         rdata->cd.layers.vcol_active = act_vcol;
+      }
+      if (rdata->cd.layers.vcol_render != -1) {
+        rdata->cd.layers.vcol_render = ren_vcol;
       }
     }
 
@@ -1021,11 +1039,15 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
     CustomData_free_layers(cd_ldata, CD_MLOOPTANGENT, rdata->loop_len);
 
     if (rdata->cd.layers.uv_len != 0) {
+      int ren_uv = rdata->cd.layers.uv_render;
       int act_uv = rdata->cd.layers.uv_active;
       for (int i_src = 0, i_dst = 0; i_src < cd_layers_src.uv_len; i_src++, i_dst++) {
         if ((cd_used->uv & (1 << i_src)) == 0) {
           /* This is a non-used UV slot. Skip. */
           i_dst--;
+          if (rdata->cd.layers.uv_render >= i_src) {
+            ren_uv--;
+          }
           if (rdata->cd.layers.uv_active >= i_src) {
             act_uv--;
           }
@@ -1044,8 +1066,11 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
               rdata->cd.uuid.auto_mix[i_dst], sizeof(*rdata->cd.uuid.auto_mix), "a%u", hash);
         }
       }
+      /* Actual active / Render UV slot inside uv layers used for shading. */
+      if (rdata->cd.layers.uv_render != -1) {
+        rdata->cd.layers.uv_render = ren_uv;
+      }
       if (rdata->cd.layers.uv_active != -1) {
-        /* Actual active UV slot inside uv layers used for shading. */
         rdata->cd.layers.uv_active = act_uv;
       }
     }
@@ -1144,9 +1169,13 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
 
       int i_dst = 0;
       int act_tan = rdata->cd.layers.tangent_active;
+      int ren_tan = rdata->cd.layers.tangent_render;
       for (int i_src = 0; i_src < cd_layers_src.uv_len; i_src++, i_dst++) {
         if ((cd_used->tan & (1 << i_src)) == 0) {
           i_dst--;
+          if (rdata->cd.layers.tangent_render >= i_src) {
+            ren_tan--;
+          }
           if (rdata->cd.layers.tangent_active >= i_src) {
             act_tan--;
           }
@@ -1172,9 +1201,12 @@ static MeshRenderData *mesh_render_data_create_ex(Mesh *me,
           }
         }
       }
+      /* Actual active rangent slot inside uv layers used for shading. */
       if (rdata->cd.layers.tangent_active != -1) {
-        /* Actual active UV slot inside uv layers used for shading. */
         rdata->cd.layers.tangent_active = act_tan;
+      }
+      if (rdata->cd.layers.tangent_render != -1) {
+        rdata->cd.layers.tangent_render = ren_tan;
       }
 
       if (cd_used->tan_orco != 0) {
@@ -1813,6 +1845,36 @@ static bool add_edit_facedot_mapped(MeshRenderData *rdata,
 
   return true;
 }
+static bool add_edit_facedot_subdiv(MeshRenderData *rdata,
+                                    GPUVertBuf *vbo,
+                                    const uint fdot_pos_id,
+                                    const uint fdot_nor_flag_id,
+                                    const int vert,
+                                    const int poly,
+                                    const int base_vert_idx)
+{
+  BLI_assert(rdata->types & (MR_DATATYPE_VERT | MR_DATATYPE_LOOP | MR_DATATYPE_POLY));
+  const int *p_origindex = rdata->mapped.p_origindex;
+  const int p_orig = p_origindex[poly];
+  if (p_orig == ORIGINDEX_NONE) {
+    return false;
+  }
+  BMEditMesh *em = rdata->edit_bmesh;
+  const BMFace *efa = BM_face_at_index(em->bm, p_orig);
+  if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+    return false;
+  }
+
+  Mesh *me_cage = em->mesh_eval_cage;
+  const MVert *mvert = &me_cage->mvert[vert];
+
+  GPUPackedNormal nor = GPU_normal_convert_i10_s3(mvert->no);
+  nor.w = BM_elem_flag_test(efa, BM_ELEM_SELECT) ? ((efa == em->bm->act_face) ? -1 : 1) : 0;
+  GPU_vertbuf_attr_set(vbo, fdot_nor_flag_id, base_vert_idx, &nor);
+  GPU_vertbuf_attr_set(vbo, fdot_pos_id, base_vert_idx, mvert->co);
+
+  return true;
+}
 
 /** \} */
 
@@ -2233,12 +2295,13 @@ void DRW_mesh_batch_cache_dirty_tag(Mesh *me, int mode)
       GPU_VERTBUF_DISCARD_SAFE(cache->ordered.loop_pos_nor);
       GPU_BATCH_DISCARD_SAFE(cache->batch.surface);
       GPU_BATCH_DISCARD_SAFE(cache->batch.wire_loops);
+      GPU_BATCH_DISCARD_SAFE(cache->batch.wire_edges);
       if (cache->surf_per_mat) {
         for (int i = 0; i < cache->mat_len; i++) {
           GPU_BATCH_DISCARD_SAFE(cache->surf_per_mat[i]);
         }
       }
-      cache->batch_ready &= ~(MBC_SURFACE | MBC_WIRE_LOOPS | MBC_SURF_PER_MAT);
+      cache->batch_ready &= ~(MBC_SURFACE | MBC_WIRE_EDGES | MBC_WIRE_LOOPS | MBC_SURF_PER_MAT);
       break;
     case BKE_MESH_BATCH_DIRTY_ALL:
       cache->is_dirty = true;
@@ -2722,7 +2785,10 @@ static void mesh_create_edit_vertex_loops(MeshRenderData *rdata,
 }
 
 /* TODO: We could use gl_PrimitiveID as index instead of using another VBO. */
-static void mesh_create_edit_facedots_select_id(MeshRenderData *rdata, GPUVertBuf *vbo)
+static void mesh_create_edit_facedots_select_id(MeshRenderData *rdata,
+                                                GPUVertBuf *vbo,
+                                                Scene *scene,
+                                                Object *ob)
 {
   const int poly_len = mesh_render_data_polys_len_get_maybe_mapped(rdata);
 
@@ -2757,12 +2823,32 @@ static void mesh_create_edit_facedots_select_id(MeshRenderData *rdata, GPUVertBu
   }
   else {
     const int *p_origindex = rdata->mapped.p_origindex;
-    for (int poly = 0; poly < poly_len; poly++) {
-      const int p_orig = p_origindex[poly];
-      if (p_orig != ORIGINDEX_NONE) {
-        const BMFace *efa = BM_face_at_index(rdata->edit_bmesh->bm, p_orig);
-        if (!BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
-          *((uint *)GPU_vertbuf_raw_step(&idx_step)) = p_orig;
+    if (modifiers_usesSubsurfFacedots(scene, ob)) {
+      Mesh *me_cage = rdata->mapped.me_cage;
+      const MPoly *mpoly = me_cage->mpoly;
+      for (int p = 0; p < poly_len; p++, mpoly++) {
+        const int p_orig = p_origindex[p];
+        if (p_orig != ORIGINDEX_NONE) {
+          const MLoop *mloop = me_cage->mloop + mpoly->loopstart;
+          for (int l = 0; l < mpoly->totloop; l++, mloop++) {
+            if (me_cage->mvert[mloop->v].flag & ME_VERT_FACEDOT) {
+              const BMFace *efa = BM_face_at_index(rdata->edit_bmesh->bm, p_orig);
+              if (!BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+                *((uint *)GPU_vertbuf_raw_step(&idx_step)) = p_orig;
+              }
+            }
+          }
+        }
+      }
+    }
+    else {
+      for (int poly = 0; poly < poly_len; poly++) {
+        const int p_orig = p_origindex[poly];
+        if (p_orig != ORIGINDEX_NONE) {
+          const BMFace *efa = BM_face_at_index(rdata->edit_bmesh->bm, p_orig);
+          if (!BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+            *((uint *)GPU_vertbuf_raw_step(&idx_step)) = p_orig;
+          }
         }
       }
     }
@@ -2932,7 +3018,7 @@ static void mesh_create_loop_edge_fac(MeshRenderData *rdata, GPUVertBuf *vbo)
         BM_ITER_ELEM (loop, &iter_loop, efa, BM_LOOPS_OF_FACE) {
           float ratio = mesh_loop_edge_factor_get(
               efa->no, loop->v->co, loop->v->no, loop->next->v->co);
-          vertbuf_raw_step(&wd_step, ratio * 255);
+          vertbuf_raw_step(&wd_step, ratio * 253 + 1);
         }
       }
       BLI_assert(GPU_vertbuf_raw_used(&wd_step) == loop_len);
@@ -3204,8 +3290,11 @@ static void mesh_create_loop_uv_and_tan(MeshRenderData *rdata, GPUVertBuf *vbo)
     attr_name = mesh_render_data_uv_auto_layer_uuid_get(rdata, i);
     GPU_vertformat_alias_add(&format, attr_name);
 
-    if (i == rdata->cd.layers.uv_active) {
+    if (i == rdata->cd.layers.uv_render) {
       GPU_vertformat_alias_add(&format, "u");
+    }
+    if (i == rdata->cd.layers.uv_active) {
+      GPU_vertformat_alias_add(&format, "au");
     }
     if (i == rdata->cd.layers.uv_mask_active) {
       GPU_vertformat_alias_add(&format, "mu");
@@ -3220,8 +3309,11 @@ static void mesh_create_loop_uv_and_tan(MeshRenderData *rdata, GPUVertBuf *vbo)
 #else
     tangent_id[i] = GPU_vertformat_attr_add(&format, attr_name, GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
 #endif
-    if (i == rdata->cd.layers.tangent_active) {
+    if (i == rdata->cd.layers.tangent_render) {
       GPU_vertformat_alias_add(&format, "t");
+    }
+    if (i == rdata->cd.layers.tangent_active) {
+      GPU_vertformat_alias_add(&format, "at");
     }
   }
 
@@ -3321,8 +3413,11 @@ static void mesh_create_loop_vcol(MeshRenderData *rdata, GPUVertBuf *vbo)
       attr_name = mesh_render_data_vcol_auto_layer_uuid_get(rdata, i);
       GPU_vertformat_alias_add(&format, attr_name);
     }
-    if (i == rdata->cd.layers.vcol_active) {
+    if (i == rdata->cd.layers.vcol_render) {
       GPU_vertformat_alias_add(&format, "c");
+    }
+    if (i == rdata->cd.layers.vcol_active) {
+      GPU_vertformat_alias_add(&format, "ac");
     }
   }
 
@@ -3372,7 +3467,10 @@ static void mesh_create_loop_vcol(MeshRenderData *rdata, GPUVertBuf *vbo)
 #undef USE_COMP_MESH_DATA
 }
 
-static void mesh_create_edit_facedots(MeshRenderData *rdata, GPUVertBuf *vbo_facedots_pos_nor_data)
+static void mesh_create_edit_facedots(MeshRenderData *rdata,
+                                      GPUVertBuf *vbo_facedots_pos_nor_data,
+                                      Scene *scene,
+                                      Object *ob)
 {
   const int poly_len = mesh_render_data_polys_len_get_maybe_mapped(rdata);
   const int verts_facedot_len = poly_len;
@@ -3414,21 +3512,37 @@ static void mesh_create_edit_facedots(MeshRenderData *rdata, GPUVertBuf *vbo_fac
     }
   }
   else {
-#if 0 /* TODO(fclem): Mapped facedots are not following the original face. */
-    Mesh *me_cage = rdata->mapped.me_cage;
-    const MVert *mvert = me_cage->mvert;
-    const MEdge *medge = me_cage->medge;
-    const int *e_origindex = rdata->mapped.e_origindex;
-    const int *v_origindex = rdata->mapped.v_origindex;
-#endif
-    for (int i = 0; i < poly_len; i++) {
-      if (add_edit_facedot_mapped(rdata,
-                                  vbo_facedots_pos_nor_data,
-                                  attr_id.fdot_pos,
-                                  attr_id.fdot_nor_flag,
-                                  i,
-                                  facedot_len_used)) {
-        facedot_len_used += 1;
+    if (modifiers_usesSubsurfFacedots(scene, ob)) {
+      /* Facedots that follow surbsurf face center. */
+      Mesh *me_cage = rdata->mapped.me_cage;
+      const MPoly *mpoly = me_cage->mpoly;
+      for (int p = 0; p < poly_len; p++, mpoly++) {
+        const MLoop *mloop = me_cage->mloop + mpoly->loopstart;
+        for (int l = 0; l < mpoly->totloop; l++, mloop++) {
+          if (me_cage->mvert[mloop->v].flag & ME_VERT_FACEDOT) {
+            if (add_edit_facedot_subdiv(rdata,
+                                        vbo_facedots_pos_nor_data,
+                                        attr_id.fdot_pos,
+                                        attr_id.fdot_nor_flag,
+                                        mloop->v,
+                                        p,
+                                        facedot_len_used)) {
+              facedot_len_used += 1;
+            }
+          }
+        }
+      }
+    }
+    else {
+      for (int i = 0; i < poly_len; i++) {
+        if (add_edit_facedot_mapped(rdata,
+                                    vbo_facedots_pos_nor_data,
+                                    attr_id.fdot_pos,
+                                    attr_id.fdot_nor_flag,
+                                    i,
+                                    facedot_len_used)) {
+          facedot_len_used += 1;
+        }
       }
     }
   }
@@ -3809,53 +3923,70 @@ static void mesh_create_loops_lines_paint_mask(MeshRenderData *rdata, GPUIndexBu
     BLI_assert(0);
   }
   else {
-    /* Each edge has two bits used to count selected edges as 0, 1, 2+. */
-    BLI_bitmap *edges_used = BLI_BITMAP_NEW(edge_len * 2, __func__);
+    if (rdata->me->editflag & ME_EDIT_PAINT_FACE_SEL) {
+      /* Each edge has two bits used to count selected edges as 0, 1, 2+. */
+      BLI_bitmap *edges_used = BLI_BITMAP_NEW(edge_len * 2, __func__);
 
-    /* Fill the EdgeHash tables. */
-    for (int poly = 0; poly < poly_len; poly++) {
-      const MPoly *mpoly = &rdata->mpoly[poly];
+      /* Fill the edge bitmap table. */
+      for (int poly = 0; poly < poly_len; poly++) {
+        const MPoly *mpoly = &rdata->mpoly[poly];
 
-      /* Do not check faces that are hidden and faces that aren't selected */
-      if (mpoly->flag & ME_HIDE || ((mpoly->flag & ME_FACE_SEL) == 0)) {
-        continue;
+        /* Do not check faces that are hidden and faces that aren't selected */
+        if (mpoly->flag & ME_HIDE || ((mpoly->flag & ME_FACE_SEL) == 0)) {
+          continue;
+        }
+
+        for (int loop_index = mpoly->loopstart, loop_index_end = mpoly->loopstart + mpoly->totloop;
+             loop_index < loop_index_end;
+             loop_index++) {
+          const MLoop *mloop = &rdata->mloop[loop_index];
+          const int e_a = mloop->e * 2;
+          const int e_b = e_a + 1;
+          if (!BLI_BITMAP_TEST(edges_used, e_a)) {
+            BLI_BITMAP_ENABLE(edges_used, e_a);
+          }
+          else {
+            BLI_BITMAP_ENABLE(edges_used, e_b);
+          }
+        }
       }
 
-      for (int loop_index = mpoly->loopstart, loop_index_end = mpoly->loopstart + mpoly->totloop;
-           loop_index < loop_index_end;
-           loop_index++) {
-        const MLoop *mloop = &rdata->mloop[loop_index];
-        const int e_a = mloop->e * 2;
-        const int e_b = e_a + 1;
-        if (!BLI_BITMAP_TEST(edges_used, e_a)) {
-          BLI_BITMAP_ENABLE(edges_used, e_a);
-        }
-        else {
-          BLI_BITMAP_ENABLE(edges_used, e_b);
+      for (int poly = 0; poly < poly_len; poly++) {
+        const MPoly *mpoly = &rdata->mpoly[poly];
+        if (!(mpoly->flag & ME_HIDE)) {
+
+          for (int loop_index_next = mpoly->loopstart,
+                   loop_index_end = mpoly->loopstart + mpoly->totloop,
+                   loop_index_curr = loop_index_end - 1;
+               loop_index_next < loop_index_end;
+               loop_index_curr = loop_index_next++) {
+            const MLoop *mloop = &rdata->mloop[loop_index_curr];
+            const int e_a = mloop->e * 2;
+            const int e_b = e_a + 1;
+
+            /* Draw if a boundary or entirely unselected. */
+            if (!BLI_BITMAP_TEST(edges_used, e_b)) {
+              GPU_indexbuf_add_line_verts(&elb, loop_index_curr, loop_index_next);
+            }
+          }
         }
       }
+
+      MEM_freeN(edges_used);
     }
-
-    for (int poly = 0; poly < poly_len; poly++) {
-      const MPoly *mpoly = &rdata->mpoly[poly];
-      if (!(mpoly->flag & ME_HIDE)) {
-
+    else {
+      /* Add edges. */
+      for (int poly = 0; poly < poly_len; poly++) {
+        const MPoly *mpoly = &rdata->mpoly[poly];
         for (int loop_index_next = mpoly->loopstart,
                  loop_index_end = mpoly->loopstart + mpoly->totloop,
                  loop_index_curr = loop_index_end - 1;
              loop_index_next < loop_index_end;
              loop_index_curr = loop_index_next++) {
-          const MLoop *mloop = &rdata->mloop[loop_index_curr];
-          const int e_a = mloop->e * 2;
-          const int e_b = e_a + 1;
-          if (BLI_BITMAP_TEST(edges_used, e_a) && !BLI_BITMAP_TEST(edges_used, e_b)) {
-            GPU_indexbuf_add_line_verts(&elb, loop_index_curr, loop_index_next);
-          }
+          GPU_indexbuf_add_line_verts(&elb, loop_index_curr, loop_index_next);
         }
       }
     }
-
-    MEM_freeN(edges_used);
   }
 
   GPU_indexbuf_build_in_place(&elb, ibo);
@@ -5430,10 +5561,12 @@ void DRW_mesh_batch_cache_create_requested(
                                   cache->edit.loop_face_idx);
   }
   if (DRW_vbo_requested(cache->edit.facedots_pos_nor_data)) {
-    mesh_create_edit_facedots(rdata, cache->edit.facedots_pos_nor_data);
+    Scene *scene = DRW_context_state_get()->scene;
+    mesh_create_edit_facedots(rdata, cache->edit.facedots_pos_nor_data, scene, ob);
   }
   if (DRW_vbo_requested(cache->edit.facedots_idx)) {
-    mesh_create_edit_facedots_select_id(rdata, cache->edit.facedots_idx);
+    Scene *scene = DRW_context_state_get()->scene;
+    mesh_create_edit_facedots_select_id(rdata, cache->edit.facedots_idx, scene, ob);
   }
   if (DRW_ibo_requested(cache->ibo.edit_loops_points) ||
       DRW_ibo_requested(cache->ibo.edit_loops_lines)) {

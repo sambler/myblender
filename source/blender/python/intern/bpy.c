@@ -231,6 +231,22 @@ static PyObject *bpy_resource_path(PyObject *UNUSED(self), PyObject *args, PyObj
   return PyC_UnicodeFromByte(path ? path : "");
 }
 
+PyDoc_STRVAR(bpy_resource_datafiles_doc,
+             ".. function:: script_paths()\n"
+             "\n"
+             "   Return the resource datafiles path.\n"
+             "\n"
+             "   :return: the resource datafiles path.\n"
+             "   :rtype: string\n");
+static PyObject *bpy_resource_datafiles(PyObject *UNUSED(self))
+{
+  const char *path;
+
+  path = BKE_appdir_folder_id(BLENDER_DATAFILES, NULL);
+
+  return PyC_UnicodeFromByte(path ? path : "");
+}
+
 PyDoc_STRVAR(bpy_escape_identifier_doc,
              ".. function:: escape_identifier(string)\n"
              "\n"
@@ -297,6 +313,12 @@ static PyMethodDef meth_bpy_resource_path = {
     (PyCFunction)bpy_resource_path,
     METH_VARARGS | METH_KEYWORDS,
     bpy_resource_path_doc,
+};
+static PyMethodDef meth_bpy_resource_datafiles = {
+    "resource_datafiles",
+    (PyCFunction)bpy_resource_datafiles,
+    METH_NOARGS,
+    bpy_resource_datafiles_doc,
 };
 static PyMethodDef meth_bpy_escape_identifier = {
     "escape_identifier",
@@ -403,7 +425,9 @@ void BPy_init_modules(void)
   PyModule_AddObject(mod,
                      meth_bpy_escape_identifier.ml_name,
                      (PyObject *)PyCFunction_New(&meth_bpy_escape_identifier, NULL));
-
+  PyModule_AddObject(mod,
+                     meth_bpy_resource_datafiles.ml_name,
+                     (PyObject *)PyCFunction_New(&meth_bpy_resource_datafiles, NULL));
   /* register funcs (bpy_rna.c) */
   PyModule_AddObject(mod,
                      meth_bpy_register_class.ml_name,

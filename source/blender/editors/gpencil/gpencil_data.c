@@ -594,8 +594,7 @@ static int gp_frame_duplicate_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   bGPDlayer *gpl = BKE_gpencil_layer_getactive(gpd);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
-  int cfra_eval = (int)DEG_get_ctime(depsgraph);
+  Scene *scene = CTX_data_scene(C);
 
   int mode = RNA_enum_get(op->ptr, "mode");
 
@@ -605,12 +604,12 @@ static int gp_frame_duplicate_exec(bContext *C, wmOperator *op)
   }
 
   if (mode == 0) {
-    BKE_gpencil_frame_addcopy(gpl, cfra_eval);
+    BKE_gpencil_frame_addcopy(gpl, CFRA);
   }
   else {
     for (gpl = gpd->layers.first; gpl; gpl = gpl->next) {
       if ((gpl->flag & GP_LAYER_LOCKED) == 0) {
-        BKE_gpencil_frame_addcopy(gpl, cfra_eval);
+        BKE_gpencil_frame_addcopy(gpl, CFRA);
       }
     }
   }

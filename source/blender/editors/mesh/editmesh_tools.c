@@ -4593,7 +4593,8 @@ static int edbm_fill_grid_exec(bContext *C, wmOperator *op)
 
       /* Only reuse on redo because these settings need to match the current selection.
        * We never want to use them on other geometry, repeat last for eg, see: T60777. */
-      if ((op->flag & OP_IS_REPEAT_LAST) == 0 && RNA_property_is_set(op->ptr, prop_span)) {
+      if (((op->flag & OP_IS_INVOKE) || (op->flag & OP_IS_REPEAT_LAST) == 0) &&
+          RNA_property_is_set(op->ptr, prop_span)) {
         span = RNA_property_int_get(op->ptr, prop_span);
         span = min_ii(span, (clamp / 2) - 1);
         calc_span = false;
@@ -8615,7 +8616,7 @@ static int edbm_normals_tools_exec(bContext *C, wmOperator *op)
 
     switch (mode) {
       case EDBM_CLNOR_TOOLS_COPY:
-        if (bm->totfacesel == 0 || bm->totvertsel == 0) {
+        if (bm->totfacesel == 0 && bm->totvertsel == 0) {
           BM_loop_normal_editdata_array_free(lnors_ed_arr);
           continue;
         }

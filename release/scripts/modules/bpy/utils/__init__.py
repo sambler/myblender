@@ -67,6 +67,7 @@ from _bpy import (
     script_paths as _bpy_script_paths,
     unregister_class,
     user_resource as _user_resource,
+    system_resource,
 )
 
 import bpy as _bpy

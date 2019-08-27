@@ -156,7 +156,7 @@ static void wm_block_splash_add_labels(uiBlock *block, int x, int y)
 
     /* Hash. */
     char hash_buf[256] = "\0";
-    BLI_snprintf(hash_buf, sizeof(hash_buf), "Hash: %s", build_hash);
+    BLI_snprintf(hash_buf, sizeof(hash_buf), "Custom build    Hash: %s", build_hash);
     wm_block_splash_add_label(block, hash_buf, x, &y);
 
     /* Branch. */

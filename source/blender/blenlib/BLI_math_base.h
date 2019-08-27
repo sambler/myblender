@@ -112,6 +112,7 @@ MINLINE float saasin(float fac);
 MINLINE float sasqrt(float fac);
 
 MINLINE float interpf(float a, float b, float t);
+MINLINE double interpd(double a, double b, double t);
 
 MINLINE float min_ff(float a, float b);
 MINLINE float max_ff(float a, float b);
@@ -197,7 +198,7 @@ double double_round(double x, int ndigits);
  * check the vector is unit length, or zero length (which can't be helped in some cases).
  */
 #ifndef NDEBUG
-/** \note 0.0001 is too small becaues normals may be converted from short's: see T34322. */
+/** \note 0.0001 is too small because normals may be converted from short's: see T34322. */
 #  define BLI_ASSERT_UNIT_EPSILON 0.0002f
 /**
  * \note Checks are flipped so NAN doesn't assert.

@@ -61,7 +61,6 @@
 
 #include "DEG_depsgraph.h"
 
-struct DRWTextStore;
 struct DefaultFramebufferList;
 struct DefaultTextureList;
 struct GPUBatch;
@@ -70,12 +69,9 @@ struct GPUMaterial;
 struct GPUShader;
 struct GPUTexture;
 struct GPUUniformBuffer;
-struct LightEngineData;
 struct Object;
 struct ParticleSystem;
 struct RenderEngineType;
-struct ViewportEngineData;
-struct ViewportEngineData_Info;
 struct bContext;
 struct rcti;
 
@@ -597,6 +593,7 @@ bool DRW_view_is_persp_get(const DRWView *view);
 bool DRW_culling_sphere_test(const DRWView *view, const BoundSphere *bsphere);
 bool DRW_culling_box_test(const DRWView *view, const BoundBox *bbox);
 bool DRW_culling_plane_test(const DRWView *view, const float plane[4]);
+bool DRW_culling_min_max_test(const DRWView *view, float obmat[4][4], float min[3], float max[3]);
 
 void DRW_culling_frustum_corners_get(const DRWView *view, BoundBox *corners);
 void DRW_culling_frustum_planes_get(const DRWView *view, float planes[6][4]);

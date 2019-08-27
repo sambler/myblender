@@ -317,8 +317,9 @@ static void vicon_keytype_draw_wrapper(
       format, "outlineColor", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
   uint flags_id = GPU_vertformat_attr_add(format, "flags", GPU_COMP_U32, 1, GPU_FETCH_INT);
 
-  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
   GPU_program_point_size(true);
+  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
+  immUniform1f("outline_scale", 1.0f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
   immBegin(GPU_PRIM_POINTS, 1);
 
@@ -403,7 +404,7 @@ static void vicon_handletype_auto_clamp_draw(int x, int y, int w, int h, float a
 static void vicon_colorset_draw(int index, int x, int y, int w, int h, float UNUSED(alpha))
 {
   bTheme *btheme = UI_GetTheme();
-  ThemeWireColor *cs = &btheme->tarm[index];
+  const ThemeWireColor *cs = &btheme->tarm[index];
 
   /* Draw three bands of color: One per color
    *    x-----a-----b-----c
@@ -420,15 +421,15 @@ static void vicon_colorset_draw(int index, int x, int y, int w, int h, float UNU
 
   /* XXX: Include alpha into this... */
   /* normal */
-  immUniformColor3ubv((uchar *)cs->solid);
+  immUniformColor3ubv(cs->solid);
   immRecti(pos, x, y, a, y + h);
 
   /* selected */
-  immUniformColor3ubv((uchar *)cs->select);
+  immUniformColor3ubv(cs->select);
   immRecti(pos, a, y, b, y + h);
 
   /* active */
-  immUniformColor3ubv((uchar *)cs->active);
+  immUniformColor3ubv(cs->active);
   immRecti(pos, b, y, c, y + h);
 
   immUnbindProgram();
@@ -464,7 +465,7 @@ DEF_ICON_VECTOR_COLORSET_DRAW_NTH(20, 19)
 #  undef DEF_ICON_VECTOR_COLORSET_DRAW_NTH
 
 /* Dynamically render icon instead of rendering a plain color to a texture/buffer
- * This is mot strictly a "vicon", as it needs access to icon->obj to get the color info,
+ * This is not strictly a "vicon", as it needs access to icon->obj to get the color info,
  * but it works in a very similar way.
  */
 static void vicon_gplayer_color_draw(Icon *icon, int x, int y, int w, int h)
@@ -1782,7 +1783,7 @@ static void icon_draw_size(float x,
                            enum eIconSizes size,
                            int draw_size,
                            const float desaturate,
-                           const char mono_rgba[4],
+                           const uchar mono_rgba[4],
                            const bool mono_border)
 {
   bTheme *btheme = UI_GetTheme();
@@ -2136,7 +2137,7 @@ int UI_rnaptr_icon_get(bContext *C, PointerRNA *ptr, int rnaicon, const bool big
 
   /* try ID, material, texture or dynapaint slot */
   if (RNA_struct_is_ID(ptr->type)) {
-    id = ptr->id.data;
+    id = ptr->owner_id;
   }
   else if (RNA_struct_is_a(ptr->type, &RNA_MaterialSlot)) {
     id = RNA_pointer_get(ptr, "material").data;
@@ -2270,7 +2271,7 @@ void UI_icon_draw_ex(float x,
                      float aspect,
                      float alpha,
                      float desaturate,
-                     const char mono_color[4],
+                     const uchar mono_color[4],
                      const bool mono_border)
 {
   int draw_size = get_draw_size(ICON_SIZE_ICON);

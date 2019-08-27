@@ -246,6 +246,14 @@ struct Mesh *AbcObjectReader::read_mesh(struct Mesh *existing_mesh,
   return existing_mesh;
 }
 
+bool AbcObjectReader::topology_changed(Mesh * /*existing_mesh*/,
+                                       const Alembic::Abc::ISampleSelector & /*sample_sel*/)
+{
+  /* The default implementation of read_mesh() just returns the original mesh, so never changes the
+   * topology. */
+  return false;
+}
+
 void AbcObjectReader::setupObjectTransform(const float time)
 {
   bool is_constant = false;
@@ -335,8 +343,10 @@ void AbcObjectReader::read_matrix(float r_mat[4][4],
       mul_m4_m4m4(r_mat, m_object->parent->obmat, r_mat);
     }
     else {
-      /* This can happen if the user deleted the parent object. */
-      unit_m4(r_mat);
+      /* This can happen if the user deleted the parent object, but also if the Alembic parent was
+       * not imported (because of unknown/unsupported schema, for example). In that case just use
+       * the local matrix as if it is the world matrix. This allows us to import Alembic files from
+       * MeshRoom, see T61935. */
     }
   }
   else {

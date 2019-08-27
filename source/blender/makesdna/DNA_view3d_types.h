@@ -25,11 +25,6 @@
 #define __DNA_VIEW3D_TYPES_H__
 
 struct BoundBox;
-struct GPUViewport;
-struct Image;
-struct Material;
-struct MovieClip;
-struct MovieClipUser;
 struct Object;
 struct RenderEngine;
 struct SmoothView3DStore;
@@ -144,7 +139,7 @@ typedef struct View3DCursor {
 
 /** 3D Viewport Shading settings. */
 typedef struct View3DShading {
-  /** Shading type (VIEW3D_SHADE_SOLID, ..). */
+  /** Shading type (OB_SOLID, ..). */
   char type;
   /** Runtime, for toggle between rendered viewport. */
   char prev_type;

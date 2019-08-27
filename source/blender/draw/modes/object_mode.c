@@ -234,6 +234,7 @@ typedef struct OBJECT_ShadingGroupList {
   /* Helpers */
   DRWCallBuffer *relationship_lines;
   DRWCallBuffer *constraint_lines;
+  DRWCallBuffer *origin_xform;
 
   /* Camera */
   DRWCallBuffer *camera;
@@ -332,7 +333,7 @@ static struct {
 
   OBJECT_Shaders sh_data[GPU_SHADER_CFG_LEN];
 
-  float grid_settings[5];
+  float grid_distance;
   float grid_mesh_size;
   int grid_flag;
   float grid_axes[3];
@@ -340,6 +341,7 @@ static struct {
   int zneg_flag;
   float zplane_axes[3];
   float inv_viewport_size[2];
+  float grid_steps[8];
   bool draw_grid;
   /* Temp buffer textures */
   struct GPUTexture *outlines_depth_tx;
@@ -559,8 +561,6 @@ static void OBJECT_engine_init(void *vedata)
     View3D *v3d = draw_ctx->v3d;
     Scene *scene = draw_ctx->scene;
     RegionView3D *rv3d = draw_ctx->rv3d;
-    float grid_scale = ED_view3d_grid_scale(scene, v3d, NULL);
-    float grid_res;
 
     const bool show_axis_x = (v3d->gridflag & V3D_SHOW_X) != 0;
     const bool show_axis_y = (v3d->gridflag & V3D_SHOW_Y) != 0;
@@ -576,21 +576,6 @@ static void OBJECT_engine_init(void *vedata)
 
     /* if perps */
     if (winmat[3][3] == 0.0f) {
-      float fov;
-      float viewvecs[2][4] = {
-          {1.0f, -1.0f, -1.0f, 1.0f},
-          {-1.0f, 1.0f, -1.0f, 1.0f},
-      };
-
-      /* convert the view vectors to view space */
-      for (int i = 0; i < 2; i++) {
-        mul_m4_v4(wininv, viewvecs[i]);
-        mul_v3_fl(viewvecs[i], 1.0f / viewvecs[i][2]); /* perspective divide */
-      }
-
-      fov = angle_v3v3(viewvecs[0], viewvecs[1]) / 2.0f;
-      grid_res = fabsf(tanf(fov)) / grid_scale;
-
       e_data.grid_flag = (1 << 4); /* XY plane */
       if (show_axis_x) {
         e_data.grid_flag |= SHOW_AXIS_X;
@@ -603,14 +588,6 @@ static void OBJECT_engine_init(void *vedata)
       }
     }
     else {
-      if (rv3d->view != RV3D_VIEW_USER) {
-        /* Allow 3 more subdivisions. */
-        grid_scale /= powf(v3d->gridsubdiv, 3);
-      }
-
-      float viewdist = 1.0f / max_ff(fabsf(winmat[0][0]), fabsf(winmat[1][1]));
-      grid_res = viewdist / grid_scale;
-
       if (ELEM(rv3d->view, RV3D_VIEW_RIGHT, RV3D_VIEW_LEFT)) {
         e_data.draw_grid = show_ortho_grid;
         e_data.grid_flag = PLANE_YZ | SHOW_AXIS_Y | SHOW_AXIS_Z | SHOW_GRID | GRID_BACK;
@@ -688,12 +665,7 @@ static void OBJECT_engine_init(void *vedata)
       dist = v3d->clip_end;
     }
 
-    e_data.grid_settings[0] = dist / 2.0f;     /* gridDistance */
-    e_data.grid_settings[1] = grid_res;        /* gridResolution */
-    e_data.grid_settings[2] = grid_scale;      /* gridScale */
-    e_data.grid_settings[3] = v3d->gridsubdiv; /* gridSubdiv */
-    e_data.grid_settings[4] = (v3d->gridsubdiv > 1) ? 1.0f / logf(v3d->gridsubdiv) :
-                                                      0.0f; /* 1/log(gridSubdiv) */
+    e_data.grid_distance = dist / 2.0f; /* gridDistance */
 
     if (winmat[3][3] == 0.0f) {
       e_data.grid_mesh_size = dist;
@@ -702,6 +674,8 @@ static void OBJECT_engine_init(void *vedata)
       float viewdist = 1.0f / min_ff(fabsf(winmat[0][0]), fabsf(winmat[1][1]));
       e_data.grid_mesh_size = viewdist * dist;
     }
+
+    ED_view3d_grid_steps(scene, v3d, rv3d, e_data.grid_steps);
   }
 
   copy_v2_v2(e_data.inv_viewport_size, DRW_viewport_size_get());
@@ -1115,6 +1089,10 @@ static void DRW_shgroup_camera_background_images(OBJECT_Shaders *sh_data,
                                                  Object *ob,
                                                  RegionView3D *rv3d)
 {
+  if (DRW_state_is_select()) {
+    return;
+  }
+
   if (!BKE_object_empty_image_frame_is_visible_in_view3d(ob, rv3d)) {
     return;
   }
@@ -1250,9 +1228,9 @@ static void DRW_shgroup_camera_background_images(OBJECT_Shaders *sh_data,
       float camera_aspect_y = 1.0;
       float camera_offset_x = 0.0;
       float camera_offset_y = 0.0;
-      float camera_aspect = 1.0;
       float camera_width = size[0];
       float camera_height = size[1];
+      float camera_aspect = camera_width / camera_height;
 
       if (!DRW_state_is_image_render()) {
         rctf render_border;
@@ -1280,48 +1258,52 @@ static void DRW_shgroup_camera_background_images(OBJECT_Shaders *sh_data,
       uv2img_space[0][0] = image_width;
       uv2img_space[1][1] = image_height;
 
-      img2cam_space[0][0] = (1.0 / image_width);
-      img2cam_space[1][1] = (1.0 / image_height);
+      const float fit_scale = image_aspect / camera_aspect;
+      img2cam_space[0][0] = 1.0 / image_width;
+      img2cam_space[1][1] = 1.0 / fit_scale / image_height;
 
       /* Update scaling based on image and camera framing */
       float scale_x = bgpic->scale;
       float scale_y = bgpic->scale;
 
       if (bgpic->flag & CAM_BGIMG_FLAG_CAMERA_ASPECT) {
-        float fit_scale = image_aspect / camera_aspect;
         if (bgpic->flag & CAM_BGIMG_FLAG_CAMERA_CROP) {
           if (image_aspect > camera_aspect) {
             scale_x *= fit_scale;
-          }
-          else {
-            scale_y /= fit_scale;
+            scale_y *= fit_scale;
           }
         }
         else {
           if (image_aspect > camera_aspect) {
+            scale_x /= fit_scale;
             scale_y /= fit_scale;
           }
           else {
             scale_x *= fit_scale;
+            scale_y *= fit_scale;
           }
         }
+      }
+      else {
+        /* Stretch image to camera aspect */
+        scale_y /= 1.0 / fit_scale;
       }
 
       // scale image to match the desired aspect ratio
       scale_m4[0][0] = scale_x;
       scale_m4[1][1] = scale_y;
 
-      /* Translate, using coordinates that aren't squashed by the aspect. */
-      translate_m4[3][0] = bgpic->offset[0] * 2.0f * max_ff(1.0f, 1.0f / camera_aspect);
-      translate_m4[3][1] = bgpic->offset[1] * 2.0f * max_ff(1.0f, camera_aspect);
+      /* Translate */
+      translate_m4[3][0] = image_width * bgpic->offset[0] * 2.0f;
+      translate_m4[3][1] = image_height * bgpic->offset[1] * 2.0f;
 
       mul_m4_series(bg_data->transform_mat,
                     win_m4_translate,
                     win_m4_scale,
-                    translate_m4,
                     img2cam_space,
-                    scale_m4,
+                    translate_m4,
                     rot_m4,
+                    scale_m4,
                     uv2img_space);
 
       DRWPass *pass = (bgpic->flag & CAM_BGIMG_FLAG_FOREGROUND) ? psl->camera_images_front :
@@ -1504,10 +1486,10 @@ static void OBJECT_cache_init(void *vedata)
     DRWShadingGroup *grp = DRW_shgroup_create(sh_data->grid, psl->grid);
     DRW_shgroup_uniform_int(grp, "gridFlag", &e_data.zneg_flag, 1);
     DRW_shgroup_uniform_vec3(grp, "planeAxes", e_data.zplane_axes, 1);
-    DRW_shgroup_uniform_vec4(grp, "gridSettings", e_data.grid_settings, 1);
+    DRW_shgroup_uniform_vec3(grp, "screenVecs[0]", DRW_viewport_screenvecs_get(), 2);
+    DRW_shgroup_uniform_float(grp, "gridDistance", &e_data.grid_distance, 1);
     DRW_shgroup_uniform_float_copy(grp, "lineKernel", grid_line_size);
     DRW_shgroup_uniform_float_copy(grp, "meshSize", e_data.grid_mesh_size);
-    DRW_shgroup_uniform_float(grp, "gridOneOverLogSubdiv", &e_data.grid_settings[4], 1);
     DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
     DRW_shgroup_uniform_texture_ref(grp, "depthBuffer", &dtxl->depth);
     DRW_shgroup_call(grp, geom, NULL);
@@ -1517,6 +1499,7 @@ static void OBJECT_cache_init(void *vedata)
     DRW_shgroup_uniform_vec3(grp, "planeAxes", e_data.grid_axes, 1);
     DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
     DRW_shgroup_uniform_texture_ref(grp, "depthBuffer", &dtxl->depth);
+    DRW_shgroup_uniform_float(grp, "gridSteps", e_data.grid_steps, ARRAY_SIZE(e_data.grid_steps));
     DRW_shgroup_call(grp, geom, NULL);
 
     grp = DRW_shgroup_create(sh_data->grid, psl->grid);
@@ -1752,6 +1735,16 @@ static void OBJECT_cache_init(void *vedata)
         sgl->non_meshes, gb->colorWire, draw_ctx->sh_cfg);
     sgl->constraint_lines = buffer_dynlines_dashed_uniform_color(
         sgl->non_meshes, gb->colorGridAxisZ, draw_ctx->sh_cfg);
+
+    {
+      DRWShadingGroup *grp_axes;
+      sgl->origin_xform = buffer_instance_color_axes(
+          sgl->non_meshes, DRW_cache_bone_arrows_get(), &grp_axes, draw_ctx->sh_cfg);
+
+      DRW_shgroup_state_disable(grp_axes, DRW_STATE_DEPTH_LESS_EQUAL);
+      DRW_shgroup_state_enable(grp_axes, DRW_STATE_DEPTH_ALWAYS);
+      DRW_shgroup_state_enable(grp_axes, DRW_STATE_WIRE_SMOOTH);
+    }
 
     /* Force Field Curve Guide End (here because of stipple) */
     /* TODO port to shader stipple */
@@ -2862,7 +2855,7 @@ static void DRW_shgroup_lightprobe(OBJECT_Shaders *sh_data,
 
       DRWCallBuffer *buf = buffer_theme_id_to_probe_cube_outline_shgrp(
           stl, theme_id, ob->base_flag);
-      /* TODO remove or change the drawing of the cube probes. Theses line draws nothing on purpose
+      /* TODO remove or change the drawing of the cube probes. This line draws nothing on purpose
        * to keep the call ids correct. */
       zero_m4(probe_cube_mat);
       DRW_buffer_add_entry(buf, call_id, &draw_size, probe_cube_mat);
@@ -3693,6 +3686,15 @@ static void OBJECT_cache_populate(void *vedata, Object *ob)
     DRW_shgroup_bounds(sgl, ob, theme_id);
   }
 
+  /* Helpers for when we're transforming origins. */
+  if (scene->toolsettings->transform_flag & SCE_XFORM_DATA_ORIGIN) {
+    if (ob->base_flag & BASE_SELECTED) {
+      const float color[4] = {0.75, 0.75, 0.75, 0.5};
+      float axes_size = 1.0f;
+      DRW_buffer_add_entry(sgl->origin_xform, color, &axes_size, ob->obmat);
+    }
+  }
+
   /* don't show object extras in set's */
   if ((ob->base_flag & (BASE_FROM_SET | BASE_FROM_DUPLI)) == 0) {
     if ((draw_ctx->object_mode & (OB_MODE_ALL_PAINT | OB_MODE_ALL_PAINT_GPENCIL)) == 0) {
@@ -3703,7 +3705,7 @@ static void OBJECT_cache_populate(void *vedata, Object *ob)
       DRW_shgroup_relationship_lines(sgl, draw_ctx->depsgraph, scene, ob);
     }
 
-    const bool draw_extra = (ob->dtx != 0);
+    const bool draw_extra = ob->dtx & (OB_DRAWNAME | OB_TEXSPACE | OB_DRAWBOUNDOX);
     if (draw_extra && (theme_id == TH_UNDEFINED)) {
       theme_id = DRW_object_wire_theme_get(ob, view_layer, NULL);
     }

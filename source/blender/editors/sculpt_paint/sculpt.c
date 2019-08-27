@@ -92,6 +92,240 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Sculpt PBVH abstraction API */
+
+/* Do not use these functions while working with PBVH_GRIDS data in SculptSession */
+
+/* TODO: why is this kept, should it be removed? */
+#if 0 /* UNUSED */
+
+static int sculpt_active_vertex_get(SculptSession *ss)
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      return ss->active_vertex_index;
+    case PBVH_BMESH:
+      return ss->active_vertex_index;
+    default:
+      return 0;
+  }
+}
+
+static int sculpt_vertex_count_get(SculptSession *ss)
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      return ss->totvert;
+    case PBVH_BMESH:
+      return BM_mesh_elem_count(BKE_pbvh_get_bmesh(ss->pbvh), BM_VERT);
+    default:
+      return 0;
+  }
+}
+
+static void sculpt_vertex_normal_get(SculptSession *ss, int index, float no[3])
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      normal_short_to_float_v3(no, ss->mvert[index].no);
+      return;
+    case PBVH_BMESH:
+      copy_v3_v3(no, BM_vert_at_index(BKE_pbvh_get_bmesh(ss->pbvh), index)->no);
+    default:
+      return;
+  }
+}
+
+static float *sculpt_vertex_co_get(SculptSession *ss, int index)
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      return ss->mvert[index].co;
+    case PBVH_BMESH:
+      return BM_vert_at_index(BKE_pbvh_get_bmesh(ss->pbvh), index)->co;
+    default:
+      return NULL;
+  }
+}
+
+static void sculpt_vertex_co_set(SculptSession *ss, int index, float co[3])
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      copy_v3_v3(ss->mvert[index].co, co);
+      return;
+    case PBVH_BMESH:
+      copy_v3_v3(BM_vert_at_index(BKE_pbvh_get_bmesh(ss->pbvh), index)->co, co);
+      return;
+    default:
+      return;
+  }
+}
+
+static void sculpt_vertex_mask_set(SculptSession *ss, int index, float mask)
+{
+  BMVert *v;
+  float *mask_p;
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      ss->vmask[index] = mask;
+      return;
+    case PBVH_BMESH:
+      v = BM_vert_at_index(BKE_pbvh_get_bmesh(ss->pbvh), index);
+      mask_p = BM_ELEM_CD_GET_VOID_P(v, CustomData_get_offset(&ss->bm->vdata, CD_PAINT_MASK));
+      *(mask_p) = mask;
+      return;
+    default:
+      return;
+  }
+}
+
+static float sculpt_vertex_mask_get(SculptSession *ss, int index)
+{
+  BMVert *v;
+  float *mask;
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      return ss->vmask[index];
+    case PBVH_BMESH:
+      v = BM_vert_at_index(BKE_pbvh_get_bmesh(ss->pbvh), index);
+      mask = BM_ELEM_CD_GET_VOID_P(v, CustomData_get_offset(&ss->bm->vdata, CD_PAINT_MASK));
+      return *mask;
+    default:
+      return 0;
+  }
+}
+
+static void sculpt_vertex_tag_update(SculptSession *ss, int index)
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      ss->mvert[index].flag |= ME_VERT_PBVH_UPDATE;
+      return;
+    case PBVH_BMESH:
+      return;
+    default:
+      return;
+  }
+}
+
+#  define SCULPT_VERTEX_NEIGHBOR_FIXED_CAPACITY 256
+
+typedef struct SculptVertexNeighborIter {
+  int *neighbors;
+  int size;
+  int capacity;
+
+  int neighbors_fixed[SCULPT_VERTEX_NEIGHBOR_FIXED_CAPACITY];
+
+  int index;
+  int i;
+} SculptVertexNeighborIter;
+
+static void sculpt_vertex_neighbor_add(SculptVertexNeighborIter *iter, int neighbor_index)
+{
+  for (int i = 0; i < iter->size; i++) {
+    if (iter->neighbors[i] == neighbor_index) {
+      return;
+    }
+  }
+
+  if (iter->size >= iter->capacity) {
+    iter->capacity += SCULPT_VERTEX_NEIGHBOR_FIXED_CAPACITY;
+
+    if (iter->neighbors == iter->neighbors_fixed) {
+      iter->neighbors = MEM_mallocN(iter->capacity * sizeof(int), "neighbor array");
+      memcpy(iter->neighbors, iter->neighbors_fixed, sizeof(int) * iter->size);
+    }
+    else {
+      iter->neighbors = MEM_reallocN_id(
+          iter->neighbors, iter->capacity * sizeof(int), "neighbor array");
+    }
+  }
+
+  iter->neighbors[iter->size] = neighbor_index;
+  iter->size++;
+}
+
+static void sculpt_vertex_neighbors_get_bmesh(SculptSession *ss,
+                                              int index,
+                                              SculptVertexNeighborIter *iter)
+{
+  BMVert *v = BM_vert_at_index(ss->bm, index);
+  BMIter liter;
+  BMLoop *l;
+  iter->size = 0;
+  iter->capacity = SCULPT_VERTEX_NEIGHBOR_FIXED_CAPACITY;
+  iter->neighbors = iter->neighbors_fixed;
+
+  int i = 0;
+  BM_ITER_ELEM (l, &liter, v, BM_LOOPS_OF_VERT) {
+    const BMVert *adj_v[2] = {l->prev->v, l->next->v};
+    for (i = 0; i < ARRAY_SIZE(adj_v); i++) {
+      const BMVert *v_other = adj_v[i];
+      if (BM_elem_index_get(v_other) != (int)index) {
+        sculpt_vertex_neighbor_add(iter, BM_elem_index_get(v_other));
+      }
+    }
+  }
+}
+
+static void sculpt_vertex_neighbors_get_faces(SculptSession *ss,
+                                              int index,
+                                              SculptVertexNeighborIter *iter)
+{
+  int i;
+  MeshElemMap *vert_map = &ss->pmap[(int)index];
+  iter->size = 0;
+  iter->capacity = SCULPT_VERTEX_NEIGHBOR_FIXED_CAPACITY;
+  iter->neighbors = iter->neighbors_fixed;
+
+  for (i = 0; i < ss->pmap[(int)index].count; i++) {
+    const MPoly *p = &ss->mpoly[vert_map->indices[i]];
+    unsigned f_adj_v[2];
+    if (poly_get_adj_loops_from_vert(p, ss->mloop, (int)index, f_adj_v) != -1) {
+      int j;
+      for (j = 0; j < ARRAY_SIZE(f_adj_v); j += 1) {
+        if (vert_map->count != 2 || ss->pmap[f_adj_v[j]].count <= 2) {
+          if (f_adj_v[j] != (int)index) {
+            sculpt_vertex_neighbor_add(iter, f_adj_v[j]);
+          }
+        }
+      }
+    }
+  }
+}
+
+static void sculpt_vertex_neighbors_get(SculptSession *ss,
+                                        int index,
+                                        SculptVertexNeighborIter *iter)
+{
+  switch (BKE_pbvh_type(ss->pbvh)) {
+    case PBVH_FACES:
+      sculpt_vertex_neighbors_get_faces(ss, index, iter);
+      return;
+    case PBVH_BMESH:
+      sculpt_vertex_neighbors_get_bmesh(ss, index, iter);
+      return;
+    default:
+      break;
+  }
+}
+
+#  define sculpt_vertex_neighbors_iter_begin(ss, v_index, neighbor_iterator) \
+    sculpt_vertex_neighbors_get(ss, v_index, &neighbor_iterator); \
+    for (neighbor_iterator.i = 0; neighbor_iterator.i < neighbor_iterator.size; \
+         neighbor_iterator.i++) { \
+      neighbor_iterator.index = ni.neighbors[ni.i];
+
+#  define sculpt_vertex_neighbors_iter_end(neighbor_iterator) \
+    } \
+    if (neighbor_iterator.neighbors != neighbor_iterator.neighbors_fixed) { \
+      MEM_freeN(neighbor_iterator.neighbors); \
+    }
+
+#endif /* UNUSED */
+
 /** \name Tool Capabilities
  *
  * Avoid duplicate checks, internal logic only,
@@ -1262,7 +1496,6 @@ float tex_strength(SculptSession *ss,
 
   /* Falloff curve */
   avg *= BKE_brush_curve_strength(br, len, cache->radius);
-
   avg *= frontface(br, cache->view_normal, vno, fno);
 
   /* Paint mask */
@@ -2309,7 +2542,7 @@ static void do_draw_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
 
   /* XXX - this shouldn't be necessary, but sculpting crashes in blender2.8 otherwise
    * initialize before threads so they can do curve mapping */
-  curvemapping_initialize(brush->curve);
+  BKE_curvemapping_initialize(brush->curve);
 
   /* threaded loop over nodes */
   SculptThreadedTaskData data = {
@@ -3754,7 +3987,7 @@ static void do_gravity(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode, fl
   BLI_task_parallel_range(0, totnode, &data, do_gravity_task_cb_ex, &settings);
 }
 
-void sculpt_vertcos_to_key(Object *ob, KeyBlock *kb, float (*vertCos)[3])
+void sculpt_vertcos_to_key(Object *ob, KeyBlock *kb, const float (*vertCos)[3])
 {
   Mesh *me = (Mesh *)ob->data;
   float(*ofs)[3] = NULL;
@@ -4116,7 +4349,7 @@ static void sculpt_update_keyblock(Object *ob)
     vertCos = ss->orig_cos;
   }
   else {
-    vertCos = BKE_pbvh_get_vertCos(ss->pbvh);
+    vertCos = BKE_pbvh_vert_coords_alloc(ss->pbvh);
   }
 
   if (vertCos) {
@@ -4605,7 +4838,7 @@ static void sculpt_update_cache_invariants(
         brush = br;
         cache->saved_smooth_size = BKE_brush_size_get(scene, brush);
         BKE_brush_size_set(scene, brush, size);
-        curvemapping_initialize(brush->curve);
+        BKE_curvemapping_initialize(brush->curve);
       }
     }
   }
@@ -4923,7 +5156,7 @@ static void sculpt_stroke_modifiers_check(const bContext *C, Object *ob, const B
   SculptSession *ss = ob->sculpt;
 
   if (ss->kb || ss->modifiers_active) {
-    Depsgraph *depsgraph = CTX_data_depsgraph(C);
+    Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
     bool need_pmap = sculpt_any_smooth_mode(brush, ss->cache, 0);
     BKE_sculpt_update_object_for_edit(depsgraph, ob, need_pmap, false);
   }
@@ -5136,7 +5369,7 @@ static void sculpt_brush_init_tex(const Scene *scene, Sculpt *sd, SculptSession 
 
 static void sculpt_brush_stroke_init(bContext *C, wmOperator *op)
 {
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   Object *ob = CTX_data_active_object(C);
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
@@ -5184,7 +5417,7 @@ void sculpt_update_object_bounding_box(Object *ob)
 
 static void sculpt_flush_update_step(bContext *C)
 {
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   Object *ob = CTX_data_active_object(C);
   SculptSession *ss = ob->sculpt;
   ARegion *ar = CTX_wm_region(C);
@@ -5696,31 +5929,19 @@ static void sculpt_dynamic_topology_disable_ex(
     CustomData_free(&me->pdata, me->totpoly);
 
     /* Copy over stored custom data */
-    me->totvert = unode->bm_enter_totvert;
-    me->totloop = unode->bm_enter_totloop;
-    me->totpoly = unode->bm_enter_totpoly;
-    me->totedge = unode->bm_enter_totedge;
+    me->totvert = unode->geom_totvert;
+    me->totloop = unode->geom_totloop;
+    me->totpoly = unode->geom_totpoly;
+    me->totedge = unode->geom_totedge;
     me->totface = 0;
-    CustomData_copy(&unode->bm_enter_vdata,
-                    &me->vdata,
-                    CD_MASK_MESH.vmask,
-                    CD_DUPLICATE,
-                    unode->bm_enter_totvert);
-    CustomData_copy(&unode->bm_enter_edata,
-                    &me->edata,
-                    CD_MASK_MESH.emask,
-                    CD_DUPLICATE,
-                    unode->bm_enter_totedge);
-    CustomData_copy(&unode->bm_enter_ldata,
-                    &me->ldata,
-                    CD_MASK_MESH.lmask,
-                    CD_DUPLICATE,
-                    unode->bm_enter_totloop);
-    CustomData_copy(&unode->bm_enter_pdata,
-                    &me->pdata,
-                    CD_MASK_MESH.pmask,
-                    CD_DUPLICATE,
-                    unode->bm_enter_totpoly);
+    CustomData_copy(
+        &unode->geom_vdata, &me->vdata, CD_MASK_MESH.vmask, CD_DUPLICATE, unode->geom_totvert);
+    CustomData_copy(
+        &unode->geom_edata, &me->edata, CD_MASK_MESH.emask, CD_DUPLICATE, unode->geom_totedge);
+    CustomData_copy(
+        &unode->geom_ldata, &me->ldata, CD_MASK_MESH.lmask, CD_DUPLICATE, unode->geom_totloop);
+    CustomData_copy(
+        &unode->geom_pdata, &me->pdata, CD_MASK_MESH.pmask, CD_DUPLICATE, unode->geom_totpoly);
 
     BKE_mesh_update_customdata_pointers(me, false);
   }
@@ -5753,7 +5974,7 @@ static void sculpt_dynamic_topology_disable_ex(
 void sculpt_dynamic_topology_disable(bContext *C, SculptUndoNode *unode)
 {
   Main *bmain = CTX_data_main(C);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   Object *ob = CTX_data_active_object(C);
   sculpt_dynamic_topology_disable_ex(bmain, depsgraph, scene, ob, unode);
@@ -5790,7 +6011,7 @@ static void sculpt_dynamic_topology_enable_with_undo(Main *bmain,
 static int sculpt_dynamic_topology_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Main *bmain = CTX_data_main(C);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   Object *ob = CTX_data_active_object(C);
   SculptSession *ss = ob->sculpt;
@@ -6153,13 +6374,12 @@ void ED_object_sculptmode_enter_ex(Main *bmain,
   DEG_id_tag_update(&ob->id, ID_RECALC_COPY_ON_WRITE);
 }
 
-void ED_object_sculptmode_enter(struct bContext *C, ReportList *reports)
+void ED_object_sculptmode_enter(struct bContext *C, Depsgraph *depsgraph, ReportList *reports)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Object *ob = OBACT(view_layer);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
   ED_object_sculptmode_enter_ex(bmain, depsgraph, scene, ob, false, reports);
 }
 
@@ -6209,10 +6429,9 @@ void ED_object_sculptmode_exit_ex(Main *bmain, Depsgraph *depsgraph, Scene *scen
   DEG_id_tag_update(&ob->id, ID_RECALC_COPY_ON_WRITE);
 }
 
-void ED_object_sculptmode_exit(bContext *C)
+void ED_object_sculptmode_exit(bContext *C, Depsgraph *depsgraph)
 {
   Main *bmain = CTX_data_main(C);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Object *ob = OBACT(view_layer);
@@ -6241,6 +6460,9 @@ static int sculpt_mode_toggle_exec(bContext *C, wmOperator *op)
     ED_object_sculptmode_exit_ex(bmain, depsgraph, scene, ob);
   }
   else {
+    if (depsgraph) {
+      depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+    }
     ED_object_sculptmode_enter_ex(bmain, depsgraph, scene, ob, false, op->reports);
     BKE_paint_toolslots_brush_validate(bmain, &ts->sculpt->paint);
   }
@@ -6265,7 +6487,7 @@ static void SCULPT_OT_sculptmode_toggle(wmOperatorType *ot)
   ot->exec = sculpt_mode_toggle_exec;
   ot->poll = ED_operator_object_active_editable_mesh;
 
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_USE_EVAL_DATA;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 static bool sculpt_and_constant_or_manual_detail_poll(bContext *C)

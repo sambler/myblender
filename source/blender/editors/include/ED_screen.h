@@ -39,10 +39,8 @@ struct Depsgraph;
 struct IDProperty;
 struct Main;
 struct MenuType;
-struct PropertyRNA;
 struct Scene;
 struct SpaceLink;
-struct ViewLayer;
 struct WorkSpace;
 struct WorkSpaceInstanceHook;
 struct bContext;
@@ -50,7 +48,6 @@ struct bScreen;
 struct rcti;
 struct uiBlock;
 struct uiLayout;
-struct wmEvent;
 struct wmKeyConfig;
 struct wmMsgBus;
 struct wmMsgSubscribeKey;
@@ -124,7 +121,8 @@ void ED_region_image_metadata_draw(
 void ED_region_image_metadata_panel_draw(struct ImBuf *ibuf, struct uiLayout *layout);
 void ED_region_grid_draw(struct ARegion *ar, float zoomx, float zoomy);
 float ED_region_blend_alpha(struct ARegion *ar);
-void ED_region_visible_rect(struct ARegion *ar, struct rcti *rect);
+void ED_region_visible_rect_calc(struct ARegion *ar, struct rcti *rect);
+const rcti *ED_region_visible_rect(ARegion *ar);
 bool ED_region_is_overlap(int spacetype, int regiontype);
 
 int ED_region_snap_size_test(const struct ARegion *ar);

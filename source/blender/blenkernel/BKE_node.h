@@ -59,7 +59,6 @@ struct RenderData;
 struct Scene;
 struct SpaceNode;
 struct Tex;
-struct ViewRender;
 struct bContext;
 struct bNode;
 struct bNodeExecContext;
@@ -310,9 +309,8 @@ typedef struct bNodeTreeType {
   /* callbacks */
   void (*free_cache)(struct bNodeTree *ntree);
   void (*free_node_cache)(struct bNodeTree *ntree, struct bNode *node);
-  void (*foreach_nodeclass)(struct Scene *scene,
-                            void *calldata,
-                            bNodeClassCallback func); /* iteration over all node classes */
+  /* Iteration over all node classes. */
+  void (*foreach_nodeclass)(struct Scene *scene, void *calldata, bNodeClassCallback func);
   /* Check visibility in the node editor */
   bool (*poll)(const struct bContext *C, struct bNodeTreeType *ntreetype);
   /* Select a node tree from the context */
@@ -616,6 +614,7 @@ void nodeUpdateInternalLinks(struct bNodeTree *ntree, struct bNode *node);
 
 int nodeSocketIsHidden(struct bNodeSocket *sock);
 void ntreeTagUsedSockets(struct bNodeTree *ntree);
+void nodeSetSocketAvailability(struct bNodeSocket *sock, bool is_available);
 
 /* Node Clipboard */
 void BKE_node_clipboard_init(struct bNodeTree *ntree);
@@ -895,7 +894,7 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 #define SH_NODE_CURVE_RGB 111
 #define SH_NODE_CAMERA 114
 #define SH_NODE_MATH 115
-#define SH_NODE_VECT_MATH 116
+#define SH_NODE_VECTOR_MATH 116
 #define SH_NODE_SQUEEZE 117
 //#define SH_NODE_MATERIAL_EXT  118
 #define SH_NODE_INVERT 119
@@ -976,6 +975,10 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 #define SH_NODE_VOLUME_PRINCIPLED 200
 /* 201..700 occupied by other node types, continue from 701 */
 #define SH_NODE_BSDF_HAIR_PRINCIPLED 701
+#define SH_NODE_MAP_RANGE 702
+#define SH_NODE_CLAMP 703
+#define SH_NODE_TEX_WHITE_NOISE 704
+#define SH_NODE_VOLUME_INFO 705
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF 1
@@ -1128,6 +1131,7 @@ void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
 #define CMP_NODE_CORNERPIN 321
 #define CMP_NODE_SWITCH_VIEW 322
 #define CMP_NODE_CRYPTOMATTE 323
+#define CMP_NODE_DENOISE 324
 
 /* channel toggles */
 #define CMP_CHAN_RGB 1

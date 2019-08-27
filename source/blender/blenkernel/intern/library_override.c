@@ -628,7 +628,7 @@ void BKE_main_override_library_operations_create(Main *bmain, const bool force_a
   ID *id;
 
   FOREACH_MAIN_ID_BEGIN (bmain, id) {
-    if (force_auto ||
+    if ((ID_IS_OVERRIDE_LIBRARY(id) && force_auto) ||
         (ID_IS_OVERRIDE_LIBRARY_AUTO(id) && (id->tag & LIB_TAG_OVERRIDE_LIBRARY_AUTOREFRESH))) {
       BKE_override_library_operations_create(bmain, id, force_auto);
       id->tag &= ~LIB_TAG_OVERRIDE_LIBRARY_AUTOREFRESH;
@@ -703,9 +703,9 @@ void BKE_override_library_update(Main *bmain, ID *local)
   local->tag |= LIB_TAG_OVERRIDE_LIBRARY_REFOK;
 
   /* Full rebuild of Depsgraph! */
-  DEG_on_visible_update(
-      bmain,
-      true); /* XXX Is this actual valid replacement for old DAG_relations_tag_update(bmain) ? */
+
+  /* XXX Is this actual valid replacement for old DAG_relations_tag_update(bmain) ? */
+  DEG_on_visible_update(bmain, true);
 }
 
 /** Update all overrides from given \a bmain. */

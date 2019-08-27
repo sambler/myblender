@@ -26,28 +26,20 @@
 #include "BLI_sys_types.h" /* for bool */
 
 struct ARegion;
-struct Base;
 struct DRWInstanceDataList;
-struct DRWPass;
 struct Depsgraph;
 struct DrawEngineType;
 struct GPUMaterial;
 struct GPUOffScreen;
 struct GPUViewport;
 struct ID;
-struct IDProperty;
 struct Main;
-struct Material;
 struct Object;
-struct RegionView3D;
 struct RenderEngine;
 struct RenderEngineType;
 struct Scene;
 struct View3D;
-struct ViewContext;
 struct ViewLayer;
-struct ViewportEngineData;
-struct WorkSpace;
 struct bContext;
 struct rcti;
 
@@ -141,9 +133,7 @@ void DRW_draw_depth_object(struct ARegion *ar,
 void DRW_draw_select_id(struct Depsgraph *depsgraph,
                         struct ARegion *ar,
                         struct View3D *v3d,
-                        struct Base **bases,
-                        const uint bases_len,
-                        short select_mode);
+                        const struct rcti *rect);
 
 /* grease pencil render */
 bool DRW_render_check_grease_pencil(struct Depsgraph *depsgraph);
@@ -168,28 +158,12 @@ void DRW_opengl_context_disable_ex(bool restore);
 
 void DRW_opengl_render_context_enable(void *re_gl_context);
 void DRW_opengl_render_context_disable(void *re_gl_context);
-void DRW_gawain_render_context_enable(void *re_gpu_context);
-void DRW_gawain_render_context_disable(void *re_gpu_context);
+void DRW_gpu_render_context_enable(void *re_gpu_context);
+void DRW_gpu_render_context_disable(void *re_gpu_context);
 
 void DRW_deferred_shader_remove(struct GPUMaterial *mat);
 
 struct DrawDataList *DRW_drawdatalist_from_id(struct ID *id);
 void DRW_drawdata_free(struct ID *id);
-
-/* select_engine.c */
-void DRW_select_context_create(struct Depsgraph *depsgraph,
-                               struct Base **bases,
-                               const uint bases_len,
-                               short select_mode);
-bool DRW_select_elem_get(const uint sel_id, uint *r_elem, uint *r_base_index, char *r_elem_type);
-uint DRW_select_context_offset_for_object_elem(const uint base_index, char elem_type);
-uint DRW_select_context_elem_len(void);
-void DRW_framebuffer_select_id_read(const struct rcti *rect, uint *r_buf);
-void DRW_draw_select_id_object(struct Depsgraph *depsgraph,
-                               struct ViewLayer *view_layer,
-                               struct ARegion *ar,
-                               struct View3D *v3d,
-                               struct Object *ob,
-                               short select_mode);
 
 #endif /* __DRW_ENGINE_H__ */

@@ -120,7 +120,7 @@ struct CurveDrawData {
 
   struct {
     float mouse[2];
-    /* used incase we can't calculate the depth */
+    /* Used in case we can't calculate the depth. */
     float location_world[3];
 
     float location_world_valid[3];
@@ -586,7 +586,7 @@ static bool curve_draw_init(bContext *C, wmOperator *op, bool is_invoke)
   }
   else {
     cdd->vc.bmain = CTX_data_main(C);
-    cdd->vc.depsgraph = CTX_data_depsgraph(C);
+    cdd->vc.depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
     cdd->vc.scene = CTX_data_scene(C);
     cdd->vc.view_layer = CTX_data_view_layer(C);
     cdd->vc.obedit = CTX_data_edit_object(C);
@@ -1053,7 +1053,7 @@ static int curve_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   const bool is_modal = RNA_boolean_get(op->ptr, "wait_for_input");
 
-  /* fallback (incase we can't find the depth on first test) */
+  /* Fallback (in case we can't find the depth on first test). */
   {
     const float mval_fl[2] = {UNPACK2(event->mval)};
     float center[3];

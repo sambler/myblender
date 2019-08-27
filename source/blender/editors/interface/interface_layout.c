@@ -648,7 +648,7 @@ static void ui_item_array(uiLayout *layout,
      * to work with common cases, but may need to be re-worked */
 
     /* special case, boolean array in a menu, this could be used in a more generic way too */
-    if (ELEM(subtype, PROP_COLOR, PROP_COLOR_GAMMA) && !expand) {
+    if (ELEM(subtype, PROP_COLOR, PROP_COLOR_GAMMA) && !expand && ELEM(len, 3, 4)) {
       uiDefAutoButR(block, ptr, prop, -1, "", ICON_NONE, 0, 0, w, UI_UNIT_Y);
     }
     else {
@@ -1179,11 +1179,6 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
   }
 
   assert(but->optype != NULL);
-
-  /* text alignment for toolbar buttons */
-  if ((layout->root->type == UI_LAYOUT_TOOLBAR) && !icon) {
-    but->drawflag |= UI_BUT_TEXT_LEFT;
-  }
 
   if (flag & UI_ITEM_R_NO_BG) {
     layout->emboss = prev_emboss;
@@ -1832,7 +1827,9 @@ static void ui_item_rna_size(uiLayout *layout,
       h += len * UI_UNIT_Y;
     }
   }
-  else if (ui_layout_variable_size(layout)) {
+
+  /* Increase width requirement if in a variable size layout. */
+  if (ui_layout_variable_size(layout)) {
     if (type == PROP_BOOLEAN && name[0]) {
       w += UI_UNIT_X / 5;
     }
@@ -1876,7 +1873,8 @@ void uiItemFullR(uiLayout *layout,
     uiBut *but;
   } ui_decorate = {
       .use_prop_decorate = (((layout->item.flag & UI_ITEM_PROP_DECORATE) != 0) &&
-                            (use_prop_sep && ptr->id.data && id_can_have_animdata(ptr->id.data))),
+                            (use_prop_sep && ptr->owner_id &&
+                             id_can_have_animdata(ptr->owner_id))),
   };
 #endif /* UI_PROP_DECORATE */
 
@@ -2949,7 +2947,7 @@ void uiItemLDrag(uiLayout *layout, PointerRNA *ptr, const char *name, int icon)
 
   if (ptr && ptr->type) {
     if (RNA_struct_is_ID(ptr->type)) {
-      UI_but_drag_set_id(but, ptr->id.data);
+      UI_but_drag_set_id(but, ptr->owner_id);
     }
   }
 }
@@ -5228,7 +5226,7 @@ static void ui_paneltype_draw_impl(bContext *C, PanelType *pt, uiLayout *layout,
       pt->draw_header(C, panel);
       panel->layout = NULL;
     }
-    uiItemL(row, pt->label, ICON_NONE);
+    uiItemL(row, CTX_IFACE_(pt->translation_context, pt->label), ICON_NONE);
   }
 
   panel->layout = layout;

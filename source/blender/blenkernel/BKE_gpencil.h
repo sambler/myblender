@@ -24,30 +24,40 @@
  * \ingroup bke
  */
 
-struct ArrayGpencilModifierData;
 struct BoundBox;
 struct Brush;
 struct CurveMapping;
 struct Depsgraph;
-struct GpencilModifierData;
-struct LatticeGpencilModifierData;
 struct ListBase;
 struct Main;
 struct Material;
 struct Object;
-struct SimplifyGpencilModifierData;
 struct ToolSettings;
 struct bDeformGroup;
 struct bGPDframe;
 struct bGPDlayer;
-struct bGPDpalette;
-struct bGPDpalettecolor;
 struct bGPDspoint;
 struct bGPDstroke;
 struct bGPdata;
 
 struct MDeformVert;
-struct MDeformWeight;
+
+#define GPENCIL_SIMPLIFY(scene) ((scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_ENABLE))
+#define GPENCIL_SIMPLIFY_ONPLAY(playing) \
+  (((playing == true) && (scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_ON_PLAY)) || \
+   ((scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_ON_PLAY) == 0))
+#define GPENCIL_SIMPLIFY_FILL(scene, playing) \
+  ((GPENCIL_SIMPLIFY_ONPLAY(playing) && (GPENCIL_SIMPLIFY(scene)) && \
+    (scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_FILL)))
+#define GPENCIL_SIMPLIFY_MODIF(scene, playing) \
+  ((GPENCIL_SIMPLIFY_ONPLAY(playing) && (GPENCIL_SIMPLIFY(scene)) && \
+    (scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_MODIFIER)))
+#define GPENCIL_SIMPLIFY_FX(scene, playing) \
+  ((GPENCIL_SIMPLIFY_ONPLAY(playing) && (GPENCIL_SIMPLIFY(scene)) && \
+    (scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_FX)))
+#define GPENCIL_SIMPLIFY_BLEND(scene, playing) \
+  ((GPENCIL_SIMPLIFY_ONPLAY(playing) && (GPENCIL_SIMPLIFY(scene)) && \
+    (scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_BLEND)))
 
 /* ------------ Grease-Pencil API ------------------ */
 
@@ -57,7 +67,7 @@ void BKE_gpencil_free_stroke(struct bGPDstroke *gps);
 bool BKE_gpencil_free_strokes(struct bGPDframe *gpf);
 void BKE_gpencil_free_frames(struct bGPDlayer *gpl);
 void BKE_gpencil_free_layers(struct ListBase *list);
-bool BKE_gpencil_free_frame_runtime_data(struct bGPDframe *derived_gpf);
+bool BKE_gpencil_free_frame_runtime_data(struct bGPDframe *gpf_eval);
 void BKE_gpencil_free(struct bGPdata *gpd, bool free_all);
 
 void BKE_gpencil_batch_cache_dirty_tag(struct bGPdata *gpd);
@@ -87,6 +97,7 @@ void BKE_gpencil_frame_delete_laststroke(struct bGPDlayer *gpl, struct bGPDframe
 
 /* materials */
 void BKE_gpencil_material_index_reassign(struct bGPdata *gpd, int totcol, int index);
+bool BKE_gpencil_material_index_used(struct bGPdata *gpd, int index);
 void BKE_gpencil_material_remap(struct bGPdata *gpd,
                                 const unsigned int *remap,
                                 unsigned int remap_len);
@@ -196,6 +207,10 @@ void BKE_gpencil_simplify_stroke(struct bGPDstroke *gps, float factor);
 void BKE_gpencil_simplify_fixed(struct bGPDstroke *gps);
 void BKE_gpencil_subdivide(struct bGPDstroke *gps, int level, int flag);
 bool BKE_gpencil_trim_stroke(struct bGPDstroke *gps);
+void BKE_gpencil_merge_distance_stroke(struct bGPDframe *gpf,
+                                       struct bGPDstroke *gps,
+                                       const float threshold,
+                                       const bool use_unselected);
 
 void BKE_gpencil_stroke_2d_flat(const struct bGPDspoint *points,
                                 int totpoints,
@@ -211,11 +226,13 @@ void BKE_gpencil_stroke_2d_flat_ref(const struct bGPDspoint *ref_points,
 
 void BKE_gpencil_transform(struct bGPdata *gpd, float mat[4][4]);
 
+bool BKE_gpencil_sample_stroke(struct bGPDstroke *gps, const float dist, const bool select);
 bool BKE_gpencil_smooth_stroke(struct bGPDstroke *gps, int i, float inf);
 bool BKE_gpencil_smooth_stroke_strength(struct bGPDstroke *gps, int point_index, float influence);
 bool BKE_gpencil_smooth_stroke_thickness(struct bGPDstroke *gps, int point_index, float influence);
 bool BKE_gpencil_smooth_stroke_uv(struct bGPDstroke *gps, int point_index, float influence);
 bool BKE_gpencil_close_stroke(struct bGPDstroke *gps);
+void BKE_gpencil_dissolve_points(struct bGPDframe *gpf, struct bGPDstroke *gps, const short tag);
 
 void BKE_gpencil_get_range_selected(struct bGPDlayer *gpl, int *r_initframe, int *r_endframe);
 float BKE_gpencil_multiframe_falloff_calc(

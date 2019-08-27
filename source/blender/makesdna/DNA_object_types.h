@@ -47,7 +47,6 @@ struct Material;
 struct Mesh;
 struct Object;
 struct PartDeflect;
-struct ParticleSystem;
 struct Path;
 struct RigidBodyOb;
 struct SculptSession;
@@ -176,8 +175,13 @@ typedef struct Object_Runtime {
 
   /** Runtime grease pencil drawing data */
   struct GpencilBatchCache *gpencil_cache;
+  /** Runtime grease pencil total layers used for evaluated data created by modifiers */
+  int gpencil_tot_layers;
+  char _pad4[4];
+  /** Runtime grease pencil evaluated data created by modifiers */
+  struct bGPDframe *gpencil_evaluated_frames;
 
-  void *_pad2; /* Padding is here for win32s unconventional stuct alignment rules. */
+  void *_pad2; /* Padding is here for win32s unconventional struct alignment rules. */
 } Object_Runtime;
 
 typedef struct Object {

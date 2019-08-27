@@ -557,8 +557,8 @@ static float density_falloff(PointDensityRangeData *pdr, int index, float square
   }
 
   if (pdr->density_curve && dist != 0.0f) {
-    curvemapping_initialize(pdr->density_curve);
-    density = curvemapping_evaluateF(pdr->density_curve, 0, density / dist) * dist;
+    BKE_curvemapping_initialize(pdr->density_curve);
+    density = BKE_curvemapping_evaluateF(pdr->density_curve, 0, density / dist) * dist;
   }
 
   return density;
@@ -792,7 +792,7 @@ static void particle_system_minmax(Depsgraph *depsgraph,
 
   INIT_MINMAX(min, max);
   if (part->type == PART_HAIR) {
-    /* TOOD(sergey): Not supported currently. */
+    /* TODO(sergey): Not supported currently. */
     return;
   }
 

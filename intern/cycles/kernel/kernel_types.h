@@ -115,7 +115,6 @@ CCL_NAMESPACE_BEGIN
 #  define __LAMP_MIS__
 #  define __CAMERA_MOTION__
 #  define __OBJECT_MOTION__
-#  define __HAIR__
 #  define __BAKING__
 #  define __PRINCIPLED__
 #  define __SUBSURFACE__
@@ -650,9 +649,8 @@ typedef struct Ray {
  * is fixed.
  */
 #ifndef __KERNEL_OPENCL_AMD__
-  float3 P; /* origin */
-  float3 D; /* direction */
-
+  float3 P;   /* origin */
+  float3 D;   /* direction */
   float t;    /* length of the ray */
   float time; /* time (for motion blur) */
 #else
@@ -1408,6 +1406,7 @@ typedef struct KernelObject {
   float surface_area;
   float pass_id;
   float random_number;
+  float color[3];
   int particle_index;
 
   float dupli_generated[3];
@@ -1420,11 +1419,9 @@ typedef struct KernelObject {
   uint patch_map_offset;
   uint attribute_map_offset;
   uint motion_offset;
-  uint pad1;
 
   float cryptomatte_object;
   float cryptomatte_asset;
-  float pad2, pad3;
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
@@ -1523,7 +1520,7 @@ static_assert_align(KernelShader, 16);
  * Queue 1 - Active rays
  * Queue 2 - Background queue
  * Queue 3 - Shadow ray cast kernel - AO
- * Queeu 4 - Shadow ray cast kernel - direct lighting
+ * Queue 4 - Shadow ray cast kernel - direct lighting
  */
 
 /* Queue names */

@@ -152,7 +152,7 @@ static int rna_ViewLayer_objects_selected_skip(CollectionPropertyIterator *iter,
 
 static PointerRNA rna_ViewLayer_depsgraph_get(PointerRNA *ptr)
 {
-  ID *id = ptr->id.data;
+  ID *id = ptr->owner_id;
   if (GS(id->name) == ID_SCE) {
     Scene *scene = (Scene *)id;
     ViewLayer *view_layer = (ViewLayer *)ptr->data;
@@ -178,8 +178,8 @@ static void rna_ViewLayer_update_tagged(ID *id_ptr, ViewLayer *view_layer, Main 
 
   Scene *scene = (Scene *)id_ptr;
   Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer, true);
-  /* NOTE: This is similar to CTX_data_depsgraph(). Ideally such access would be de-duplicated
-   * across all possible cases, but for now this is safest and easiest way to go.
+  /* NOTE: This is similar to CTX_data_depsgraph_pointer(). Ideally such access would be
+   * de-duplicated across all possible cases, but for now this is safest and easiest way to go.
    *
    * The reason for this is that it's possible to have Python operator which asks view layer to
    * be updated. After re-do of such operator view layer's dependency graph will not be marked
@@ -274,7 +274,7 @@ static void rna_LayerCollection_exclude_update_recursive(ListBase *lb, const boo
 
 static void rna_LayerCollection_exclude_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
-  Scene *scene = (Scene *)ptr->id.data;
+  Scene *scene = (Scene *)ptr->owner_id;
   LayerCollection *lc = (LayerCollection *)ptr->data;
   ViewLayer *view_layer = BKE_view_layer_find_from_collection(scene, lc);
 
@@ -294,7 +294,7 @@ static void rna_LayerCollection_exclude_update(Main *bmain, Scene *UNUSED(scene)
 
 static void rna_LayerCollection_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
-  Scene *scene = (Scene *)ptr->id.data;
+  Scene *scene = (Scene *)ptr->owner_id;
   LayerCollection *lc = (LayerCollection *)ptr->data;
   ViewLayer *view_layer = BKE_view_layer_find_from_collection(scene, lc);
 

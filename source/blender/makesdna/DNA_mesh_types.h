@@ -40,7 +40,6 @@ struct MLoopCol;
 struct MLoopTri;
 struct MLoopUV;
 struct MPoly;
-struct MTexPoly;
 struct MVert;
 struct Material;
 struct Mesh;
@@ -193,9 +192,10 @@ typedef struct Mesh {
 
   short totcol;
 
+  float remesh_voxel_size;
+  char _pad1[4];
   /** Deprecated multiresolution modeling data, only keep for loading old files. */
   struct Multires *mr DNA_DEPRECATED;
-  void *_pad1;
 
   Mesh_Runtime runtime;
 } Mesh;
@@ -250,6 +250,8 @@ enum {
   ME_FLAG_UNUSED_8 = 1 << 8, /* cleared */
   ME_DS_EXPAND = 1 << 9,
   ME_SCULPT_DYNAMIC_TOPOLOGY = 1 << 10,
+  ME_REMESH_SMOOTH_NORMALS = 1 << 11,
+  ME_REMESH_REPROJECT_PAINT_MASK = 1 << 12,
 };
 
 /* me->cd_flag */
@@ -266,11 +268,5 @@ enum {
 };
 
 #define MESH_MAX_VERTS 2000000000L
-
-/* this is so we can save bmesh files that load in trunk, ignoring NGons
- * will eventually be removed */
-
-/* enable this so meshes get tessfaces calculated by default */
-/* #define USE_TESSFACE_DEFAULT */
 
 #endif

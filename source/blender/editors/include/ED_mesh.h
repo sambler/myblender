@@ -45,7 +45,6 @@ struct Mesh;
 struct Object;
 struct ReportList;
 struct Scene;
-struct ToolSettings;
 struct UndoType;
 struct UvMapVert;
 struct UvMapVert;
@@ -55,7 +54,6 @@ struct View3D;
 struct ViewContext;
 struct bContext;
 struct bDeformGroup;
-struct rcti;
 struct wmKeyConfig;
 struct wmOperator;
 
@@ -105,7 +103,9 @@ bool EDBM_vert_color_check(struct BMEditMesh *em);
 bool EDBM_mesh_hide(struct BMEditMesh *em, bool swap);
 bool EDBM_mesh_reveal(struct BMEditMesh *em, bool select);
 
-void EDBM_update_generic(struct BMEditMesh *em, const bool do_tessface, const bool is_destructive);
+void EDBM_update_generic(struct BMEditMesh *em,
+                         const bool do_tessellation,
+                         const bool is_destructive);
 
 struct UvElementMap *BM_uv_element_map_create(struct BMesh *bm,
                                               const bool selected,
@@ -145,6 +145,8 @@ void ED_mesh_undosys_type(struct UndoType *ut);
 void EDBM_select_mirrored(
     struct BMEditMesh *em, const int axis, const bool extend, int *r_totmirr, int *r_totfail);
 void EDBM_automerge(struct Scene *scene, struct Object *ob, bool update, const char hflag);
+void EDBM_automerge_and_split(
+    struct Scene *scene, struct Object *ob, bool split_edges, bool update, const char hflag);
 
 struct BMVert *EDBM_vert_find_nearest_ex(struct ViewContext *vc,
                                          float *r_dist,
@@ -254,7 +256,10 @@ void ED_operatormacros_mesh(void);
 void ED_keymap_mesh(struct wmKeyConfig *keyconf);
 
 /* editmesh_tools.c (could be moved) */
-void EDBM_project_snap_verts(struct bContext *C, struct ARegion *ar, struct BMEditMesh *em);
+void EDBM_project_snap_verts(struct bContext *C,
+                             struct Depsgraph *depsgraph,
+                             struct ARegion *ar,
+                             struct BMEditMesh *em);
 
 /* editface.c */
 void paintface_flush_flags(struct bContext *C, struct Object *ob, short flag);
@@ -355,21 +360,14 @@ void ED_mesh_geometry_add(
     struct Mesh *mesh, struct ReportList *reports, int verts, int edges, int faces);
 #endif
 void ED_mesh_polys_add(struct Mesh *mesh, struct ReportList *reports, int count);
-void ED_mesh_tessfaces_add(struct Mesh *mesh, struct ReportList *reports, int count);
 void ED_mesh_edges_add(struct Mesh *mesh, struct ReportList *reports, int count);
 void ED_mesh_loops_add(struct Mesh *mesh, struct ReportList *reports, int count);
 void ED_mesh_vertices_add(struct Mesh *mesh, struct ReportList *reports, int count);
 
-void ED_mesh_faces_remove(struct Mesh *mesh, struct ReportList *reports, int count);
 void ED_mesh_edges_remove(struct Mesh *mesh, struct ReportList *reports, int count);
 void ED_mesh_vertices_remove(struct Mesh *mesh, struct ReportList *reports, int count);
 
-void ED_mesh_calc_tessface(struct Mesh *mesh, bool free_mpoly);
-void ED_mesh_update(struct Mesh *mesh,
-                    struct bContext *C,
-                    bool calc_edges,
-                    bool calc_edges_loose,
-                    bool calc_tessface);
+void ED_mesh_update(struct Mesh *mesh, struct bContext *C, bool calc_edges, bool calc_edges_loose);
 
 void ED_mesh_uv_texture_ensure(struct Mesh *me, const char *name);
 int ED_mesh_uv_texture_add(struct Mesh *me,

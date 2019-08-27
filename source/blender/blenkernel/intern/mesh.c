@@ -40,6 +40,7 @@
 #include "BKE_idcode.h"
 #include "BKE_main.h"
 #include "BKE_global.h"
+#include "BKE_key.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_library.h"
@@ -479,20 +480,38 @@ bool BKE_mesh_has_custom_loop_normals(Mesh *me)
 /** Free (or release) any data used by this mesh (does not free the mesh itself). */
 void BKE_mesh_free(Mesh *me)
 {
-  BKE_animdata_free(&me->id, false);
-
-  BKE_mesh_runtime_clear_cache(me);
-
-  CustomData_free(&me->vdata, me->totvert);
-  CustomData_free(&me->edata, me->totedge);
-  CustomData_free(&me->fdata, me->totface);
-  CustomData_free(&me->ldata, me->totloop);
-  CustomData_free(&me->pdata, me->totpoly);
-
+  BKE_mesh_clear_geometry(me);
   MEM_SAFE_FREE(me->mat);
-  MEM_SAFE_FREE(me->bb);
-  MEM_SAFE_FREE(me->mselect);
-  MEM_SAFE_FREE(me->edit_mesh);
+}
+
+void BKE_mesh_clear_geometry(Mesh *mesh)
+{
+  BKE_animdata_free(&mesh->id, false);
+  BKE_mesh_runtime_clear_cache(mesh);
+
+  CustomData_free(&mesh->vdata, mesh->totvert);
+  CustomData_free(&mesh->edata, mesh->totedge);
+  CustomData_free(&mesh->fdata, mesh->totface);
+  CustomData_free(&mesh->ldata, mesh->totloop);
+  CustomData_free(&mesh->pdata, mesh->totpoly);
+
+  MEM_SAFE_FREE(mesh->bb);
+  MEM_SAFE_FREE(mesh->mselect);
+  MEM_SAFE_FREE(mesh->edit_mesh);
+
+  /* Note that materials and shape keys are not freed here. This is intentional, as freeing
+   * shape keys requires tagging the depsgraph for updated relations, which is expensive.
+   * Material slots should be kept in sync with the object.*/
+
+  mesh->totvert = 0;
+  mesh->totedge = 0;
+  mesh->totface = 0;
+  mesh->totloop = 0;
+  mesh->totpoly = 0;
+  mesh->act_face = -1;
+  mesh->totselect = 0;
+
+  BKE_mesh_update_customdata_pointers(mesh, false);
 }
 
 static void mesh_tessface_clear_intern(Mesh *mesh, int free_customdata)
@@ -517,6 +536,7 @@ void BKE_mesh_init(Mesh *me)
   me->size[0] = me->size[1] = me->size[2] = 1.0;
   me->smoothresh = DEG2RADF(30);
   me->texflag = ME_AUTOSPACE;
+  me->remesh_voxel_size = 0.1f;
 
   CustomData_reset(&me->vdata);
   CustomData_reset(&me->edata);
@@ -781,7 +801,7 @@ Mesh *BKE_mesh_from_editmesh_with_coords_thin_wrap(BMEditMesh *em,
   me->runtime.is_original = true;
   if (vertexCos) {
     /* We will own this array in the future. */
-    BKE_mesh_apply_vert_coords(me, vertexCos);
+    BKE_mesh_vert_coords_apply(me, vertexCos);
     MEM_freeN(vertexCos);
     me->runtime.is_original = false;
   }
@@ -791,92 +811,6 @@ Mesh *BKE_mesh_from_editmesh_with_coords_thin_wrap(BMEditMesh *em,
 void BKE_mesh_make_local(Main *bmain, Mesh *me, const bool lib_local)
 {
   BKE_id_make_local_generic(bmain, &me->id, true, lib_local);
-}
-
-bool BKE_mesh_uv_cdlayer_rename_index(Mesh *me,
-                                      const int loop_index,
-                                      const int face_index,
-                                      const char *new_name,
-                                      const bool do_tessface)
-{
-  CustomData *ldata, *fdata;
-  CustomDataLayer *cdlu, *cdlf;
-
-  if (me->edit_mesh) {
-    ldata = &me->edit_mesh->bm->ldata;
-    fdata = NULL; /* No tessellated data in BMesh! */
-  }
-  else {
-    ldata = &me->ldata;
-    fdata = &me->fdata;
-  }
-
-  cdlu = &ldata->layers[loop_index];
-  cdlf = (face_index != -1) && fdata && do_tessface ? &fdata->layers[face_index] : NULL;
-
-  if (cdlu->name != new_name) {
-    /* Mesh validate passes a name from the CD layer as the new name,
-     * Avoid memcpy from self to self in this case.
-     */
-    BLI_strncpy(cdlu->name, new_name, sizeof(cdlu->name));
-    CustomData_set_layer_unique_name(ldata, loop_index);
-  }
-
-  if (cdlf == NULL) {
-    return false;
-  }
-
-  BLI_strncpy(cdlf->name, cdlu->name, sizeof(cdlf->name));
-  CustomData_set_layer_unique_name(fdata, face_index);
-
-  return true;
-}
-
-bool BKE_mesh_uv_cdlayer_rename(Mesh *me,
-                                const char *old_name,
-                                const char *new_name,
-                                bool do_tessface)
-{
-  CustomData *ldata, *fdata;
-  if (me->edit_mesh) {
-    ldata = &me->edit_mesh->bm->ldata;
-    /* No tessellated data in BMesh! */
-    fdata = NULL;
-    do_tessface = false;
-  }
-  else {
-    ldata = &me->ldata;
-    fdata = &me->fdata;
-    do_tessface = (do_tessface && fdata->totlayer);
-  }
-
-  {
-    const int lidx_start = CustomData_get_layer_index(ldata, CD_MLOOPUV);
-    const int fidx_start = do_tessface ? CustomData_get_layer_index(fdata, CD_MTFACE) : -1;
-    int lidx = CustomData_get_named_layer(ldata, CD_MLOOPUV, old_name);
-    int fidx = do_tessface ? CustomData_get_named_layer(fdata, CD_MTFACE, old_name) : -1;
-
-    /* None of those cases should happen, in theory!
-     * Note this assume we have the same number of mtexpoly, mloopuv and mtface layers!
-     */
-    if (lidx == -1) {
-      if (fidx == -1) {
-        /* No layer found with this name! */
-        return false;
-      }
-      else {
-        lidx = fidx;
-      }
-    }
-
-    /* Go back to absolute indices! */
-    lidx += lidx_start;
-    if (fidx != -1) {
-      fidx += fidx_start;
-    }
-
-    return BKE_mesh_uv_cdlayer_rename_index(me, lidx, fidx, new_name, do_tessface);
-  }
 }
 
 void BKE_mesh_boundbox_calc(Mesh *me, float r_loc[3], float r_size[3])
@@ -1187,6 +1121,27 @@ void BKE_mesh_material_index_remove(Mesh *me, short index)
   }
 }
 
+bool BKE_mesh_material_index_used(Mesh *me, short index)
+{
+  MPoly *mp;
+  MFace *mf;
+  int i;
+
+  for (mp = me->mpoly, i = 0; i < me->totpoly; i++, mp++) {
+    if (mp->mat_nr == index) {
+      return true;
+    }
+  }
+
+  for (mf = me->mface, i = 0; i < me->totface; i++, mf++) {
+    if (mf->mat_nr == index) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void BKE_mesh_material_index_clear(Mesh *me)
 {
   MPoly *mp;
@@ -1232,51 +1187,18 @@ void BKE_mesh_material_remap(Mesh *me, const unsigned int *remap, unsigned int r
 #undef MAT_NR_REMAP
 }
 
-void BKE_mesh_smooth_flag_set(Object *meshOb, int enableSmooth)
+void BKE_mesh_smooth_flag_set(Mesh *me, const bool use_smooth)
 {
-  Mesh *me = meshOb->data;
-  int i;
-
-  for (i = 0; i < me->totpoly; i++) {
-    MPoly *mp = &me->mpoly[i];
-
-    if (enableSmooth) {
-      mp->flag |= ME_SMOOTH;
-    }
-    else {
-      mp->flag &= ~ME_SMOOTH;
+  if (use_smooth) {
+    for (int i = 0; i < me->totpoly; i++) {
+      me->mpoly[i].flag |= ME_SMOOTH;
     }
   }
-
-  for (i = 0; i < me->totface; i++) {
-    MFace *mf = &me->mface[i];
-
-    if (enableSmooth) {
-      mf->flag |= ME_SMOOTH;
-    }
-    else {
-      mf->flag &= ~ME_SMOOTH;
+  else {
+    for (int i = 0; i < me->totpoly; i++) {
+      me->mpoly[i].flag &= ~ME_SMOOTH;
     }
   }
-}
-
-/**
- * Return a newly MEM_malloc'd array of all the mesh vertex locations
- * \note \a r_verts_len may be NULL
- */
-float (*BKE_mesh_vertexCos_get(const Mesh *me, int *r_verts_len))[3]
-{
-  int i, verts_len = me->totvert;
-  float(*cos)[3] = MEM_malloc_arrayN(verts_len, sizeof(*cos), "vertexcos1");
-
-  if (r_verts_len) {
-    *r_verts_len = verts_len;
-  }
-  for (i = 0; i < verts_len; i++) {
-    copy_v3_v3(cos[i], me->mvert[i].co);
-  }
-
-  return cos;
 }
 
 /**
@@ -1430,7 +1352,7 @@ void BKE_mesh_ensure_navmesh(Mesh *me)
 
 void BKE_mesh_tessface_calc(Mesh *mesh)
 {
-  mesh->totface = BKE_mesh_recalc_tessellation(
+  mesh->totface = BKE_mesh_tessface_calc_ex(
       &mesh->fdata,
       &mesh->ldata,
       &mesh->pdata,
@@ -1624,35 +1546,56 @@ void BKE_mesh_count_selected_items(const Mesh *mesh, int r_count[3])
   /* We could support faces in paint modes. */
 }
 
-void BKE_mesh_apply_vert_coords(Mesh *mesh, float (*vertCoords)[3])
+void BKE_mesh_vert_coords_get(const Mesh *mesh, float (*vert_coords)[3])
 {
-  MVert *vert;
-  int i;
-
-  /* this will just return the pointer if it wasn't a referenced layer */
-  vert = CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert);
-  mesh->mvert = vert;
-
-  for (i = 0; i < mesh->totvert; ++i, ++vert) {
-    copy_v3_v3(vert->co, vertCoords[i]);
+  const MVert *mv = mesh->mvert;
+  for (int i = 0; i < mesh->totvert; i++, mv++) {
+    copy_v3_v3(vert_coords[i], mv->co);
   }
+}
 
+float (*BKE_mesh_vert_coords_alloc(const Mesh *mesh, int *r_vert_len))[3]
+{
+  float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * mesh->totvert, __func__);
+  BKE_mesh_vert_coords_get(mesh, vert_coords);
+  if (r_vert_len) {
+    *r_vert_len = mesh->totvert;
+  }
+  return vert_coords;
+}
+
+void BKE_mesh_vert_coords_apply(Mesh *mesh, const float (*vert_coords)[3])
+{
+  /* This will just return the pointer if it wasn't a referenced layer. */
+  MVert *mv = CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert);
+  mesh->mvert = mv;
+  for (int i = 0; i < mesh->totvert; i++, mv++) {
+    copy_v3_v3(mv->co, vert_coords[i]);
+  }
   mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
 }
 
-void BKE_mesh_apply_vert_normals(Mesh *mesh, short (*vertNormals)[3])
+void BKE_mesh_vert_coords_apply_with_mat4(Mesh *mesh,
+                                          const float (*vert_coords)[3],
+                                          const float mat[4][4])
 {
-  MVert *vert;
-  int i;
-
-  /* this will just return the pointer if it wasn't a referenced layer */
-  vert = CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert);
-  mesh->mvert = vert;
-
-  for (i = 0; i < mesh->totvert; ++i, ++vert) {
-    copy_v3_v3_short(vert->no, vertNormals[i]);
+  /* This will just return the pointer if it wasn't a referenced layer. */
+  MVert *mv = CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert);
+  mesh->mvert = mv;
+  for (int i = 0; i < mesh->totvert; i++, mv++) {
+    mul_v3_m4v3(mv->co, mat, vert_coords[i]);
   }
+  mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+}
 
+void BKE_mesh_vert_normals_apply(Mesh *mesh, const short (*vert_normals)[3])
+{
+  /* This will just return the pointer if it wasn't a referenced layer. */
+  MVert *mv = CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert);
+  mesh->mvert = mv;
+  for (int i = 0; i < mesh->totvert; i++, mv++) {
+    copy_v3_v3_short(mv->no, vert_normals[i]);
+  }
   mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
 }
 

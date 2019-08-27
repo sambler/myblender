@@ -561,87 +561,6 @@ static short gp_stroke_addpoint(tGPsdata *p, const float mval[2], float pressure
   return GP_STROKEADD_INVALID;
 }
 
-/* simplify a stroke (in buffer) before storing it
- * - applies a reverse Chaikin filter
- * - code adapted from etch-a-ton branch
- */
-static void gp_stroke_simplify(tGPsdata *p)
-{
-  bGPdata *gpd = p->gpd;
-  tGPspoint *old_points = (tGPspoint *)gpd->runtime.sbuffer;
-  short num_points = gpd->runtime.sbuffer_used;
-  short flag = gpd->runtime.sbuffer_sflag;
-  short i, j;
-
-  /* only simplify if simplification is enabled, and we're not doing a straight line */
-  if (!(U.gp_settings & GP_PAINT_DOSIMPLIFY) || (p->paintmode == GP_PAINTMODE_DRAW_STRAIGHT)) {
-    return;
-  }
-
-  /* don't simplify if less than 4 points in buffer */
-  if ((num_points <= 4) || (old_points == NULL)) {
-    return;
-  }
-
-  /* clear buffer (but don't free mem yet) so that we can write to it
-   * - firstly set sbuffer to NULL, so a new one is allocated
-   * - secondly, reset flag after, as it gets cleared auto
-   */
-  gpd->runtime.sbuffer = NULL;
-  gp_session_validatebuffer(p);
-  gpd->runtime.sbuffer_sflag = flag;
-
-/* macro used in loop to get position of new point
- * - used due to the mixture of datatypes in use here
- */
-#define GP_SIMPLIFY_AVPOINT(offs, sfac) \
-  { \
-    co[0] += (float)(old_points[offs].x * sfac); \
-    co[1] += (float)(old_points[offs].y * sfac); \
-    pressure += old_points[offs].pressure * sfac; \
-    time += old_points[offs].time * sfac; \
-  } \
-  (void)0
-
-  /* XXX Here too, do not lose start and end points! */
-  gp_stroke_addpoint(
-      p, &old_points->x, old_points->pressure, p->inittime + (double)old_points->time);
-  for (i = 0, j = 0; i < num_points; i++) {
-    if (i - j == 3) {
-      float co[2], pressure, time;
-      float mco[2];
-
-      /* initialize values */
-      co[0] = 0.0f;
-      co[1] = 0.0f;
-      pressure = 0.0f;
-      time = 0.0f;
-
-      /* using macro, calculate new point */
-      GP_SIMPLIFY_AVPOINT(j, -0.25f);
-      GP_SIMPLIFY_AVPOINT(j + 1, 0.75f);
-      GP_SIMPLIFY_AVPOINT(j + 2, 0.75f);
-      GP_SIMPLIFY_AVPOINT(j + 3, -0.25f);
-
-      /* set values for adding */
-      mco[0] = co[0];
-      mco[1] = co[1];
-
-      /* ignore return values on this... assume to be ok for now */
-      gp_stroke_addpoint(p, mco, pressure, p->inittime + (double)time);
-
-      j += 2;
-    }
-  }
-  gp_stroke_addpoint(p,
-                     &old_points[num_points - 1].x,
-                     old_points[num_points - 1].pressure,
-                     p->inittime + (double)old_points[num_points - 1].time);
-
-  /* free old buffer */
-  MEM_freeN(old_points);
-}
-
 /* make a new stroke from the buffer data */
 static void gp_stroke_newfrombuffer(tGPsdata *p)
 {
@@ -1073,7 +992,7 @@ static bool gp_session_initdata(bContext *C, tGPsdata *p)
   /* pass on current scene and window */
   p->bmain = CTX_data_main(C);
   p->scene = CTX_data_scene(C);
-  p->depsgraph = CTX_data_depsgraph(C);
+  p->depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   p->win = CTX_wm_window(C);
 
   unit_m4(p->imat);
@@ -1237,7 +1156,7 @@ static tGPsdata *gp_session_initpaint(bContext *C)
   /* create new context data */
   p = MEM_callocN(sizeof(tGPsdata), "Annotation Drawing Data");
 
-  /* Try to initialise context data
+  /* Try to initialize context data
    * WARNING: This may not always succeed (e.g. using GP in an annotation-only context)
    */
   if (gp_session_initdata(C, p) == 0) {
@@ -1332,15 +1251,6 @@ static void gp_paint_initstroke(tGPsdata *p, eGPencil_PaintModes paintmode, Deps
 
     /* Ensure active frame is set correctly... */
     p->gpf = p->gpl->actframe;
-
-    /* Restrict eraser to only affecting selected strokes, if the "selection mask" is on
-     * (though this is only available in editmode)
-     */
-    if (p->gpd->flag & GP_DATA_STROKE_EDITMODE) {
-      if (ts->gp_sculpt.flag & GP_SCULPT_SETT_FLAG_SELECT_MASK) {
-        p->flags |= GP_PAINTFLAG_SELECTMASK;
-      }
-    }
 
     if (has_layer_to_erase == false) {
       p->status = GP_STATUS_CAPTURE;
@@ -1466,9 +1376,6 @@ static void gp_paint_strokeend(tGPsdata *p)
 
   /* check if doing eraser or not */
   if ((p->gpd->runtime.sbuffer_sflag & GP_STROKE_ERASER) == 0) {
-    /* simplify stroke before transferring? */
-    gp_stroke_simplify(p);
-
     /* transfer stroke to frame */
     gp_stroke_newfrombuffer(p);
   }
@@ -1630,7 +1537,7 @@ static int gpencil_draw_init(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   /* init painting data */
-  gp_paint_initstroke(p, paintmode, CTX_data_depsgraph(C));
+  gp_paint_initstroke(p, paintmode, CTX_data_ensure_evaluated_depsgraph(C));
   if (p->status == GP_STATUS_ERROR) {
     gpencil_draw_exit(C, op);
     return 0;
@@ -1903,7 +1810,7 @@ static void annotation_draw_apply_event(
 static int gpencil_draw_exec(bContext *C, wmOperator *op)
 {
   tGPsdata *p = NULL;
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
 
   /* printf("GPencil - Starting Re-Drawing\n"); */
 
@@ -2057,7 +1964,7 @@ static int gpencil_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event
     p->status = GP_STATUS_PAINTING;
 
     /* handle the initial drawing - i.e. for just doing a simple dot */
-    annotation_draw_apply_event(op, event, CTX_data_depsgraph(C), 0.0f, 0.0f);
+    annotation_draw_apply_event(op, event, CTX_data_ensure_evaluated_depsgraph(C), 0.0f, 0.0f);
     op->flag |= OP_IS_MODAL_CURSOR_REGION;
   }
   else {
@@ -2098,7 +2005,7 @@ static tGPsdata *gpencil_stroke_begin(bContext *C, wmOperator *op)
    *      it'd be nice to allow changing paint-mode when in sketching-sessions */
 
   if (gp_session_initdata(C, p)) {
-    gp_paint_initstroke(p, p->paintmode, CTX_data_depsgraph(C));
+    gp_paint_initstroke(p, p->paintmode, CTX_data_ensure_evaluated_depsgraph(C));
   }
 
   if (p->status != GP_STATUS_ERROR) {
@@ -2133,6 +2040,7 @@ static void annotation_add_missing_events(bContext *C,
                                           const wmEvent *event,
                                           tGPsdata *p)
 {
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   float pt[2], a[2], b[2];
   float factor = 10.0f;
 
@@ -2148,7 +2056,7 @@ static void annotation_add_missing_events(bContext *C,
     interp_v2_v2v2(pt, a, b, 0.5f);
     sub_v2_v2v2(pt, b, pt);
     /* create fake event */
-    annotation_draw_apply_event(op, event, CTX_data_depsgraph(C), pt[0], pt[1]);
+    annotation_draw_apply_event(op, event, depsgraph, pt[0], pt[1]);
   }
   else if (dist >= factor) {
     int slices = 2 + (int)((dist - 1.0) / factor);
@@ -2157,7 +2065,7 @@ static void annotation_add_missing_events(bContext *C,
       interp_v2_v2v2(pt, a, b, n * i);
       sub_v2_v2v2(pt, b, pt);
       /* create fake event */
-      annotation_draw_apply_event(op, event, CTX_data_depsgraph(C), pt[0], pt[1]);
+      annotation_draw_apply_event(op, event, depsgraph, pt[0], pt[1]);
     }
   }
 }
@@ -2325,11 +2233,9 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else if (p->ar) {
-        rcti region_rect;
-
-        /* Perform bounds check using  */
-        ED_region_visible_rect(p->ar, &region_rect);
-        in_bounds = BLI_rcti_isect_pt_v(&region_rect, event->mval);
+        /* Perform bounds check. */
+        const rcti *region_rect = ED_region_visible_rect(p->ar);
+        in_bounds = BLI_rcti_isect_pt_v(region_rect, event->mval);
       }
       else {
         /* No region */
@@ -2387,7 +2293,8 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
         annotation_add_missing_events(C, op, event, p);
       }
 
-      annotation_draw_apply_event(op, event, CTX_data_depsgraph(C), 0.0f, 0.0f);
+      /* TODO(sergey): Possibly evaluating dependency graph from modal operator? */
+      annotation_draw_apply_event(op, event, CTX_data_ensure_evaluated_depsgraph(C), 0.0f, 0.0f);
 
       /* finish painting operation if anything went wrong just now */
       if (p->status == GP_STATUS_ERROR) {

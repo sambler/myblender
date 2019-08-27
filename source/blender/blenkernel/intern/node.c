@@ -2799,6 +2799,16 @@ int nodeSocketIsHidden(bNodeSocket *sock)
   return ((sock->flag & (SOCK_HIDDEN | SOCK_UNAVAIL)) != 0);
 }
 
+void nodeSetSocketAvailability(bNodeSocket *sock, bool is_available)
+{
+  if (is_available) {
+    sock->flag &= ~SOCK_UNAVAIL;
+  }
+  else {
+    sock->flag |= SOCK_UNAVAIL;
+  }
+}
+
 /* ************** Node Clipboard *********** */
 
 #define USE_NODE_CB_VALIDATE
@@ -3222,11 +3232,6 @@ void ntreeTagUsedSockets(bNodeTree *ntree)
   }
 
   for (link = ntree->links.first; link; link = link->next) {
-    /* link is unused if either side is disabled */
-    if ((link->fromsock->flag & SOCK_UNAVAIL) || (link->tosock->flag & SOCK_UNAVAIL)) {
-      continue;
-    }
-
     link->fromsock->flag |= SOCK_IN_USE;
     link->tosock->flag |= SOCK_IN_USE;
   }
@@ -3779,6 +3784,7 @@ static void registerCompositNodes(void)
   register_node_type_cmp_despeckle();
   register_node_type_cmp_defocus();
   register_node_type_cmp_sunbeams();
+  register_node_type_cmp_denoise();
 
   register_node_type_cmp_valtorgb();
   register_node_type_cmp_rgbtobw();
@@ -3856,6 +3862,8 @@ static void registerShaderNodes(void)
   register_node_type_sh_mapping();
   register_node_type_sh_curve_vec();
   register_node_type_sh_curve_rgb();
+  register_node_type_sh_map_range();
+  register_node_type_sh_clamp();
   register_node_type_sh_math();
   register_node_type_sh_vect_math();
   register_node_type_sh_vect_transform();
@@ -3925,6 +3933,7 @@ static void registerShaderNodes(void)
   register_node_type_sh_tex_brick();
   register_node_type_sh_tex_pointdensity();
   register_node_type_sh_tex_ies();
+  register_node_type_sh_tex_white_noise();
 }
 
 static void registerTextureNodes(void)
@@ -3951,6 +3960,7 @@ static void registerTextureNodes(void)
   register_node_type_sh_tangent();
   register_node_type_sh_normal_map();
   register_node_type_sh_hair_info();
+  register_node_type_sh_volume_info();
 
   register_node_type_tex_checker();
   register_node_type_tex_texture();

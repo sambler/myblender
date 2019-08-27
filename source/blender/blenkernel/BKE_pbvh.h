@@ -28,12 +28,10 @@
 
 struct BMLog;
 struct BMesh;
-struct CCGDerivedMesh;
 struct CCGElem;
 struct CCGKey;
 struct CustomData;
 struct DMFlagMat;
-struct GPUBatch;
 struct GPU_PBVH_Buffers;
 struct IsectRayPrecalc;
 struct MLoop;
@@ -278,9 +276,9 @@ float *BKE_pbvh_node_layer_disp_get(PBVH *pbvh, PBVHNode *node);
 void BKE_pbvh_node_layer_disp_free(PBVHNode *node);
 
 /* vertex deformer */
-float (*BKE_pbvh_get_vertCos(struct PBVH *pbvh))[3];
-void BKE_pbvh_apply_vertCos(struct PBVH *pbvh, float (*vertCos)[3], const int totvert);
-bool BKE_pbvh_isDeformed(struct PBVH *pbvh);
+float (*BKE_pbvh_vert_coords_alloc(struct PBVH *pbvh))[3];
+void BKE_pbvh_vert_coords_apply(struct PBVH *pbvh, const float (*vertCos)[3], const int totvert);
+bool BKE_pbvh_is_deformed(struct PBVH *pbvh);
 
 /* Vertex Iterator */
 
@@ -301,6 +299,7 @@ typedef struct PBVHVertexIter {
   int gx;
   int gy;
   int i;
+  int index;
 
   /* grid */
   struct CCGElem **grids;
@@ -369,6 +368,7 @@ void pbvh_vertex_iter_init(PBVH *bvh, PBVHNode *node, PBVHVertexIter *vi, int mo
             continue; \
           vi.co = vi.mvert->co; \
           vi.no = vi.mvert->no; \
+          vi.index = vi.vert_indices[vi.i]; \
           if (vi.vmask) \
             vi.mask = &vi.vmask[vi.vert_indices[vi.gx]]; \
         } \
@@ -385,6 +385,7 @@ void pbvh_vertex_iter_init(PBVH *bvh, PBVHNode *node, PBVHVertexIter *vi, int mo
             continue; \
           vi.co = vi.bm_vert->co; \
           vi.fno = vi.bm_vert->no; \
+          vi.index = BM_elem_index_get(vi.bm_vert); \
           vi.mask = BM_ELEM_CD_GET_VOID_P(vi.bm_vert, vi.cd_vert_mask_offset); \
         }
 
@@ -409,7 +410,6 @@ bool BKE_pbvh_node_vert_update_check_any(PBVH *bvh, PBVHNode *node);
 // void BKE_pbvh_node_BB_expand(PBVHNode *node, float co[3]);
 
 bool pbvh_has_mask(PBVH *bvh);
-void pbvh_show_diffuse_color_set(PBVH *bvh, bool show_diffuse_color);
 void pbvh_show_mask_set(PBVH *bvh, bool show_mask);
 
 #endif /* __BKE_PBVH_H__ */

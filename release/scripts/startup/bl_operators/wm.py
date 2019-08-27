@@ -846,6 +846,86 @@ class WM_OT_url_open(Operator):
         return {'FINISHED'}
 
 
+class WM_OT_url_open_preset(Operator):
+    """Open a preset website in the web-browser"""
+    bl_idname = "wm.url_open_preset"
+    bl_label = "Open Preset Website"
+    bl_options = {'INTERNAL'}
+
+    type: EnumProperty(
+        name="Site",
+        items=lambda self, _context: (
+            item for (item, _) in WM_OT_url_open_preset.preset_items
+        ),
+    )
+
+    id: StringProperty(
+        name="Identifier",
+        description="Optional identifier",
+    )
+
+    def _url_from_bug(self, _context):
+        from bl_ui_utils.bug_report_url import url_prefill_from_blender
+        return url_prefill_from_blender()
+
+    def _url_from_bug_addon(self, _context):
+        from bl_ui_utils.bug_report_url import url_prefill_from_blender
+        return url_prefill_from_blender(addon_info=self.id)
+
+    def _url_from_release_notes(self, _context):
+        return "https://www.blender.org/download/releases/%d-%d/" % bpy.app.version[:2]
+
+    def _url_from_manual(self, _context):
+        if bpy.app.version_cycle in {"rc", "release"}:
+            manual_version = "%d.%d" % bpy.app.version[:2]
+        else:
+            manual_version = "dev"
+        return "https://docs.blender.org/manual/en/" + manual_version + "/"
+
+    # This list is: (enum_item, url) pairs.
+    # Allow dynamically extending.
+    preset_items = [
+        # Dynamic URL's.
+        (('BUG', "Bug",
+          "Report a bug with pre-filled version information"),
+         _url_from_bug),
+        (('BUG_ADDON', "Add-On Bug",
+          "Report a bug in an add-on"),
+         _url_from_bug_addon),
+        (('RELEASE_NOTES', "Release Notes",
+          "Read about whats new in this version of Blender"),
+         _url_from_release_notes),
+        (('MANUAL', "Manual",
+          "The reference manual for this version of Blender"),
+         _url_from_manual),
+
+        # Static URL's.
+        (('FUND', "Development Fund",
+          "The donation program to support maintenance and improvements"),
+         "https://fund.blender.org"),
+        (('BLENDER', "blender.org",
+          "Blender's official web-site"),
+         "https://www.blender.org"),
+        (('CREDITS', "Credits",
+          "Lists committers to Blender's source code"),
+         "https://www.blender.org/about/credits/"),
+    ]
+
+    def execute(self, context):
+        url = None
+        type = self.type
+        for (item_id, _, _), url in self.preset_items:
+            if item_id == type:
+                if callable(url):
+                    url = url(self, context)
+                break
+
+        import webbrowser
+        webbrowser.open(url)
+
+        return {'FINISHED'}
+
+
 class WM_OT_path_open(Operator):
     """Open a path in a file browser"""
     bl_idname = "wm.path_open"
@@ -1085,6 +1165,14 @@ rna_is_overridable_library = BoolProperty(
     default=False,
 )
 
+# Most useful entries of rna_enum_property_subtype_items for number arrays:
+rna_vector_subtype_items = (
+    ('NONE', "Plain Data", "Data values without special behavior"),
+    ('COLOR', "Linear Color", "Color in the linear space"),
+    ('COLOR_GAMMA', "Gamma-Corrected Color", "Color in the gamma corrected space"),
+    ('EULER', "Euler Angles", "Euler rotation angles in radians"),
+    ('QUATERNION', "Quaternion Rotation", "Quaternion rotation (affects NLA blending)"),
+)
 
 class WM_OT_properties_edit(Operator):
     bl_idname = "wm.properties_edit"
@@ -1105,6 +1193,23 @@ class WM_OT_properties_edit(Operator):
     description: StringProperty(
         name="Tooltip",
     )
+    subtype: EnumProperty(
+        name="Subtype",
+        items=lambda self, _context: WM_OT_properties_edit.subtype_items,
+    )
+
+    subtype_items = rna_vector_subtype_items
+
+    def _init_subtype(self, prop_type, is_array, subtype):
+        subtype = subtype or 'NONE'
+        subtype_items = rna_vector_subtype_items
+
+        # Add a temporary enum entry to preserve unknown subtypes
+        if not any(subtype == item[0] for item in subtype_items):
+            subtype_items += ((subtype, subtype, ""),)
+
+        WM_OT_properties_edit.subtype_items = subtype_items
+        self.subtype = subtype
 
     def _cmp_props_get(self):
         # Changing these properties will refresh the UI
@@ -1139,6 +1244,8 @@ class WM_OT_properties_edit(Operator):
             rna_idprop_ui_prop_get,
             rna_idprop_ui_prop_clear,
             rna_idprop_ui_prop_update,
+            rna_idprop_ui_prop_default_set,
+            rna_idprop_value_item_type,
         )
 
         data_path = self.data_path
@@ -1174,15 +1281,15 @@ class WM_OT_properties_edit(Operator):
 
         self._last_prop[:] = [prop]
 
-        prop_type = type(item[prop])
+        prop_value = item[prop]
+        prop_type_new = type(prop_value)
+        prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
         prop_ui = rna_idprop_ui_prop_get(item, prop)
 
         if prop_type in {float, int}:
             prop_ui["min"] = prop_type(self.min)
             prop_ui["max"] = prop_type(self.max)
-            if type(default_eval) in {float, int} and default_eval != 0:
-                prop_ui["default"] = prop_type(default_eval)
 
             if self.use_soft_limits:
                 prop_ui["soft_min"] = prop_type(self.soft_min)
@@ -1191,10 +1298,17 @@ class WM_OT_properties_edit(Operator):
                 prop_ui["soft_min"] = prop_type(self.min)
                 prop_ui["soft_max"] = prop_type(self.max)
 
+        if prop_type == float and is_array and self.subtype != 'NONE':
+            prop_ui["subtype"] = self.subtype
+        else:
+            prop_ui.pop("subtype", None)
+
         prop_ui["description"] = self.description
 
+        rna_idprop_ui_prop_default_set(item, prop, default_eval)
+
         # If we have changed the type of the property, update its potential anim curves!
-        if prop_type_old != prop_type:
+        if prop_type_old != prop_type_new:
             data_path = '["%s"]' % bpy.utils.escape_identifier(prop)
             done = set()
 
@@ -1231,7 +1345,11 @@ class WM_OT_properties_edit(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, _event):
-        from rna_prop_ui import rna_idprop_ui_prop_get
+        from rna_prop_ui import (
+            rna_idprop_ui_prop_get,
+            rna_idprop_value_to_python,
+            rna_idprop_value_item_type
+        )
 
         data_path = self.data_path
 
@@ -1248,7 +1366,7 @@ class WM_OT_properties_edit(Operator):
         self.is_overridable_library = bool(eval(exec_str))
 
         # default default value
-        prop_type = type(self.get_value_eval())
+        prop_type, is_array = rna_idprop_value_item_type(self.get_value_eval())
         if prop_type in {int, float}:
             self.default = str(prop_type(0))
         else:
@@ -1263,7 +1381,7 @@ class WM_OT_properties_edit(Operator):
 
             defval = prop_ui.get("default", None)
             if defval is not None:
-                self.default = str(defval)
+                self.default = str(rna_idprop_value_to_python(defval))
 
             self.soft_min = prop_ui.get("soft_min", self.min)
             self.soft_max = prop_ui.get("soft_max", self.max)
@@ -1271,6 +1389,12 @@ class WM_OT_properties_edit(Operator):
                 self.min != self.soft_min or
                 self.max != self.soft_max
             )
+
+            subtype = prop_ui.get("subtype", None)
+        else:
+            subtype = None
+
+        self._init_subtype(prop_type, is_array, subtype)
 
         # store for comparison
         self._cmp_props = self._cmp_props_get()
@@ -1307,12 +1431,19 @@ class WM_OT_properties_edit(Operator):
         return changed
 
     def draw(self, _context):
+        from rna_prop_ui import (
+            rna_idprop_value_item_type,
+        )
+
         layout = self.layout
         layout.prop(self, "property")
         layout.prop(self, "value")
 
+        value = self.get_value_eval()
+        proptype, is_array = rna_idprop_value_item_type(value)
+
         row = layout.row()
-        row.enabled = type(self.get_value_eval()) in {int, float}
+        row.enabled = proptype in {int, float}
         row.prop(self, "default")
 
         row = layout.row(align=True)
@@ -1329,6 +1460,9 @@ class WM_OT_properties_edit(Operator):
         row.prop(self, "soft_min", text="Soft Min")
         row.prop(self, "soft_max", text="Soft Max")
         layout.prop(self, "description")
+
+        if is_array and proptype == float:
+            layout.prop(self, "subtype")
 
 
 class WM_OT_properties_add(Operator):
@@ -1754,26 +1888,13 @@ class WM_MT_splash(Menu):
         if found_recent:
             col2_title.label(text="Recent Files")
         else:
-            if bpy.app.version_cycle in {'rc', 'release'}:
-                manual_version = '%d.%d' % bpy.app.version[:2]
-            else:
-                manual_version = 'dev'
 
             # Links if no recent files
             col2_title.label(text="Getting Started")
 
-            col2.operator(
-                "wm.url_open", text="Manual", icon='URL'
-            ).url = "https://docs.blender.org/manual/en/" + manual_version + "/"
-            col2.operator(
-                "wm.url_open", text="Release Notes", icon='URL',
-            ).url = "https://www.blender.org/download/releases/%d-%d/" % bpy.app.version[:2]
-            col2.operator(
-                "wm.url_open", text="Blender Website", icon='URL',
-            ).url = "https://www.blender.org"
-            col2.operator(
-                "wm.url_open", text="Credits", icon='URL',
-            ).url = "https://www.blender.org/about/credits/"
+            col2.operator("wm.url_open_preset", text="Manual", icon='URL').type = 'MANUAL'
+            col2.operator("wm.url_open_preset", text="Blender Website", icon='URL').type = 'BLENDER'
+            col2.operator("wm.url_open_preset", text="Credits", icon='URL').type = 'CREDITS'
 
         layout.separator()
 
@@ -1786,12 +1907,9 @@ class WM_MT_splash(Menu):
         col1.operator("wm.recover_last_session", icon='RECOVER_LAST')
 
         col2 = split.column()
-        col2.operator(
-            "wm.url_open", text="Release Notes", icon='URL',
-        ).url = "https://www.blender.org/download/releases/%d-%d/" % bpy.app.version[:2]
-        col2.operator(
-            "wm.url_open", text="Development Fund", icon='FUND'
-        ).url = "https://fund.blender.org"
+
+        col2.operator("wm.url_open_preset", text="Release Notes", icon='URL').type = 'RELEASE_NOTES'
+        col2.operator("wm.url_open_preset", text="Development Fund", icon='FUND').type = 'FUND'
 
         layout.separator()
         layout.separator()
@@ -1857,6 +1975,7 @@ classes = (
     WM_OT_owner_disable,
     WM_OT_owner_enable,
     WM_OT_url_open,
+    WM_OT_url_open_preset,
     WM_OT_tool_set_by_id,
     WM_OT_tool_set_by_index,
     WM_OT_toolbar,

@@ -325,25 +325,31 @@ void deg_graph_id_tag_legacy_compat(
        * tagging here. */
       case ID_ME: {
         Mesh *mesh = (Mesh *)id;
-        ID *key_id = &mesh->key->id;
-        if (key_id != NULL) {
-          graph_id_tag_update(bmain, depsgraph, key_id, 0, update_source);
+        if (mesh->key != NULL) {
+          ID *key_id = &mesh->key->id;
+          if (key_id != NULL) {
+            graph_id_tag_update(bmain, depsgraph, key_id, 0, update_source);
+          }
         }
         break;
       }
       case ID_LT: {
         Lattice *lattice = (Lattice *)id;
-        ID *key_id = &lattice->key->id;
-        if (key_id != NULL) {
-          graph_id_tag_update(bmain, depsgraph, key_id, 0, update_source);
+        if (lattice->key != NULL) {
+          ID *key_id = &lattice->key->id;
+          if (key_id != NULL) {
+            graph_id_tag_update(bmain, depsgraph, key_id, 0, update_source);
+          }
         }
         break;
       }
       case ID_CU: {
         Curve *curve = (Curve *)id;
-        ID *key_id = &curve->key->id;
-        if (key_id != NULL) {
-          graph_id_tag_update(bmain, depsgraph, key_id, 0, update_source);
+        if (curve->key != NULL) {
+          ID *key_id = &curve->key->id;
+          if (key_id != NULL) {
+            graph_id_tag_update(bmain, depsgraph, key_id, 0, update_source);
+          }
         }
         break;
       }
@@ -632,7 +638,7 @@ void graph_id_tag_update(
    * This way IDs in the undo steps will have this flag preserved, making it possible to restore
    * all needed tags when new dependency graph is created on redo.
    * This is the only way to ensure modifications to animation data (such as keyframes i.e.)
-   * properly triggers animation update for the newely constructed dependency graph on redo (while
+   * properly triggers animation update for the newly constructed dependency graph on redo (while
    * usually newly created dependency graph skips animation update to avoid loss of unkeyed
    * changes). */
   if (update_source == DEG_UPDATE_SOURCE_USER_EDIT) {

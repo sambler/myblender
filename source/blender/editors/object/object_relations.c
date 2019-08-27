@@ -124,7 +124,7 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   View3D *v3d = CTX_wm_view3d(C);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Object *obedit = CTX_data_edit_object(C);
   BMVert *eve;
@@ -149,7 +149,7 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
     em = me->edit_mesh;
 
     EDBM_mesh_normals_update(em);
-    BKE_editmesh_tessface_calc(em);
+    BKE_editmesh_looptri_calc(em);
 
     /* Make sure the evaluated mesh is updated.
      *
@@ -677,7 +677,7 @@ bool ED_object_parent_set(ReportList *reports,
                           const int vert_par[3])
 {
   Main *bmain = CTX_data_main(C);
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   bPoseChannel *pchan = NULL;
   bPoseChannel *pchan_eval = NULL;
   const bool pararm = ELEM(
@@ -1727,7 +1727,7 @@ static Collection *single_object_users_collection(Main *bmain,
                                                   const bool is_master_collection)
 {
   /* Generate new copies for objects in given collection and all its children,
-   * and optionnaly also copy collections themselves. */
+   * and optionally also copy collections themselves. */
   if (copy_collections && !is_master_collection) {
     collection = ID_NEW_SET(collection, BKE_collection_copy(bmain, NULL, collection));
   }
@@ -1744,7 +1744,7 @@ static Collection *single_object_users_collection(Main *bmain,
   }
 
   /* Since master collection has already be duplicated as part of scene copy,
-   * we do not duplictae it here.
+   * we do not duplicate it here.
    * However, this means its children need to be re-added manually here,
    * otherwise their parent lists are empty (which will lead to crashes, see T63101). */
   CollectionChild *child_next, *child = collection->children.first;
@@ -2471,7 +2471,11 @@ static int make_override_library_exec(bContext *C, wmOperator *op)
           DEG_id_tag_update_ex(bmain, &new_ob->id, ID_RECALC_TRANSFORM | ID_RECALC_BASE_FLAGS);
         }
         /* parent to 'collection' empty */
-        if (new_ob->parent == NULL) {
+        /* Disabled for now, according to some artist this is probably not really useful anyway.
+         * And it breaks things like objects parented to bones
+         * (most likely due to missing proper setting of inverse parent matrix?)... */
+        /* Note: we might even actually want to get rid of that instanciating empty... */
+        if (0 && new_ob->parent == NULL) {
           new_ob->parent = obcollection;
         }
         if (new_ob == (Object *)obact->id.newid) {
@@ -2706,7 +2710,7 @@ static int object_unlink_data_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  id = pprop.ptr.id.data;
+  id = pprop.ptr.owner_id;
 
   if (GS(id->name) == ID_OB) {
     Object *ob = (Object *)id;

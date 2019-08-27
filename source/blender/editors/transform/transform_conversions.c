@@ -52,6 +52,7 @@
 #include "BLI_string.h"
 #include "BLI_bitmap.h"
 #include "BLI_rect.h"
+#include "BLI_kdtree.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
@@ -235,8 +236,9 @@ static void sort_trans_data_selected_first(TransInfo *t)
   }
 }
 
-/* distance calculated from not-selected vertex to nearest selected vertex
- * warning; this is loops inside loop, has minor N^2 issues, but by sorting list it is OK */
+/**
+ * Distance calculated from not-selected vertex to nearest selected vertex.
+ */
 static void set_prop_dist(TransInfo *t, const bool with_dist)
 {
   int a;
@@ -255,54 +257,124 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
     }
   }
 
+  /* Count number of selected. */
+  int td_table_len = 0;
   FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-    TransData *tob = tc->data;
-    for (a = 0; a < tc->data_len; a++, tob++) {
+    TransData *td = tc->data;
+    for (a = 0; a < tc->data_len; a++, td++) {
+      if (td->flag & TD_SELECTED) {
+        td_table_len++;
+      }
+      else {
+        /* By definition transform-data has selected items in beginning. */
+        break;
+      }
+    }
+  }
 
-      tob->rdist = 0.0f;  // init, it was mallocced
+  /* Pointers to selected's #TransData.
+   * Used to find #TransData from the index returned by #BLI_kdtree_find_nearest. */
+  TransData **td_table = MEM_mallocN(sizeof(*td_table) * td_table_len, __func__);
 
-      if ((tob->flag & TD_SELECTED) == 0) {
-        TransData *td;
-        int i;
-        float dist_sq, vec[3];
+  /* Create and fill kd-tree of selected's positions - in global or proj_vec space. */
+  KDTree_3d *td_tree = BLI_kdtree_3d_new(td_table_len);
 
-        tob->rdist = -1.0f;  // signal for next loop
+  int td_table_index = 0;
+  FOREACH_TRANS_DATA_CONTAINER (t, tc) {
+    TransData *td = tc->data;
+    for (a = 0; a < tc->data_len; a++, td++) {
+      if (td->flag & TD_SELECTED) {
+        /* Initialize, it was mallocced. */
+        float vec[3];
+        td->rdist = 0.0f;
 
-        for (i = 0, td = tc->data; i < tc->data_len; i++, td++) {
-          if (td->flag & TD_SELECTED) {
-            if (use_island) {
-              sub_v3_v3v3(vec, tob->iloc, td->iloc);
-            }
-            else {
-              sub_v3_v3v3(vec, tob->center, td->center);
-            }
-            mul_m3_v3(tob->mtx, vec);
-
-            if (proj_vec) {
-              float vec_p[3];
-              project_v3_v3v3(vec_p, vec, proj_vec);
-              sub_v3_v3(vec, vec_p);
-            }
-
-            dist_sq = len_squared_v3(vec);
-            if ((tob->rdist == -1.0f) || (dist_sq < SQUARE(tob->rdist))) {
-              tob->rdist = sqrtf(dist_sq);
-              if (use_island) {
-                copy_v3_v3(tob->center, td->center);
-                copy_m3_m3(tob->axismtx, td->axismtx);
-              }
-            }
+        if (use_island) {
+          if (tc->use_local_mat) {
+            mul_v3_m4v3(vec, tc->mat, td->iloc);
           }
           else {
-            break; /* by definition transdata has selected items in beginning */
+            mul_v3_m3v3(vec, td->mtx, td->iloc);
           }
         }
+        else {
+          if (tc->use_local_mat) {
+            mul_v3_m4v3(vec, tc->mat, td->center);
+          }
+          else {
+            mul_v3_m3v3(vec, td->mtx, td->center);
+          }
+        }
+
+        if (proj_vec) {
+          float vec_p[3];
+          project_v3_v3v3(vec_p, vec, proj_vec);
+          sub_v3_v3(vec, vec_p);
+        }
+
+        BLI_kdtree_3d_insert(td_tree, td_table_index, vec);
+        td_table[td_table_index++] = td;
+      }
+      else {
+        /* By definition transform-data has selected items in beginning. */
+        break;
+      }
+    }
+  }
+  BLI_assert(td_table_index == td_table_len);
+
+  BLI_kdtree_3d_balance(td_tree);
+
+  /* For each non-selected vertex, find distance to the nearest selected vertex. */
+  FOREACH_TRANS_DATA_CONTAINER (t, tc) {
+    TransData *td = tc->data;
+    for (a = 0; a < tc->data_len; a++, td++) {
+      if ((td->flag & TD_SELECTED) == 0) {
+        float vec[3];
+
+        if (use_island) {
+          if (tc->use_local_mat) {
+            mul_v3_m4v3(vec, tc->mat, td->iloc);
+          }
+          else {
+            mul_v3_m3v3(vec, td->mtx, td->iloc);
+          }
+        }
+        else {
+          if (tc->use_local_mat) {
+            mul_v3_m4v3(vec, tc->mat, td->center);
+          }
+          else {
+            mul_v3_m3v3(vec, td->mtx, td->center);
+          }
+        }
+
+        if (proj_vec) {
+          float vec_p[3];
+          project_v3_v3v3(vec_p, vec, proj_vec);
+          sub_v3_v3(vec, vec_p);
+        }
+
+        KDTreeNearest_3d nearest;
+        const int td_index = BLI_kdtree_3d_find_nearest(td_tree, vec, &nearest);
+
+        td->rdist = -1.0f;
+        if (td_index != -1) {
+          td->rdist = nearest.dist;
+          if (use_island) {
+            copy_v3_v3(td->center, td_table[td_index]->center);
+            copy_m3_m3(td->axismtx, td_table[td_index]->axismtx);
+          }
+        }
+
         if (with_dist) {
-          tob->dist = tob->rdist;
+          td->dist = td->rdist;
         }
       }
     }
   }
+
+  BLI_kdtree_3d_free(td_tree);
+  MEM_freeN(td_table);
 }
 
 /* ************************** CONVERSIONS ************************* */
@@ -1445,6 +1517,7 @@ void restoreBones(TransDataContainer *tc)
     ebo = bid->bone;
 
     ebo->dist = bid->dist;
+    ebo->rad_head = bid->rad_head;
     ebo->rad_tail = bid->rad_tail;
     ebo->roll = bid->roll;
     ebo->xwidth = bid->xwidth;
@@ -1710,6 +1783,7 @@ static void createTransArmatureVerts(TransInfo *t)
         if (eboflip) {
           bid[i].bone = eboflip;
           bid[i].dist = eboflip->dist;
+          bid[i].rad_head = eboflip->rad_head;
           bid[i].rad_tail = eboflip->rad_tail;
           bid[i].roll = eboflip->roll;
           bid[i].xwidth = eboflip->xwidth;
@@ -6462,11 +6536,14 @@ static void flush_trans_object_base_deps_flag(Depsgraph *depsgraph, Object *obje
       depsgraph, &object->id, DEG_OB_COMP_TRANSFORM, set_trans_object_base_deps_flag_cb, NULL);
 }
 
-static void trans_object_base_deps_flag_finish(ViewLayer *view_layer)
+static void trans_object_base_deps_flag_finish(const TransInfo *t, ViewLayer *view_layer)
 {
-  for (Base *base = view_layer->object_bases.first; base; base = base->next) {
-    if (base->object->id.tag & LIB_TAG_DOIT) {
-      base->flag_legacy |= BA_SNAP_FIX_DEPS_FIASCO;
+
+  if ((t->flag & T_OBJECT_DATA_IN_OBJECT_MODE) == 0) {
+    for (Base *base = view_layer->object_bases.first; base; base = base->next) {
+      if (base->object->id.tag & LIB_TAG_DOIT) {
+        base->flag_legacy |= BA_SNAP_FIX_DEPS_FIASCO;
+      }
     }
   }
 }
@@ -6528,7 +6605,7 @@ static void set_trans_object_base_flags(TransInfo *t)
   /* Store temporary bits in base indicating that base is being modified
    * (directly or indirectly) by transforming objects.
    */
-  trans_object_base_deps_flag_finish(view_layer);
+  trans_object_base_deps_flag_finish(t, view_layer);
 }
 
 static bool mark_children(Object *ob)
@@ -6596,7 +6673,7 @@ static int count_proportional_objects(TransInfo *t)
   /* Store temporary bits in base indicating that base is being modified
    * (directly or indirectly) by transforming objects.
    */
-  trans_object_base_deps_flag_finish(view_layer);
+  trans_object_base_deps_flag_finish(t, view_layer);
   return total;
 }
 
@@ -6631,7 +6708,6 @@ void autokeyframe_object(bContext *C, Scene *scene, ViewLayer *view_layer, Objec
 
   // TODO: this should probably be done per channel instead...
   if (autokeyframe_cfra_can_key(scene, id)) {
-    Depsgraph *depsgraph = CTX_data_depsgraph(C);
     ReportList *reports = CTX_wm_reports(C);
     ToolSettings *ts = scene->toolsettings;
     KeyingSet *active_ks = ANIM_scene_get_active_keyingset(scene);
@@ -6658,11 +6734,9 @@ void autokeyframe_object(bContext *C, Scene *scene, ViewLayer *view_layer, Objec
       /* only key on available channels */
       if (adt && adt->action) {
         ListBase nla_cache = {NULL, NULL};
-
         for (fcu = adt->action->curves.first; fcu; fcu = fcu->next) {
           fcu->flag &= ~FCURVE_SELECTED;
           insert_keyframe(bmain,
-                          depsgraph,
                           reports,
                           id,
                           adt->action,
@@ -6777,7 +6851,6 @@ void autokeyframe_pose(bContext *C, Scene *scene, Object *ob, int tmode, short t
 
   // TODO: this should probably be done per channel instead...
   if (autokeyframe_cfra_can_key(scene, id)) {
-    Depsgraph *depsgraph = CTX_data_depsgraph(C);
     ReportList *reports = CTX_wm_reports(C);
     ToolSettings *ts = scene->toolsettings;
     KeyingSet *active_ks = ANIM_scene_get_active_keyingset(scene);
@@ -6825,7 +6898,6 @@ void autokeyframe_pose(bContext *C, Scene *scene, Object *ob, int tmode, short t
                  */
                 if (pchanName && STREQ(pchanName, pchan->name)) {
                   insert_keyframe(bmain,
-                                  depsgraph,
                                   reports,
                                   id,
                                   act,
@@ -7054,7 +7126,14 @@ static void special_aftertrans_update__mesh(bContext *UNUSED(C), TransInfo *t)
         hflag = BM_ELEM_SELECT;
       }
 
-      EDBM_automerge(t->scene, tc->obedit, true, hflag);
+      if (t->scene->toolsettings->automerge & AUTO_MERGE) {
+        if (t->scene->toolsettings->automerge & AUTO_MERGE_AND_SPLIT) {
+          EDBM_automerge_and_split(t->scene, tc->obedit, true, true, hflag);
+        }
+        else {
+          EDBM_automerge(t->scene, tc->obedit, true, hflag);
+        }
+      }
 
       /* Special case, this is needed or faces won't re-select.
        * Flush selected edges to faces. */
@@ -7609,6 +7688,81 @@ int special_transform_moving(TransInfo *t)
   return 0;
 }
 
+/* -------------------------------------------------------------------- */
+/** \name Object Data in Object Mode
+ *
+ * Use to implement 'Affect Only Origins' feature.
+ * We need this to be detached from transform data because,
+ * unlike transforming regular objects, we need to transform the children.
+ *
+ * \{ */
+
+struct XFormObjectData_Extra {
+  Object *ob;
+  float obmat_orig[4][4];
+  struct XFormObjectData *xod;
+};
+
+static void trans_obdata_in_obmode_ensure_object(TransInfo *t, Object *ob)
+{
+  if (t->obdata_in_obmode_map == NULL) {
+    t->obdata_in_obmode_map = BLI_ghash_ptr_new(__func__);
+  }
+
+  void **xf_p;
+  if (!BLI_ghash_ensure_p(t->obdata_in_obmode_map, ob->data, &xf_p)) {
+    struct XFormObjectData_Extra *xf = MEM_mallocN(sizeof(*xf), __func__);
+    copy_m4_m4(xf->obmat_orig, ob->obmat);
+    xf->ob = ob;
+    /* Result may be NULL, that's OK. */
+    xf->xod = ED_object_data_xform_create(ob->data);
+    *xf_p = xf;
+  }
+}
+
+void trans_obdata_in_obmode_update_all(TransInfo *t)
+{
+  struct Main *bmain = CTX_data_main(t->context);
+  BKE_scene_graph_evaluated_ensure(t->depsgraph, bmain);
+
+  GHashIterator gh_iter;
+  GHASH_ITER (gh_iter, t->obdata_in_obmode_map) {
+    ID *id = BLI_ghashIterator_getKey(&gh_iter);
+    struct XFormObjectData_Extra *xf = BLI_ghashIterator_getValue(&gh_iter);
+    if (xf->xod == NULL) {
+      continue;
+    }
+
+    Object *ob_eval = DEG_get_evaluated_object(t->depsgraph, xf->ob);
+    float imat[4][4], dmat[4][4];
+    invert_m4_m4(imat, xf->obmat_orig);
+    mul_m4_m4m4(dmat, imat, ob_eval->obmat);
+    invert_m4(dmat);
+
+    ED_object_data_xform_by_mat4(xf->xod, dmat);
+    DEG_id_tag_update(id, 0);
+  }
+}
+
+/** Callback for #GHash free. */
+static void trans_obdata_in_obmode_free_elem(void *xf_p)
+{
+  struct XFormObjectData_Extra *xf = xf_p;
+  if (xf->xod) {
+    ED_object_data_xform_destroy(xf->xod);
+  }
+  MEM_freeN(xf);
+}
+
+void trans_obdata_in_obmode_free_all(TransInfo *t)
+{
+  if (t->obdata_in_obmode_map != NULL) {
+    BLI_ghash_free(t->obdata_in_obmode_map, NULL, trans_obdata_in_obmode_free_elem);
+  }
+}
+
+/** \} */
+
 static void createTransObject(bContext *C, TransInfo *t)
 {
   TransData *td = NULL;
@@ -7653,6 +7807,24 @@ static void createTransObject(bContext *C, TransInfo *t)
       td->flag |= TD_SKIP;
     }
 
+    if (t->flag & T_OBJECT_DATA_IN_OBJECT_MODE) {
+      ID *id = ob->data;
+      if (!id || id->lib) {
+        td->flag |= TD_SKIP;
+      }
+      else if (BKE_object_is_in_editmode(ob)) {
+        /* The object could have edit-mode data from another view-layer,
+         * it's such a corner-case it can be skipped for now - Campbell. */
+        td->flag |= TD_SKIP;
+      }
+    }
+
+    if (t->flag & T_OBJECT_DATA_IN_OBJECT_MODE) {
+      if ((td->flag & TD_SKIP) == 0) {
+        trans_obdata_in_obmode_ensure_object(t, ob);
+      }
+    }
+
     ObjectToTransData(t, td, ob);
     td->val = NULL;
     td++;
@@ -7683,6 +7855,47 @@ static void createTransObject(bContext *C, TransInfo *t)
         tx++;
       }
     }
+  }
+
+  if (t->flag & T_OBJECT_DATA_IN_OBJECT_MODE) {
+    GSet *objects_in_transdata = BLI_gset_ptr_new_ex(__func__, tc->data_len);
+    td = tc->data;
+    for (int i = 0; i < tc->data_len; i++, td++) {
+      if ((td->flag & TD_SKIP) == 0) {
+        BLI_gset_add(objects_in_transdata, td->ob);
+      }
+    }
+
+    ViewLayer *view_layer = t->view_layer;
+    View3D *v3d = t->view;
+
+    for (Base *base = view_layer->object_bases.first; base; base = base->next) {
+      Object *ob = base->object;
+
+      /* if base is not selected, not a parent of selection
+       * or not a child of selection and it is editable and selectable */
+      if ((base->flag & BASE_SELECTED) == 0 && BASE_EDITABLE(v3d, base) &&
+          BASE_SELECTABLE(v3d, base)) {
+
+        Object *ob_parent = ob->parent;
+        if (ob_parent != NULL) {
+          if (!BLI_gset_haskey(objects_in_transdata, ob)) {
+            bool parent_in_transdata = false;
+            while (ob_parent != NULL) {
+              if (BLI_gset_haskey(objects_in_transdata, ob_parent)) {
+                parent_in_transdata = true;
+                break;
+              }
+              ob_parent = ob_parent->parent;
+            }
+            if (parent_in_transdata) {
+              trans_obdata_in_obmode_ensure_object(t, ob);
+            }
+          }
+        }
+      }
+    }
+    BLI_gset_free(objects_in_transdata, NULL);
   }
 }
 
@@ -9020,7 +9233,7 @@ static void createTransGPencil_center_get(bGPDstroke *gps, float r_center[3])
 
 static void createTransGPencil(bContext *C, TransInfo *t)
 {
-  Depsgraph *depsgraph = CTX_data_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   ToolSettings *ts = CTX_data_tool_settings(C);
 
@@ -9054,7 +9267,7 @@ static void createTransGPencil(bContext *C, TransInfo *t)
 
   /* initialize falloff curve */
   if (is_multiedit) {
-    curvemapping_initialize(ts->gp_sculpt.cur_falloff);
+    BKE_curvemapping_initialize(ts->gp_sculpt.cur_falloff);
   }
 
   /* First Pass: Count the number of data-points required for the strokes,
@@ -9669,6 +9882,10 @@ void createTransData(bContext *C, TransInfo *t)
   else {
     /* Needed for correct Object.obmat after duplication, see: T62135. */
     BKE_scene_graph_evaluated_ensure(t->depsgraph, CTX_data_main(t->context));
+
+    if ((scene->toolsettings->transform_flag & SCE_XFORM_DATA_ORIGIN) != 0) {
+      t->flag |= T_OBJECT_DATA_IN_OBJECT_MODE;
+    }
 
     createTransObject(C, t);
     countAndCleanTransDataContainer(t);

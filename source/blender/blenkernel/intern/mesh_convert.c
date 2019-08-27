@@ -978,7 +978,7 @@ static void curve_to_mesh_eval_ensure(Object *object)
    *
    * So we create temporary copy of the object which will use same data as the original bevel, but
    * will have no modifiers. */
-  Object bevel_object = {NULL};
+  Object bevel_object = {{NULL}};
   if (remapped_curve.bevobj != NULL) {
     bevel_object = *remapped_curve.bevobj;
     BLI_listbase_clear(&bevel_object.modifiers);
@@ -986,7 +986,7 @@ static void curve_to_mesh_eval_ensure(Object *object)
   }
 
   /* Same thing for taper. */
-  Object taper_object = {NULL};
+  Object taper_object = {{NULL}};
   if (remapped_curve.taperobj != NULL) {
     taper_object = *remapped_curve.taperobj;
     BLI_listbase_clear(&taper_object.modifiers);
@@ -1216,10 +1216,14 @@ Mesh *BKE_mesh_new_from_object_to_bmain(Main *bmain,
                                         Object *object,
                                         bool preserve_all_data_layers)
 {
+  BLI_assert(ELEM(object->type, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL, OB_MESH));
+
   Mesh *mesh = BKE_mesh_new_from_object(depsgraph, object, preserve_all_data_layers);
   if (mesh == NULL) {
-    /* Unable to convert the object to a mesh. */
-    return NULL;
+    /* Unable to convert the object to a mesh, return an empty one. */
+    Mesh *mesh_in_bmain = BKE_mesh_add(bmain, ((ID *)object->data)->name + 2);
+    id_us_min(&mesh_in_bmain->id);
+    return mesh_in_bmain;
   }
 
   /* Make sure mesh only points original datablocks, also increase users of materials and other
@@ -1233,14 +1237,14 @@ Mesh *BKE_mesh_new_from_object_to_bmain(Main *bmain,
   BKE_library_foreach_ID_link(
       NULL, &mesh->id, foreach_libblock_make_original_callback, NULL, IDWALK_NOP);
 
-  /* Append the mesh to bmain.
-   * We do it a bit longer way since there is no simple and clear way of adding existing datablock
-   * to the bmain. So we allocate new empty mesh in the bmain (which guarantess all the naming and
-   * orders and flags) and move the temporary mesh in place there. */
+  /* Append the mesh to 'bmain'.
+   * We do it a bit longer way since there is no simple and clear way of adding existing data-block
+   * to the 'bmain'. So we allocate new empty mesh in the 'bmain' (which guarantees all the naming
+   * and orders and flags) and move the temporary mesh in place there. */
   Mesh *mesh_in_bmain = BKE_mesh_add(bmain, mesh->id.name + 2);
 
   /* NOTE: BKE_mesh_nomain_to_mesh() does not copy materials and instead it preserves them in the
-   * destinaion mesh. So we "steal" all related fields before calling it.
+   * destination mesh. So we "steal" all related fields before calling it.
    *
    * TODO(sergey): We really better have a function which gets and ID and accepts it for the bmain.
    */
@@ -1337,11 +1341,11 @@ Mesh *BKE_mesh_create_derived_for_modifier(struct Depsgraph *depsgraph,
 
   if (mti->type == eModifierTypeType_OnlyDeform) {
     int numVerts;
-    float(*deformedVerts)[3] = BKE_mesh_vertexCos_get(me, &numVerts);
+    float(*deformedVerts)[3] = BKE_mesh_vert_coords_alloc(me, &numVerts);
 
     BKE_id_copy_ex(NULL, &me->id, (ID **)&result, LIB_ID_COPY_LOCALIZE);
     mti->deformVerts(md_eval, &mectx, result, deformedVerts, numVerts);
-    BKE_mesh_apply_vert_coords(result, deformedVerts);
+    BKE_mesh_vert_coords_apply(result, deformedVerts);
 
     if (build_shapekey_layers) {
       add_shapekey_layers(result, me);
@@ -1430,7 +1434,6 @@ static void shapekey_layers_to_keyblocks(Mesh *mesh_src, Mesh *mesh_dst, int act
   }
 }
 
-/* This is a Mesh-based copy of DM_to_mesh() */
 void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
                              Mesh *mesh_dst,
                              Object *ob,
@@ -1438,7 +1441,7 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
                              bool take_ownership)
 {
   /* mesh_src might depend on mesh_dst, so we need to do everything with a local copy */
-  /* TODO(Sybren): the above claim came from DM_to_mesh();
+  /* TODO(Sybren): the above claim came from 2.7x derived-mesh code (DM_to_mesh);
    * check whether it is still true with Mesh */
   Mesh tmp = *mesh_dst;
   int totvert, totedge /*, totface */ /* UNUSED */, totloop, totpoly;
@@ -1590,7 +1593,6 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
   }
 }
 
-/* This is a Mesh-based copy of DM_to_meshkey() */
 void BKE_mesh_nomain_to_meshkey(Mesh *mesh_src, Mesh *mesh_dst, KeyBlock *kb)
 {
   int a, totvert = mesh_src->totvert;

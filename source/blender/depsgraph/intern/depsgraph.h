@@ -45,13 +45,11 @@
 struct GHash;
 struct GSet;
 struct ID;
-struct Main;
 struct Scene;
 struct ViewLayer;
 
 namespace DEG {
 
-struct ComponentNode;
 struct IDNode;
 struct Node;
 struct OperationNode;
@@ -73,7 +71,7 @@ enum RelationFlag {
   RELATION_FLAG_FLUSH_USER_EDIT_ONLY = (1 << 2),
   /* The relation can not be killed by the cyclic dependencies solver. */
   RELATION_FLAG_GODMODE = (1 << 4),
-  /* Relation will check existance before being added. */
+  /* Relation will check existence before being added. */
   RELATION_CHECK_BEFORE_ADD = (1 << 5),
 };
 

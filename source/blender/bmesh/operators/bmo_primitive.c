@@ -1092,7 +1092,7 @@ static void bm_mesh_calc_uvs_sphere_face(BMFace *f, const int cd_loop_uv_offset)
     float z = l->v->co[2];
     float len = len_v3(l->v->co);
 
-    /* Use neigboring point to compute angle for poles. */
+    /* Use neighboring point to compute angle for poles. */
     float theta;
     if (f->len == 3 && fabsf(x) < 0.0001f && fabsf(y) < 0.0001f) {
       theta = atan2f(avgy, avgx);
@@ -1560,9 +1560,10 @@ void BM_mesh_calc_uvs_cone(BMesh *bm,
   float inv_mat[4][4];
   int loop_index;
 
-  mul_mat3_m4_v3(
-      mat, local_up); /* transform the upvector like we did the cone itself, without location. */
-  normalize_v3(local_up); /* remove global scaling... */
+  /* Transform the upvector like we did the cone itself, without location. */
+  mul_mat3_m4_v3(mat, local_up);
+  /* Remove global scaling... */
+  normalize_v3(local_up);
 
   invert_m4_m4(inv_mat, mat);
 

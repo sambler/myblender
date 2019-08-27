@@ -531,7 +531,7 @@ void DepsgraphRelationBuilder::build_collection(LayerCollection *from_layer_coll
     /* If we came from layer collection we don't go deeper, view layer
      * builder takes care of going deeper.
      *
-     * NOTE: Do early output before tagging build as done, so possbile
+     * NOTE: Do early output before tagging build as done, so possible
      * subsequent builds from outside of the layer collection properly
      * recurses into all the nested objects and collections. */
     return;
@@ -677,7 +677,7 @@ void DepsgraphRelationBuilder::build_object(Base *base, Object *object)
   }
   /* Point caches. */
   build_object_pointcache(object);
-  /* Syncronization back to original object. */
+  /* Synchronization back to original object. */
   OperationKey synchronize_key(
       &object->id, NodeType::SYNCHRONIZATION, OperationCode::SYNCHRONIZE_TO_ORIGINAL);
   add_relation(final_transform_key, synchronize_key, "Synchronize to Original");
@@ -695,7 +695,7 @@ void DepsgraphRelationBuilder::build_object_flags(Base *base, Object *object)
   OperationKey object_flags_key(
       &object->id, NodeType::OBJECT_FROM_LAYER, OperationCode::OBJECT_BASE_FLAGS);
   add_relation(view_layer_done_key, object_flags_key, "Base flags flush");
-  /* Syncronization back to original object. */
+  /* Synchronization back to original object. */
   OperationKey synchronize_key(
       &object->id, NodeType::SYNCHRONIZATION, OperationCode::SYNCHRONIZE_TO_ORIGINAL);
   add_relation(object_flags_key, synchronize_key, "Synchronize to Original");
@@ -1321,7 +1321,7 @@ void DepsgraphRelationBuilder::build_animdata_drivers(ID *id)
 
 void DepsgraphRelationBuilder::build_animation_images(ID *id)
 {
-  /* TODO: can we check for existance of node for performance? */
+  /* TODO: can we check for existence of node for performance? */
   if (BKE_image_user_id_has_animation(id)) {
     OperationKey image_animation_key(id, NodeType::ANIMATION, OperationCode::IMAGE_ANIMATION);
     TimeSourceKey time_src_key;
@@ -1384,7 +1384,7 @@ void DepsgraphRelationBuilder::build_driver_data(ID *id, FCurve *fcu)
    * it. This is necessary to provide more granular dependencies specifically for
    * Bone objects, because the armature data doesn't have per-bone components,
    * and generic add_relation can only add one link. */
-  ID *id_ptr = (ID *)property_entry_key.ptr.id.data;
+  ID *id_ptr = property_entry_key.ptr.owner_id;
   bool is_bone = id_ptr && property_entry_key.ptr.type == &RNA_Bone;
   /* If the Bone property is referenced via obj.pose.bones[].bone,
    * the RNA pointer refers to the Object ID, so skip to data. */
@@ -1433,8 +1433,8 @@ void DepsgraphRelationBuilder::build_driver_data(ID *id, FCurve *fcu)
       PointerRNA ptr;
       RNA_id_pointer_create(id, &id_ptr);
       if (RNA_path_resolve_full(&id_ptr, fcu->rna_path, &ptr, NULL, NULL)) {
-        if (id_ptr.id.data != ptr.id.data) {
-          ComponentKey cow_key((ID *)ptr.id.data, NodeType::COPY_ON_WRITE);
+        if (id_ptr.owner_id != ptr.owner_id) {
+          ComponentKey cow_key(ptr.owner_id, NodeType::COPY_ON_WRITE);
           add_relation(cow_key, driver_key, "Driven CoW -> Driver", RELATION_CHECK_BEFORE_ADD);
         }
       }
@@ -1531,8 +1531,9 @@ void DepsgraphRelationBuilder::build_driver_id_property(ID *id, const char *rna_
   }
   PointerRNA id_ptr, ptr;
   PropertyRNA *prop;
+  int index;
   RNA_id_pointer_create(id, &id_ptr);
-  if (!RNA_path_resolve_full(&id_ptr, rna_path, &ptr, &prop, NULL)) {
+  if (!RNA_path_resolve_full(&id_ptr, rna_path, &ptr, &prop, &index)) {
     return;
   }
   if (prop == NULL) {
@@ -1999,7 +2000,7 @@ void DepsgraphRelationBuilder::build_object_data_geometry(Object *object)
       }
     }
   }
-  /* Syncronization back to original object. */
+  /* Synchronization back to original object. */
   ComponentKey final_geometry_key(&object->id, NodeType::GEOMETRY);
   OperationKey synchronize_key(
       &object->id, NodeType::SYNCHRONIZATION, OperationCode::SYNCHRONIZE_TO_ORIGINAL);
@@ -2536,7 +2537,7 @@ void DepsgraphRelationBuilder::build_copy_on_write_relations(IDNode *id_node)
      *   copied by copy-on-write, and not preserved. PROBABLY it is better
      *   to preserve that cache in copy-on-write, but for the time being
      *   we allow flush to layer collections component which will ensure
-     *   that cached array fo bases exists and is up-to-date. */
+     *   that cached array of bases exists and is up-to-date. */
     if (comp_node->type == NodeType::PARAMETERS ||
         comp_node->type == NodeType::LAYER_COLLECTIONS) {
       rel_flag &= ~RELATION_FLAG_NO_FLUSH;

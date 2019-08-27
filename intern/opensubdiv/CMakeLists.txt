@@ -83,7 +83,7 @@ if(WITH_OPENSUBDIV)
     internal/opensubdiv_util.h
   )
 
-  OPENSUBDIV_DEFINE_COMPONENT(OPENSUBDIV_HAS_OPENMP)
+#  OPENSUBDIV_DEFINE_COMPONENT(OPENSUBDIV_HAS_OPENMP)
   # TODO(sergey): OpenCL is not tested and totally unstable atm.
   # OPENSUBDIV_DEFINE_COMPONENT(OPENSUBDIV_HAS_OPENCL)
   # TODO(sergey): CUDA stays disabled for util it's ported to drievr API.

@@ -63,12 +63,18 @@ short select_id_get_object_select_mode(Scene *scene, Object *ob)
 {
   short r_select_mode = 0;
   if (ob->mode & (OB_MODE_WEIGHT_PAINT | OB_MODE_VERTEX_PAINT | OB_MODE_TEXTURE_PAINT)) {
+    /* In order to sample flat colors for vertex weights / texture-paint / vertex-paint
+     * we need to be in SCE_SELECT_FACE mode so select_cache_init() correctly sets up
+     * a shgroup with select_id_flat.
+     * Note this is not working correctly for vertex-paint (yet), but has been discussed
+     * in T66645 and there is a solution by @mano-wii in P1032.
+     * So OB_MODE_VERTEX_PAINT is already included here [required for P1032 I guess]. */
     Mesh *me_orig = DEG_get_original_object(ob)->data;
-    if (me_orig->editflag & ME_EDIT_PAINT_FACE_SEL) {
-      r_select_mode = SCE_SELECT_FACE;
-    }
     if (me_orig->editflag & ME_EDIT_PAINT_VERT_SEL) {
-      r_select_mode |= SCE_SELECT_VERTEX;
+      r_select_mode = SCE_SELECT_VERTEX;
+    }
+    else {
+      r_select_mode = SCE_SELECT_FACE;
     }
   }
   else {
@@ -123,7 +129,11 @@ static void draw_select_id_edit_mesh(SELECTID_StorageList *stl,
   }
   else {
     if (ob->dt >= OB_SOLID) {
+#ifdef USE_CAGE_OCCLUSION
+      struct GPUBatch *geom_faces = DRW_mesh_batch_cache_get_triangles_with_select_id(me);
+#else
       struct GPUBatch *geom_faces = DRW_mesh_batch_cache_get_surface(me);
+#endif
       DRWShadingGroup *face_shgrp = stl->g_data->shgrp_face_unif;
       DRW_shgroup_call_no_cull(face_shgrp, geom_faces, ob);
     }

@@ -912,6 +912,13 @@ static bool rna_UserDef_studiolight_is_user_defined_get(PointerRNA *ptr)
   return (sl->flag & STUDIOLIGHT_USER_DEFINED) != 0;
 }
 
+/* StudioLight.is_user_defined */
+static bool rna_UserDef_studiolight_has_specular_highlight_pass_get(PointerRNA *ptr)
+{
+  StudioLight *sl = (StudioLight *)ptr->data;
+  return sl->flag & STUDIOLIGHT_SPECULAR_HIGHLIGHT_PASS;
+}
+
 /* StudioLight.type */
 
 static int rna_UserDef_studiolight_type_get(PointerRNA *ptr)
@@ -1495,6 +1502,12 @@ static void rna_def_userdef_theme_ui(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "icon_shading");
   RNA_def_property_array(prop, 4);
   RNA_def_property_ui_text(prop, "Shading", "");
+  RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
+
+  prop = RNA_def_property(srna, "icon_folder", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_float_sdna(prop, NULL, "icon_folder");
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_ui_text(prop, "File Folders", "Color of folders in the file browser");
   RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
 
   prop = RNA_def_property(srna, "icon_border_intensity", PROP_FLOAT, PROP_FACTOR);
@@ -3700,6 +3713,15 @@ static void rna_def_userdef_studiolight(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "User Defined", "");
 
+  prop = RNA_def_property(srna, "has_specular_highlight_pass", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_UserDef_studiolight_has_specular_highlight_pass_get", NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop,
+      "Has Specular Highlight",
+      "Studio light image file has separate \"diffuse\" and \"specular\" passes");
+
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_studio_light_type_items);
   RNA_def_property_enum_funcs(prop, "rna_UserDef_studiolight_type_get", NULL, NULL);
@@ -4022,6 +4044,43 @@ static void rna_def_userdef_view(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem render_display_types[] = {
+      {USER_RENDER_DISPLAY_NONE,
+       "NONE",
+       0,
+       "Keep User Interface",
+       "Images are rendered without changing the user interface"},
+      {USER_RENDER_DISPLAY_SCREEN,
+       "SCREEN",
+       0,
+       "Full Screen",
+       "Images are rendered in a maximized Image Editor"},
+      {USER_RENDER_DISPLAY_AREA,
+       "AREA",
+       0,
+       "Image Editor",
+       "Images are rendered in an Image Editor"},
+      {USER_RENDER_DISPLAY_WINDOW,
+       "WINDOW",
+       0,
+       "New Window",
+       "Images are rendered in a new window"},
+      {0, NULL, 0, NULL, NULL},
+  };
+  static const EnumPropertyItem temp_space_display_types[] = {
+      {USER_TEMP_SPACE_DISPLAY_FULLSCREEN,
+       "SCREEN", /* Could be FULLSCREEN, but keeping it consistent with render_display_types */
+       0,
+       "Full Screen",
+       "Open the temporary editor in a maximized screen"},
+      {USER_TEMP_SPACE_DISPLAY_WINDOW,
+       "WINDOW",
+       0,
+       "New Window",
+       "Open the temporary editor in a new window"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   PropertyRNA *prop;
   StructRNA *srna;
 
@@ -4037,7 +4096,6 @@ static void rna_def_userdef_view(BlenderRNA *brna)
       prop, "UI Scale", "Changes the size of the fonts and widgets in the interface");
   RNA_def_property_range(prop, 0.25f, 4.0f);
   RNA_def_property_ui_range(prop, 0.5f, 2.0f, 1, 2);
-  RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_update(prop, 0, "rna_userdef_dpi_update");
 
   prop = RNA_def_property(srna, "ui_line_width", PROP_ENUM, PROP_NONE);
@@ -4096,7 +4154,8 @@ static void rna_def_userdef_view(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_userdef_update");
 
   prop = RNA_def_property(srna, "show_addons_enabled_only", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_ADDONS_ENABLED_ONLY);
+  RNA_def_property_boolean_sdna(
+      prop, NULL, "space_data.flag", USER_SPACEDATA_ADDONS_SHOW_ONLY_ENABLED);
   RNA_def_property_ui_text(prop,
                            "Enabled Add-ons Only",
                            "Only show enabled add-ons. Un-check to see all installed add-ons");
@@ -4246,6 +4305,17 @@ static void rna_def_userdef_view(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Header Position", "Default header position for new space-types");
   RNA_def_property_update(prop, 0, "rna_userdef_screen_update_header_default");
 
+  prop = RNA_def_property(srna, "render_display_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, render_display_types);
+  RNA_def_property_ui_text(
+      prop, "Render Display Type", "Default location where rendered images will be displayed in");
+
+  prop = RNA_def_property(srna, "filebrowser_display_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, temp_space_display_types);
+  RNA_def_property_ui_text(prop,
+                           "File Browser Display Type",
+                           "Default location where the File Editor will be displayed in");
+
   static const EnumPropertyItem text_hinting_items[] = {
       {0, "AUTO", 0, "Auto", ""},
       {USER_TEXT_HINTING_NONE, "NONE", 0, "None", ""},
@@ -4302,7 +4372,6 @@ static void rna_def_userdef_view(BlenderRNA *brna)
   prop = RNA_def_property(srna, "gizmo_size", PROP_INT, PROP_PIXEL);
   RNA_def_property_int_sdna(prop, NULL, "gizmo_size");
   RNA_def_property_range(prop, 10, 200);
-  RNA_def_property_int_default(prop, 75);
   RNA_def_property_ui_text(prop, "Gizmo Size", "Diameter of the gizmo");
   RNA_def_property_update(prop, 0, "rna_userdef_update");
 
@@ -4310,7 +4379,6 @@ static void rna_def_userdef_view(BlenderRNA *brna)
   prop = RNA_def_property(srna, "lookdev_sphere_size", PROP_INT, PROP_PIXEL);
   RNA_def_property_int_sdna(prop, NULL, "lookdev_sphere_size");
   RNA_def_property_range(prop, 50, 400);
-  RNA_def_property_int_default(prop, 150);
   RNA_def_property_ui_text(
       prop, "Look Dev Spheres Size", "Maximum diameter of the look development sphere size");
   RNA_def_property_update(prop, 0, "rna_userdef_update");
@@ -5240,7 +5308,6 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "view_rotate_sensitivity_turntable", PROP_FLOAT, PROP_ANGLE);
   RNA_def_property_range(prop, DEG2RADF(0.001f), DEG2RADF(15.0f));
-  RNA_def_property_float_default(prop, DEG2RADF(0.4f));
   RNA_def_property_ui_range(prop, DEG2RADF(0.001f), DEG2RADF(15.0f), 1.0f, 2);
   RNA_def_property_ui_text(prop,
                            "Orbit Sensitivity",
@@ -5248,7 +5315,6 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "view_rotate_sensitivity_trackball", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_range(prop, 0.1f, 10.0f);
-  RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_ui_range(prop, 0.1f, 2.0f, 0.01f, 2);
   RNA_def_property_ui_text(prop, "Orbit Sensitivity", "Scale trackball orbit sensitivity");
 
@@ -5288,7 +5354,6 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   /* tablet pressure curve */
   prop = RNA_def_property(srna, "pressure_threshold_max", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_range(prop, 0.0f, 1.0f);
-  RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.01f, 3);
   RNA_def_property_ui_text(
       prop, "Max Threshold", "Raw input pressure value that is interpreted as 100% by Blender");
@@ -5447,7 +5512,7 @@ static void rna_def_userdef_keymap(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "show_ui_keyconfig", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(
-      prop, NULL, "userpref_flag", USER_SECTION_INPUT_HIDE_UI_KEYCONFIG);
+      prop, NULL, "space_data.flag", USER_SPACEDATA_INPUT_HIDE_UI_KEYCONFIG);
   RNA_def_property_ui_text(prop, "Show UI Key-Config", "");
 
   prop = RNA_def_property(srna, "active_keyconfig", PROP_STRING, PROP_DIRPATH);
@@ -5728,7 +5793,7 @@ void RNA_def_userdef(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "Preferences", "Global preferences");
 
   prop = RNA_def_property(srna, "active_section", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "userpref");
+  RNA_def_property_enum_sdna(prop, NULL, "space_data.section_active");
   RNA_def_property_enum_items(prop, preference_section_items);
   RNA_def_property_ui_text(
       prop, "Active Section", "Active section of the preferences shown in the user interface");

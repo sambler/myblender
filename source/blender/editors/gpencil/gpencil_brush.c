@@ -71,10 +71,6 @@
 #include "ED_screen.h"
 #include "ED_view3d.h"
 
-#include "GPU_immediate.h"
-#include "GPU_immediate_util.h"
-#include "GPU_state.h"
-
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
@@ -569,7 +565,7 @@ static void gp_brush_grab_calc_dvec(tGP_BrushEditData *gso)
 /* Apply grab transform to all relevant points of the affected strokes */
 static void gp_brush_grab_apply_cached(tGP_BrushEditData *gso,
                                        bGPDstroke *gps,
-                                       float diff_mat[4][4])
+                                       const float diff_mat[4][4])
 {
   tGPSB_Grab_StrokeData *data = BLI_ghash_lookup(gso->stroke_customdata, gps);
   int i;
@@ -1467,7 +1463,7 @@ static bool gpsculpt_brush_poll(bContext *C)
 
 /* Init Sculpt Stroke ---------------------------------- */
 
-static void gpsculpt_brush_init_stroke(tGP_BrushEditData *gso)
+static void gpsculpt_brush_init_stroke(bContext *C, tGP_BrushEditData *gso)
 {
   bGPdata *gpd = gso->gpd;
 
@@ -1491,9 +1487,11 @@ static void gpsculpt_brush_init_stroke(tGP_BrushEditData *gso)
        * - This is useful when animating as it saves that "uh-oh" moment when you realize you've
        *   spent too much time editing the wrong frame.
        */
-      // XXX: should this be allowed when framelock is enabled?
       if (gpf->framenum != cfra) {
         BKE_gpencil_frame_addcopy(gpl, cfra);
+        /* Need tag to recalculate evaluated data to avoid crashes. */
+        DEG_id_tag_update(&gso->gpd->id, ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
+        WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
       }
     }
   }
@@ -1559,7 +1557,7 @@ static float gpsculpt_rotation_eval_get(GP_SpaceConversion *gsc,
 /* Apply brush operation to points in this stroke */
 static bool gpsculpt_brush_do_stroke(tGP_BrushEditData *gso,
                                      bGPDstroke *gps,
-                                     float diff_mat[4][4],
+                                     const float diff_mat[4][4],
                                      GP_BrushApplyCb apply)
 {
   GP_SpaceConversion *gsc = &gso->gsc;
@@ -1684,8 +1682,11 @@ static bool gpsculpt_brush_do_stroke(tGP_BrushEditData *gso,
 }
 
 /* Apply sculpt brushes to strokes in the given frame */
-static bool gpsculpt_brush_do_frame(
-    bContext *C, tGP_BrushEditData *gso, bGPDlayer *gpl, bGPDframe *gpf, float diff_mat[4][4])
+static bool gpsculpt_brush_do_frame(bContext *C,
+                                    tGP_BrushEditData *gso,
+                                    bGPDlayer *gpl,
+                                    bGPDframe *gpf,
+                                    const float diff_mat[4][4])
 {
   bool changed = false;
   Object *ob = CTX_data_active_object(C);
@@ -2080,7 +2081,7 @@ static int gpsculpt_brush_invoke(bContext *C, wmOperator *op, const wmEvent *eve
     ARegion *ar = CTX_wm_region(C);
 
     /* ensure that we'll have a new frame to draw on */
-    gpsculpt_brush_init_stroke(gso);
+    gpsculpt_brush_init_stroke(C, gso);
 
     /* apply first dab... */
     gso->is_painting = true;
@@ -2195,7 +2196,7 @@ static int gpsculpt_brush_modal(bContext *C, wmOperator *op, const wmEvent *even
         gso->is_painting = true;
         gso->first = true;
 
-        gpsculpt_brush_init_stroke(gso);
+        gpsculpt_brush_init_stroke(C, gso);
         gpsculpt_brush_apply_event(C, op, event);
         break;
 

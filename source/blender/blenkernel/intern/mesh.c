@@ -27,6 +27,7 @@
 #include "DNA_key_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_defaults.h"
 
 #include "BLI_utildefines.h"
 #include "BLI_bitmap.h"
@@ -533,10 +534,7 @@ void BKE_mesh_init(Mesh *me)
 {
   BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(me, id));
 
-  me->size[0] = me->size[1] = me->size[2] = 1.0;
-  me->smoothresh = DEG2RADF(30);
-  me->texflag = ME_AUTOSPACE;
-  me->remesh_voxel_size = 0.1f;
+  MEMCPY_STRUCT_AFTER(me, DNA_struct_default_get(Mesh), id);
 
   CustomData_reset(&me->vdata);
   CustomData_reset(&me->edata);
@@ -661,20 +659,48 @@ Mesh *BKE_mesh_new_nomain(
   return mesh;
 }
 
-static Mesh *mesh_new_nomain_from_template_ex(const Mesh *me_src,
-                                              int verts_len,
-                                              int edges_len,
-                                              int tessface_len,
-                                              int loops_len,
-                                              int polys_len,
-                                              CustomData_MeshMasks mask)
+/* Copy user editable settings that we want to preserve through the modifier stack
+ * or operations where a mesh with new topology is created based on another mesh. */
+void BKE_mesh_copy_settings(Mesh *me_dst, const Mesh *me_src)
+{
+  /* Copy general settings. */
+  me_dst->editflag = me_src->editflag;
+  me_dst->flag = me_src->flag;
+  me_dst->smoothresh = me_src->smoothresh;
+  me_dst->remesh_voxel_size = me_src->remesh_voxel_size;
+  me_dst->remesh_mode = me_src->remesh_mode;
+
+  /* Copy texture space. */
+  me_dst->texflag = me_src->texflag;
+  if (me_dst->bb != NULL && me_dst->bb != me_src->bb) {
+    MEM_freeN(me_dst->bb);
+  }
+  me_dst->bb = MEM_dupallocN(me_src->bb);
+  copy_v3_v3(me_dst->loc, me_src->loc);
+  copy_v3_v3(me_dst->rot, me_src->rot);
+  copy_v3_v3(me_dst->size, me_src->size);
+
+  /* Copy materials. */
+  if (me_dst->mat != NULL && me_dst->mat != me_src->mat) {
+    MEM_freeN(me_dst->mat);
+  }
+  me_dst->mat = MEM_dupallocN(me_src->mat);
+  me_dst->totcol = me_src->totcol;
+}
+
+Mesh *BKE_mesh_new_nomain_from_template_ex(const Mesh *me_src,
+                                           int verts_len,
+                                           int edges_len,
+                                           int tessface_len,
+                                           int loops_len,
+                                           int polys_len,
+                                           CustomData_MeshMasks mask)
 {
   /* Only do tessface if we are creating tessfaces or copying from mesh with only tessfaces. */
   const bool do_tessface = (tessface_len || ((me_src->totface != 0) && (me_src->totpoly == 0)));
 
   Mesh *me_dst = BKE_id_new_nomain(ID_ME, NULL);
 
-  me_dst->mat = MEM_dupallocN(me_src->mat);
   me_dst->mselect = MEM_dupallocN(me_dst->mselect);
 
   me_dst->totvert = verts_len;
@@ -684,8 +710,7 @@ static Mesh *mesh_new_nomain_from_template_ex(const Mesh *me_src,
   me_dst->totpoly = polys_len;
 
   me_dst->cd_flag = me_src->cd_flag;
-  me_dst->editflag = me_src->editflag;
-  me_dst->texflag = me_src->texflag;
+  BKE_mesh_copy_settings(me_dst, me_src);
 
   CustomData_copy(&me_src->vdata, &me_dst->vdata, mask.vmask, CD_CALLOC, verts_len);
   CustomData_copy(&me_src->edata, &me_dst->edata, mask.emask, CD_CALLOC, edges_len);
@@ -713,7 +738,7 @@ Mesh *BKE_mesh_new_nomain_from_template(const Mesh *me_src,
                                         int loops_len,
                                         int polys_len)
 {
-  return mesh_new_nomain_from_template_ex(
+  return BKE_mesh_new_nomain_from_template_ex(
       me_src, verts_len, edges_len, tessface_len, loops_len, polys_len, CD_MASK_EVERYTHING);
 }
 
@@ -774,18 +799,24 @@ BMesh *BKE_mesh_to_bmesh(Mesh *me,
                               });
 }
 
-Mesh *BKE_mesh_from_bmesh_nomain(BMesh *bm, const struct BMeshToMeshParams *params)
+Mesh *BKE_mesh_from_bmesh_nomain(BMesh *bm,
+                                 const struct BMeshToMeshParams *params,
+                                 const Mesh *me_settings)
 {
   BLI_assert(params->calc_object_remap == false);
   Mesh *mesh = BKE_id_new_nomain(ID_ME, NULL);
   BM_mesh_bm_to_me(NULL, bm, mesh, params);
+  BKE_mesh_copy_settings(mesh, me_settings);
   return mesh;
 }
 
-Mesh *BKE_mesh_from_bmesh_for_eval_nomain(BMesh *bm, const CustomData_MeshMasks *cd_mask_extra)
+Mesh *BKE_mesh_from_bmesh_for_eval_nomain(BMesh *bm,
+                                          const CustomData_MeshMasks *cd_mask_extra,
+                                          const Mesh *me_settings)
 {
   Mesh *mesh = BKE_id_new_nomain(ID_ME, NULL);
   BM_mesh_bm_to_me_for_eval(bm, mesh, cd_mask_extra);
+  BKE_mesh_copy_settings(mesh, me_settings);
   return mesh;
 }
 
@@ -794,9 +825,10 @@ Mesh *BKE_mesh_from_bmesh_for_eval_nomain(BMesh *bm, const CustomData_MeshMasks 
  */
 Mesh *BKE_mesh_from_editmesh_with_coords_thin_wrap(BMEditMesh *em,
                                                    const CustomData_MeshMasks *data_mask,
-                                                   float (*vertexCos)[3])
+                                                   float (*vertexCos)[3],
+                                                   const Mesh *me_settings)
 {
-  Mesh *me = BKE_mesh_from_bmesh_for_eval_nomain(em->bm, data_mask);
+  Mesh *me = BKE_mesh_from_bmesh_for_eval_nomain(em->bm, data_mask, me_settings);
   /* Use editmesh directly where possible. */
   me->runtime.is_original = true;
   if (vertexCos) {
@@ -1082,11 +1114,11 @@ void BKE_mesh_assign_object(Main *bmain, Object *ob, Mesh *me)
 {
   Mesh *old = NULL;
 
-  multires_force_update(ob);
-
   if (ob == NULL) {
     return;
   }
+
+  multires_force_sculpt_rebuild(ob);
 
   if (ob->type == OB_MESH) {
     old = ob->data;
@@ -1951,9 +1983,6 @@ void BKE_mesh_eval_geometry(Depsgraph *depsgraph, Mesh *mesh)
 {
   DEG_debug_print_eval(depsgraph, __func__, mesh->id.name, mesh);
   BKE_mesh_texspace_calc(mesh);
-  /* Clear autospace flag in evaluated mesh, so that texspace does not get recomputed when bbox is
-   * (e.g. after modifiers, etc.) */
-  mesh->texflag &= ~ME_AUTOSPACE;
   /* We are here because something did change in the mesh. This means we can not trust the existing
    * evaluated mesh, and we don't know what parts of the mesh did change. So we simply delete the
    * evaluated mesh and let objects to re-create it with updated settings. */

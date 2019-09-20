@@ -1831,7 +1831,10 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
   pid->file_type = PTCACHE_FILE_PTCACHE;
 }
 
-/** Both \param ob and \param scene may be NULL. */
+/**
+ * \param ob: Optional, may be NULL.
+ * \param scene: Optional may be NULL.
+ */
 PTCacheID BKE_ptcache_id_find(Object *ob, Scene *scene, PointCache *cache)
 {
   PTCacheID result = {0};
@@ -4543,7 +4546,7 @@ void BKE_ptcache_update_info(PTCacheID *pid)
     }
 
     BLI_str_format_int_grouped(formatted_tot, totframes);
-    BLI_str_format_byte_unit(formatted_mem, bytes, true);
+    BLI_str_format_byte_unit(formatted_mem, bytes, false);
 
     BLI_snprintf(mem_info,
                  sizeof(mem_info),

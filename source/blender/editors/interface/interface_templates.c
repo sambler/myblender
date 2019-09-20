@@ -76,6 +76,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
+#include "ED_fileselect.h"
 #include "ED_screen.h"
 #include "ED_object.h"
 #include "ED_render.h"
@@ -103,6 +104,24 @@
 void UI_template_fix_linking(void)
 {
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Header Template
+ * \{ */
+
+void uiTemplateHeader(uiLayout *layout, bContext *C)
+{
+  uiBlock *block;
+
+  block = uiLayoutAbsoluteBlock(layout);
+  ED_area_header_switchbutton(C, block, 0);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Search Menu Helpers
+ * \{ */
 
 /**
  * Add a block button for the search menu for templateID and templateSearch.
@@ -264,17 +283,11 @@ static uiBlock *template_common_search_menu(const bContext *C,
   return block;
 }
 
-/********************** Header Template *************************/
+/** \} */
 
-void uiTemplateHeader(uiLayout *layout, bContext *C)
-{
-  uiBlock *block;
-
-  block = uiLayoutAbsoluteBlock(layout);
-  ED_area_header_switchbutton(C, block, 0);
-}
-
-/********************** Search Callbacks *************************/
+/* -------------------------------------------------------------------- */
+/** \name Search Callbacks
+ * \{ */
 
 typedef struct TemplateID {
   PointerRNA ptr;
@@ -450,7 +463,12 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
                                      template_ui.scale);
 }
 
-/************************ ID Template ***************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name ID Template
+ * \{ */
+
 /* This is for browsing and editing the ID-blocks used */
 
 /* for new/open operators */
@@ -516,12 +534,15 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
       if (id) {
         Main *bmain = CTX_data_main(C);
         if (BKE_override_library_is_enabled() && CTX_wm_window(C)->eventstate->shift) {
-          ID *override_id = BKE_override_library_create_from_id(bmain, id);
-          if (override_id != NULL) {
-            BKE_main_id_clear_newpoins(bmain);
+          if (ID_IS_OVERRIDABLE_LIBRARY(id)) {
+            /* Only remap that specific ID usage to overriding local data-block. */
+            ID *override_id = BKE_override_library_create_from_id(bmain, id, false);
+            if (override_id != NULL) {
+              BKE_main_id_clear_newpoins(bmain);
 
-            /* Assign new pointer, takes care of updates/notifiers */
-            RNA_id_pointer_create(override_id, &idptr);
+              /* Assign new pointer, takes care of updates/notifiers */
+              RNA_id_pointer_create(override_id, &idptr);
+            }
           }
         }
         else {
@@ -538,7 +559,7 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
       break;
     case UI_ID_OVERRIDE:
       if (id && id->override_library) {
-        BKE_override_library_free(&id->override_library);
+        BKE_override_library_free(&id->override_library, true);
         /* reassign to get get proper updates/notifiers */
         idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
         RNA_property_pointer_set(&template_ui->ptr, template_ui->prop, idptr, NULL);
@@ -1364,7 +1385,11 @@ void uiTemplateIDTabs(uiLayout *layout,
                  false);
 }
 
-/************************ ID Chooser Template ***************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name ID Chooser Template
+ * \{ */
 
 /**
  * This is for selecting the type of ID-block to use,
@@ -1437,7 +1462,11 @@ void uiTemplateAnyID(uiLayout *layout,
   uiItemFullR(sub, ptr, propID, 0, 0, 0, "", ICON_NONE);
 }
 
-/********************* Search Template ********************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Search Template
+ * \{ */
 
 typedef struct TemplateSearch {
   uiRNACollectionSearch search_data;
@@ -1683,7 +1712,11 @@ void uiTemplateSearchPreview(uiLayout *layout,
   }
 }
 
-/********************* RNA Path Builder Template ********************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name RNA Path Builder Template
+ * \{ */
 
 /* ---------- */
 
@@ -1720,7 +1753,11 @@ void uiTemplatePathBuilder(uiLayout *layout,
    * searching of nested properties to 'build' the path */
 }
 
-/************************ Modifier Template *************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Modifier Template
+ * \{ */
 
 #define ERROR_LIBDATA_MESSAGE TIP_("Can't edit external library data")
 
@@ -2065,7 +2102,11 @@ uiLayout *uiTemplateModifier(uiLayout *layout, bContext *C, PointerRNA *ptr)
   return NULL;
 }
 
-/************************ Grease Pencil Modifier Template *************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Grease Pencil Modifier Template
+ * \{ */
 
 static uiLayout *gpencil_draw_modifier(uiLayout *layout, Object *ob, GpencilModifierData *md)
 {
@@ -2200,7 +2241,11 @@ uiLayout *uiTemplateGpencilModifier(uiLayout *layout, bContext *UNUSED(C), Point
   return NULL;
 }
 
-/************************ Shader FX Template *************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Grease Pencil Shader FX Template
+ * \{ */
 
 static uiLayout *gpencil_draw_shaderfx(uiLayout *layout, Object *ob, ShaderFxData *md)
 {
@@ -2318,7 +2363,11 @@ uiLayout *uiTemplateShaderFx(uiLayout *layout, bContext *UNUSED(C), PointerRNA *
   return NULL;
 }
 
-/************************ Redo Buttons Template *************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Operator Redo Buttons Template
+ * \{ */
 
 static void template_operator_redo_property_buts_draw(
     const bContext *C, wmOperator *op, uiLayout *layout, int layout_flags, bool *r_has_advanced)
@@ -2384,7 +2433,11 @@ void uiTemplateOperatorRedoProperties(uiLayout *layout, const bContext *C)
   }
 }
 
-/************************ Constraint Template *************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Constraint Template
+ * \{ */
 
 static void constraint_active_func(bContext *UNUSED(C), void *ob_v, void *con_v)
 {
@@ -2600,7 +2653,11 @@ uiLayout *uiTemplateConstraint(uiLayout *layout, PointerRNA *ptr)
   return draw_constraint(layout, ob, con);
 }
 
-/************************* Preview Template ***************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Preview Template
+ * \{ */
 
 #include "DNA_light_types.h"
 #include "DNA_material_types.h"
@@ -2862,7 +2919,11 @@ void uiTemplatePreview(uiLayout *layout,
   }
 }
 
-/********************** ColorRamp Template **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name ColorRamp Template
+ * \{ */
 
 typedef struct RNAUpdateCb {
   PointerRNA ptr;
@@ -3207,7 +3268,7 @@ static void colorband_buttons_layout(uiLayout *layout,
                 &coba->cur,
                 0.0,
                 (float)(MAX2(0, coba->tot - 1)),
-                0,
+                1,
                 0,
                 TIP_("Choose active color stop"));
       row = uiLayoutRow(split, false);
@@ -3237,7 +3298,7 @@ static void colorband_buttons_layout(uiLayout *layout,
                 &coba->cur,
                 0.0,
                 (float)(MAX2(0, coba->tot - 1)),
-                0,
+                1,
                 0,
                 TIP_("Choose active color stop"));
       row = uiLayoutRow(subsplit, false);
@@ -3293,7 +3354,12 @@ void uiTemplateColorRamp(uiLayout *layout, PointerRNA *ptr, const char *propname
   MEM_freeN(cb);
 }
 
-/********************* Icon Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Icon Template
+ * \{ */
+
 /**
  * \param icon_scale: Scale of the icon, 1x == button height.
  */
@@ -3320,7 +3386,12 @@ void uiTemplateIcon(uiLayout *layout, int icon_value, float icon_scale)
   ui_def_but_icon(but, icon_value, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
 }
 
-/********************* Icon viewer Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Icon viewer Template
+ * \{ */
+
 typedef struct IconViewMenuArgs {
   PointerRNA ptr;
   PropertyRNA *prop;
@@ -3480,7 +3551,11 @@ void uiTemplateIconView(uiLayout *layout,
   }
 }
 
-/********************* Histogram Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Histogram Template
+ * \{ */
 
 void uiTemplateHistogram(uiLayout *layout, PointerRNA *ptr, const char *propname)
 {
@@ -3530,7 +3605,11 @@ void uiTemplateHistogram(uiLayout *layout, PointerRNA *ptr, const char *propname
                 "");
 }
 
-/********************* Waveform Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Waveform Template
+ * \{ */
 
 void uiTemplateWaveform(uiLayout *layout, PointerRNA *ptr, const char *propname)
 {
@@ -3592,7 +3671,11 @@ void uiTemplateWaveform(uiLayout *layout, PointerRNA *ptr, const char *propname)
                 "");
 }
 
-/********************* Vectorscope Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Vector-Scope Template
+ * \{ */
 
 void uiTemplateVectorscope(uiLayout *layout, PointerRNA *ptr, const char *propname)
 {
@@ -3654,7 +3737,11 @@ void uiTemplateVectorscope(uiLayout *layout, PointerRNA *ptr, const char *propna
                 "");
 }
 
-/********************* CurveMapping Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name CurveMapping Template
+ * \{ */
 
 static void curvemap_buttons_zoom_in(bContext *C, void *cumap_v, void *UNUSED(arg))
 {
@@ -3745,12 +3832,11 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
   float width = 8 * UI_UNIT_X;
 
   block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
-
-  /* use this for a fake extra empty space around the buttons */
-  uiDefBut(block, UI_BTYPE_LABEL, 0, "", -4, 16, width + 8, 6 * UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
+  UI_block_flag_enable(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
+  UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_POPUP);
 
   bt = uiDefButBitI(block,
-                    UI_BTYPE_TOGGLE,
+                    UI_BTYPE_CHECKBOX,
                     CUMA_DO_CLIP,
                     1,
                     IFACE_("Use Clipping"),
@@ -3770,7 +3856,7 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
   uiDefButF(block,
             UI_BTYPE_NUM,
             0,
-            IFACE_("Min X "),
+            IFACE_("Min X:"),
             0,
             4 * UI_UNIT_Y,
             width,
@@ -3784,7 +3870,7 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
   uiDefButF(block,
             UI_BTYPE_NUM,
             0,
-            IFACE_("Min Y "),
+            IFACE_("Min Y:"),
             0,
             3 * UI_UNIT_Y,
             width,
@@ -3798,7 +3884,7 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
   uiDefButF(block,
             UI_BTYPE_NUM,
             0,
-            IFACE_("Max X "),
+            IFACE_("Max X:"),
             0,
             2 * UI_UNIT_Y,
             width,
@@ -3812,7 +3898,7 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
   uiDefButF(block,
             UI_BTYPE_NUM,
             0,
-            IFACE_("Max Y "),
+            IFACE_("Max Y:"),
             0,
             UI_UNIT_Y,
             width,
@@ -3824,7 +3910,8 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
             2,
             "");
 
-  UI_block_direction_set(block, UI_DIR_RIGHT);
+  UI_block_bounds_set_normal(block, 0.3f * U.widget_unit);
+  UI_block_direction_set(block, UI_DIR_DOWN);
 
   return block;
 }
@@ -4415,7 +4502,11 @@ void uiTemplateCurveMapping(uiLayout *layout,
   MEM_freeN(cb);
 }
 
-/********************* ColorPicker Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name ColorPicker Template
+ * \{ */
 
 #define WHEEL_SIZE (5 * U.widget_unit)
 
@@ -4762,7 +4853,11 @@ void uiTemplateCryptoPicker(uiLayout *layout, PointerRNA *ptr, const char *propn
   RNA_boolean_set(opptr, "use_accumulate", false);
 }
 
-/********************* Layer Buttons Template ************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Layer Buttons Template
+ * \{ */
 
 static void handle_layer_buttons(bContext *C, void *arg1, void *arg2)
 {
@@ -4776,7 +4871,7 @@ static void handle_layer_buttons(bContext *C, void *arg1, void *arg2)
 
     /* Normally clicking only selects one layer */
     RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, cur, true);
-    for (i = 0; i < tot; ++i) {
+    for (i = 0; i < tot; i++) {
       if (i != cur) {
         RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, i, false);
       }
@@ -4867,7 +4962,12 @@ void uiTemplateLayers(uiLayout *layout,
   }
 }
 
-/************************* List Template **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name List Template
+ * \{ */
+
 static void uilist_draw_item_default(struct uiList *ui_list,
                                      struct bContext *UNUSED(C),
                                      struct uiLayout *layout,
@@ -5752,7 +5852,11 @@ void uiTemplateList(uiLayout *layout,
   }
 }
 
-/************************* Operator Search Template **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Operator Search Template
+ * \{ */
 
 static void operator_call_cb(bContext *C, void *UNUSED(arg1), void *arg2)
 {
@@ -5857,7 +5961,11 @@ void uiTemplateOperatorSearch(uiLayout *layout)
   UI_but_func_operator_search(but);
 }
 
-/************************* Operator Redo Properties Template **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Operator Redo Properties Template
+ * \{ */
 
 #ifdef USE_OP_RESET_BUT
 static void ui_layout_operator_buts__reset_cb(bContext *UNUSED(C),
@@ -5961,6 +6069,7 @@ eAutoPropButsReturn uiTemplateOperatorPropertyButs(const bContext *C,
     RNA_pointer_create(&wm->id, op->type->srna, op->properties, &ptr);
 
     uiLayoutSetPropSep(layout, true);
+    uiLayoutSetPropDecorate(layout, false);
 
     /* main draw call */
     return_info = uiDefAutoButsRNA(
@@ -6033,7 +6142,11 @@ eAutoPropButsReturn uiTemplateOperatorPropertyButs(const bContext *C,
   return return_info;
 }
 
-/************************* Running Jobs Template **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Running Jobs Template
+ * \{ */
 
 #define B_STOPRENDER 1
 #define B_STOPCAST 2
@@ -6308,7 +6421,11 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
   }
 }
 
-/************************* Reports for Last Operator Template **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Reports for Last Operator Template
+ * \{ */
 
 void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
 {
@@ -6444,7 +6561,11 @@ void uiTemplateInputStatus(uiLayout *layout, struct bContext *C)
   }
 }
 
-/********************************* Keymap *************************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keymap Template
+ * \{ */
 
 static void keymap_item_modified(bContext *UNUSED(C), void *kmi_p, void *UNUSED(unused))
 {
@@ -6533,7 +6654,11 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
   }
 }
 
-/********************************* Color management *************************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Color Management Template
+ * \{ */
 
 void uiTemplateColorspaceSettings(uiLayout *layout, PointerRNA *ptr, const char *propname)
 {
@@ -6593,7 +6718,11 @@ void uiTemplateColormanagedViewSettings(uiLayout *layout,
   }
 }
 
-/********************************* Component Menu *************************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Component Menu
+ * \{ */
 
 typedef struct ComponentMenuArgs {
   PointerRNA ptr;
@@ -6622,7 +6751,7 @@ static uiBlock *component_menu(bContext *C, ARegion *ar, void *args_v)
 
   uiItemR(layout, &args->ptr, args->propname, UI_ITEM_R_EXPAND, "", ICON_NONE);
 
-  UI_block_bounds_set_normal(block, 6);
+  UI_block_bounds_set_normal(block, 0.3f * U.widget_unit);
   UI_block_direction_set(block, UI_DIR_DOWN);
 
   return block;
@@ -6651,7 +6780,11 @@ void uiTemplateComponentMenu(uiLayout *layout,
   UI_block_align_end(block);
 }
 
-/************************* Node Socket Icon **************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Node Socket Icon Template
+ * \{ */
 
 void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float *color)
 {
@@ -6672,7 +6805,11 @@ void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float *color)
   UI_block_align_end(block);
 }
 
-/********************************* Cache File *********************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Cache File Template
+ * \{ */
 
 void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *propname)
 {
@@ -6752,7 +6889,11 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 #endif
 }
 
-/******************************* Recent Files *******************************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Recent Files Template
+ * \{ */
 
 int uiTemplateRecentFiles(uiLayout *layout, int rows)
 {
@@ -6776,3 +6917,19 @@ int uiTemplateRecentFiles(uiLayout *layout, int rows)
 
   return i;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name FileSelectParams Path Button Template
+ * \{ */
+
+void uiTemplateFileSelectPath(uiLayout *layout, bContext *C, FileSelectParams *params)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  SpaceFile *sfile = CTX_wm_space_file(C);
+
+  ED_file_path_button(screen, sfile, params, uiLayoutGetBlock(layout));
+}
+
+/** \} */

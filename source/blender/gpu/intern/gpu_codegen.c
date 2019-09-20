@@ -44,7 +44,6 @@
 #include "GPU_glew.h"
 #include "GPU_material.h"
 #include "GPU_shader.h"
-#include "GPU_texture.h"
 #include "GPU_uniformbuffer.h"
 #include "GPU_vertex_format.h"
 
@@ -55,6 +54,12 @@
 
 #include <string.h>
 #include <stdarg.h>
+
+extern char datatoc_gpu_shader_material_glsl[];
+extern char datatoc_gpu_shader_geometry_glsl[];
+
+extern char datatoc_gpu_shader_common_obinfos_lib_glsl[];
+extern char datatoc_common_view_lib_glsl[];
 
 /* -------------------- GPUPass Cache ------------------ */
 /**
@@ -414,7 +419,7 @@ static void codegen_convert_datatype(DynStr *ds, int from, int to, const char *t
   }
   else if (to == GPU_FLOAT) {
     if (from == GPU_VEC4) {
-      BLI_dynstr_appendf(ds, "convert_rgba_to_float(%s)", name);
+      BLI_dynstr_appendf(ds, "dot(%s.rgb, vec3(0.2126, 0.7152, 0.0722))", name);
     }
     else if (from == GPU_VEC3) {
       BLI_dynstr_appendf(ds, "(%s.r + %s.g + %s.b) / 3.0", name, name, name);
@@ -779,6 +784,12 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUOutput *final
         else if (input->builtin == GPU_OBJECT_MATRIX) {
           BLI_dynstr_append(ds, "objmat");
         }
+        else if (input->builtin == GPU_OBJECT_INFO) {
+          BLI_dynstr_append(ds, "ObjectInfo");
+        }
+        else if (input->builtin == GPU_OBJECT_COLOR) {
+          BLI_dynstr_append(ds, "ObjectColor");
+        }
         else if (input->builtin == GPU_INVERSE_OBJECT_MATRIX) {
           BLI_dynstr_append(ds, "objinv");
         }
@@ -840,6 +851,10 @@ static char *code_generate_fragment(GPUMaterial *material,
 
   codegen_set_unique_ids(nodes);
   *rbuiltins = builtins = codegen_process_uniforms_functions(material, ds, nodes);
+
+  if (builtins & (GPU_OBJECT_INFO | GPU_OBJECT_COLOR)) {
+    BLI_dynstr_append(ds, datatoc_gpu_shader_common_obinfos_lib_glsl);
+  }
 
   if (builtins & GPU_BARYCENTRIC_TEXCO) {
     BLI_dynstr_append(ds, "in vec2 barycentricTexCo;\n");
@@ -989,7 +1004,7 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
         /* NOTE : Replicate changes to mesh_render_data_create() in draw_cache_impl_mesh.c */
         if (input->attr_type == CD_ORCO) {
           /* OPTI : orco is computed from local positions, but only if no modifier is present. */
-          BLI_dynstr_append(ds, "uniform vec3 OrcoTexCoFactors[2];\n");
+          BLI_dynstr_append(ds, datatoc_gpu_shader_common_obinfos_lib_glsl);
           BLI_dynstr_append(ds, "DEFINE_ATTR(vec4, orco);\n");
         }
         else if (input->attr_name[0] == '\0') {
@@ -1071,6 +1086,8 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
 
   BLI_dynstr_append(ds, "\n");
 
+  BLI_dynstr_append(ds, use_geom ? "RESOURCE_ID_VARYING_GEOM\n" : "RESOURCE_ID_VARYING\n");
+
   BLI_dynstr_append(ds,
                     "#define USE_ATTR\n"
                     "vec3 srgb_to_linear_attr(vec3 c) {\n"
@@ -1078,6 +1095,15 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
                     "\tvec3 c1 = c * (1.0 / 12.92);\n"
                     "\tvec3 c2 = pow((c + 0.055) * (1.0 / 1.055), vec3(2.4));\n"
                     "\treturn mix(c1, c2, step(vec3(0.04045), c));\n"
+                    "}\n\n");
+
+  BLI_dynstr_append(ds,
+                    "vec4 srgba_to_linear_attr(vec4 c) {\n"
+                    "\tc = max(c, vec4(0.0));\n"
+                    "\tvec4 c1 = c * (1.0 / 12.92);\n"
+                    "\tvec4 c2 = pow((c + 0.055) * (1.0 / 1.055), vec4(2.4));\n"
+                    "\tvec4 final = mix(c1, c2, step(vec4(0.04045), c));"
+                    "\treturn vec4(final.xyz, c.a);\n"
                     "}\n\n");
 
   /* Prototype because defined later. */
@@ -1090,6 +1116,8 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
                     "\n");
 
   BLI_dynstr_append(ds, "void pass_attr(in vec3 position) {\n");
+
+  BLI_dynstr_append(ds, use_geom ? "\tPASS_RESOURCE_ID_GEOM\n" : "\tPASS_RESOURCE_ID\n");
 
   BLI_dynstr_append(ds, "#ifdef HAIR_SHADER\n");
 
@@ -1117,8 +1145,8 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
         }
         else if (input->attr_type == CD_ORCO) {
           BLI_dynstr_appendf(ds,
-                             "\tvar%d%s = OrcoTexCoFactors[0] + (ModelMatrixInverse * "
-                             "vec4(hair_get_strand_pos(), 1.0)).xyz * OrcoTexCoFactors[1];\n",
+                             "\tvar%d%s = OrcoTexCoFactors[0].xyz + (ModelMatrixInverse * "
+                             "vec4(hair_get_strand_pos(), 1.0)).xyz * OrcoTexCoFactors[1].xyz;\n",
                              input->attr_id,
                              use_geom ? "g" : "");
           /* TODO: fix ORCO with modifiers. */
@@ -1173,7 +1201,8 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
         }
         else if (input->attr_type == CD_ORCO) {
           BLI_dynstr_appendf(ds,
-                             "\tvar%d%s = OrcoTexCoFactors[0] + position * OrcoTexCoFactors[1];\n",
+                             "\tvar%d%s = OrcoTexCoFactors[0].xyz + position *"
+                             " OrcoTexCoFactors[1].xyz;\n",
                              input->attr_id,
                              use_geom ? "g" : "");
           /* See mesh_create_loop_orco() for explanation. */
@@ -1184,7 +1213,7 @@ static char *code_generate_vertex(ListBase *nodes, const char *vert_code, bool u
         }
         else if (input->attr_type == CD_MCOL) {
           BLI_dynstr_appendf(ds,
-                             "\tvar%d%s = srgb_to_linear_attr(att%d);\n",
+                             "\tvar%d%s = srgba_to_linear_attr(att%d);\n",
                              input->attr_id,
                              use_geom ? "g" : "",
                              input->attr_id);
@@ -1288,6 +1317,8 @@ static char *code_generate_geometry(ListBase *nodes, const char *geom_code, cons
       BLI_dynstr_append(ds, "out vec3 worldNormal;\n");
       BLI_dynstr_append(ds, "out vec3 viewNormal;\n");
 
+      BLI_dynstr_append(ds, datatoc_common_view_lib_glsl);
+
       BLI_dynstr_append(ds, "void main(){\n");
 
       if (builtins & GPU_BARYCENTRIC_DIST) {
@@ -1307,7 +1338,7 @@ static char *code_generate_geometry(ListBase *nodes, const char *geom_code, cons
       BLI_dynstr_append(ds, "\tgl_Position = gl_in[2].gl_Position;\n");
       BLI_dynstr_append(ds, "\tpass_attr(2);\n");
       BLI_dynstr_append(ds, "\tEmitVertex();\n");
-      BLI_dynstr_append(ds, "};\n");
+      BLI_dynstr_append(ds, "}\n");
     }
   }
   else {
@@ -1332,8 +1363,12 @@ static char *code_generate_geometry(ListBase *nodes, const char *geom_code, cons
     BLI_dynstr_append(ds, "}\n");
   }
 
+  BLI_dynstr_append(ds, "RESOURCE_ID_VARYING\n");
+
   /* Generate varying assignments. */
   BLI_dynstr_append(ds, "void pass_attr(in int vert) {\n");
+
+  BLI_dynstr_append(ds, "\tPASS_RESOURCE_ID(vert)\n");
 
   /* XXX HACK: Eevee specific. */
   if (geom_code == NULL) {
@@ -1376,8 +1411,8 @@ void GPU_code_generate_glsl_lib(void)
   }
 
   FUNCTION_HASH = BLI_ghash_str_new("GPU_lookup_function gh");
-  for (int i = 0; gpu_material_libraries[i].code; i++) {
-    gpu_parse_material_library(FUNCTION_HASH, &gpu_material_libraries[i]);
+  for (int i = 0; gpu_material_libraries[i]; i++) {
+    gpu_parse_material_library(FUNCTION_HASH, gpu_material_libraries[i]);
   }
 }
 
@@ -1780,17 +1815,20 @@ GPUNodeLink *GPU_builtin(eGPUBuiltin builtin)
   return link;
 }
 
+static void gpu_material_use_library_with_dependencies(GSet *used_libraries,
+                                                       GPUMaterialLibrary *library)
+{
+  if (BLI_gset_add(used_libraries, library->code)) {
+    for (int i = 0; library->dependencies[i]; i++) {
+      gpu_material_use_library_with_dependencies(used_libraries, library->dependencies[i]);
+    }
+  }
+}
+
 static void gpu_material_use_library(GPUMaterial *material, GPUMaterialLibrary *library)
 {
   GSet *used_libraries = gpu_material_used_libraries(material);
-
-  if (BLI_gset_add(used_libraries, library->code)) {
-    if (library->dependencies) {
-      for (int i = 0; library->dependencies[i]; i++) {
-        BLI_gset_add(used_libraries, library->dependencies[i]);
-      }
-    }
-  }
+  gpu_material_use_library_with_dependencies(used_libraries, library);
 }
 
 bool GPU_link(GPUMaterial *mat, const char *name, ...)
@@ -1973,9 +2011,13 @@ static char *code_generate_material_library(GPUMaterial *material, const char *f
 
   GSet *used_libraries = gpu_material_used_libraries(material);
 
+  /* Always include those because they may be needed by the execution function. */
+  gpu_material_use_library_with_dependencies(used_libraries,
+                                             &gpu_shader_material_world_normals_library);
+
   /* Add library code in order, for dependencies. */
-  for (int i = 0; gpu_material_libraries[i].code; i++) {
-    GPUMaterialLibrary *library = &gpu_material_libraries[i];
+  for (int i = 0; gpu_material_libraries[i]; i++) {
+    GPUMaterialLibrary *library = gpu_material_libraries[i];
     if (BLI_gset_haskey(used_libraries, library->code)) {
       BLI_dynstr_append(ds, library->code);
     }
@@ -2122,7 +2164,7 @@ static int count_active_texture_sampler(GPUShader *shader, char *source)
         }
         /* Catch duplicates. */
         bool is_duplicate = false;
-        for (int i = 0; i < sampler_len; ++i) {
+        for (int i = 0; i < sampler_len; i++) {
           if (samplers_id[i] == id) {
             is_duplicate = true;
           }

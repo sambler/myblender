@@ -26,9 +26,6 @@
 /* defines BLI_INLINE */
 #include "BLI_compiler_compat.h"
 
-/* defines CustomDataMask */
-//#include "BKE_customdata.h"
-
 struct BLI_Stack;
 struct BMEditMesh;
 struct BMesh;
@@ -81,12 +78,18 @@ struct BMesh *BKE_mesh_to_bmesh(struct Mesh *me,
                                 const bool add_key_index,
                                 const struct BMeshCreateParams *params);
 
-struct Mesh *BKE_mesh_from_bmesh_nomain(struct BMesh *bm, const struct BMeshToMeshParams *params);
+struct Mesh *BKE_mesh_from_bmesh_nomain(struct BMesh *bm,
+                                        const struct BMeshToMeshParams *params,
+                                        const struct Mesh *me_settings);
 struct Mesh *BKE_mesh_from_bmesh_for_eval_nomain(struct BMesh *bm,
-                                                 const struct CustomData_MeshMasks *cd_mask_extra);
+                                                 const struct CustomData_MeshMasks *cd_mask_extra,
+                                                 const struct Mesh *me_settings);
 
 struct Mesh *BKE_mesh_from_editmesh_with_coords_thin_wrap(
-    struct BMEditMesh *em, const struct CustomData_MeshMasks *data_mask, float (*vertexCos)[3]);
+    struct BMEditMesh *em,
+    const struct CustomData_MeshMasks *data_mask,
+    float (*vertexCos)[3],
+    const struct Mesh *me_settings);
 
 int poly_find_loop_from_vert(const struct MPoly *poly,
                              const struct MLoop *loopstart,
@@ -110,6 +113,7 @@ void BKE_mesh_copy_data(struct Main *bmain,
                         const struct Mesh *me_src,
                         const int flag);
 struct Mesh *BKE_mesh_copy(struct Main *bmain, const struct Mesh *me);
+void BKE_mesh_copy_settings(struct Mesh *me_dst, const struct Mesh *me_src);
 void BKE_mesh_update_customdata_pointers(struct Mesh *me, const bool do_ensure_tess_cd);
 void BKE_mesh_ensure_skin_customdata(struct Mesh *me);
 
@@ -121,6 +125,13 @@ struct Mesh *BKE_mesh_new_nomain_from_template(const struct Mesh *me_src,
                                                int tessface_len,
                                                int loops_len,
                                                int polys_len);
+struct Mesh *BKE_mesh_new_nomain_from_template_ex(const struct Mesh *me_src,
+                                                  int verts_len,
+                                                  int edges_len,
+                                                  int tessface_len,
+                                                  int loops_len,
+                                                  int polys_len,
+                                                  CustomData_MeshMasks mask);
 
 void BKE_mesh_eval_delete(struct Mesh *me_eval);
 
@@ -473,6 +484,7 @@ void BKE_mesh_calc_poly_center(const struct MPoly *mpoly,
 float BKE_mesh_calc_poly_area(const struct MPoly *mpoly,
                               const struct MLoop *loopstart,
                               const struct MVert *mvarray);
+float BKE_mesh_calc_area(const struct Mesh *me);
 float BKE_mesh_calc_poly_uv_area(const struct MPoly *mpoly, const struct MLoopUV *uv_array);
 void BKE_mesh_calc_poly_angles(const struct MPoly *mpoly,
                                const struct MLoop *loopstart,

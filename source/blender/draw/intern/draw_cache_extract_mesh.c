@@ -60,7 +60,6 @@
 
 #include "GPU_batch.h"
 #include "GPU_extensions.h"
-#include "GPU_material.h"
 
 #include "DRW_render.h"
 
@@ -523,7 +522,7 @@ static void extract_tris_finish(const MeshRenderData *mr, void *ibo, void *_data
   /* HACK Create ibo subranges and assign them to each GPUBatch. */
   if (mr->use_final_mesh && mr->cache->surface_per_mat && mr->cache->surface_per_mat[0]) {
     BLI_assert(mr->cache->surface_per_mat[0]->elem == ibo);
-    for (int i = 0; i < mr->mat_len; ++i) {
+    for (int i = 0; i < mr->mat_len; i++) {
       /* Multiply by 3 because these are triangle indices. */
       int start = data->tri_mat_start[i] * 3;
       int len = data->tri_mat_end[i] * 3 - data->tri_mat_start[i] * 3;
@@ -1442,12 +1441,15 @@ static void extract_pos_nor_loop_mesh(const MeshRenderData *mr,
   copy_v3_v3(vert->pos, mvert->co);
   vert->nor = data->packed_nor[mloop->v];
   /* Flag for paint mode overlay. */
-  if (mvert->flag & ME_HIDE)
+  if (mvert->flag & ME_HIDE) {
     vert->nor.w = -1;
-  else if (mvert->flag & SELECT)
+  }
+  else if (mvert->flag & SELECT) {
     vert->nor.w = 1;
-  else
+  }
+  else {
     vert->nor.w = 0;
+  }
 }
 
 static void extract_pos_nor_ledge_bmesh(const MeshRenderData *mr, int e, BMEdge *eed, void *_data)
@@ -1562,12 +1564,15 @@ static void extract_lnor_loop_mesh(
     ((GPUPackedNormal *)data)[l] = GPU_normal_convert_i10_v3(mr->poly_normals[p]);
   }
   /* Flag for paint mode overlay. */
-  if (mpoly->flag & ME_HIDE)
+  if (mpoly->flag & ME_HIDE) {
     ((GPUPackedNormal *)data)[l].w = -1;
-  else if (mpoly->flag & ME_FACE_SEL)
+  }
+  else if (mpoly->flag & ME_FACE_SEL) {
     ((GPUPackedNormal *)data)[l].w = 1;
-  else
+  }
+  else {
     ((GPUPackedNormal *)data)[l].w = 0;
+  }
 }
 
 static const MeshExtract extract_lnor = {
@@ -2670,7 +2675,7 @@ static void *extract_stretch_area_init(const MeshRenderData *mr, void *buf)
 {
   static GPUVertFormat format = {0};
   if (format.attr_len == 0) {
-    GPU_vertformat_attr_add(&format, "stretch", GPU_COMP_U16, 1, GPU_FETCH_INT_TO_FLOAT_UNIT);
+    GPU_vertformat_attr_add(&format, "ratio", GPU_COMP_U16, 1, GPU_FETCH_INT_TO_FLOAT_UNIT);
   }
 
   GPUVertBuf *vbo = buf;
@@ -2697,7 +2702,7 @@ BLI_INLINE float area_ratio_to_stretch(float ratio, float tot_ratio, float inv_t
 
 static void mesh_stretch_area_finish(const MeshRenderData *mr, void *buf, void *UNUSED(data))
 {
-  float totarea = 0, totuvarea = 0;
+  float tot_area = 0.0f, tot_uv_area = 0.0f;
   float *area_ratio = MEM_mallocN(sizeof(float) * mr->poly_len, __func__);
 
   if (mr->extract_type == MR_EXTRACT_BMESH) {
@@ -2710,8 +2715,8 @@ static void mesh_stretch_area_finish(const MeshRenderData *mr, void *buf, void *
     BM_ITER_MESH_INDEX (efa, &f_iter, mr->bm, BM_FACES_OF_MESH, f) {
       float area = BM_face_calc_area(efa);
       float uvarea = BM_face_calc_area_uv(efa, uv_ofs);
-      totarea += area;
-      totuvarea += uvarea;
+      tot_area += area;
+      tot_uv_area += uvarea;
       area_ratio[f] = area_ratio_get(area, uvarea);
     }
   }
@@ -2721,8 +2726,8 @@ static void mesh_stretch_area_finish(const MeshRenderData *mr, void *buf, void *
     for (int p = 0; p < mr->poly_len; p++, mpoly++) {
       float area = BKE_mesh_calc_poly_area(mpoly, &mr->mloop[mpoly->loopstart], mr->mvert);
       float uvarea = BKE_mesh_calc_poly_uv_area(mpoly, uv_data);
-      totarea += area;
-      totuvarea += uvarea;
+      tot_area += area;
+      tot_uv_area += uvarea;
       area_ratio[p] = area_ratio_get(area, uvarea);
     }
   }
@@ -2731,21 +2736,13 @@ static void mesh_stretch_area_finish(const MeshRenderData *mr, void *buf, void *
     BLI_assert(0);
   }
 
-  float tot_ratio, inv_tot_ratio;
-  if (totarea < FLT_EPSILON || totuvarea < FLT_EPSILON) {
-    tot_ratio = 0.0f;
-    inv_tot_ratio = 0.0f;
-  }
-  else {
-    tot_ratio = totarea / totuvarea;
-    inv_tot_ratio = totuvarea / totarea;
-  }
+  mr->cache->tot_area = tot_area;
+  mr->cache->tot_uv_area = tot_uv_area;
 
   /* Convert in place to avoid an extra allocation */
   uint16_t *poly_stretch = (uint16_t *)area_ratio;
   for (int p = 0; p < mr->poly_len; p++) {
-    float stretch = area_ratio_to_stretch(area_ratio[p], tot_ratio, inv_tot_ratio);
-    poly_stretch[p] = (1.0f - stretch) * 65534.0f;
+    poly_stretch[p] = area_ratio[p] * 65534.0f;
   }
 
   /* Copy face data for each loop. */
@@ -2816,8 +2813,8 @@ static void compute_normalize_edge_vectors(float auv[2][2],
                                            float av[2][3],
                                            const float uv[2],
                                            const float uv_prev[2],
-                                           const float co[2],
-                                           const float co_prev[2])
+                                           const float co[3],
+                                           const float co_prev[3])
 {
   /* Move previous edge. */
   copy_v2_v2(auv[0], auv[1]);
@@ -2980,7 +2977,7 @@ static const MeshExtract extract_stretch_angle = {
     NULL,
     extract_stretch_angle_finish,
     0,
-    true,
+    false,
 };
 
 /** \} */
@@ -4322,7 +4319,7 @@ void mesh_buffer_cache_create_requested(MeshBatchCache *cache,
   TaskPool *task_pool;
 
   task_scheduler = BLI_task_scheduler_get();
-  task_pool = BLI_task_pool_create(task_scheduler, NULL);
+  task_pool = BLI_task_pool_create_suspended(task_scheduler, NULL);
 
   size_t counters_size = (sizeof(mbc) / sizeof(void *)) * sizeof(int32_t);
   int32_t *task_counters = MEM_callocN(counters_size, __func__);

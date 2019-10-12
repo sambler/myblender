@@ -60,7 +60,6 @@
 #include "ED_curve.h"
 #include "ED_object.h"
 #include "ED_screen.h"
-#include "ED_util.h"
 #include "ED_view3d.h"
 
 #include "UI_interface.h"
@@ -1877,6 +1876,7 @@ void ED_curve_editfont_make(Object *obedit)
 
   memcpy(ef->textbufinfo, cu->strinfo, ef->len * sizeof(CharInfo));
 
+  ef->pos = cu->pos;
   if (ef->pos > ef->len) {
     ef->pos = ef->len;
   }
@@ -1884,7 +1884,6 @@ void ED_curve_editfont_make(Object *obedit)
   cu->curinfo = ef->textbufinfo[ef->pos ? ef->pos - 1 : 0];
 
   /* Other vars */
-  ef->pos = cu->pos;
   ef->selstart = cu->selstart;
   ef->selend = cu->selend;
 

@@ -561,7 +561,7 @@ void GPENCIL_OT_layer_duplicate_object(wmOperatorType *ot)
   };
 
   /* identifiers */
-  ot->name = "Duplicate Layer to new Object";
+  ot->name = "Duplicate Layer to New Object";
   ot->idname = "GPENCIL_OT_layer_duplicate_object";
   ot->description = "Make a copy of the active Grease Pencil layer to new object";
 
@@ -792,7 +792,7 @@ static int gp_frame_clean_loose_exec(bContext *C, wmOperator *op)
 void GPENCIL_OT_frame_clean_loose(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Clean Loose points";
+  ot->name = "Clean Loose Points";
   ot->idname = "GPENCIL_OT_frame_clean_loose";
   ot->description = "Remove loose points";
 
@@ -1580,7 +1580,9 @@ void GPENCIL_OT_stroke_lock_color(wmOperatorType *ot)
 /* ******************* Brush create presets ************************** */
 static int gp_brush_presets_create_exec(bContext *C, wmOperator *UNUSED(op))
 {
-  BKE_brush_gpencil_presets(C);
+  Main *bmain = CTX_data_main(C);
+  ToolSettings *ts = CTX_data_tool_settings(C);
+  BKE_brush_gpencil_presets(bmain, ts);
 
   /* notifiers */
   WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);

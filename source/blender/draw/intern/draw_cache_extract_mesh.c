@@ -949,10 +949,8 @@ BLI_INLINE void lines_adjacency_triangle(
   GPUIndexBufBuilder *elb = &data->elb;
   /* Iter around the triangle's edges. */
   for (int e = 0; e < 3; e++) {
-    uint tmp = v1;
-    v1 = v2, v2 = v3, v3 = tmp;
-    tmp = l1;
-    l1 = l2, l2 = l3, l3 = tmp;
+    SHIFT3(uint, v3, v2, v1);
+    SHIFT3(uint, l3, l2, l1);
 
     bool inv_indices = (v2 > v3);
     void **pval;
@@ -1185,8 +1183,7 @@ static void extract_edituv_lines_loop_mesh(const MeshRenderData *mr,
 {
   int loopend = mpoly->totloop + mpoly->loopstart - 1;
   int loop_next_idx = (loop_idx == loopend) ? mpoly->loopstart : (loop_idx + 1);
-  const bool real_edge = (mr->extract_type == MR_EXTRACT_MAPPED &&
-                          mr->e_origindex[mloop->e] != ORIGINDEX_NONE);
+  const bool real_edge = (mr->e_origindex == NULL || mr->e_origindex[mloop->e] != ORIGINDEX_NONE);
   edituv_edge_add(data,
                   (mpoly->flag & ME_HIDE) != 0 || !real_edge,
                   (mpoly->flag & ME_FACE_SEL) != 0,
@@ -1603,6 +1600,14 @@ static void *extract_uv_init(const MeshRenderData *mr, void *buf)
 
   CustomData *cd_ldata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->ldata : &mr->me->ldata;
   uint32_t uv_layers = mr->cache->cd_used.uv;
+
+  /* HACK to fix T68857 */
+  if (mr->extract_type == MR_EXTRACT_BMESH && mr->cache->cd_used.edit_uv == 1) {
+    int layer = CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
+    if (layer != -1) {
+      uv_layers |= (1 << layer);
+    }
+  }
 
   for (int i = 0; i < MAX_MTFACE; i++) {
     if (uv_layers & (1 << i)) {
@@ -4329,7 +4334,8 @@ void mesh_buffer_cache_create_requested(MeshBatchCache *cache,
   if (mbc.buf.name) { \
     extract_task_create( \
         task_pool, mr, &extract_##name, mbc.buf.name, &task_counters[counter_used++]); \
-  }
+  } \
+  ((void)0)
 
   EXTRACT(vbo, pos_nor);
   EXTRACT(vbo, lnor);

@@ -508,7 +508,7 @@ static bool view3d_camera_to_view_poll(bContext *C)
 void VIEW3D_OT_camera_to_view(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Align Camera To View";
+  ot->name = "Align Camera to View";
   ot->description = "Set camera view to active view";
   ot->idname = "VIEW3D_OT_camera_to_view";
 
@@ -1583,7 +1583,13 @@ static uint free_localcollection_bit(Main *bmain,
 static void local_collections_reset_uuid(LayerCollection *layer_collection,
                                          const unsigned short local_view_bit)
 {
-  layer_collection->local_collections_bits |= local_view_bit;
+  if (layer_collection->flag & LAYER_COLLECTION_HIDE) {
+    layer_collection->local_collections_bits &= ~local_view_bit;
+  }
+  else {
+    layer_collection->local_collections_bits |= local_view_bit;
+  }
+
   LISTBASE_FOREACH (LayerCollection *, child, &layer_collection->layer_collections) {
     local_collections_reset_uuid(child, local_view_bit);
   }

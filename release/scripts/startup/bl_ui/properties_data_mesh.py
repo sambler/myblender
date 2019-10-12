@@ -72,8 +72,8 @@ class MESH_MT_shape_key_context_menu(Menu):
         layout.separator()
         layout.operator("object.shape_key_remove", icon='X', text="Delete All Shape Keys").all = True
         layout.separator()
-        layout.operator("object.shape_key_move", icon='TRIA_UP_BAR', text="Move To Top").type = 'TOP'
-        layout.operator("object.shape_key_move", icon='TRIA_DOWN_BAR', text="Move To Bottom").type = 'BOTTOM'
+        layout.operator("object.shape_key_move", icon='TRIA_UP_BAR', text="Move to Top").type = 'TOP'
+        layout.operator("object.shape_key_move", icon='TRIA_DOWN_BAR', text="Move to Bottom").type = 'BOTTOM'
 
 
 class MESH_UL_vgroups(UIList):
@@ -476,11 +476,15 @@ class DATA_PT_remesh(MeshButtonsPanel, Panel):
         col = layout.column()
         if (mesh.remesh_mode == 'VOXEL'):
             col.prop(mesh, "remesh_voxel_size")
+            col.prop(mesh, "remesh_voxel_adaptivity")
+            col.prop(mesh, "remesh_fix_poles")
             col.prop(mesh, "remesh_smooth_normals")
+            col.prop(mesh, "remesh_preserve_volume")
             col.prop(mesh, "remesh_preserve_paint_mask")
             col.operator("object.voxel_remesh", text="Voxel Remesh")
         else:
             col.operator("object.quadriflow_remesh", text="QuadriFlow Remesh")
+
 
 class DATA_PT_customdata(MeshButtonsPanel, Panel):
     bl_label = "Geometry Data"

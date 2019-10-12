@@ -524,6 +524,7 @@ bool UI_but_is_tool(const uiBut *but);
 bool UI_but_is_utf8(const uiBut *but);
 #define UI_but_is_decorator(but) ((but)->func == ui_but_anim_decorate_cb)
 
+bool UI_block_is_empty_ex(const uiBlock *block, const bool skip_title);
 bool UI_block_is_empty(const uiBlock *block);
 bool UI_block_can_add_separator(const uiBlock *block);
 
@@ -2452,6 +2453,8 @@ void UI_widgetbase_draw_cache_end(void);
 /* Use for resetting the theme. */
 void UI_theme_init_default(void);
 void UI_style_init_default(void);
+
+void UI_interface_tag_script_reload(void);
 
 /* Special drawing for toolbar, mainly workarounds for inflexible icon sizing. */
 #define USE_UI_TOOLBAR_HACK

@@ -2777,7 +2777,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   op->flag |= OP_IS_MODAL_CURSOR_REGION;
 
   /* add a modal handler for this operator - handles loop selection */
-  WM_cursor_modal_set(CTX_wm_window(C), BC_KNIFECURSOR);
+  WM_cursor_modal_set(CTX_wm_window(C), WM_CURSOR_KNIFE);
   WM_event_add_modal_handler(C, op);
 
   knifetool_update_mval_i(kcd, event->mval);
@@ -2804,8 +2804,8 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
   static const EnumPropertyItem modal_items[] = {
       {KNF_MODAL_CANCEL, "CANCEL", 0, "Cancel", ""},
       {KNF_MODAL_CONFIRM, "CONFIRM", 0, "Confirm", ""},
-      {KNF_MODAL_MIDPOINT_ON, "SNAP_MIDPOINTS_ON", 0, "Snap To Midpoints On", ""},
-      {KNF_MODAL_MIDPOINT_OFF, "SNAP_MIDPOINTS_OFF", 0, "Snap To Midpoints Off", ""},
+      {KNF_MODAL_MIDPOINT_ON, "SNAP_MIDPOINTS_ON", 0, "Snap to Midpoints On", ""},
+      {KNF_MODAL_MIDPOINT_OFF, "SNAP_MIDPOINTS_OFF", 0, "Snap to Midpoints Off", ""},
       {KNF_MODEL_IGNORE_SNAP_ON, "IGNORE_SNAP_ON", 0, "Ignore Snapping On", ""},
       {KNF_MODEL_IGNORE_SNAP_OFF, "IGNORE_SNAP_OFF", 0, "Ignore Snapping Off", ""},
       {KNF_MODAL_ANGLE_SNAP_TOGGLE, "ANGLE_SNAP_TOGGLE", 0, "Toggle Angle Snapping", ""},

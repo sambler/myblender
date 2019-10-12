@@ -443,6 +443,8 @@ static int text_reload_exec(bContext *C, wmOperator *op)
   text_drawcache_tag_update(CTX_wm_space_text(C), 1);
   WM_event_add_notifier(C, NC_TEXT | NA_EDITED, text);
 
+  text->flags &= ~TXT_ISDIRTY;
+
   /* return to scroll position */
   st->top = orig_top;
   txt_screen_clamp(st, ar);
@@ -3482,7 +3484,7 @@ static int text_find_and_replace(bContext *C, wmOperator *op, short mode)
   }
   else {
     if (!found) {
-      BKE_reportf(op->reports, RPT_ERROR, "Text not found: %s", st->findstr);
+      BKE_reportf(op->reports, RPT_WARNING, "Text not found: %s", st->findstr);
     }
   }
 

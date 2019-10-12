@@ -47,6 +47,7 @@
 #include "BKE_object.h"
 #include "BKE_anim.h" /* for duplis */
 #include "BKE_editmesh.h"
+#include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_tracking.h"
 #include "BKE_context.h"
@@ -1717,7 +1718,7 @@ static short snapCurve(SnapData *snapdata,
 
   if (use_obedit == false) {
     /* Test BoundBox */
-    BoundBox *bb = BKE_curve_texspace_get(cu, NULL, NULL, NULL);
+    BoundBox *bb = BKE_curve_boundbox_get(ob);
     if (bb && !snap_bound_box_check_dist(
                   bb->vec[0], bb->vec[6], lpmat, snapdata->win_size, snapdata->mval, dist_px_sq)) {
       return 0;

@@ -41,20 +41,18 @@
 #include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
-#include "BKE_node.h"
 #include "BKE_screen.h"
 #include "BKE_scene.h"
+#include "BKE_sound.h"
 #include "BKE_workspace.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_screen_types.h"
 #include "ED_clip.h"
 #include "ED_node.h"
-#include "ED_render.h"
 
 #include "UI_interface.h"
 
@@ -518,6 +516,17 @@ void ED_screen_ensure_updated(wmWindowManager *wm, wmWindow *win, bScreen *scree
   }
 }
 
+/**
+ * Utility to exit and free an area-region. Screen level regions (menus/popups) need to be treated
+ * slightly differently, see #ui_region_temp_remove().
+ */
+void ED_region_remove(bContext *C, ScrArea *sa, ARegion *ar)
+{
+  ED_region_exit(C, ar);
+  BKE_area_region_free(sa->type, ar);
+  BLI_freelinkN(&sa->regionbase, ar);
+}
+
 /* *********** exit calls are for closing running stuff ******** */
 
 void ED_region_exit(bContext *C, ARegion *ar)
@@ -583,6 +592,11 @@ void ED_screen_exit(bContext *C, wmWindow *window, bScreen *screen)
 
   if (screen->animtimer) {
     WM_event_remove_timer(wm, window, screen->animtimer);
+
+    Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+    Scene *scene = WM_window_get_active_scene(prevwin);
+    Scene *scene_eval = (Scene *)DEG_get_evaluated_id(depsgraph, &scene->id);
+    BKE_sound_stop_scene(scene_eval);
   }
   screen->animtimer = NULL;
   screen->scrubbing = false;
@@ -630,14 +644,14 @@ static void screen_cursor_set(wmWindow *win, const int xy[2])
 
   if (sa) {
     if (az->type == AZONE_AREA) {
-      WM_cursor_set(win, CURSOR_EDIT);
+      WM_cursor_set(win, WM_CURSOR_EDIT);
     }
     else if (az->type == AZONE_REGION) {
       if (az->edge == AE_LEFT_TO_TOPRIGHT || az->edge == AE_RIGHT_TO_TOPLEFT) {
-        WM_cursor_set(win, CURSOR_X_MOVE);
+        WM_cursor_set(win, WM_CURSOR_X_MOVE);
       }
       else {
-        WM_cursor_set(win, CURSOR_Y_MOVE);
+        WM_cursor_set(win, WM_CURSOR_Y_MOVE);
       }
     }
   }
@@ -646,14 +660,14 @@ static void screen_cursor_set(wmWindow *win, const int xy[2])
 
     if (actedge) {
       if (screen_geom_edge_is_horizontal(actedge)) {
-        WM_cursor_set(win, CURSOR_Y_MOVE);
+        WM_cursor_set(win, WM_CURSOR_Y_MOVE);
       }
       else {
-        WM_cursor_set(win, CURSOR_X_MOVE);
+        WM_cursor_set(win, WM_CURSOR_X_MOVE);
       }
     }
     else {
-      WM_cursor_set(win, CURSOR_STD);
+      WM_cursor_set(win, WM_CURSOR_DEFAULT);
     }
   }
 }
@@ -1361,13 +1375,14 @@ ScrArea *ED_screen_temp_space_open(bContext *C,
                                    int sizex,
                                    int sizey,
                                    eSpace_Type space_type,
-                                   int display_type)
+                                   int display_type,
+                                   bool dialog)
 {
   ScrArea *sa = NULL;
 
   switch (display_type) {
     case USER_TEMP_SPACE_DISPLAY_WINDOW:
-      if (WM_window_open_temp(C, title, x, y, sizex, sizey, (int)space_type)) {
+      if (WM_window_open_temp(C, title, x, y, sizex, sizey, (int)space_type, dialog)) {
         sa = CTX_wm_area(C);
       }
       break;

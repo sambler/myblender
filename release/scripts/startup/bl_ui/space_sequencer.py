@@ -502,12 +502,9 @@ class SEQUENCER_MT_add(Menu):
         col.menu("SEQUENCER_MT_add_transitions", icon='ARROW_LEFTRIGHT')
         col.enabled = selected_sequences_len(context) >= 2
 
-        # Disable until D5166#133312 is resolved.
-        '''
         col = layout.column()
         col.operator_menu_enum("sequencer.fades_add", "type", text="Fade", icon="IPO_EASE_IN_OUT")
         col.enabled = selected_sequences_len(context) >= 1
-        '''
 
 
 class SEQUENCER_MT_add_empty(Menu):
@@ -778,13 +775,10 @@ class SEQUENCER_MT_context_menu(Menu):
                 layout.separator()
                 layout.operator("sequencer.crossfade_sounds", text="Crossfade Sounds")
 
-            # Disable until D5166#133312 is resolved.
-            '''
             if selected_sequences_count >= 1:
                 col = layout.column()
                 col.operator_menu_enum("sequencer.fades_add", "type", text="Fade")
                 layout.operator("sequencer.fades_clear", text="Clear Fade")
-            '''
 
             if strip_type in {
                     'CROSS', 'ADD', 'SUBTRACT', 'ALPHA_OVER', 'ALPHA_UNDER',
@@ -1577,10 +1571,13 @@ class SEQUENCER_PT_adjust_sound(SequencerButtonsPanel, Panel):
 
         col.prop(strip, "volume", text="Volume")
         col.prop(strip, "pitch")
+
+        col = layout.column()
         col.prop(strip, "pan")
+        col.enabled = sound is not None and sound.use_mono
 
         if sound is not None:
-
+            col = layout.column()
             if st.waveform_display_type == 'DEFAULT_WAVEFORMS':
                 col.prop(strip, "show_waveform")
             col.prop(sound, "use_mono")

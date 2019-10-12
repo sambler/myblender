@@ -56,13 +56,11 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "ED_keyframes_edit.h"
 #include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 #include "ED_transform_snap_object_context.h"
 #include "ED_types.h"
-#include "ED_util.h"
 #include "ED_view3d.h"
 #include "ED_curve.h"
 
@@ -7138,7 +7136,6 @@ static int match_texture_space_exec(bContext *C, wmOperator *UNUSED(op))
 
   copy_v3_v3(curve->loc, loc);
   copy_v3_v3(curve->size, size);
-  zero_v3(curve->rot);
 
   curve->texflag &= ~CU_AUTOSPACE;
 

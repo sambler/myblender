@@ -24,13 +24,8 @@
 #include "BLI_math.h"
 #include "BLI_bitmap.h"
 
-#include "IMB_imbuf.h"
-#include "IMB_imbuf_types.h"
-#include "IMB_colormanagement.h"
-
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "DNA_particle_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -44,7 +39,6 @@
 #include "BKE_deform.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_iterators.h"
-#include "BKE_mesh_mapping.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_modifier.h"
 #include "BKE_object_deform.h"
@@ -888,7 +882,7 @@ void PAINT_OT_weight_gradient(wmOperatorType *ot)
   prop = RNA_def_enum(ot->srna, "type", gradient_types, 0, "Type", "");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
-  WM_operator_properties_gesture_straightline(ot, CURSOR_EDIT);
+  WM_operator_properties_gesture_straightline(ot, WM_CURSOR_EDIT);
 }
 
 /** \} */

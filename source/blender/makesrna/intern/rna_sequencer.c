@@ -1462,7 +1462,7 @@ static const EnumPropertyItem blend_mode_items[] = {
     {0, "", ICON_NONE, NULL, NULL},
     {SEQ_TYPE_LIGHTEN, "LIGHTEN", 0, "Lighten", ""},
     {SEQ_TYPE_SCREEN, "SCREEN", 0, "Screen", ""},
-    {SEQ_TYPE_DODGE, "DODGE", 0, "Dodge", ""},
+    {SEQ_TYPE_DODGE, "DODGE", 0, "Color Dodge", ""},
     {SEQ_TYPE_ADD, "ADD", 0, "Add", ""},
     {0, "", ICON_NONE, NULL, NULL},
     {SEQ_TYPE_OVERLAY, "OVERLAY", 0, "Overlay", ""},
@@ -1723,7 +1723,7 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "blend_mode");
   RNA_def_property_enum_items(prop, blend_mode_items);
   RNA_def_property_ui_text(
-      prop, "Blend Mode", "Method for controlling how the strip combines with other strips");
+      prop, "Blending Mode", "Method for controlling how the strip combines with other strips");
   RNA_def_property_update(
       prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
 
@@ -1740,7 +1740,7 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.1, 3);
   RNA_def_property_float_sdna(prop, NULL, "effect_fader");
-  RNA_def_property_ui_text(prop, "Effect fader position", "Custom fade value");
+  RNA_def_property_ui_text(prop, "Effect Fader Position", "Custom fade value");
   RNA_def_property_update(
       prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
 
@@ -1758,7 +1758,7 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "speed_fader");
   RNA_def_property_ui_text(
       prop,
-      "Speed factor",
+      "Speed Factor",
       "Multiply the current speed of the sequence with this number or remap current frame "
       "to this frame");
   RNA_def_property_update(
@@ -1944,7 +1944,7 @@ static void rna_def_editor(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.0f, SEQ_CACHE_COST_MAX, 0.1f, 1);
   RNA_def_property_float_sdna(prop, NULL, "recycle_max_cost");
   RNA_def_property_ui_text(
-      prop, "Recycle Up To Cost", "Only frames with cost lower than this value will be recycled");
+      prop, "Recycle Up to Cost", "Only frames with cost lower than this value will be recycled");
 }
 
 static void rna_def_filter_video(StructRNA *srna)
@@ -2639,8 +2639,7 @@ static void rna_def_solid_color(StructRNA *srna)
   prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR_GAMMA);
   RNA_def_property_float_sdna(prop, NULL, "col");
   RNA_def_property_ui_text(prop, "Color", "Effect Strip color");
-  RNA_def_property_update(
-      prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_raw_update");
 }
 
 static void rna_def_speed_control(StructRNA *srna)
@@ -2661,14 +2660,14 @@ static void rna_def_speed_control(StructRNA *srna)
   prop = RNA_def_property(srna, "use_as_speed", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", SEQ_SPEED_INTEGRATE);
   RNA_def_property_ui_text(
-      prop, "Use as speed", "Interpret the value as speed instead of a frame number");
+      prop, "Use as Speed", "Interpret the value as speed instead of a frame number");
   RNA_def_property_update(
       prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
 
   prop = RNA_def_property(srna, "use_scale_to_length", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", SEQ_SPEED_COMPRESS_IPO_Y);
   RNA_def_property_ui_text(
-      prop, "Scale to length", "Scale values from 0.0 to 1.0 to target sequence length");
+      prop, "Scale to Length", "Scale values from 0.0 to 1.0 to target sequence length");
   RNA_def_property_update(
       prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
 }
@@ -2786,27 +2785,31 @@ static void rna_def_text(StructRNA *srna)
 static void rna_def_color_mix(StructRNA *srna)
 {
   static EnumPropertyItem blend_color_items[] = {
-      {SEQ_TYPE_ADD, "ADD", 0, "Add", ""},
-      {SEQ_TYPE_SUB, "SUBTRACT", 0, "Subtract", ""},
-      {SEQ_TYPE_MUL, "MULTIPLY", 0, "Multiply", ""},
-      {SEQ_TYPE_LIGHTEN, "LIGHTEN", 0, "Lighten", ""},
       {SEQ_TYPE_DARKEN, "DARKEN", 0, "Darken", ""},
-      {SEQ_TYPE_SCREEN, "SCREEN", 0, "Screen", ""},
-      {SEQ_TYPE_OVERLAY, "OVERLAY", 0, "Overlay", ""},
-      {SEQ_TYPE_DODGE, "DODGE", 0, "Dodge", ""},
+      {SEQ_TYPE_MUL, "MULTIPLY", 0, "Multiply", ""},
       {SEQ_TYPE_COLOR_BURN, "BURN", 0, "Color Burn", ""},
       {SEQ_TYPE_LINEAR_BURN, "LINEAR_BURN", 0, "Linear Burn", ""},
+      {0, "", ICON_NONE, NULL, NULL},
+      {SEQ_TYPE_LIGHTEN, "LIGHTEN", 0, "Lighten", ""},
+      {SEQ_TYPE_SCREEN, "SCREEN", 0, "Screen", ""},
+      {SEQ_TYPE_DODGE, "DODGE", 0, "Color Dodge", ""},
+      {SEQ_TYPE_ADD, "ADD", 0, "Add", ""},
+      {0, "", ICON_NONE, NULL, NULL},
+      {SEQ_TYPE_OVERLAY, "OVERLAY", 0, "Overlay", ""},
       {SEQ_TYPE_SOFT_LIGHT, "SOFT_LIGHT", 0, "Soft Light", ""},
       {SEQ_TYPE_HARD_LIGHT, "HARD_LIGHT", 0, "Hard Light", ""},
-      {SEQ_TYPE_PIN_LIGHT, "PIN_LIGHT", 0, "Pin Light", ""},
-      {SEQ_TYPE_LIN_LIGHT, "LINEAR_LIGHT", 0, "Linear Light", ""},
       {SEQ_TYPE_VIVID_LIGHT, "VIVID_LIGHT", 0, "Vivid Light", ""},
-      {SEQ_TYPE_BLEND_COLOR, "COLOR", 0, "Color", ""},
-      {SEQ_TYPE_HUE, "HUE", 0, "Hue", ""},
-      {SEQ_TYPE_SATURATION, "SATURATION", 0, "Saturation", ""},
-      {SEQ_TYPE_VALUE, "VALUE", 0, "Value", ""},
+      {SEQ_TYPE_LIN_LIGHT, "LINEAR_LIGHT", 0, "Linear Light", ""},
+      {SEQ_TYPE_PIN_LIGHT, "PIN_LIGHT", 0, "Pin Light", ""},
+      {0, "", ICON_NONE, NULL, NULL},
       {SEQ_TYPE_DIFFERENCE, "DIFFERENCE", 0, "Difference", ""},
       {SEQ_TYPE_EXCLUSION, "EXCLUSION", 0, "Exclusion", ""},
+      {SEQ_TYPE_SUB, "SUBTRACT", 0, "Subtract", ""},
+      {0, "", ICON_NONE, NULL, NULL},
+      {SEQ_TYPE_HUE, "HUE", 0, "Hue", ""},
+      {SEQ_TYPE_SATURATION, "SATURATION", 0, "Saturation", ""},
+      {SEQ_TYPE_BLEND_COLOR, "COLOR", 0, "Color", ""},
+      {SEQ_TYPE_VALUE, "VALUE", 0, "Value", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -2818,7 +2821,7 @@ static void rna_def_color_mix(StructRNA *srna)
   RNA_def_property_enum_sdna(prop, NULL, "blend_effect");
   RNA_def_property_enum_items(prop, blend_color_items);
   RNA_def_property_ui_text(
-      prop, "Blend Effect", "Method for controlling how the strip combines with other strips");
+      prop, "Blending Mode", "Method for controlling how the strip combines with other strips");
   RNA_def_property_update(
       prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
 
@@ -3015,7 +3018,7 @@ static void rna_def_whitebalance_modifier(BlenderRNA *brna)
   prop = RNA_def_property(srna, "white_value", PROP_FLOAT, PROP_COLOR_GAMMA);
   RNA_def_property_range(prop, 0.0, 1.0);
   RNA_def_property_float_sdna(prop, NULL, "white_value");
-  RNA_def_property_ui_text(prop, "White value", "This color defines white in the strip");
+  RNA_def_property_ui_text(prop, "White Value", "This color defines white in the strip");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceModifier_update");
 }
 

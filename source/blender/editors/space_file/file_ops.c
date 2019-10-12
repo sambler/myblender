@@ -2149,6 +2149,10 @@ void file_directory_enter_handle(bContext *C, void *UNUSED(arg_unused), void *UN
   SpaceFile *sfile = CTX_wm_space_file(C);
 
   if (sfile->params) {
+    char old_dir[sizeof(sfile->params->dir)];
+
+    BLI_strncpy(old_dir, sfile->params->dir, sizeof(old_dir));
+
     file_expand_directory(C);
 
     /* special case, user may have pasted a filepath into the directory */
@@ -2182,8 +2186,10 @@ void file_directory_enter_handle(bContext *C, void *UNUSED(arg_unused), void *UN
     BLI_cleanup_dir(BKE_main_blendfile_path(bmain), sfile->params->dir);
 
     if (filelist_is_dir(sfile->files, sfile->params->dir)) {
-      /* if directory exists, enter it immediately */
-      ED_file_change_dir(C);
+      if (!STREQ(sfile->params->dir, old_dir)) { /* Avoids flickering when nothing's changed. */
+        /* if directory exists, enter it immediately */
+        ED_file_change_dir(C);
+      }
 
       /* don't do for now because it selects entire text instead of
        * placing cursor at the end */
@@ -2312,78 +2318,6 @@ void FILE_OT_hidedot(struct wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = file_hidedot_exec;
-  ot->poll = ED_operator_file_active; /* <- important, handler is on window level */
-}
-
-ARegion *file_tools_region(ScrArea *sa)
-{
-  ARegion *ar, *arnew;
-
-  if ((ar = BKE_area_find_region_type(sa, RGN_TYPE_TOOLS)) != NULL) {
-    return ar;
-  }
-
-  /* add subdiv level; after header */
-  ar = BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
-
-  /* is error! */
-  if (ar == NULL) {
-    return NULL;
-  }
-
-  arnew = MEM_callocN(sizeof(ARegion), "tools for file");
-  BLI_insertlinkafter(&sa->regionbase, ar, arnew);
-  arnew->regiontype = RGN_TYPE_TOOLS;
-  arnew->alignment = RGN_ALIGN_LEFT;
-
-  return arnew;
-}
-
-ARegion *file_tool_props_region(ScrArea *sa)
-{
-  ARegion *ar, *arnew;
-
-  if ((ar = BKE_area_find_region_type(sa, RGN_TYPE_TOOL_PROPS)) != NULL) {
-    return ar;
-  }
-
-  /* add subdiv level; after execute region */
-  ar = BKE_area_find_region_type(sa, RGN_TYPE_EXECUTE);
-
-  /* is error! */
-  if (ar == NULL) {
-    return NULL;
-  }
-
-  arnew = MEM_callocN(sizeof(ARegion), "tool props for file");
-  BLI_insertlinkafter(&sa->regionbase, ar, arnew);
-  arnew->regiontype = RGN_TYPE_TOOL_PROPS;
-  arnew->alignment = RGN_ALIGN_RIGHT;
-
-  return arnew;
-}
-
-static int file_bookmark_toggle_exec(bContext *C, wmOperator *UNUSED(unused))
-{
-  ScrArea *sa = CTX_wm_area(C);
-  ARegion *ar = file_tools_region(sa);
-
-  if (ar) {
-    ED_region_toggle_hidden(C, ar);
-  }
-
-  return OPERATOR_FINISHED;
-}
-
-void FILE_OT_bookmark_toggle(struct wmOperatorType *ot)
-{
-  /* identifiers */
-  ot->name = "Toggle Bookmarks";
-  ot->description = "Toggle bookmarks display";
-  ot->idname = "FILE_OT_bookmark_toggle";
-
-  /* api callbacks */
-  ot->exec = file_bookmark_toggle_exec;
   ot->poll = ED_operator_file_active; /* <- important, handler is on window level */
 }
 
@@ -2570,23 +2504,29 @@ int file_delete_exec(bContext *C, wmOperator *op)
   int numfiles = filelist_files_ensure(sfile->files);
   int i;
 
+  const char *error_message = NULL;
   bool report_error = false;
   errno = 0;
   for (i = 0; i < numfiles; i++) {
     if (filelist_entry_select_index_get(sfile->files, i, CHECK_FILES)) {
       file = filelist_file(sfile->files, i);
       BLI_make_file_string(BKE_main_blendfile_path(bmain), str, sfile->params->dir, file->relpath);
-      if (BLI_delete(str, false, false) != 0 || BLI_exists(str)) {
+      if (BLI_delete_soft(str, &error_message) != 0 || BLI_exists(str)) {
         report_error = true;
       }
     }
   }
 
   if (report_error) {
-    BKE_reportf(op->reports,
-                RPT_ERROR,
-                "Could not delete file: %s",
-                errno ? strerror(errno) : "unknown error");
+    if (error_message != NULL) {
+      BKE_reportf(op->reports, RPT_ERROR, "Could not delete file or directory: %s", error_message);
+    }
+    else {
+      BKE_reportf(op->reports,
+                  RPT_ERROR,
+                  "Could not delete file or directory: %s",
+                  errno ? strerror(errno) : "unknown error");
+    }
   }
 
   ED_fileselect_clear(wm, sa, sfile);
@@ -2599,7 +2539,7 @@ void FILE_OT_delete(struct wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Delete Selected Files";
-  ot->description = "Delete selected files";
+  ot->description = "Move selected files to the trash or recycle bin";
   ot->idname = "FILE_OT_delete";
 
   /* api callbacks */

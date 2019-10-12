@@ -250,6 +250,8 @@ static int isffmpeg(const char *filename)
   if (BLI_path_extension_check_n(filename,
                                  ".swf",
                                  ".jpg",
+                                 ".jp2",
+                                 ".j2c",
                                  ".png",
                                  ".dds",
                                  ".tga",
@@ -387,7 +389,7 @@ bool IMB_isanim(const char *filename)
   return (type && type != ANIM_SEQUENCE);
 }
 
-bool IMB_isfloat(ImBuf *ibuf)
+bool IMB_isfloat(const ImBuf *ibuf)
 {
   const ImFileType *type;
 

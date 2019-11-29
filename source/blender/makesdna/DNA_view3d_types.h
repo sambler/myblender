@@ -38,7 +38,6 @@ struct wmTimer;
 #include "DNA_image_types.h"
 #include "DNA_object_types.h"
 #include "DNA_movieclip_types.h"
-#include "DNA_gpu_types.h"
 
 typedef struct RegionView3D {
 
@@ -180,6 +179,10 @@ typedef struct View3DShading {
   float curvature_ridge_factor;
   float curvature_valley_factor;
 
+  /* Render pass displayed in the viewport. Is an `eScenePassType` where one bit is set */
+  int render_pass;
+  char _pad2[4];
+
   struct IDProperty *prop;
 } View3DShading;
 
@@ -300,10 +303,6 @@ typedef struct View3D {
 
   /** Actually only used to define the opacity of the grease pencil vertex in edit mode. */
   float vertex_opacity;
-
-  /* note, 'fx_settings.dof' is currently _not_ allocated,
-   * instead set (temporarily) from camera */
-  struct GPUFXSettings fx_settings;
 
   /* XXX deprecated? */
   /** Grease-Pencil Data (annotation layers). */

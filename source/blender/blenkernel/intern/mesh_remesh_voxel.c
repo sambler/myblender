@@ -311,12 +311,12 @@ Mesh *BKE_mesh_remesh_voxel_to_mesh_nomain(Mesh *mesh,
   OpenVDBLevelSet_free(level_set);
   OpenVDBTransform_free(xform);
 #else
-  UNUSED_VARS(mesh, voxel_size, adaptivity);
+  UNUSED_VARS(mesh, voxel_size, adaptivity, isovalue);
 #endif
   return new_mesh;
 }
 
-void BKE_remesh_reproject_paint_mask(Mesh *target, Mesh *source)
+void BKE_mesh_remesh_reproject_paint_mask(Mesh *target, Mesh *source)
 {
   BVHTreeFromMesh bvhtree = {
       .nearest_callback = NULL,
@@ -445,6 +445,8 @@ struct Mesh *BKE_mesh_remesh_voxel_fix_poles(struct Mesh *mesh)
       mid_v3_v3v3(v->co, v->co, co);
     }
   }
+
+  BM_mesh_normals_update(bm);
 
   BM_mesh_elem_hflag_disable_all(bm, BM_VERT | BM_EDGE | BM_FACE, BM_ELEM_SELECT, false);
   BM_mesh_elem_hflag_enable_all(bm, BM_FACE, BM_ELEM_TAG, false);

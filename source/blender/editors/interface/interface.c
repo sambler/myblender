@@ -2624,10 +2624,10 @@ void ui_but_string_get_ex(uiBut *but,
       BLI_assert(0);
     }
 
-    if (!buf) {
+    if (buf == NULL) {
       str[0] = '\0';
     }
-    else if (buf && buf != str) {
+    else if (buf != str) {
       BLI_assert(maxlen <= buf_len + 1);
       /* string was too long, we have to truncate */
       if (UI_but_is_utf8(but)) {
@@ -2777,6 +2777,7 @@ static bool ui_number_from_string(bContext *C, const char *str, double *r_value)
 #ifdef WITH_PYTHON
   return BPY_execute_string_as_number(C, NULL, str, true, r_value);
 #else
+  UNUSED_VARS(C);
   *r_value = atof(str);
   return true;
 #endif
@@ -3391,7 +3392,7 @@ static void ui_but_build_drawstr_float(uiBut *but, double value)
   if (value == (double)FLT_MAX) {
     STR_CONCAT(but->drawstr, slen, "inf");
   }
-  else if (value == (double)-FLT_MIN) {
+  else if (value == (double)-FLT_MAX) {
     STR_CONCAT(but->drawstr, slen, "-inf");
   }
   else if (subtype == PROP_PERCENTAGE) {
